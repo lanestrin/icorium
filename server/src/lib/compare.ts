@@ -15,8 +15,13 @@ export function compareResults(A: Loaded, B: Loaded): Omit<CompareResult, 'probl
   if (A.meta.processor !== B.meta.processor)
     throw httpError(400, `These files can't be compared: ${A.meta.name} is a ${label(A.meta.processor)} result but ${B.meta.name} is a ${label(B.meta.processor)} result. Pick two results from the same function.`);
 
+  const colsA = A.meta.generatedColumns ?? [];
+  const colsB = B.meta.generatedColumns ?? [];
+  if (!colsA.length || colsA.length !== colsB.length || colsA.some((c, i) => c !== colsB[i]))
+    throw httpError(400, "These result schemas can't be compared. Regenerate the older result from its original input so both files use the same output columns.");
+
   const n = Math.max(A.rows.length, B.rows.length);
-  const columns = (A.meta.generatedColumns ?? []).map((name): CompareColumn => {
+  const columns = colsA.map((name): CompareColumn => {
     const va = Array.from({ length: n }, (_, i) => A.rows[i]?.[name] ?? '');
     const vb = Array.from({ length: n }, (_, i) => B.rows[i]?.[name] ?? '');
     const rowsDiffering = va.filter((v, i) => v !== vb[i]).length;

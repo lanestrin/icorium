@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getAdapter } from '../adapters';
-import { detectProcessor, findProblems, processors, processRows } from '../processing';
+import { detectResult, findProblems, processRows } from '../processing';
 import { compareResults } from '../lib/compare';
 import { httpError, parseCsv, toCsv } from '../lib/csv';
 import { storage } from '../lib/storage';
@@ -35,8 +35,8 @@ export async function fileRoutes(app: FastifyInstance) {
     getAdapter(headers);
     const base = { name: file.filename, text, rows: rows.length, columns: headers.length, problemRows: findProblems(headers, rows).total };
     // A previously exported result is registered as a result, so it can be compared in a later session.
-    const processor = detectProcessor(headers);
-    if (processor) return storage.save({ ...base, status: 'Processed', processor, generatedColumns: processors[processor].columns });
+    const result = detectResult(headers);
+    if (result) return storage.save({ ...base, status: 'Processed', ...result });
     return storage.save({ ...base, status: 'Ready' });
   });
 
@@ -77,7 +77,7 @@ export async function fileRoutes(app: FastifyInstance) {
         processor,
         sourceId: meta.id,
         generatedColumns: out.generated,
-        problemRows: findProblems(headers, rows).total,
+        problemRows: out.problemRows,
       },
       true,
     );
@@ -85,7 +85,14 @@ export async function fileRoutes(app: FastifyInstance) {
 
   app.get('/compare', async (req) => {
     const { a, b } = compareQuery.parse(req.query);
-    const load = (id: string) => ({ meta: storage.get(id), ...parseCsv(storage.read(id)) });
+    const load = (id: string) => {
+      const meta = storage.get(id);
+      const csv = parseCsv(storage.read(id));
+      if (meta.status !== 'Processed') return { meta, ...csv };
+      const result = detectResult(csv.headers);
+      if (!result) throw httpError(400, `${meta.name} has an unrecognized result schema. Regenerate it from its original input.`);
+      return { meta: { ...meta, ...result }, ...csv };
+    };
     const [A, B] = [load(a), load(b)];
     // Which rows in each file have problems, so the comparison can say which file an error is in.
     return { ...compareResults(A, B), problemsA: findProblems(A.headers, A.rows), problemsB: findProblems(B.headers, B.rows) };

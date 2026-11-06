@@ -29,11 +29,13 @@ The five synthetic sample CSVs in `sample-data/` (described in `sample-data/READ
 
 1. Open **Preview** on `partner_a_baseline.csv` to show its original columns.
 2. Click the row to select it, choose **Component Mass Calculation**, and click **Run Processing**. The row shows *Processing…*, then the result preview opens with the new columns highlighted.
-3. **Download** the result and open it: every original column is unchanged, and `r32_mass_kg`, `r125_mass_kg`, `r134a_mass_kg` and `mass_status` are added at the end. Invalid rows are kept and marked `Skipped (invalid input)`.
+3. **Download** the result and open it: every original column is unchanged, and `r32_mass_kg`, `r125_mass_kg`, `r134a_mass_kg`, `processing_status` and `validation_errors` are added at the end. Every result ends with `Valid`/`Invalid` status and the reasons (empty when valid). Invalid rows keep their original values with blank calculated masses; invalid classifications show `Needs review`.
 4. Repeat with `partner_a_followup.csv` using the same function. Or check both Partner A files and run once: they are processed in turn, and the two results fill **File A** and **File B** in the footer.
 5. In the footer, pick both results as **File A** and **File B** and click **Compare Selected**. The chart shows per-row kg values. The summary shows total kg per component and how many rows differ.
 6. Optional: upload a downloaded result CSV. It is recognised as a result and appears in the compare dropdowns, so results from an earlier session can be compared.
 7. Show the validation rules: every file with problem rows carries a *flagged* tag in the list, its preview lists those rows and highlights them, and the comparison shows each file's problems in its own card (A or B). Each sample has one planted problem: missing mass (A baseline), negative R-125 (A follow-up), non-numeric weight (B baseline), duplicate lot number (B follow-up) and fractions that don't sum to 1 (C baseline).
+
+Older exported results remain readable and downloadable unchanged. Compare results from the same function and output schema; if one uses the old columns, regenerate it from its original input before comparing it with a new result. No data reset or migration is required. Processing rejects source-column names that would be overwritten by generated columns.
 
 Composition totals within ±0.5 percentage points of 100% count as valid. Batch Classification uses demo-only thresholds (`DEMO_CLASS_RULES` in `server/src/processing/index.ts`): R-32 ≥ 40% is *R-32-rich*, otherwise R-134a ≥ 34% is *R-134a-rich*, otherwise *Balanced*.
 

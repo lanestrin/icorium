@@ -67,8 +67,8 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 8.1 — Shared row validation and consistent result columns.**
-Branch: `feature/8.1-shared-row-validation`.
+**Next: 8.2 — Needs Review status and filtering (after 8.1 is reviewed and merged).**
+Branch: `feature/8.2-needs-review-status`.
 
 Start here because file status and confirmation UI need reliable, consistent
 validation results. Do not start the warning dialog before its dependencies.
@@ -132,8 +132,9 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 | Row-level | Missing mass, negative percentage, nonnumeric value, missing or duplicate batch ID | Keep the row and reason; skip its calculation |
 | Allowed input | Extra columns, composition within ±0.5 percentage points of 100% | Allow; do not add a noisy warning list for rounding |
 
-- [ ] **8.1** `feature/8.1-shared-row-validation` — Use the same Composition Validation rules for all three functions, including missing and duplicate batch IDs. End every result with `processing_status` (`Valid` / `Invalid`) and `validation_errors` (empty when valid), replacing `validation_status`, `validation_message` and `mass_status`. Validation retains `composition_total_pct`; invalid mass rows have empty calculated values and invalid classification rows use `Needs review`. Update result detection and comparison so newly exported or renamed/re-uploaded results work in this same PR.
+- [x] **8.1** `feature/8.1-shared-row-validation` — Use the same Composition Validation rules for all three functions, including missing and duplicate batch IDs. End every result with `processing_status` (`Valid` / `Invalid`) and `validation_errors` (empty when valid), replacing `validation_status`, `validation_message` and `mass_status`. Validation retains `composition_total_pct`; invalid mass rows have empty calculated values and invalid classification rows use `Needs review`. Update result detection and comparison so newly exported or renamed/re-uploaded results work in this same PR.
 
+  **Result:** implemented and verified, uncommitted. See [feature scope and results](features/8.1-shared-row-validation.md); commit/PR link will follow publication.
   **Depends on:** existing processing, export and comparison baseline.
   **Done when:** unit/API tests prove consistent invalid-row decisions across
   all functions, unchanged source columns and row counts, correct final column

@@ -1,5 +1,6 @@
 import type { Problem, ProblemList, ProcessorId, Row } from '../../../shared/types';
 import { getAdapter, type Normalized } from '../adapters';
+import { httpError } from '../lib/csv';
 
 const COMPONENTS = ['r32', 'r125', 'r134a'] as const;
 type Component = (typeof COMPONENTS)[number];
@@ -47,15 +48,14 @@ function normalizeAll(headers: string[], rows: Row[]) {
   const norm = rows.map(getAdapter(headers).normalize);
   const idCounts = new Map<string, number>();
   for (const n of norm) if (n.batchId) idCounts.set(n.batchId, (idCounts.get(n.batchId) ?? 0) + 1);
-  return norm.map((n) => ({ n, ctx: { duplicate: (idCounts.get(n.batchId) ?? 0) > 1 } }));
+  return norm.map((n) => ({ n, errors: rowIssues(n, { duplicate: (idCounts.get(n.batchId) ?? 0) > 1 }) }));
 }
 
 /** Rows the Composition Validation rules flag, for any file (input or result). Lists the first `cap` in detail. */
 export function findProblems(headers: string[], rows: Row[], cap = 100): ProblemList {
   const items: Problem[] = [];
   let total = 0;
-  normalizeAll(headers, rows).forEach(({ n, ctx }, i) => {
-    const p = rowIssues(n, ctx);
+  normalizeAll(headers, rows).forEach(({ n, errors: p }, i) => {
     if (!p.length) return;
     total++;
     if (items.length < cap) items.push({ row: i + 1, batchId: n.batchId, message: p.join('; ') });
@@ -65,31 +65,37 @@ export function findProblems(headers: string[], rows: Row[], cap = 100): Problem
 
 interface Processor {
   columns: string[];
-  run(n: Normalized, ctx: RowContext): Record<string, string | number>;
+  run(n: Normalized, errors: string[]): Record<string, string | number>;
 }
+
+const STATUS_COLUMNS = ['processing_status', 'validation_errors'];
+
+// Exact historical suffixes remain readable; new exports only use the current columns.
+const LEGACY_COLUMNS: Record<ProcessorId, string[]> = {
+  validation: ['composition_total_pct', 'validation_status', 'validation_message'],
+  mass: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status'],
+  classification: ['blend_class', 'dominant_component'],
+};
 
 // To add a processing function: add an entry here and to PROCESSORS in shared/types.ts.
 export const processors: Record<ProcessorId, Processor> = {
   validation: {
-    columns: ['composition_total_pct', 'validation_status', 'validation_message'],
-    run: (n, ctx) => {
-      const p = rowIssues(n, ctx);
-      return { composition_total_pct: round(total(n), 2), validation_status: p.length ? 'ERROR' : 'OK', validation_message: p.join('; ') || 'Composition valid' };
-    },
+    columns: ['composition_total_pct', ...STATUS_COLUMNS],
+    run: (n) => ({ composition_total_pct: round(total(n), 2) }),
   },
   mass: {
-    columns: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status'],
-    run: (n) => {
-      if (issues(n).length) return { r32_mass_kg: '', r125_mass_kg: '', r134a_mass_kg: '', mass_status: 'Skipped (invalid input)' };
+    columns: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', ...STATUS_COLUMNS],
+    run: (n, errors) => {
+      if (errors.length) return { r32_mass_kg: '', r125_mass_kg: '', r134a_mass_kg: '' };
       const kg = (c: Component) => round((n.massKg! * n[c]!) / 100);
-      return { r32_mass_kg: kg('r32'), r125_mass_kg: kg('r125'), r134a_mass_kg: kg('r134a'), mass_status: 'OK' };
+      return { r32_mass_kg: kg('r32'), r125_mass_kg: kg('r125'), r134a_mass_kg: kg('r134a') };
     },
   },
   classification: {
     // Uses DEMO_CLASS_RULES; checked in order, first match wins.
-    columns: ['blend_class', 'dominant_component'],
-    run: (n) => {
-      if (issues(n).length) return { blend_class: 'Unclassifiable', dominant_component: '' };
+    columns: ['blend_class', 'dominant_component', ...STATUS_COLUMNS],
+    run: (n, errors) => {
+      if (errors.length) return { blend_class: 'Needs review', dominant_component: '' };
       const dominant = COMPONENTS.reduce((a, b) => (n[b]! > n[a]! ? b : a));
       const blend_class =
         n.r32! >= DEMO_CLASS_RULES.r32RichMin ? 'R-32-rich (demo)'
@@ -101,20 +107,33 @@ export const processors: Record<ProcessorId, Processor> = {
 };
 
 /** Which processor produced a CSV, judged by its last columns. undefined = an input file. */
+export function detectResult(headers: string[]): { processor: ProcessorId; generatedColumns: string[] } | undefined {
+  for (const processor of Object.keys(processors) as ProcessorId[]) {
+    for (const generatedColumns of [processors[processor].columns, LEGACY_COLUMNS[processor]]) {
+      if (generatedColumns.every((c, i) => headers[headers.length - generatedColumns.length + i] === c))
+        return { processor, generatedColumns: [...generatedColumns] };
+    }
+  }
+}
+
 export function detectProcessor(headers: string[]): ProcessorId | undefined {
-  return (Object.keys(processors) as ProcessorId[]).find((id) => {
-    const cols = processors[id].columns;
-    return cols.every((c, i) => headers[headers.length - cols.length + i] === c);
-  });
+  return detectResult(headers)?.processor;
 }
 
 /** Runs a processor on every row; keeps all original columns and values and appends generated ones. */
 export function processRows(headers: string[], rows: Row[], id: ProcessorId) {
   const p = processors[id];
+  const collisions = p.columns.filter((c) => headers.includes(c));
+  if (collisions.length) throw httpError(400, `Cannot process this file: source columns conflict with generated columns: ${collisions.join(', ')}. Rename the source columns before processing.`);
   const norm = normalizeAll(headers, rows);
   const out = rows.map((r, i) => {
-    const res = p.run(norm[i].n, norm[i].ctx);
+    const { n, errors } = norm[i];
+    const res = {
+      ...p.run(n, errors),
+      processing_status: errors.length ? 'Invalid' : 'Valid',
+      validation_errors: errors.join('; '),
+    };
     return { ...r, ...Object.fromEntries(Object.entries(res).map(([k, v]) => [k, String(v)])) };
   });
-  return { headers: [...headers, ...p.columns], rows: out, generated: p.columns };
+  return { headers: [...headers, ...p.columns], rows: out, generated: p.columns, problemRows: norm.filter(({ errors }) => errors.length).length };
 }
