@@ -18,16 +18,16 @@ type IdParams = { Params: { id: string } };
 export async function fileRoutes(app: FastifyInstance) {
   // Backfill missing counts and reconcile historical input statuses without rewriting CSVs.
   app.get('/files', async () =>
-    storage.list().map((m) => {
+    Promise.all((await storage.list()).map(async (m) => {
       let problemRows = m.problemRows;
       if (problemRows === undefined) {
-        const { headers, rows } = parseCsv(storage.read(m.id));
+        const { headers, rows } = parseCsv(await storage.read(m.id));
         problemRows = findProblems(headers, rows).total;
       }
       const status = m.status === 'Processed' ? 'Processed' : problemRows > 0 ? 'Needs Review' : 'Ready';
       if (m.problemRows === problemRows && m.status === status) return m;
       return storage.patch(m.id, { problemRows, status });
-    }),
+    })),
   );
 
   // Upload: parse + schema check always run here, regardless of processing function.
@@ -47,8 +47,8 @@ export async function fileRoutes(app: FastifyInstance) {
 
   app.get<IdParams>('/files/:id/rows', async (req) => {
     const { offset, limit } = pageQuery.parse(req.query);
-    const meta = storage.get(req.params.id);
-    const { headers, rows } = parseCsv(storage.read(meta.id));
+    const meta = await storage.get(req.params.id);
+    const { headers, rows } = parseCsv(await storage.read(meta.id));
     return {
       headers,
       rows: rows.slice(offset, offset + limit),
@@ -60,16 +60,16 @@ export async function fileRoutes(app: FastifyInstance) {
   });
 
   app.get<IdParams>('/files/:id/download', async (req, reply) => {
-    const meta = storage.get(req.params.id);
+    const meta = await storage.get(req.params.id);
     reply.header('content-disposition', `attachment; filename="${meta.name}"`).type('text/csv');
     return storage.read(meta.id);
   });
 
   app.post('/process', async (req) => {
     const { fileId, processor } = processBody.parse(req.body);
-    const meta = storage.get(fileId);
+    const meta = await storage.get(fileId);
     if (meta.status === 'Processed') throw httpError(400, 'Select an input file, not a result file');
-    const { headers, rows } = parseCsv(storage.read(fileId));
+    const { headers, rows } = parseCsv(await storage.read(fileId));
     const out = processRows(headers, rows, processor);
     const base = meta.name.replace(/\.csv$/i, '');
     return storage.save(
@@ -90,15 +90,15 @@ export async function fileRoutes(app: FastifyInstance) {
 
   app.get('/compare', async (req) => {
     const { a, b } = compareQuery.parse(req.query);
-    const load = (id: string) => {
-      const meta = storage.get(id);
-      const csv = parseCsv(storage.read(id));
+    const load = async (id: string) => {
+      const meta = await storage.get(id);
+      const csv = parseCsv(await storage.read(id));
       if (meta.status !== 'Processed') return { meta, ...csv };
       const result = detectResult(csv.headers);
       if (!result) throw httpError(400, `${meta.name} has an unrecognized result schema. Regenerate it from its original input.`);
       return { meta: { ...meta, ...result }, ...csv };
     };
-    const [A, B] = [load(a), load(b)];
+    const [A, B] = await Promise.all([load(a), load(b)]);
     // Which rows in each file have problems, so the comparison can say which file an error is in.
     return { ...compareResults(A, B), problemsA: findProblems(A.headers, A.rows), problemsB: findProblems(B.headers, B.rows) };
   });

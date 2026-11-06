@@ -178,7 +178,7 @@ describe('problem rows', () => {
   it('fills in the count for files saved before it existed', async () => {
     const { storage } = await import('./lib/storage');
     const id = (await fileNamed('partner_b_followup.csv')).id;
-    storage.patch(id, { problemRows: undefined });
+    await storage.patch(id, { problemRows: undefined });
     expect((await fileNamed('partner_b_followup.csv')).problemRows).toBe(2);
   });
 });
@@ -289,7 +289,7 @@ describe('current result contract', () => {
     const text = (await app.inject(`/api/files/${result.id}/download`)).body;
     const imported = (await upload('current_mass_stale_metadata.csv', text)).json<FileMeta>();
     const { storage } = await import('./lib/storage');
-    storage.patch(imported.id, { generatedColumns: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status'] });
+    await storage.patch(imported.id, { generatedColumns: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status'] });
     const response = await compare(imported.id, result.id);
     expect(response.statusCode).toBe(200);
     expect(response.json().columns.map((c: { name: string }) => c.name)).toEqual(processors.mass.columns);
@@ -338,10 +338,10 @@ describe('input review status', () => {
     const invalid = (await upload('old_invalid_status.csv', clean.replace(',100,', ',,'))).json<FileMeta>();
     const missing = (await upload('missing_count_status.csv', clean.replace(',100,', ',,'))).json<FileMeta>();
     const result = await processSample('partner_a_baseline.csv', 'mass');
-    storage.patch(cleanMeta.id, { status: 'Needs Review' });
-    storage.patch(invalid.id, { status: 'Ready' });
-    storage.patch(missing.id, { status: 'Ready', problemRows: undefined });
-    storage.patch(result.id, { problemRows: undefined });
+    await storage.patch(cleanMeta.id, { status: 'Needs Review' });
+    await storage.patch(invalid.id, { status: 'Ready' });
+    await storage.patch(missing.id, { status: 'Ready', problemRows: undefined });
+    await storage.patch(result.id, { problemRows: undefined });
     const read = vi.spyOn(storage, 'read');
     const patch = vi.spyOn(storage, 'patch');
     try {
@@ -395,12 +395,12 @@ describe('legacy result compatibility', () => {
 
   it('loads persisted legacy metadata after restarting without rewriting CSVs', async () => {
     const { storage } = await import('./lib/storage');
-    const saved = (['validation', 'mass', 'classification'] as const).map((id) => {
+    const saved = await Promise.all((['validation', 'mass', 'classification'] as const).map(async (id) => {
       const text = legacyCsv(id);
-      const meta = storage.save({ name: `persisted_${id}.csv`, text, rows: 1, columns: originalHeaders.length + legacy[id].columns.length,
+      const meta = await storage.save({ name: `persisted_${id}.csv`, text, rows: 1, columns: originalHeaders.length + legacy[id].columns.length,
         status: 'Processed', processor: id, generatedColumns: legacy[id].columns, problemRows: 0 });
       return { meta, text };
-    });
+    }));
     vi.resetModules();
     const { buildApp: restart } = await import('./app');
     const restarted = await restart(false);

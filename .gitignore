@@ -4,3 +4,4 @@ server/data
 test-results
 playwright-report
 blueprint/context/landing-*
+.vercel

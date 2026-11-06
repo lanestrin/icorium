@@ -16,7 +16,7 @@ export async function buildApp(logger: FastifyServerOptions['logger'] = { level:
     return reply.code(code).send({ message: err.message });
   });
 
-  seedSamples();
+  await seedSamples();
   await app.register(fileRoutes, { prefix: '/api' });
   return app;
 }
