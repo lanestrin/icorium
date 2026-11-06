@@ -1,5 +1,7 @@
 # Reclaim Studio
 
+[![CI](https://github.com/lanestrin/icorium/actions/workflows/ci.yml/badge.svg)](https://github.com/lanestrin/icorium/actions/workflows/ci.yml)
+
 Upload partner refrigerant CSVs, run one of three processing functions on every row, export results (original columns + generated columns), and compare two result files.
 
 Interview exercise. All data is fictional and the classification rules are demo-only.

@@ -62,6 +62,7 @@ npm run test:e2e  # browser tests only; add --ui to watch them, -g "<name>" for 
 
 - Browser tests start their own API (:3101) and UI (:5199) with a throwaway data folder, so they never touch the dev server's data. On failure, `npx playwright show-report` shows a screenshot and a step-by-step trace.
 - First time on a new machine: `npx playwright install chromium`.
+- CI (`.github/workflows/ci.yml`) runs `npm run verify` on every push to `main` and every PR. A failed run uploads the Playwright report as an artifact.
 
 - Reset the demo data: stop the servers, delete `server/data/`, start again.
 - On Windows, stopping a background `npm run dev` can leave the tsx server holding port 3001. Check the port and stop only that process.
