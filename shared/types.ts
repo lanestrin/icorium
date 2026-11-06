@@ -5,7 +5,7 @@ export const PROCESSORS = [
 ] as const;
 
 export type ProcessorId = (typeof PROCESSORS)[number]['id'];
-export type FileStatus = 'Ready' | 'Processed';
+export type FileStatus = 'Ready' | 'Needs Review' | 'Processed';
 
 export interface FileMeta {
   id: string;
@@ -19,6 +19,9 @@ export interface FileMeta {
   generatedColumns?: string[];
   problemRows?: number; // rows with missing, invalid or duplicate values
 }
+
+/** Both clean and invalid input files can be processed; result files cannot. */
+export const isInputFile = (file: FileMeta) => file.status === 'Ready' || file.status === 'Needs Review';
 
 /** A row the Composition Validation rules flag. row is 1-based. */
 export interface Problem {
