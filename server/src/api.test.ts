@@ -174,6 +174,37 @@ describe('processing', () => {
   });
 });
 
+describe('problem rows', () => {
+  it('counts problem rows for every file in the list', async () => {
+    const counts = Object.fromEntries((await listFiles()).filter((f) => f.name.startsWith('partner_')).map((f) => [f.name, f.problemRows]));
+    expect(counts).toEqual({
+      'partner_a_baseline.csv': 1, 'partner_a_followup.csv': 1, 'partner_b_baseline.csv': 1, 'partner_b_followup.csv': 2, 'partner_c_baseline.csv': 1,
+    });
+  });
+
+  it('marks a result file with its problem rows, whatever function made it', async () => {
+    const result = await processSample('partner_a_followup.csv', 'classification');
+    expect(result.problemRows).toBe(1);
+    const { problems } = await rowsOf(result.id);
+    expect(problems).toEqual({ total: 1, items: [{ row: 13, batchId: expect.any(String), message: 'R-125 out of range' }] });
+  });
+
+  it('says which file of a comparison each problem row is in', async () => {
+    const a = await processSample('partner_a_baseline.csv', 'validation');
+    const c = await processSample('partner_c_baseline.csv', 'validation');
+    const { problemsA, problemsB } = (await compare(a.id, c.id)).json();
+    expect(problemsA.items).toEqual([expect.objectContaining({ row: 8, message: 'mass missing' })]);
+    expect(problemsB.items).toEqual([expect.objectContaining({ row: 18, message: expect.stringContaining('composition totals') })]);
+  });
+
+  it('fills in the count for files saved before it existed', async () => {
+    const { storage } = await import('./lib/storage');
+    const id = (await fileNamed('partner_b_followup.csv')).id;
+    storage.patch(id, { problemRows: undefined });
+    expect((await fileNamed('partner_b_followup.csv')).problemRows).toBe(2);
+  });
+});
+
 describe('comparing results', () => {
   it('compares two results from the same function', async () => {
     const a = await processSample('partner_a_baseline.csv', 'mass');

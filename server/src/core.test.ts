@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from './lib/csv';
 import { getAdapter } from './adapters';
-import { detectProcessor, issues, processRows } from './processing';
+import { detectProcessor, findProblems, issues, processRows } from './processing';
 import { compareResults } from './lib/compare';
 import type { FileMeta, Row } from '../../shared/types';
 
@@ -65,6 +65,32 @@ describe('validation rules', () => {
     const out = processRows(headers, rows, 'validation').rows;
     expect(out.map((r) => r.validation_status)).toEqual(['ERROR', 'ERROR', 'OK']);
     expect(out[0].validation_message).toMatch(/duplicate batch ID A-1/);
+  });
+});
+
+describe('problem rows', () => {
+  it('lists each flagged row with its number, batch ID and reason', () => {
+    const { headers, rows } = parseCsv(`${A_HEADERS}\nA-1,d,100,50,30,20\nA-2,d,,50,30,20\nA-1,d,100,50,30,20\n,d,100,50,30,20`);
+    expect(findProblems(headers, rows)).toEqual({
+      total: 4,
+      items: [
+        { row: 1, batchId: 'A-1', message: 'duplicate batch ID A-1' },
+        { row: 2, batchId: 'A-2', message: 'mass missing' },
+        { row: 3, batchId: 'A-1', message: 'duplicate batch ID A-1' },
+        { row: 4, batchId: '', message: 'batch ID missing' },
+      ],
+    });
+  });
+  it('finds the same problems in a result file as in its input', () => {
+    const { headers, rows } = parseCsv(A_CSV);
+    const out = processRows(headers, rows, 'mass');
+    expect(findProblems(out.headers, out.rows)).toEqual(findProblems(headers, rows));
+  });
+  it('counts every problem row but details only the first ones', () => {
+    const { headers, rows } = parseCsv(`${A_HEADERS}\n${Array.from({ length: 5 }, (_, i) => `A-${i},d,,50,30,20`).join('\n')}`);
+    const list = findProblems(headers, rows, 2);
+    expect(list.total).toBe(5);
+    expect(list.items.map((p) => p.row)).toEqual([1, 2]);
   });
 });
 

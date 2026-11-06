@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { FileMeta } from '../../../shared/types';
 import { httpError, parseCsv } from './csv';
+import { findProblems } from '../processing';
 
 // Local-file storage. Swap this module to change persistence; nothing else touches the disk.
 // RECLAIM_DATA_DIR lets tests use their own throwaway folder.
@@ -27,6 +28,13 @@ export const storage = {
 
   read: (id: string) => fs.readFileSync(filePath(storage.get(id).id), 'utf8'),
 
+  /** Updates stored metadata fields of one file. */
+  patch(id: string, fields: Partial<Omit<FileMeta, 'id'>>) {
+    const meta = Object.assign(storage.get(id), fields);
+    persist();
+    return meta;
+  },
+
   /** replaceByName: re-running the same processing overwrites the previous result. */
   save(input: Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string }, replaceByName = false) {
     const { text, ...rest } = input;
@@ -48,6 +56,6 @@ export function seedSamples() {
   for (const name of fs.readdirSync(SAMPLES).filter((f) => f.endsWith('.csv')).sort()) {
     const text = fs.readFileSync(path.join(SAMPLES, name), 'utf8');
     const { headers, rows } = parseCsv(text);
-    storage.save({ name, text, rows: rows.length, columns: headers.length, status: 'Ready' });
+    storage.save({ name, text, rows: rows.length, columns: headers.length, status: 'Ready', problemRows: findProblems(headers, rows).total });
   }
 }

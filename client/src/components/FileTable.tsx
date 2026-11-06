@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Download, Eye, Layers, LoaderCircle, type LucideIcon } from 'lucide-react';
+import { Check, CircleAlert, Download, Eye, Layers, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react';
 import type { FileMeta } from '../../../shared/types';
 import { api } from '../api';
 
@@ -56,7 +56,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
       tabIndex={0}
       className="overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:max-h-[calc(100vh-20rem)]"
     >
-      <table className="w-full min-w-[860px] text-sm">
+      <table className="w-full min-w-[920px] text-sm">
         <thead>
           <tr className="text-left text-slate-700 [&>th]:sticky [&>th]:top-0 [&>th]:z-[1] [&>th]:bg-slate-50 [&>th]:py-3 [&>th]:font-semibold">
             <th className="w-14 rounded-l-xl pl-6">
@@ -71,9 +71,9 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
               />
             </th>
             <th className="pl-1">File Name</th>
-            <th className="text-center">Rows</th>
-            <th className="text-center">Columns</th>
-            <th className="pl-6">Uploaded</th>
+            <th className="px-3 text-center">Rows</th>
+            <th className="px-3 text-center">Columns</th>
+            <th className="pl-4 pr-3">Uploaded</th>
             <th>Status</th>
             <th className="rounded-r-xl">Actions</th>
           </tr>
@@ -102,10 +102,25 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   />
                 </td>
                 <td className="py-2.5 pl-1 pr-4 font-semibold">{f.name}</td>
-                <td className="text-center">{f.rows}</td>
-                <td className="text-center">{f.columns}</td>
-                <td className="whitespace-nowrap pl-6">{fmtDate(f.uploadedAt)}</td>
-                <td><StatusBadge status={status} /></td>
+                <td className="px-3 text-center">{f.rows}</td>
+                <td className="px-3 text-center">{f.columns}</td>
+                <td className="whitespace-nowrap pl-4 pr-3">{fmtDate(f.uploadedAt)}</td>
+                <td>
+                  <div className="flex items-center gap-2 whitespace-nowrap pr-3">
+                    <StatusBadge status={status} />
+                    {!!f.problemRows && (
+                      <span
+                        // relative: keeps the sr-only text inside the table's scroll box, not the page's
+                        className="relative inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800"
+                        title="Rows with missing, invalid or duplicate values. Open Preview to see which."
+                      >
+                        <TriangleAlert className="h-3.5 w-3.5" />
+                        {/* Reads "1 flagged"; screen readers hear "1 row flagged" */}
+                        {f.problemRows}<span className="sr-only"> {f.problemRows === 1 ? 'row' : 'rows'}</span> flagged
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td>
                   <div className="flex items-center gap-2 pr-2">
                     <button

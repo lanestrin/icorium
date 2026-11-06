@@ -91,6 +91,35 @@ test('compares two result CSVs loaded from disk, even after renaming them', asyn
   await expect(dialog.locator('.recharts-bar-rectangle').first()).toBeVisible();
 });
 
+test('shows which file has problem rows: in the list, the preview and the comparison', async ({ page }) => {
+  await processViaApi(page, 'partner_a_baseline.csv', 'validation');
+  await processViaApi(page, 'partner_c_baseline.csv', 'validation');
+  await page.reload();
+
+  // List: a tag on each file with problems
+  await expect(fileRow(page, 'result_partner_a_baseline_validation.csv')).toContainText('1 row flagged');
+  await expect(fileRow(page, 'partner_b_followup.csv')).toContainText('2 rows flagged');
+
+  // Preview: which rows, and why
+  await fileRow(page, 'result_partner_a_baseline_validation.csv').getByRole('button', { name: 'Preview' }).click();
+  const preview = page.getByRole('dialog', { name: 'result_partner_a_baseline_validation.csv' });
+  await expect(preview.getByRole('region', { name: 'Rows with problems' })).toContainText(/Row 8 · A-\d+: mass missing/);
+  await expect(preview.getByRole('row').nth(8)).toHaveAttribute('title', 'mass missing'); // row 8 is marked in the table
+  await page.keyboard.press('Escape');
+
+  // Comparison: each file's problems, labelled A or B
+  await fileA(page).selectOption({ label: 'partner_a_baseline · Validation' });
+  await fileB(page).selectOption({ label: 'partner_c_baseline · Validation' });
+  await page.getByRole('button', { name: 'Compare Selected' }).click();
+  const compare = page.getByRole('dialog', { name: /vs/ });
+  const a = compare.getByRole('region', { name: 'Problems in A · result_partner_a_baseline_validation.csv' });
+  const b = compare.getByRole('region', { name: 'Problems in B · result_partner_c_baseline_validation.csv' });
+  await expect(a).toContainText('1 row flagged');
+  await expect(a).toContainText(/Row 8 · .*mass missing/);
+  await expect(b).toContainText(/Row 18 · .*composition totals 78\.37%/);
+  await expect(a).not.toContainText('composition totals');
+});
+
 test('shows a clear error for a CSV it cannot read', async ({ page }) => {
   await uploadViaChooser(page, [{ name: 'not_a_partner.csv', text: 'foo,bar\n1,2\n' }]);
   await expect(page.getByRole('alert')).toContainText('not_a_partner.csv: Unrecognized CSV schema');

@@ -1,8 +1,47 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { Download, X } from 'lucide-react';
+import { CircleCheck, Download, TriangleAlert, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { PROCESSORS, type CompareColumn, type CompareResult, type FileMeta, type FileRows } from '../../../shared/types';
+import { PROCESSORS, type CompareColumn, type CompareResult, type FileMeta, type FileRows, type ProblemList } from '../../../shared/types';
 import { api } from '../api';
+
+const rowsWord = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'row' : 'rows'}`;
+
+/** "Row 8 · A-008: mass missing", one per problem row. */
+function ProblemItems({ list }: { list: ProblemList }) {
+  return (
+    <ul className="max-h-32 space-y-1 overflow-auto text-sm">
+      {list.items.map((p) => (
+        <li key={p.row}>
+          <span className="font-semibold">Row {p.row}</span>
+          {p.batchId && <span> · {p.batchId}</span>}: {p.message}
+        </li>
+      ))}
+      {list.total > list.items.length && <li className="opacity-75">…and {rowsWord(list.total - list.items.length)} more</li>}
+    </ul>
+  );
+}
+
+/** One file's problem rows in the comparison, marked with that file's chart colour. */
+function ProblemCard({ side, name, list, dot }: { side: 'A' | 'B'; name: string; list: ProblemList; dot: string }) {
+  return (
+    <section aria-label={`Problems in ${side} · ${name}`} className="min-w-0 rounded-xl border border-slate-200 px-4 py-3">
+      <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden />
+        <span className="truncate">{side} · {name}</span>
+        {list.total ? (
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs text-amber-800">
+            <TriangleAlert className="h-3.5 w-3.5" /> {rowsWord(list.total)} flagged
+          </span>
+        ) : (
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs text-green-700">
+            <CircleCheck className="h-3.5 w-3.5" /> No problems
+          </span>
+        )}
+      </h3>
+      {list.total > 0 && <div className="text-amber-900"><ProblemItems list={list} /></div>}
+    </section>
+  );
+}
 
 const processorLabel = (id?: string) => PROCESSORS.find((p) => p.id === id)?.label ?? '';
 const fmt = (v?: number | null) => (v == null ? '—' : v.toLocaleString(undefined, { maximumFractionDigits: 3 }));
@@ -70,6 +109,7 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
   useEffect(() => { api.rows(file.id, 0, PAGE).then(setData).catch((e) => setError(e.message)); }, [file.id]);
   const gen = new Set(data?.generatedColumns);
   const remaining = data ? data.totalRows - data.rows.length : 0;
+  const flagged = new Map(data?.problems.items.map((p) => [p.row, p.message])); // row number -> problem
 
   async function showMore() {
     if (!data) return;
@@ -99,10 +139,19 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
     >
       {error && <p className="pt-6 text-red-600">{error}</p>}
       {!data && !error && <p className="pt-6 text-slate-500">Loading…</p>}
+      {data && data.problems.total > 0 && (
+        <section aria-label="Rows with problems" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+          <h3 className="mb-1 flex items-center gap-2 font-semibold">
+            <TriangleAlert className="h-4 w-4" /> {rowsWord(data.problems.total)} with problems in this file
+          </h3>
+          <ProblemItems list={data.problems} />
+        </section>
+      )}
       {data && (
         <table className="w-full text-sm">
           <thead className="sticky top-0">
             <tr>
+              <th className="bg-white px-3 py-2 pt-6 text-right font-semibold text-slate-400">#</th>
               {data.headers.map((h) => (
                 <th key={h} className={`whitespace-nowrap px-3 py-2 pt-6 text-left font-semibold ${gen.has(h) ? 'bg-blue-50 text-blue-800' : 'bg-white'}`}>{h}</th>
               ))}
@@ -110,7 +159,15 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
           </thead>
           <tbody>
             {data.rows.map((r, i) => (
-              <tr key={i} className="border-t border-slate-100">
+              <tr
+                key={i}
+                title={flagged.get(i + 1)}
+                className={`border-t border-slate-100 ${flagged.has(i + 1) ? 'bg-amber-50 [&>td]:bg-transparent' : ''}`}
+              >
+                <td className={`px-3 py-1.5 text-right tabular-nums ${flagged.has(i + 1) ? 'font-semibold text-amber-800' : 'text-slate-400'}`}>
+                  {flagged.has(i + 1) && <TriangleAlert className="mr-1 inline h-3.5 w-3.5" aria-label="Problem row" />}
+                  {i + 1}
+                </td>
                 {data.headers.map((h) => (
                   <td key={h} className={`whitespace-nowrap px-3 py-1.5 ${gen.has(h) ? 'bg-blue-50/50' : ''} ${r[h] === 'ERROR' ? 'font-semibold text-red-600' : ''}`}>{r[h]}</td>
                 ))}
@@ -140,6 +197,11 @@ export function CompareModal({ result, onClose }: { result: CompareResult; onClo
 
   return (
     <Modal title={`${result.fileA}  vs  ${result.fileB}`} subtitle={`${processorLabel(result.processor)} · ${result.columns.length} generated columns compared`} onClose={onClose}>
+      <div className="grid gap-3 pt-5 md:grid-cols-2">
+        <ProblemCard side="A" name={result.fileA} list={result.problemsA} dot="bg-blue-600" />
+        <ProblemCard side="B" name={result.fileB} list={result.problemsB} dot="bg-amber-500" />
+      </div>
+
       <div className="flex flex-wrap gap-2 pt-5">
         {result.columns.map((c, k) => (
           <button key={c.name} onClick={() => setI(k)} aria-pressed={k === i} className={`rounded-full px-4 py-1.5 text-sm font-medium ${k === i ? 'bg-blue-600 text-white' : 'bg-slate-100 hover:bg-slate-200'}`}>

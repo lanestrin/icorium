@@ -1,4 +1,4 @@
-import type { ProcessorId, Row } from '../../../shared/types';
+import type { Problem, ProblemList, ProcessorId, Row } from '../../../shared/types';
 import { getAdapter, type Normalized } from '../adapters';
 
 const COMPONENTS = ['r32', 'r125', 'r134a'] as const;
@@ -34,6 +34,35 @@ interface RowContext {
   duplicate: boolean; // another row in the file has the same batch ID
 }
 
+/** Every problem with one row, including batch-ID checks that need the whole file. */
+function rowIssues(n: Normalized, ctx: RowContext): string[] {
+  const p = issues(n);
+  if (!n.batchId) p.unshift('batch ID missing');
+  else if (ctx.duplicate) p.unshift(`duplicate batch ID ${n.batchId}`);
+  return p;
+}
+
+/** Normalizes every row and works out which batch IDs appear more than once. */
+function normalizeAll(headers: string[], rows: Row[]) {
+  const norm = rows.map(getAdapter(headers).normalize);
+  const idCounts = new Map<string, number>();
+  for (const n of norm) if (n.batchId) idCounts.set(n.batchId, (idCounts.get(n.batchId) ?? 0) + 1);
+  return norm.map((n) => ({ n, ctx: { duplicate: (idCounts.get(n.batchId) ?? 0) > 1 } }));
+}
+
+/** Rows the Composition Validation rules flag, for any file (input or result). Lists the first `cap` in detail. */
+export function findProblems(headers: string[], rows: Row[], cap = 100): ProblemList {
+  const items: Problem[] = [];
+  let total = 0;
+  normalizeAll(headers, rows).forEach(({ n, ctx }, i) => {
+    const p = rowIssues(n, ctx);
+    if (!p.length) return;
+    total++;
+    if (items.length < cap) items.push({ row: i + 1, batchId: n.batchId, message: p.join('; ') });
+  });
+  return { total, items };
+}
+
 interface Processor {
   columns: string[];
   run(n: Normalized, ctx: RowContext): Record<string, string | number>;
@@ -44,9 +73,7 @@ export const processors: Record<ProcessorId, Processor> = {
   validation: {
     columns: ['composition_total_pct', 'validation_status', 'validation_message'],
     run: (n, ctx) => {
-      const p = issues(n);
-      if (!n.batchId) p.unshift('batch ID missing');
-      else if (ctx.duplicate) p.unshift(`duplicate batch ID ${n.batchId}`);
+      const p = rowIssues(n, ctx);
       return { composition_total_pct: round(total(n), 2), validation_status: p.length ? 'ERROR' : 'OK', validation_message: p.join('; ') || 'Composition valid' };
     },
   },
@@ -83,14 +110,10 @@ export function detectProcessor(headers: string[]): ProcessorId | undefined {
 
 /** Runs a processor on every row; keeps all original columns and values and appends generated ones. */
 export function processRows(headers: string[], rows: Row[], id: ProcessorId) {
-  const adapter = getAdapter(headers);
   const p = processors[id];
-  const norm = rows.map(adapter.normalize);
-  const idCounts = new Map<string, number>();
-  for (const n of norm) if (n.batchId) idCounts.set(n.batchId, (idCounts.get(n.batchId) ?? 0) + 1);
-
+  const norm = normalizeAll(headers, rows);
   const out = rows.map((r, i) => {
-    const res = p.run(norm[i], { duplicate: (idCounts.get(norm[i].batchId) ?? 0) > 1 });
+    const res = p.run(norm[i].n, norm[i].ctx);
     return { ...r, ...Object.fromEntries(Object.entries(res).map(([k, v]) => [k, String(v)])) };
   });
   return { headers: [...headers, ...p.columns], rows: out, generated: p.columns };

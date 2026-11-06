@@ -17,6 +17,20 @@ export interface FileMeta {
   processor?: ProcessorId; // result files only
   sourceId?: string;
   generatedColumns?: string[];
+  problemRows?: number; // rows with missing, invalid or duplicate values
+}
+
+/** A row the Composition Validation rules flag. row is 1-based. */
+export interface Problem {
+  row: number;
+  batchId: string;
+  message: string;
+}
+
+/** Problem rows in one file: the total, and the first ones in detail. */
+export interface ProblemList {
+  total: number;
+  items: Problem[];
 }
 
 export type Row = Record<string, string>;
@@ -28,6 +42,7 @@ export interface FileRows {
   offset: number; // index of rows[0] in the file
   totalRows: number;
   generatedColumns: string[];
+  problems: ProblemList; // for the whole file, not just this page
 }
 
 export interface CompareColumn {
@@ -49,4 +64,6 @@ export interface CompareResult {
   fileA: string;
   fileB: string;
   columns: CompareColumn[];
+  problemsA: ProblemList;
+  problemsB: ProblemList;
 }

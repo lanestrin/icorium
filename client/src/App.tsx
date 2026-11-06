@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, Check, CircleAlert, CircleHelp, Ellipsis, Filter, Search, X } from 'lucide-react';
+import { Calendar, Check, CircleAlert, Filter, Search, X } from 'lucide-react';
 import type { CompareResult, FileMeta, ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
@@ -104,12 +104,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen overflow-x-clip pb-32 text-slate-900">
-      <div className="absolute right-6 top-4 flex gap-4 text-slate-600">
-        <button aria-label="Help" title="Upload a CSV, check it, choose a function and Run Processing. Compare two result files in the footer."><CircleHelp className="h-6 w-6" /></button>
-        <button aria-label="More" title="More"><Ellipsis className="h-6 w-6" /></button>
-      </div>
-
-      <div className="flex flex-col gap-6 p-4 pt-16 sm:p-6 sm:pt-16 lg:flex-row">
+      <div className="flex flex-col gap-6 p-4 pt-8 sm:p-6 sm:pt-10 lg:flex-row">
         <Sidebar
           processor={processor}
           setProcessor={setProcessor}

@@ -9,7 +9,7 @@ const present = (xs: (number | null)[]) => xs.filter((x): x is number => x !== n
 const sum = (xs: (number | null)[]) => present(xs).reduce((s, x) => s + x, 0);
 const mean = (xs: (number | null)[]) => (present(xs).length ? sum(xs) / present(xs).length : undefined);
 
-export function compareResults(A: Loaded, B: Loaded): CompareResult {
+export function compareResults(A: Loaded, B: Loaded): Omit<CompareResult, 'problemsA' | 'problemsB'> {
   for (const f of [A, B])
     if (f.meta.status !== 'Processed') throw httpError(400, `${f.meta.name} is an input file. Compare two files produced by Run Processing.`);
   if (A.meta.processor !== B.meta.processor)
