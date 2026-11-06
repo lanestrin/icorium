@@ -32,8 +32,9 @@ Status: <what is done, awaiting a decision, or blocked>
 Next: <one exact command, reply or action>
 ```
 
-- **Name the exact state, never a later one.** In order: changed (uncommitted), verified (`npm run verify` ran and passed), checked in the browser, committed, pushed. Say plainly when verify was not run or the UI was not looked at.
-- **One next action**, the single best step. Mention an alternative above the two lines only if it is a real option.
+- **Name the exact state, never a later one.** In order: changed (uncommitted), verified (`npm run verify` ran and passed), committed, pushed, CI passed. Say plainly when verify was not run.
+- **One next action**, the single best step: real work or a real decision. Mention an alternative above the two lines only if it is a real option.
+- **Never ask the person to check by hand what the tests cover** (demo steps, the acceptance checklist, any flow in `e2e/`). Run `npm run verify` instead. If a flow has no test yet, add one. Ask them to look only at what a test can't judge: visual match with `blueprint/reference-ui.png`, taste, wording.
 - **Blocked:** `Status: Blocked - <reason>.` and `Next:` names the decision or action needed.
 - **Ask only for a real decision** (scope, design choice, a risk), with 2–4 options and the recommended one first.
 - No vague endings: never "let me know", "shall I continue?" or "anything else?".
@@ -42,9 +43,9 @@ Examples:
 
 | After | Status | Next |
 | --- | --- | --- |
-| UI change | Changed (uncommitted); type-check passed; not checked in the browser. | Refresh http://localhost:5173 and compare with `blueprint/reference-ui.png`. |
-| Feature done | Changed (uncommitted); verify passed. | Reply "commit" to commit and push. |
-| Commit | Committed and pushed to `origin/main`. | <the next item from the acceptance checks> |
+| Visual change | Changed (uncommitted); verify passed; layout not compared with the reference. | Refresh http://localhost:5173 and compare the <area> with `blueprint/reference-ui.png`. |
+| Feature done | Changed (uncommitted); verify passed, incl. new browser test for <feature>. | Reply "commit" to commit and push. |
+| Commit | Committed and pushed; CI passed. | <the next open item in `blueprint/build-plan.md`, or a decision> |
 
 ## Extending
 
