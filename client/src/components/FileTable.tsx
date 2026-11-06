@@ -1,5 +1,5 @@
 import { Check, CircleAlert, Download, Eye, Layers, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react';
-import type { FileMeta } from '../../../shared/types';
+import { isInputFile, type FileMeta } from '../../../shared/types';
 import { api } from '../api';
 
 export type Status = FileMeta['status'] | 'Processing' | 'Error';
@@ -10,6 +10,7 @@ export const displayStatus = (f: FileMeta, processingId?: string, failedIds?: Se
 
 const BADGE: Record<Status, [string, LucideIcon]> = {
   Ready: ['bg-green-50 text-green-700', Check],
+  'Needs Review': ['bg-amber-50 text-amber-800', TriangleAlert],
   Processed: ['bg-violet-50 text-violet-700', Layers],
   Processing: ['bg-blue-50 text-blue-700', LoaderCircle],
   Error: ['bg-red-50 text-red-700', CircleAlert],
@@ -43,7 +44,7 @@ interface Props {
 
 export function FileTable({ files, selectedIds, processingId, failedIds, locked, onToggle, onToggleAll, onPreview }: Props) {
   // Only input files can be processed, so only they are selectable.
-  const inputs = files.filter((f) => f.status === 'Ready').map((f) => f.id);
+  const inputs = files.filter(isInputFile).map((f) => f.id);
   const checkedCount = inputs.filter((id) => selectedIds.has(id)).length;
   const allChecked = inputs.length > 0 && checkedCount === inputs.length;
 
@@ -81,8 +82,8 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
         <tbody>
           {files.map((f) => {
             const status = displayStatus(f, processingId, failedIds);
-            const selectable = f.status === 'Ready' && !locked;
-            const checked = selectedIds.has(f.id) && f.status === 'Ready';
+            const selectable = isInputFile(f) && !locked;
+            const checked = selectedIds.has(f.id) && isInputFile(f);
             return (
               <tr
                 key={f.id}
@@ -115,8 +116,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                         title="Rows with missing, invalid or duplicate values. Open Preview to see which."
                       >
                         <TriangleAlert className="h-3.5 w-3.5" />
-                        {/* Reads "1 flagged"; screen readers hear "1 row flagged" */}
-                        {f.problemRows}<span className="sr-only"> {f.problemRows === 1 ? 'row' : 'rows'}</span> flagged
+                        {f.problemRows} invalid<span className="sr-only"> {f.problemRows === 1 ? 'row' : 'rows'}</span>
                       </span>
                     )}
                   </div>

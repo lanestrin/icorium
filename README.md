@@ -25,6 +25,10 @@ npm run verify    # every test + the production build
 
 The five synthetic sample CSVs in `sample-data/` (described in `sample-data/README.txt`) are loaded the first time the server starts. To reset the demo, delete `server/data/`.
 
+Input files without invalid rows are **Ready**; inputs with invalid rows are **Needs Review** and remain selectable for all three functions. The status filter includes both states. Results remain **Processed**, with an **N invalid** tag when applicable. Existing saved file metadata is updated automatically without rewriting CSVs or resetting data.
+
+Filters do not clear selected inputs. Select-all affects the visible input rows, while the processing panel lists every selected filename, including selections hidden by filters. Processing a file does not repair its source data, so an invalid input remains Needs Review after a successful run.
+
 ## Demo steps
 
 1. Open **Preview** on `partner_a_baseline.csv` to show its original columns.
@@ -33,7 +37,7 @@ The five synthetic sample CSVs in `sample-data/` (described in `sample-data/READ
 4. Repeat with `partner_a_followup.csv` using the same function. Or check both Partner A files and run once: they are processed in turn, and the two results fill **File A** and **File B** in the footer.
 5. In the footer, pick both results as **File A** and **File B** and click **Compare Selected**. The chart shows per-row kg values. The summary shows total kg per component and how many rows differ.
 6. Optional: upload a downloaded result CSV. It is recognised as a result and appears in the compare dropdowns, so results from an earlier session can be compared.
-7. Show the validation rules: every file with problem rows carries a *flagged* tag in the list, its preview lists those rows and highlights them, and the comparison shows each file's problems in its own card (A or B). Each sample has one planted problem: missing mass (A baseline), negative R-125 (A follow-up), non-numeric weight (B baseline), duplicate lot number (B follow-up) and fractions that don't sum to 1 (C baseline).
+7. Show the validation rules: input samples show **Needs Review** and every file with problem rows carries an **N invalid** tag in the list. Preview lists those rows and highlights them; comparison shows each file's problems in its own card (A or B). Each sample has one planted problem: missing mass (A baseline), negative R-125 (A follow-up), non-numeric weight (B baseline), duplicate lot number (B follow-up, two invalid rows) and fractions that don't sum to 1 (C baseline).
 
 Older exported results remain readable and downloadable unchanged. Compare results from the same function and output schema; if one uses the old columns, regenerate it from its original input before comparing it with a new result. No data reset or migration is required. Processing rejects source-column names that would be overwritten by generated columns.
 

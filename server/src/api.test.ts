@@ -25,12 +25,12 @@ afterAll(async () => {
 });
 
 describe('loading files', () => {
-  it('starts with the five sample files, ready to process', async () => {
+  it('starts with the five sample files marked Needs Review', async () => {
     const files = await listFiles();
     expect(files.map((f) => f.name)).toEqual([
       'partner_a_baseline.csv', 'partner_a_followup.csv', 'partner_b_baseline.csv', 'partner_b_followup.csv', 'partner_c_baseline.csv',
     ]);
-    for (const f of files) expect(f).toMatchObject({ status: 'Ready', rows: 25, columns: 6 });
+    for (const f of files) expect(f).toMatchObject({ status: 'Needs Review', rows: 25, columns: 6, problemRows: f.name === 'partner_b_followup.csv' ? 2 : 1 });
   });
 
   it('accepts an upload, previews its rows and downloads it unchanged', async () => {
@@ -38,7 +38,7 @@ describe('loading files', () => {
     const res = await upload('uploaded_c.csv', text);
     expect(res.statusCode).toBe(200);
     const meta = res.json<FileMeta>();
-    expect(meta).toMatchObject({ name: 'uploaded_c.csv', status: 'Ready', rows: 25, columns: 6 });
+    expect(meta).toMatchObject({ name: 'uploaded_c.csv', status: 'Needs Review', rows: 25, columns: 6 });
 
     const preview = await rowsOf(meta.id);
     expect(preview.headers).toEqual(['material_ref', 'collection_date', 'quantity_g', 'R32_fraction', 'R125_fraction', 'R134a_fraction']);
@@ -297,6 +297,74 @@ describe('current result contract', () => {
   });
 });
 
+describe('input review status', () => {
+  const clean = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct\nCLEAN,d,100,40,30,30';
+
+  it('returns Ready only for clean inputs and keeps upload/list status consistent', async () => {
+    const a = (await upload('clean_status.csv', clean)).json<FileMeta>();
+    const b = (await upload('invalid_status.csv', clean.replace(',100,', ',,'))).json<FileMeta>();
+    expect(a).toMatchObject({ status: 'Ready', problemRows: 0 });
+    expect(b).toMatchObject({ status: 'Needs Review', problemRows: 1 });
+    const files = await listFiles();
+    expect(files.find((f) => f.id === a.id)).toEqual(a);
+    expect(files.find((f) => f.id === b.id)).toEqual(b);
+  });
+
+  it.each(['validation', 'mass', 'classification'] as const)('processes Needs Review inputs with %s without changing the source status', async (processor) => {
+    const source = await fileNamed('partner_b_followup.csv');
+    expect(source).toMatchObject({ status: 'Needs Review', problemRows: 2 });
+    const before = (await app.inject(`/api/files/${source.id}/download`)).body;
+    const response = await processFile(source.id, processor);
+    expect(response.statusCode).toBe(200);
+    const result = response.json<FileMeta>();
+    expect(result).toMatchObject({ status: 'Processed', problemRows: 2, processor });
+    const imported = (await upload(`review_result_${processor}.csv`, (await app.inject(`/api/files/${result.id}/download`)).body)).json<FileMeta>();
+    expect(imported).toMatchObject({ status: 'Processed', problemRows: 2, processor });
+    expect((await fileNamed(source.name))).toEqual(source);
+    expect((await app.inject(`/api/files/${source.id}/download`)).body).toBe(before);
+  });
+
+  it('keeps an invalid legacy result Processed and counts errors from its source columns', async () => {
+    const text = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct,r32_mass_kg,r125_mass_kg,r134a_mass_kg,mass_status\nOLD,d,,40,30,30,,,,Skipped (invalid input)';
+    const result = (await upload('legacy_invalid_status.csv', text)).json<FileMeta>();
+    expect(result).toMatchObject({ status: 'Processed', processor: 'mass', problemRows: 1 });
+    expect((await fileNamed(result.name))).toEqual(result);
+    expect((await app.inject(`/api/files/${result.id}/download`)).body).toBe(text);
+  });
+
+  it('reconciles old statuses and missing counts without rereading or rewriting known files', async () => {
+    const { storage } = await import('./lib/storage');
+    const cleanMeta = (await upload('old_clean_status.csv', clean)).json<FileMeta>();
+    const invalid = (await upload('old_invalid_status.csv', clean.replace(',100,', ',,'))).json<FileMeta>();
+    const missing = (await upload('missing_count_status.csv', clean.replace(',100,', ',,'))).json<FileMeta>();
+    const result = await processSample('partner_a_baseline.csv', 'mass');
+    storage.patch(cleanMeta.id, { status: 'Needs Review' });
+    storage.patch(invalid.id, { status: 'Ready' });
+    storage.patch(missing.id, { status: 'Ready', problemRows: undefined });
+    storage.patch(result.id, { problemRows: undefined });
+    const read = vi.spyOn(storage, 'read');
+    const patch = vi.spyOn(storage, 'patch');
+    try {
+      const files = await listFiles();
+      expect(files.find((f) => f.id === cleanMeta.id)).toEqual(cleanMeta);
+      expect(files.find((f) => f.id === invalid.id)).toEqual(invalid);
+      expect(files.find((f) => f.id === missing.id)).toEqual(missing);
+      expect(files.find((f) => f.id === result.id)).toEqual(result);
+      expect(files.find((f) => f.id === cleanMeta.id)?.status).toBe('Ready');
+      expect(files.find((f) => f.id === invalid.id)).toMatchObject({ status: 'Needs Review', problemRows: 1 });
+      expect(files.find((f) => f.id === missing.id)).toMatchObject({ status: 'Needs Review', problemRows: 1 });
+      expect(files.find((f) => f.id === result.id)).toMatchObject({ status: 'Processed', problemRows: 1 });
+      expect(read.mock.calls.map(([id]) => id).sort()).toEqual([missing.id, result.id].sort());
+      read.mockClear(); patch.mockClear();
+      await listFiles();
+      expect(read).not.toHaveBeenCalled();
+      expect(patch).not.toHaveBeenCalled();
+    } finally { read.mockRestore(); patch.mockRestore(); }
+    for (const [meta, text] of [[cleanMeta, clean], [invalid, clean.replace(',100,', ',,')], [missing, clean.replace(',100,', ',,')]] as const)
+      expect((await app.inject(`/api/files/${meta.id}/download`)).body).toBe(text);
+  });
+});
+
 describe('legacy result compatibility', () => {
   const originalHeaders = ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'];
   const legacy = {
@@ -338,6 +406,12 @@ describe('legacy result compatibility', () => {
     const restarted = await restart(false);
     try {
       const files = (await restarted.inject('/api/files')).json<FileMeta[]>();
+      for (const [name, status] of [['old_clean_status.csv', 'Ready'], ['old_invalid_status.csv', 'Needs Review'], ['missing_count_status.csv', 'Needs Review']] as const) {
+        const original = (await listFiles()).find((f) => f.name === name)!;
+        expect(files.find((f) => f.id === original.id)).toEqual({ ...original, status });
+        expect((await restarted.inject(`/api/files/${original.id}/download`)).body)
+          .toBe((await app.inject(`/api/files/${original.id}/download`)).body);
+      }
       for (const { meta, text } of saved) {
         expect(files.find((f) => f.id === meta.id)).toEqual(meta);
         const preview = (await restarted.inject(`/api/files/${meta.id}/rows`)).json<FileRows>();

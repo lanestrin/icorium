@@ -56,6 +56,7 @@ export function seedSamples() {
   for (const name of fs.readdirSync(SAMPLES).filter((f) => f.endsWith('.csv')).sort()) {
     const text = fs.readFileSync(path.join(SAMPLES, name), 'utf8');
     const { headers, rows } = parseCsv(text);
-    storage.save({ name, text, rows: rows.length, columns: headers.length, status: 'Ready', problemRows: findProblems(headers, rows).total });
+    const problemRows = findProblems(headers, rows).total;
+    storage.save({ name, text, rows: rows.length, columns: headers.length, status: problemRows > 0 ? 'Needs Review' : 'Ready', problemRows });
   }
 }

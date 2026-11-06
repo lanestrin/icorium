@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Calendar, Check, CircleAlert, Filter, Search, X } from 'lucide-react';
-import type { CompareResult, FileMeta, ProcessorId } from '../../shared/types';
+import { isInputFile, type CompareResult, type FileMeta, type ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
 import { displayStatus, FileTable, type Status } from './components/FileTable';
@@ -35,7 +35,7 @@ export default function App() {
   const filtersActive = !!(search || from || to || status !== 'All');
   const clearFilters = () => { setSearch(''); setFrom(''); setTo(''); setStatus('All'); };
 
-  const selectedInputs = files.filter((f) => selectedIds.has(f.id) && f.status === 'Ready');
+  const selectedInputs = files.filter((f) => selectedIds.has(f.id) && isInputFile(f));
   const toggle = (id: string) =>
     setSelectedIds((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const toggleAll = (ids: string[], on: boolean) =>
@@ -142,6 +142,7 @@ export default function App() {
               <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="min-w-0 flex-1 bg-transparent pr-2 outline-none">
                 <option value="All">All Statuses</option>
                 <option>Ready</option>
+                <option>Needs Review</option>
                 <option>Processing</option>
                 <option>Processed</option>
                 <option>Error</option>

@@ -16,12 +16,17 @@ const pageQuery = z.object({
 type IdParams = { Params: { id: string } };
 
 export async function fileRoutes(app: FastifyInstance) {
-  // Files saved before problem counting existed get their count filled in once.
+  // Backfill missing counts and reconcile historical input statuses without rewriting CSVs.
   app.get('/files', async () =>
     storage.list().map((m) => {
-      if (m.problemRows !== undefined) return m;
-      const { headers, rows } = parseCsv(storage.read(m.id));
-      return storage.patch(m.id, { problemRows: findProblems(headers, rows).total });
+      let problemRows = m.problemRows;
+      if (problemRows === undefined) {
+        const { headers, rows } = parseCsv(storage.read(m.id));
+        problemRows = findProblems(headers, rows).total;
+      }
+      const status = m.status === 'Processed' ? 'Processed' : problemRows > 0 ? 'Needs Review' : 'Ready';
+      if (m.problemRows === problemRows && m.status === status) return m;
+      return storage.patch(m.id, { problemRows, status });
     }),
   );
 
@@ -37,7 +42,7 @@ export async function fileRoutes(app: FastifyInstance) {
     // A previously exported result is registered as a result, so it can be compared in a later session.
     const result = detectResult(headers);
     if (result) return storage.save({ ...base, status: 'Processed', ...result });
-    return storage.save({ ...base, status: 'Ready' });
+    return storage.save({ ...base, status: base.problemRows > 0 ? 'Needs Review' : 'Ready' });
   });
 
   app.get<IdParams>('/files/:id/rows', async (req) => {

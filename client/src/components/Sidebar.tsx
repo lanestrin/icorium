@@ -66,6 +66,11 @@ export function Sidebar(p: Props) {
           {p.selectedNames.length === 1 && <>Input: <span className="font-medium text-slate-700">{p.selectedNames[0]}</span></>}
           {p.selectedNames.length > 1 && <>Input: <span className="font-medium text-slate-700">{p.selectedNames.length} files selected</span></>}
         </p>
+        {p.selectedNames.length > 1 && (
+          <ul aria-label="Selected input files" className="mb-3 max-h-28 space-y-1 overflow-auto text-xs text-slate-600">
+            {p.selectedNames.map((name, i) => <li key={`${i}-${name}`} className="break-all">{name}</li>)}
+          </ul>
+        )}
         <button
           disabled={!p.canRun}
           onClick={p.onRun}

@@ -148,6 +148,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [ ] **8.2** `feature/8.2-needs-review-status` — Show invalid input files as **Needs Review** with an **N invalid** tag and add that status to the filter. Results remain **Processed** with the invalid-row tag. Keep processing/error feedback and file eligibility consistent with the new input status.
 
+  **Progress:** implementation added; automated checks pass, manual UI checks pending. See [scope and verification status](features/8.2-needs-review-status.md).
   **Depends on:** 8.1.
   **Done when:** metadata/list API and UI agree on status and invalid counts;
   Ready inputs have no invalid rows; Needs Review inputs remain selectable;
