@@ -5,3 +5,4 @@ test-results
 playwright-report
 blueprint/context/landing-*
 .vercel
+.env*
