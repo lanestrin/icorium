@@ -15,8 +15,8 @@ Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of thre
 
 - **Keep it simple.** No accounts, database, cloud, queues or extra layers (see "Do not add" in `blueprint/stack.md`). Prefer editing an existing file over adding one.
 - **Match the reference.** UI changes follow `blueprint/reference-ui.png` and must still work at phone width with no sideways page scroll.
-- **Verify before saying done.** Run `npm run verify` and report the real result. It runs server tests and the client type-check/build. Browser tests are removed while the UI is being edited; report browser behavior and visual checks separately and never claim the acceptance checklist passed from this command alone.
-- **Every change keeps or adds tests.** Rules and calculations → `server/src/core.test.ts`. Endpoints and errors → `server/src/api.test.ts`. For UI changes, run the client build and report whether the affected flow was checked manually. Do not add browser tests unless the person asks to restore them.
+- **Verify before saying done.** Run `npm run verify` and report the real result. It runs server unit/API tests, client unit/component tests and the client type-check/build. Manual testing is not a completion requirement. Component tests do not establish visual correctness in a real browser.
+- **Every change keeps or adds tests.** Rules and calculations belong in server unit tests; endpoints and errors in API tests. UI changes require unit/component coverage using Vitest and React Testing Library. Exercise user-visible behavior, async success/failure and relevant keyboard interactions. Do not add browser tests unless requested.
 - **Branch, draft, then wait for approval.** Follow `blueprint/commit-rules.md`: create a new branch before editing a new work item, implement and verify, then present the full commit message and PR description. Wait for explicit approval before committing. Push and publish a PR only when explicitly authorized. Never commit directly to `main`, merge or force-push. Commit messages end with the attribution line from the session.
 - **Never edit the sample CSVs.** They are the person's test data; adapters adapt to them, not the other way round.
 - **Results keep every original column.** Processors only append columns.
@@ -43,7 +43,7 @@ Next: <one exact command, reply or action>
 
 - **Name the exact state, never a later one.** In order: changed (uncommitted), verified (`npm run verify` ran and passed), committed, pushed, CI passed. Say plainly when verify was not run.
 - **One next action**, the single best step: real work or a real decision. Mention an alternative above the two lines only if it is a real option.
-- **Separate automated checks from manual UI checks.** Run `npm run verify` for server behavior and client compilation. Browser workflows and visual match require manual checks while browser tests are removed. State what was checked and what remains unchecked.
+- **Report automated evidence accurately.** `npm run verify` covers server unit/API tests, client unit/component tests and client compilation. Manual UI checklists are not required; do not claim browser or visual checks passed from a jsdom test.
 - **Blocked:** `Status: Blocked - <reason>.` and `Next:` names the decision or action needed.
 - **Ask only for a real decision** (scope, design choice, a risk), with 2–4 options. Mark the preferred option **Recommended** and put it first, with a brief reason; if none is preferable, say so instead of labeling one.
 - No vague endings: never "let me know", "shall I continue?" or "anything else?".
@@ -52,8 +52,8 @@ Examples:
 
 | After | Status | Next |
 | --- | --- | --- |
-| Visual change | Changed (uncommitted); verify passed; layout not compared with the reference. | Refresh http://localhost:5173 and compare the <area> with `blueprint/reference-ui.png`. |
-| Feature done | Changed (uncommitted); server tests and client build passed; UI checks reported separately. | Run `/complete` to prepare review drafts. |
+| UI change | Changed (uncommitted); unit/component tests and build passed; browser visuals not verified. | Run `/complete` to prepare review drafts. |
+| Feature done | Changed (uncommitted); server unit/API tests, client unit/component tests and build passed. | Run `/complete` to prepare review drafts. |
 | Commit | Committed and pushed; CI passed. | <the next open item in `blueprint/build-plan.md`, or a decision> |
 
 ## Extending
@@ -65,8 +65,8 @@ Examples:
 
 ```bash
 npm run dev       # API :3001 + UI :5173 (Vite picks the next free port if taken)
-npm run verify    # server tests + client type-check and build
-npm test          # unit + API tests only (~2 s)
+npm run verify    # server unit/API + client unit/component tests + client build
+npm test          # server unit/API + client unit/component tests
 ```
 
 - CI (`.github/workflows/ci.yml`) runs `npm run verify` on every push to `main` and every PR.
