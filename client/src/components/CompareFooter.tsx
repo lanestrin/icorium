@@ -1,4 +1,5 @@
-import { ArrowLeftRight, Scale } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeftRight, ChevronUp, Scale } from 'lucide-react';
 import type { FileMeta } from '../../../shared/types';
 
 interface Props {
@@ -10,7 +11,15 @@ interface Props {
   onCompare: () => void;
 }
 
+const Title = () => (
+  <>
+    <Scale className="h-8 w-8 shrink-0 text-blue-600" strokeWidth={1.5} />
+    <span className="text-xl font-semibold">Compare Files</span>
+  </>
+);
+
 export function CompareFooter({ results, a, b, setA, setB, onCompare }: Props) {
+  const [open, setOpen] = useState(false); // mobile only; always expanded on lg+
   const fa = results.find((f) => f.id === a);
   const fb = results.find((f) => f.id === b);
   const reason =
@@ -19,34 +28,56 @@ export function CompareFooter({ results, a, b, setA, setB, onCompare }: Props) {
     : fa.processor !== fb.processor ? 'Files come from different processing functions'
     : '';
 
-  const pick = (label: string, value: string, set: (id: string) => void) => (
+  // File B only offers results from the same function as File A.
+  const optionsB = fa ? results.filter((f) => f.processor === fa.processor && f.id !== fa.id) : results;
+  const chooseA = (id: string) => {
+    setA(id);
+    const next = results.find((f) => f.id === id);
+    if (next && fb && (fb.processor !== next.processor || fb.id === next.id)) setB('');
+  };
+
+  const pick = (label: string, value: string, set: (id: string) => void, options: FileMeta[]) => (
     <label className="flex items-center gap-3">
-      <span className="font-semibold">{label}</span>
-      <select value={value} onChange={(e) => set(e.target.value)} className="w-72 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm outline-none focus:border-blue-400">
+      <span className="w-12 shrink-0 font-semibold">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => set(e.target.value)}
+        className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm outline-none focus:border-blue-400 lg:w-72"
+      >
         <option value="">Select result file…</option>
-        {results.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+        {options.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
       </select>
     </label>
   );
 
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/90 px-6 py-4 backdrop-blur">
-      <div className="flex flex-wrap items-center gap-4 lg:gap-8">
-        <div className="flex items-center gap-3 lg:border-r lg:border-slate-200 lg:pr-8">
-          <Scale className="h-8 w-8 text-blue-600" strokeWidth={1.5} />
-          <span className="text-xl font-semibold">Compare Files</span>
-        </div>
-        {pick('File A', a, setA)}
-        {pick('File B', b, setB)}
-        <div className="ml-auto flex items-center gap-3">
-          {reason && <span className="text-sm text-slate-500">{reason}</span>}
-          <button
-            disabled={!!reason}
-            onClick={onCompare}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <ArrowLeftRight className="h-5 w-5" /> Compare Selected
-          </button>
+    <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] backdrop-blur lg:px-6 lg:py-4">
+      {/* Mobile toggle */}
+      <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-3 lg:hidden">
+        <Title />
+        <ChevronUp className={`ml-auto h-5 w-5 text-slate-500 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* Slides up on mobile; always visible on desktop */}
+      <div className={`grid transition-[grid-template-rows] duration-300 ease-out lg:grid-rows-[1fr] ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+        <div className="overflow-hidden lg:overflow-visible">
+          <div className="flex flex-col gap-3 pt-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-8 lg:pt-0">
+            <div className="hidden items-center gap-3 border-r border-slate-200 pr-8 lg:flex">
+              <Title />
+            </div>
+            {pick('File A', a, chooseA, results)}
+            {pick('File B', b, setB, optionsB)}
+            <div className="flex flex-col">
+              <button
+                disabled={!!reason}
+                title={reason || undefined}
+                onClick={() => { onCompare(); setOpen(false); }}
+                className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ArrowLeftRight className="h-5 w-5" /> Compare Selected
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </footer>

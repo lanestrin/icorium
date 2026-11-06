@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getAdapter } from '../adapters';
-import { processRows } from '../processing';
+import { detectProcessor, processors, processRows } from '../processing';
 import { compareResults } from '../lib/compare';
 import { httpError, parseCsv, toCsv } from '../lib/csv';
 import { storage } from '../lib/storage';
@@ -21,7 +21,11 @@ export async function fileRoutes(app: FastifyInstance) {
     const text = (await file.toBuffer()).toString('utf8');
     const { headers, rows } = parseCsv(text);
     getAdapter(headers);
-    return storage.save({ name: file.filename, text, rows: rows.length, columns: headers.length, status: 'Ready' });
+    const base = { name: file.filename, text, rows: rows.length, columns: headers.length };
+    // A previously exported result is registered as a result, so it can be compared in a later session.
+    const processor = detectProcessor(headers);
+    if (processor) return storage.save({ ...base, status: 'Processed', processor, generatedColumns: processors[processor].columns });
+    return storage.save({ ...base, status: 'Ready' });
   });
 
   app.get<IdParams>('/files/:id/rows', async (req) => {

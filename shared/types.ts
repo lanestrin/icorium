@@ -30,10 +30,15 @@ export interface FileRows {
 export interface CompareColumn {
   name: string;
   kind: 'numeric' | 'category';
+  unit?: string; // 'kg' or '%'
+  /** How valueA/valueB summarize the rows. 'count' = the chart shows rows per category. */
+  measure: 'total' | 'mean' | 'count';
+  /** numeric: one point per row; category: one point per category with row counts */
   data: { label: string; a: number | null; b: number | null }[];
-  meanA?: number;
-  meanB?: number;
+  valueA?: number;
+  valueB?: number;
   rowsDiffering: number;
+  rowsCompared: number;
 }
 
 export interface CompareResult {

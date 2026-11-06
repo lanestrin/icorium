@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Calendar, CircleAlert, CircleHelp, Ellipsis, Filter, Search, X } from 'lucide-react';
-import type { CompareResult, FileMeta, FileStatus, ProcessorId } from '../../shared/types';
+import type { CompareResult, FileMeta, ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
-import { FileTable } from './components/FileTable';
+import { displayStatus, FileTable, type Status } from './components/FileTable';
 import { CompareFooter } from './components/CompareFooter';
 import { CompareModal, PreviewModal } from './components/Modals';
 
@@ -21,7 +21,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [status, setStatus] = useState<'All' | FileStatus>('All');
+  const [status, setStatus] = useState<'All' | Status>('All');
 
   const [preview, setPreview] = useState<FileMeta>();
   const [compareA, setCompareA] = useState('');
@@ -31,6 +31,9 @@ export default function App() {
   const refresh = () => api.list().then(setFiles).catch((e) => setError(msg(e)));
   useEffect(() => { refresh(); }, []);
 
+  const filtersActive = !!(search || from || to || status !== 'All');
+  const clearFilters = () => { setSearch(''); setFrom(''); setTo(''); setStatus('All'); };
+
   const selected = files.find((f) => f.id === selectedId);
   const results = files.filter((f) => f.status === 'Processed');
   const visible = useMemo(
@@ -39,12 +42,12 @@ export default function App() {
         const day = new Date(f.uploadedAt).toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
         return (
           f.name.toLowerCase().includes(search.toLowerCase()) &&
-          (status === 'All' || f.status === status) &&
+          (status === 'All' || displayStatus(f, processingId, failedId) === status) &&
           (!from || day >= from) &&
           (!to || day <= to)
         );
       }),
-    [files, search, status, from, to],
+    [files, search, status, from, to, processingId, failedId],
   );
 
   async function upload(list: File[]) {
@@ -82,13 +85,13 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen pb-32 text-slate-900">
+    <div className="min-h-screen overflow-x-clip pb-32 text-slate-900">
       <div className="absolute right-6 top-4 flex gap-4 text-slate-600">
         <button title="Upload a CSV, select it, choose a function and Run Processing. Compare two result files in the footer."><CircleHelp className="h-6 w-6" /></button>
         <button title="More"><Ellipsis className="h-6 w-6" /></button>
       </div>
 
-      <div className="flex flex-col gap-6 p-6 pt-16 lg:flex-row">
+      <div className="flex flex-col gap-6 p-4 pt-16 sm:p-6 sm:pt-16 lg:flex-row">
         <Sidebar
           processor={processor}
           setProcessor={setProcessor}
@@ -107,26 +110,38 @@ export default function App() {
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <label className="flex min-w-64 flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
-              <Search className="h-5 w-5 text-slate-500" />
-              <input className="w-full bg-transparent outline-none" placeholder="Search CSV files..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <label className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm sm:w-auto sm:min-w-64 sm:flex-1">
+              <Search className="h-5 w-5 shrink-0 text-slate-500" />
+              <input className="w-full min-w-0 bg-transparent outline-none" placeholder="Search CSV files..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </label>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm">
-              <Calendar className="h-5 w-5 text-slate-600" />
+            <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm sm:w-auto">
+              <Calendar className="h-5 w-5 shrink-0 text-slate-600" />
               <span className="mr-1 font-semibold">Date Range</span>
-              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-transparent text-sm outline-none" />
-              <span className="text-slate-400">–</span>
-              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-transparent text-sm outline-none" />
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+                <span className="text-slate-400">–</span>
+                <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+              </span>
             </div>
-            <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
-              <Filter className="h-5 w-5 text-slate-600" />
+            <label className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm sm:w-auto">
+              <Filter className="h-5 w-5 shrink-0 text-slate-600" />
               <span className="font-semibold">Status</span>
-              <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="bg-transparent pr-2 outline-none">
+              <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="min-w-0 flex-1 bg-transparent pr-2 outline-none">
                 <option value="All">All Statuses</option>
                 <option>Ready</option>
+                <option>Processing</option>
                 <option>Processed</option>
+                <option>Error</option>
               </select>
             </label>
+            {filtersActive && (
+              <button
+                onClick={clearFilters}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 sm:w-auto"
+              >
+                <X className="h-4 w-4" /> Clear filters
+              </button>
+            )}
           </div>
 
           {error && (

@@ -2,7 +2,11 @@ import { Check, CircleAlert, Download, Eye, File as FileIcon, Layers, LoaderCirc
 import type { FileMeta } from '../../../shared/types';
 import { api } from '../api';
 
-type Status = FileMeta['status'] | 'Processing' | 'Error';
+export type Status = FileMeta['status'] | 'Processing' | 'Error';
+
+/** Stored status, overridden while this file is processing or after its processing failed. */
+export const displayStatus = (f: FileMeta, processingId?: string, failedId?: string): Status =>
+  f.id === processingId ? 'Processing' : f.id === failedId ? 'Error' : f.status;
 
 const BADGE: Record<Status, [string, LucideIcon]> = {
   Ready: ['bg-green-50 text-green-700', Check],
@@ -16,7 +20,7 @@ function StatusBadge({ status }: { status: Status }) {
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-medium ${cls}`}>
       <Icon className={`h-4 w-4 ${status === 'Processing' ? 'animate-spin' : ''}`} />
-      {status}
+      {status === 'Processing' ? 'Processing…' : status}
     </span>
   );
 }
@@ -49,12 +53,17 @@ export function FileTable({ files, selectedId, processingId, failedId, onSelect,
         </thead>
         <tbody>
           {files.map((f) => {
-            const status: Status = f.id === processingId ? 'Processing' : f.id === failedId ? 'Error' : f.status;
+            const status = displayStatus(f, processingId, failedId);
             return (
               <tr
                 key={f.id}
+                tabIndex={0}
+                aria-selected={f.id === selectedId}
                 onClick={() => onSelect(f.id)}
-                className={`cursor-pointer border-b border-slate-100 transition ${f.id === selectedId ? 'bg-blue-50 outline-2 -outline-offset-2 outline-blue-300' : 'hover:bg-slate-50'}`}
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onSelect(f.id); }
+                }}
+                className={`cursor-pointer border-b border-slate-100 transition focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-500 ${f.id === selectedId ? 'bg-blue-50 outline-2 -outline-offset-2 outline-blue-300' : 'hover:bg-slate-50'}`}
               >
                 <td className="py-2.5 pl-6 pr-4">
                   <div className="flex items-center gap-5">

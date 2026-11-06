@@ -19,7 +19,7 @@ export function Sidebar(p: Props) {
   const pick = (list: FileList | null) => list?.length && p.onUpload([...list]);
 
   return (
-    <aside className="w-full shrink-0 space-y-8 lg:w-72">
+    <aside className="w-full shrink-0 space-y-8 lg:w-[22rem]">
       <div
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
         onDragLeave={() => setDrag(false)}
