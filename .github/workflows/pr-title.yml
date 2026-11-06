@@ -1,0 +1,25 @@
+name: PR title
+
+# Separate from CI so editing a PR's title or description does not rerun the
+# whole suite.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: PR title
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # The title is untrusted input: it reaches the script only through an
+      # environment variable, never as text inside the run command.
+      - name: Check title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: pwsh -NoProfile -File scripts/check-pr-title.ps1 -Title "$PR_TITLE"

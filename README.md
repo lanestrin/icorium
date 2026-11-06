@@ -10,7 +10,6 @@ Interview exercise. All data is fictional and the classification rules are demo-
 
 ```bash
 npm install
-npx playwright install chromium   # once, for the browser tests
 npm run dev       # API on :3001, UI on http://localhost:5173
 npm run verify    # every test + the production build
 ```
@@ -21,10 +20,8 @@ npm run verify    # every test + the production build
 | --- | --- | --- |
 | Unit (Vitest) | `server/src/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths |
 | API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message; each sample file flags exactly its planted problem; results keep every original column and value; saved results compare after re-upload |
-| Browser (Playwright) | `e2e/checklist.spec.ts` | The final acceptance checklist in `blueprint/build-plan.md`, end to end in Chromium |
-| Browser (Playwright) | `e2e/usability.spec.ts` | Filters, keyboard use and dialog focus, select-all, phone width |
 
-`npm test` runs the first two in about 2 seconds. `npm run test:e2e` runs the browser tests in about 30 seconds on their own ports and data, so the dev server can keep running.
+`npm test` runs the unit and API tests. `npm run verify` also type-checks and builds the client. Browser tests have been removed while the UI is being edited; a passing verification run does not establish browser behavior or visual correctness. Use the demo steps below for manual UI checks.
 
 The five synthetic sample CSVs in `sample-data/` (described in `sample-data/README.txt`) are loaded the first time the server starts. To reset the demo, delete `server/data/`.
 
