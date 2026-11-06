@@ -151,6 +151,36 @@ A single repository and **one API** are sufficient. Avoid microservices, task qu
 
 **Done when:** every item in the interview brief is demonstrated from the UI and basic failure cases do not crash the app.
 
+### Phase 8 — Partial processing (planned, not built)
+
+**Principle:** never silently correct bad data or produce misleading results. Validate automatically → flag errors → process valid rows → keep every row in the output. Only block a whole file when it is unreadable or cannot be mapped to a partner schema.
+
+| Error type | Example | Behaviour |
+| --- | --- | --- |
+| File-level | Missing required columns, unsupported format, malformed CSV | Block (already built) |
+| Row-level | Missing mass, negative percentage, non-numeric value, duplicate batch ID | Skip that row's calculation; keep the row with its reason |
+| Warning | Extra columns, total within the ±0.5 % rounding tolerance | Allow (already allowed; no separate warning list, to avoid noise from rows at 99.99 %) |
+
+| Function | Behaviour with invalid rows |
+| --- | --- |
+| Composition Validation | Analyse every row and report its errors (no warning step: finding problems is its job) |
+| Component Mass Calculation | Calculate valid rows; invalid rows get empty mass values |
+| Batch Classification | Classify valid rows; invalid rows get `Needs review` |
+
+**Already in place:** file-level blocking, invalid rows kept with no made-up values, Validation runs on every row, problem rows listed per file in the list, preview and comparison.
+
+**Build**
+- [ ] Every result ends with the same two columns: `processing_status` (`Valid` / `Invalid`) and `validation_errors` (the reasons, empty when valid). They replace `validation_status`/`validation_message` and `mass_status`; Validation keeps `composition_total_pct`.
+- [ ] Classification writes `Needs review` (not `Unclassifiable`) for invalid rows.
+- [ ] One definition of "invalid" for all functions: the Composition Validation rules, including duplicate and missing batch IDs. A row tagged invalid is never also calculated.
+- [ ] Input files with invalid rows show the status **Needs Review** instead of Ready, with an "N invalid" tag; result files keep **Processed** with the tag. Add Needs Review to the Status filter.
+- [ ] **Data Quality Warning** dialog before Mass or Classification runs on files with invalid rows: per file, valid rows and rows with errors; text "Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values."; buttons **Cancel** and **Process Valid Rows**.
+- [ ] Update the result-file detection, README demo steps and tests (unit, API, browser) for the new columns, status and dialog.
+
+**Done when:** for each sample file, Mass and Classification results have 24 (B follow-up: 23) `Valid` rows with calculated values and the planted rows `Invalid` with their reason; the warning dialog appears for those functions and not for Validation; Cancel processes nothing.
+
+**Interview answer — "What happens when someone uploads a CSV with bad data?"** Unreadable or unmappable files are rejected with a clear message. Otherwise every row is checked; valid rows are processed, invalid rows stay in the output marked `Invalid` with the reason and no calculated values, and the user is warned before calculating on a file with problems.
+
 ## 5. Minimal API outline (suggested, not prescribed)
 
 | Action | Example route | Result |
