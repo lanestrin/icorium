@@ -13,7 +13,7 @@
       "entrypoint": "src/index.ts",
       "functions": {
         "src/index.ts": {
-          "includeFiles": "../sample-data/*.csv"
+          "includeFiles": "sample-data/*.csv"
         }
       }
     }
