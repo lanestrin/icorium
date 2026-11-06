@@ -9,6 +9,10 @@ export const sampleText = (name: string) => fs.readFileSync(path.join(__dirname,
 let counter = 0;
 export const uniqueName = (base: string) => `${base}_${Date.now()}${counter++}`;
 
+/** A valid Partner A CSV with `n` rows, batch IDs X-1 … X-n. */
+export const bigCsv = (n: number) =>
+  ['batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct', ...Array.from({ length: n }, (_, i) => `X-${i + 1},2026-09-01,100,40,30,30`)].join('\n');
+
 /** The table row whose file-name cell is exactly `name`. */
 export const fileRow = (page: Page, name: string) =>
   page.getByRole('row').filter({ has: page.getByRole('cell', { name, exact: true }) });

@@ -21,9 +21,12 @@ export interface FileMeta {
 
 export type Row = Record<string, string>;
 
+/** One page of a file's rows. */
 export interface FileRows {
   headers: string[];
   rows: Row[];
+  offset: number; // index of rows[0] in the file
+  totalRows: number;
   generatedColumns: string[];
 }
 

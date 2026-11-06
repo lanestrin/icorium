@@ -8,7 +8,7 @@ async function json<T>(res: Response): Promise<T> {
 
 export const api = {
   list: () => fetch('/api/files').then(json<FileMeta[]>),
-  rows: (id: string) => fetch(`/api/files/${id}/rows`).then(json<FileRows>),
+  rows: (id: string, offset = 0, limit = 100) => fetch(`/api/files/${id}/rows?offset=${offset}&limit=${limit}`).then(json<FileRows>),
   downloadUrl: (id: string) => `/api/files/${id}/download`,
   upload: (file: File) => {
     const fd = new FormData();

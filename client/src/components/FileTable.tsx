@@ -48,10 +48,17 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
   const allChecked = inputs.length > 0 && checkedCount === inputs.length;
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+    // On desktop the list scrolls inside this box (header pinned) so the page and footer stay put.
+    // A labelled, focusable region lets keyboard users scroll it too.
+    <div
+      role="region"
+      aria-label="CSV files"
+      tabIndex={0}
+      className="overflow-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:max-h-[calc(100vh-20rem)]"
+    >
       <table className="w-full min-w-[860px] text-sm">
         <thead>
-          <tr className="text-left text-slate-700 [&>th]:bg-slate-50 [&>th]:py-3 [&>th]:font-semibold">
+          <tr className="text-left text-slate-700 [&>th]:sticky [&>th]:top-0 [&>th]:z-[1] [&>th]:bg-slate-50 [&>th]:py-3 [&>th]:font-semibold">
             <th className="w-14 rounded-l-xl pl-6">
               <input
                 type="checkbox"

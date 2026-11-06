@@ -90,6 +90,32 @@ describe('loading files', () => {
   });
 });
 
+describe('preview paging', () => {
+  const bigCsv = (n: number) =>
+    ['batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct', ...Array.from({ length: n }, (_, i) => `X-${i + 1},2026-09-01,100,40,30,30`)].join('\n');
+  const page = (id: string, query: string) => app.inject(`/api/files/${id}/rows?${query}`);
+  let id: string;
+  beforeAll(async () => { id = (await upload('big.csv', bigCsv(250))).json<FileMeta>().id; });
+
+  it('returns the first 100 rows and the total by default', async () => {
+    const res = (await app.inject(`/api/files/${id}/rows`)).json<FileRows>();
+    expect(res).toMatchObject({ offset: 0, totalRows: 250 });
+    expect(res.rows).toHaveLength(100);
+    expect(res.rows[0].batch_id).toBe('X-1');
+  });
+
+  it('returns the requested page, and a short last page', async () => {
+    const second = (await page(id, 'offset=100&limit=100')).json<FileRows>();
+    expect(second.rows[0].batch_id).toBe('X-101');
+    const last = (await page(id, 'offset=200&limit=100')).json<FileRows>();
+    expect(last.rows.map((r) => r.batch_id)).toEqual(Array.from({ length: 50 }, (_, i) => `X-${i + 201}`));
+  });
+
+  it.each(['limit=0', 'limit=1001', 'offset=-1', 'limit=abc'])('rejects %s', async (query) => {
+    expect((await page(id, query)).statusCode).toBe(400);
+  });
+});
+
 describe('processing', () => {
   // The one planted problem per file, from sample-data/README.txt (1-based data rows).
   it.each([

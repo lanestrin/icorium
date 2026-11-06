@@ -8,6 +8,11 @@ import { storage } from '../lib/storage';
 
 const processBody = z.object({ fileId: z.string().min(1), processor: z.enum(['validation', 'mass', 'classification']) });
 const compareQuery = z.object({ a: z.string().min(1), b: z.string().min(1) }).refine((q) => q.a !== q.b, 'Choose two different files');
+// Previews load a page at a time so a large CSV never has to be rendered all at once.
+const pageQuery = z.object({
+  offset: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(1000).default(100),
+});
 type IdParams = { Params: { id: string } };
 
 export async function fileRoutes(app: FastifyInstance) {
@@ -29,9 +34,10 @@ export async function fileRoutes(app: FastifyInstance) {
   });
 
   app.get<IdParams>('/files/:id/rows', async (req) => {
+    const { offset, limit } = pageQuery.parse(req.query);
     const meta = storage.get(req.params.id);
     const { headers, rows } = parseCsv(storage.read(meta.id));
-    return { headers, rows, generatedColumns: meta.generatedColumns ?? [] };
+    return { headers, rows: rows.slice(offset, offset + limit), offset, totalRows: rows.length, generatedColumns: meta.generatedColumns ?? [] };
   });
 
   app.get<IdParams>('/files/:id/download', async (req, reply) => {

@@ -61,11 +61,28 @@ function Modal({ title, subtitle, actions, onClose, children }: { title: string;
   );
 }
 
+const PAGE = 100; // rows loaded per "Show more"
+
 export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () => void }) {
   const [data, setData] = useState<FileRows>();
   const [error, setError] = useState<string>();
-  useEffect(() => { api.rows(file.id).then(setData).catch((e) => setError(e.message)); }, [file.id]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  useEffect(() => { api.rows(file.id, 0, PAGE).then(setData).catch((e) => setError(e.message)); }, [file.id]);
   const gen = new Set(data?.generatedColumns);
+  const remaining = data ? data.totalRows - data.rows.length : 0;
+
+  async function showMore() {
+    if (!data) return;
+    setLoadingMore(true);
+    try {
+      const next = await api.rows(file.id, data.rows.length, PAGE);
+      setData({ ...next, rows: [...data.rows, ...next.rows] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <Modal
@@ -101,6 +118,16 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
             ))}
           </tbody>
         </table>
+      )}
+      {data && (
+        <div className="mt-4 flex items-center justify-between gap-4 text-sm text-slate-500">
+          <span>Showing {data.rows.length.toLocaleString()} of {data.totalRows.toLocaleString()} rows</span>
+          {remaining > 0 && (
+            <button onClick={showMore} disabled={loadingMore} className="rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+              {loadingMore ? 'Loading…' : `Show ${Math.min(PAGE, remaining)} more`}
+            </button>
+          )}
+        </div>
       )}
     </Modal>
   );
