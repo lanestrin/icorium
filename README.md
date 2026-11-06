@@ -16,6 +16,9 @@ npm run verify    # every test + the production build
 
 ## Tests
 
+For the proposed Vercel multi-service setup and durable private Blob storage,
+see [deployment configuration and outstanding checks](blueprint/vercel-deployment.md).
+
 | Level | File | What it proves |
 | --- | --- | --- |
 | Unit (Vitest) | `server/src/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths |
@@ -59,4 +62,4 @@ shared/   types shared by client and server
 
 - **New partner CSV schema:** add one entry to `ADAPTERS` in `server/src/adapters/index.ts`, listing the column names and the unit factors.
 - **New processing function:** add an entry to `processors` in `server/src/processing/index.ts`, plus its label in `PROCESSORS` in `shared/types.ts`. Add the id to the Zod enum in `routes/files.ts`.
-- **Different storage:** only `server/src/lib/storage.ts` reads or writes the disk.
+- **Storage:** `server/src/lib/storage.ts` owns local files and selects the private Blob adapter in `server/src/lib/blob-storage.ts` when a server-side Blob token is configured. Deployed instances share durable objects; local development keeps file storage.

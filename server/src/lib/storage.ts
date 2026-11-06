@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { FileMeta } from '../../../shared/types';
 import { httpError, parseCsv } from './csv';
 import { findProblems } from '../processing';
+import { createBlobStorage } from './blob-storage';
 
 // Local-file storage. Swap this module to change persistence; nothing else touches the disk.
 // RECLAIM_DATA_DIR lets tests use their own throwaway folder.
@@ -12,12 +13,15 @@ const FILES = path.join(DATA, 'files');
 const META = path.join(DATA, 'meta.json');
 const SAMPLES = path.resolve(import.meta.dirname, '../../../sample-data');
 
-fs.mkdirSync(FILES, { recursive: true });
-let metas: FileMeta[] = fs.existsSync(META) ? JSON.parse(fs.readFileSync(META, 'utf8')) : [];
+const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN && !process.env.RECLAIM_DATA_DIR;
+if (process.env.VERCEL && !useBlob && !process.env.RECLAIM_DATA_DIR)
+  throw new Error('Connect a private Vercel Blob store with BLOB_READ_WRITE_TOKEN before running the API on Vercel.');
+if (!useBlob) fs.mkdirSync(FILES, { recursive: true });
+let metas: FileMeta[] = !useBlob && fs.existsSync(META) ? JSON.parse(fs.readFileSync(META, 'utf8')) : [];
 const persist = () => fs.writeFileSync(META, JSON.stringify(metas, null, 2));
 const filePath = (id: string) => path.join(FILES, `${id}.csv`);
 
-export const storage = {
+const localStorage = {
   list: () => [...metas].sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt)),
 
   get(id: string) {
@@ -26,11 +30,11 @@ export const storage = {
     return m;
   },
 
-  read: (id: string) => fs.readFileSync(filePath(storage.get(id).id), 'utf8'),
+  read: (id: string) => fs.readFileSync(filePath(localStorage.get(id).id), 'utf8'),
 
   /** Updates stored metadata fields of one file. */
   patch(id: string, fields: Partial<Omit<FileMeta, 'id'>>) {
-    const meta = Object.assign(storage.get(id), fields);
+    const meta = Object.assign(localStorage.get(id), fields);
     persist();
     return meta;
   },
@@ -50,13 +54,20 @@ export const storage = {
   },
 };
 
+export const storage = useBlob
+  ? createBlobStorage(process.env.RECLAIM_BLOB_PREFIX ?? `icorium/${process.env.VERCEL_ENV ?? 'development'}`)
+  : localStorage;
+
 /** First run only: load the synthetic CSVs so the demo has data. Delete server/data to reset. */
-export function seedSamples() {
-  if (fs.existsSync(META)) return;
+export async function seedSamples() {
+  if (!useBlob && fs.existsSync(META)) return;
   for (const name of fs.readdirSync(SAMPLES).filter((f) => f.endsWith('.csv')).sort()) {
     const text = fs.readFileSync(path.join(SAMPLES, name), 'utf8');
     const { headers, rows } = parseCsv(text);
     const problemRows = findProblems(headers, rows).total;
-    storage.save({ name, text, rows: rows.length, columns: headers.length, status: problemRows > 0 ? 'Needs Review' : 'Ready', problemRows });
+    const input = { name, text, rows: rows.length, columns: headers.length,
+      status: problemRows > 0 ? 'Needs Review' as const : 'Ready' as const, problemRows };
+    if ('seed' in storage) await storage.seed(input);
+    else await storage.save(input);
   }
 }

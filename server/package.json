@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.7",
+    "@vercel/blob": "2.4.0",
     "fastify": "^5.12.8",
     "papaparse": "^5.7.0",
     "zod": "^4.6.7"
