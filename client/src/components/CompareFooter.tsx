@@ -1,8 +1,16 @@
 import { useState } from 'react';
 import { ArrowLeftRight, ChevronUp, Scale } from 'lucide-react';
-import type { FileMeta } from '../../../shared/types';
+import { PROCESSORS, type FileMeta } from '../../../shared/types';
+
+/** Short dropdown label, e.g. "partner_a_baseline · Mass". Uses the source file when known, else the result's own name. */
+function shortLabel(f: FileMeta, files: FileMeta[]) {
+  const source = files.find((s) => s.id === f.sourceId)?.name ?? f.name.replace(/^result_/, '').replace(new RegExp(`_${f.processor}\\.csv$`, 'i'), '');
+  const fn = PROCESSORS.find((p) => p.id === f.processor)?.short ?? '';
+  return `${source.replace(/\.csv$/i, '')} · ${fn}`;
+}
 
 interface Props {
+  files: FileMeta[];
   results: FileMeta[];
   a: string;
   b: string;
@@ -18,7 +26,7 @@ const Title = () => (
   </>
 );
 
-export function CompareFooter({ results, a, b, setA, setB, onCompare }: Props) {
+export function CompareFooter({ files, results, a, b, setA, setB, onCompare }: Props) {
   const [open, setOpen] = useState(false); // mobile only; always expanded on lg+
   const fa = results.find((f) => f.id === a);
   const fb = results.find((f) => f.id === b);
@@ -45,7 +53,7 @@ export function CompareFooter({ results, a, b, setA, setB, onCompare }: Props) {
         className="w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm outline-none focus:border-blue-400 lg:w-72"
       >
         <option value="">Select result file…</option>
-        {options.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+        {options.map((f) => <option key={f.id} value={f.id} title={f.name}>{shortLabel(f, files)}</option>)}
       </select>
     </label>
   );

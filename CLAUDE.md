@@ -19,6 +19,7 @@ Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of thre
 - **Commit and push only when the person asks.** Commit messages end with the attribution line from the session.
 - **Never edit the sample CSVs.** They are the person's test data; adapters adapt to them, not the other way round.
 - **Results keep every original column.** Processors only append columns.
+- **Result file names:** `result_<input name without .csv>_<function id>.csv`, e.g. `result_partner_a_baseline_mass.csv`. Function ids are fixed: `validation`, `mass`, `classification`. Re-running the same function on the same input replaces the earlier result (no timestamps or versions). The name is only a label: a result is recognised by its columns, so a renamed result still uploads and compares.
 - Only `server/src/lib/storage.ts` touches the disk.
 
 ## Ending a turn

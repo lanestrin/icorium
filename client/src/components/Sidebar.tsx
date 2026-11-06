@@ -10,7 +10,7 @@ interface Props {
   canRun: boolean;
   running: boolean;
   uploading: boolean;
-  selectedName?: string;
+  selectedNames: string[];
 }
 
 export function Sidebar(p: Props) {
@@ -61,8 +61,10 @@ export function Sidebar(p: Props) {
       </section>
 
       <div>
-        <p className="mb-2 truncate text-sm text-slate-500">
-          {p.selectedName ? <>Input: <span className="font-medium text-slate-700">{p.selectedName}</span></> : 'Click an input file in the list to select it'}
+        <p className="mb-2 truncate text-sm text-slate-500" title={p.selectedNames.join(', ')}>
+          {p.selectedNames.length === 0 && 'Check one or more input files in the list'}
+          {p.selectedNames.length === 1 && <>Input: <span className="font-medium text-slate-700">{p.selectedNames[0]}</span></>}
+          {p.selectedNames.length > 1 && <>Input: <span className="font-medium text-slate-700">{p.selectedNames.length} files selected</span></>}
         </p>
         <button
           disabled={!p.canRun}
@@ -70,7 +72,7 @@ export function Sidebar(p: Props) {
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3.5 font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {p.running ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
-          {p.running ? 'Processing…' : 'Run Processing'}
+          {p.running ? 'Processing…' : `Run Processing${p.selectedNames.length > 1 ? ` (${p.selectedNames.length})` : ''}`}
         </button>
       </div>
     </aside>

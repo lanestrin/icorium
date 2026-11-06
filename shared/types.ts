@@ -1,7 +1,7 @@
 export const PROCESSORS = [
-  { id: 'validation', label: 'Composition Validation', description: 'Check mixture percentages (≈100%)' },
-  { id: 'mass', label: 'Component Mass Calculation', description: 'Calculate mass of each refrigerant (kg)' },
-  { id: 'classification', label: 'Batch Classification', description: 'Categorize batches by composition' },
+  { id: 'validation', label: 'Composition Validation', short: 'Validation', description: 'Check mixture percentages (≈100%)' },
+  { id: 'mass', label: 'Component Mass Calculation', short: 'Mass', description: 'Calculate mass of each refrigerant (kg)' },
+  { id: 'classification', label: 'Batch Classification', short: 'Classification', description: 'Categorize batches by composition' },
 ] as const;
 
 export type ProcessorId = (typeof PROCESSORS)[number]['id'];

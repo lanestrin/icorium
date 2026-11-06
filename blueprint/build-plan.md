@@ -23,7 +23,7 @@ This is a general-purpose interview exercise illustrated with synthetic refriger
 
 - **Left control column:** CSV upload/drop area; three processing functions; selected input filename; **Run Processing** button.
 - **Right file workspace:** one-line “CSV Files” heading/subtitle; search; upload-date range filter; status filter (**All / Ready / Processing / Processed / Error**); scrollable file table with filename, rows, columns, upload date, status, **Preview** and **Download**.
-- **Select a file for processing:** click its table row; highlight the active input row. Do *not* add file-selection checkboxes or compare buttons to each row.
+- **Select files for processing:** each input row has a checkbox (or click the row); a header checkbox selects all visible inputs. **Run Processing** processes every checked file in turn with the chosen function. Result rows are not selectable. Do *not* add compare buttons to each row.
 - **Processing feedback:** the selected input row displays a spinner and **Processing…** while the request runs; if it fails, show **Error** and an actionable message. On success, keep the input available and add a **new processed result file** to the list.
 - **Fixed bottom comparison footer:** **File A** dropdown, **File B** dropdown, **Compare Selected**. Populate with compatible processed results. Button disabled until two distinct files are selected.
 

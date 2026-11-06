@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, CircleAlert, CircleHelp, Ellipsis, Filter, Search, X } from 'lucide-react';
+import { Calendar, Check, CircleAlert, CircleHelp, Ellipsis, Filter, Search, X } from 'lucide-react';
 import type { CompareResult, FileMeta, ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
@@ -11,12 +11,13 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function App() {
   const [files, setFiles] = useState<FileMeta[]>([]);
-  const [selectedId, setSelectedId] = useState<string>();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [processor, setProcessor] = useState<ProcessorId>('validation');
-  const [processingId, setProcessingId] = useState<string>();
-  const [failedId, setFailedId] = useState<string>();
+  const [processingId, setProcessingId] = useState<string>(); // batches run one file at a time
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string>();
+  const [notice, setNotice] = useState<string>();
 
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
@@ -34,7 +35,11 @@ export default function App() {
   const filtersActive = !!(search || from || to || status !== 'All');
   const clearFilters = () => { setSearch(''); setFrom(''); setTo(''); setStatus('All'); };
 
-  const selected = files.find((f) => f.id === selectedId);
+  const selectedInputs = files.filter((f) => selectedIds.has(f.id) && f.status === 'Ready');
+  const toggle = (id: string) =>
+    setSelectedIds((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const toggleAll = (ids: string[], on: boolean) =>
+    setSelectedIds((s) => { const n = new Set(s); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; });
   const results = files.filter((f) => f.status === 'Processed');
   const visible = useMemo(
     () =>
@@ -42,12 +47,12 @@ export default function App() {
         const day = new Date(f.uploadedAt).toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
         return (
           f.name.toLowerCase().includes(search.toLowerCase()) &&
-          (status === 'All' || displayStatus(f, processingId, failedId) === status) &&
+          (status === 'All' || displayStatus(f, processingId, failedIds) === status) &&
           (!from || day >= from) &&
           (!to || day <= to)
         );
       }),
-    [files, search, status, from, to, processingId, failedId],
+    [files, search, status, from, to, processingId, failedIds],
   );
 
   async function upload(list: File[]) {
@@ -62,21 +67,34 @@ export default function App() {
     refresh();
   }
 
+  /** Processes every checked input file, one after another, with the chosen function. */
   async function run() {
-    if (!selected) return;
-    setProcessingId(selected.id);
-    setFailedId(undefined);
+    const batch = selectedInputs;
+    if (!batch.length) return;
     setError(undefined);
-    try {
-      const result = await api.process(selected.id, processor);
-      await refresh();
-      setPreview(result); // show the result preview right away
-    } catch (e) {
-      setFailedId(selected.id);
-      setError(`Processing failed: ${msg(e)}`);
-    } finally {
-      setProcessingId(undefined);
+    setNotice(undefined);
+    setFailedIds(new Set());
+    const failed = new Set<string>();
+    const errors: string[] = [];
+    const made: FileMeta[] = [];
+    for (const f of batch) {
+      setProcessingId(f.id);
+      try {
+        made.push(await api.process(f.id, processor));
+        await refresh();
+      } catch (e) {
+        failed.add(f.id);
+        errors.push(`${f.name}: ${msg(e)}`);
+      }
     }
+    setProcessingId(undefined);
+    setFailedIds(failed);
+    setSelectedIds(failed); // failed files stay checked so they can be retried
+    if (errors.length) setError(`Processing failed\n${errors.join('\n')}`);
+
+    if (made.length === 1) return setPreview(made[0]); // single file: show the result right away
+    if (made.length > 1) setNotice(`Processed ${made.length} files. Results are in the list${made.length === 2 ? ' and ready to compare below' : ''}.`);
+    if (made.length === 2) { setCompareA(made[0].id); setCompareB(made[1].id); }
   }
 
   async function compare() {
@@ -97,10 +115,10 @@ export default function App() {
           setProcessor={setProcessor}
           onUpload={upload}
           onRun={run}
-          canRun={!!selected && selected.status === 'Ready' && !processingId}
+          canRun={selectedInputs.length > 0 && !processingId}
           running={!!processingId}
           uploading={uploading}
-          selectedName={selected?.status === 'Ready' ? selected.name : undefined}
+          selectedNames={selectedInputs.map((f) => f.name)}
         />
 
         <main className="min-w-0 flex-1">
@@ -144,6 +162,13 @@ export default function App() {
             )}
           </div>
 
+          {notice && (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              <Check className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="flex-1">{notice}</span>
+              <button onClick={() => setNotice(undefined)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
+            </div>
+          )}
           {error && (
             <div className="mt-4 flex items-start gap-3 whitespace-pre-line rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -153,12 +178,21 @@ export default function App() {
           )}
 
           <div className="mt-5">
-            <FileTable files={visible} selectedId={selectedId} processingId={processingId} failedId={failedId} onSelect={setSelectedId} onPreview={setPreview} />
+            <FileTable
+              files={visible}
+              selectedIds={selectedIds}
+              processingId={processingId}
+              failedIds={failedIds}
+              locked={!!processingId}
+              onToggle={toggle}
+              onToggleAll={toggleAll}
+              onPreview={setPreview}
+            />
           </div>
         </main>
       </div>
 
-      <CompareFooter results={results} a={compareA} b={compareB} setA={setCompareA} setB={setCompareB} onCompare={compare} />
+      <CompareFooter files={files} results={results} a={compareA} b={compareB} setA={setCompareA} setB={setCompareB} onCompare={compare} />
 
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}
       {comparison && <CompareModal result={comparison} onClose={() => setComparison(undefined)} />}
