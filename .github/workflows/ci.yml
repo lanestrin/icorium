@@ -14,6 +14,11 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Playwright's image ships Chromium and its system libraries, which saves ~9 minutes per run.
+    # Its version must match @playwright/test in package-lock.json (checked below).
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v4
 
@@ -24,8 +29,12 @@ jobs:
 
       - run: npm ci
 
-      - name: Install Chromium for the browser tests
-        run: npx playwright install --with-deps chromium
+      - name: Check the Playwright version matches the container image
+        run: |
+          test "$(npx playwright --version)" = "Version 1.65.0" || {
+            echo "::error::@playwright/test is now $(npx playwright --version). Update the container image tag in ci.yml to match."
+            exit 1
+          }
 
       # Unit + API tests, client type-check and build, browser tests
       - run: npm run verify
