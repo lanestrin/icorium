@@ -5,7 +5,8 @@ import type { FileMeta } from '../../../shared/types';
 import { httpError, parseCsv } from './csv';
 
 // Local-file storage. Swap this module to change persistence; nothing else touches the disk.
-const DATA = path.resolve(import.meta.dirname, '../../data');
+// RECLAIM_DATA_DIR lets tests use their own throwaway folder.
+const DATA = path.resolve(process.env.RECLAIM_DATA_DIR ?? path.join(import.meta.dirname, '../../data'));
 const FILES = path.join(DATA, 'files');
 const META = path.join(DATA, 'meta.json');
 const SAMPLES = path.resolve(import.meta.dirname, '../../../sample-data');

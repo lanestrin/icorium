@@ -105,8 +105,8 @@ export default function App() {
   return (
     <div className="min-h-screen overflow-x-clip pb-32 text-slate-900">
       <div className="absolute right-6 top-4 flex gap-4 text-slate-600">
-        <button title="Upload a CSV, select it, choose a function and Run Processing. Compare two result files in the footer."><CircleHelp className="h-6 w-6" /></button>
-        <button title="More"><Ellipsis className="h-6 w-6" /></button>
+        <button aria-label="Help" title="Upload a CSV, check it, choose a function and Run Processing. Compare two result files in the footer."><CircleHelp className="h-6 w-6" /></button>
+        <button aria-label="More" title="More"><Ellipsis className="h-6 w-6" /></button>
       </div>
 
       <div className="flex flex-col gap-6 p-4 pt-16 sm:p-6 sm:pt-16 lg:flex-row">
@@ -136,9 +136,9 @@ export default function App() {
               <Calendar className="h-5 w-5 shrink-0 text-slate-600" />
               <span className="mr-1 font-semibold">Date Range</span>
               <span className="flex min-w-0 flex-1 items-center gap-2">
-                <input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+                <input type="date" aria-label="From date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
                 <span className="text-slate-400">–</span>
-                <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
+                <input type="date" aria-label="To date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
               </span>
             </div>
             <label className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm sm:w-auto">
@@ -163,17 +163,17 @@ export default function App() {
           </div>
 
           {notice && (
-            <div className="mt-4 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <div role="status" className="mt-4 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
               <Check className="mt-0.5 h-4 w-4 shrink-0" />
               <span className="flex-1">{notice}</span>
               <button onClick={() => setNotice(undefined)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
             </div>
           )}
           {error && (
-            <div className="mt-4 flex items-start gap-3 whitespace-pre-line rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div role="alert" className="mt-4 flex items-start gap-3 whitespace-pre-line rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
               <span className="flex-1">{error}</span>
-              <button onClick={() => setError(undefined)}><X className="h-4 w-4" /></button>
+              <button onClick={() => setError(undefined)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
             </div>
           )}
 

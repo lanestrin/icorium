@@ -1,4 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+const DESKTOP = '(min-width: 1024px)'; // Tailwind lg
+
+function useIsDesktop() {
+  const [desktop, setDesktop] = useState(() => window.matchMedia(DESKTOP).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(DESKTOP);
+    const onChange = () => setDesktop(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return desktop;
+}
 import { ArrowLeftRight, ChevronUp, Scale } from 'lucide-react';
 import { PROCESSORS, type FileMeta } from '../../../shared/types';
 
@@ -28,6 +41,7 @@ const Title = () => (
 
 export function CompareFooter({ files, results, a, b, setA, setB, onCompare }: Props) {
   const [open, setOpen] = useState(false); // mobile only; always expanded on lg+
+  const desktop = useIsDesktop();
   const fa = results.find((f) => f.id === a);
   const fb = results.find((f) => f.id === b);
   const reason =
@@ -68,7 +82,8 @@ export function CompareFooter({ files, results, a, b, setA, setB, onCompare }: P
 
       {/* Slides up on mobile; always visible on desktop */}
       <div className={`grid transition-[grid-template-rows] duration-300 ease-out lg:grid-rows-[1fr] ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-        <div className="overflow-hidden lg:overflow-visible">
+        {/* inert while collapsed, so Tab can't reach controls that are out of sight */}
+        <div className="overflow-hidden lg:overflow-visible" inert={!open && !desktop}>
           <div className="flex flex-col gap-3 pt-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-center lg:gap-8 lg:pt-0">
             <div className="hidden items-center gap-3 border-r border-slate-200 pr-8 lg:flex">
               <Title />

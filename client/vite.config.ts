@@ -4,5 +4,6 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { proxy: { '/api': 'http://localhost:3001' } },
+  // API_URL lets the browser tests point at their own API instance.
+  server: { proxy: { '/api': process.env.API_URL ?? 'http://localhost:3001' } },
 });

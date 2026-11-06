@@ -15,7 +15,8 @@ Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of thre
 
 - **Keep it simple.** No accounts, database, cloud, queues or extra layers (see "Do not add" in `blueprint/stack.md`). Prefer editing an existing file over adding one.
 - **Match the reference.** UI changes follow `blueprint/reference-ui.png` and must still work at phone width with no sideways page scroll.
-- **Verify before saying done.** Run `npm run verify` and report the real result. Say when a UI change was not looked at in a browser.
+- **Verify before saying done.** Run `npm run verify` and report the real result. It includes the browser tests, so a passing run means the acceptance checklist works in a real browser; still say when a visual change was not looked at.
+- **Every change keeps or adds tests.** Rules and calculations → `server/src/core.test.ts`. Endpoints and errors → `server/src/api.test.ts`. Anything a user does in the UI → `e2e/*.spec.ts`. Find elements by role and accessible name (`getByRole`), not CSS classes; set up unrelated state through the API (`processViaApi`); give uploaded files a `uniqueName` so tests don't depend on each other.
 - **Commit and push only when the person asks.** Commit messages end with the attribution line from the session.
 - **Never edit the sample CSVs.** They are the person's test data; adapters adapt to them, not the other way round.
 - **Results keep every original column.** Processors only append columns.
@@ -54,9 +55,13 @@ Examples:
 
 ```bash
 npm run dev       # API :3001 + UI :5173 (Vite picks the next free port if taken)
-npm run verify    # server tests + client type-check and build
-npm test          # server tests only
+npm run verify    # server tests + client type-check and build + browser tests (~30 s)
+npm test          # unit + API tests only (~2 s)
+npm run test:e2e  # browser tests only; add --ui to watch them, -g "<name>" for one
 ```
+
+- Browser tests start their own API (:3101) and UI (:5199) with a throwaway data folder, so they never touch the dev server's data. On failure, `npx playwright show-report` shows a screenshot and a step-by-step trace.
+- First time on a new machine: `npx playwright install chromium`.
 
 - Reset the demo data: stop the servers, delete `server/data/`, start again.
 - On Windows, stopping a background `npm run dev` can leave the tsx server holding port 3001. Check the port and stop only that process.
