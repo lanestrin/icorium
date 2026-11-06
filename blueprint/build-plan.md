@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** Planning document — implementation is not yet complete.
+**Status:** Baseline implemented; partial processing and final manual readiness remain. See the next feature in section 4.
 
 ## 1. What “done” means
 
@@ -59,127 +59,145 @@ reclaim-studio/
 
 A single repository and **one API** are sufficient. Avoid microservices, task queues, authentication, and a database for the first version.
 
-## 4. Implementation phases
+## 4. Feature build order
 
-### Phase 1 — Set up project and sample data
+Each numbered item is one work item: one branch, one reviewed scope, one small
+PR. This replaces the phase checklist; the requirements elsewhere in this
+plan still apply. IDs retain their original phase prefix for traceability.
 
-**Build**
-- [ ] Create Vite React/TypeScript client and Fastify/TypeScript server.
-- [ ] Add Tailwind, Lucide, Papa Parse, Zod, Recharts, and Vitest.
-- [ ] Configure local client-to-API development requests and a shared TypeScript data contract.
-- [ ] Copy the five synthetic partner CSVs into `sample-data/`.
-- [ ] Add concise startup commands and configuration notes to the README.
+### What to build next
 
-**Done when:** both apps start locally on Windows/macOS-compatible Node.js commands, with no database or cloud account required.
+**Next: 8.1 — Shared row validation and consistent result columns.**
+Branch: `feature/8.1-shared-row-validation`.
 
-### Phase 2 — Implement the finalized UI as a static shell
+Start here because file status and confirmation UI need reliable, consistent
+validation results. Do not start the warning dialog before its dependencies.
+Prepare the scope and acceptance criteria for review before implementing it.
 
-**Build**
-- [ ] Lay out the left controls, file table, filters, and fixed comparison footer.
-- [ ] Add the CSV Preview, Processed Results, and Comparison modals.
-- [ ] Support selected-row highlighting and disabled button states.
-- [ ] Make the table body scroll within the available desktop height while the comparison footer remains fixed.
-- [ ] Check narrow-screen behavior and keyboard/focus access to dialogs and controls.
+**Selection rule:** take the first unchecked item below whose dependencies are
+satisfied. Completed baseline capabilities are not new work. If an item is
+blocked, name the blocker and the next eligible item; do not silently skip it.
+After completing an item, update this recommendation to the next eligible ID.
+For a future request such as "what next?", report the ID, title, branch, why it
+is next, and one concrete starting action.
 
-**Done when:** the interface visually matches the approved mockup with representative fixture content, without adding extra screens.
+### Rules for features
 
-### Phase 3 — Import, normalize, validate, and preview CSVs
+- Stable IDs are never reused or renumbered. Split a large item into lettered
+  sub-items (`8.1a`, `8.1b`) before implementation if necessary; document their
+  order and dependencies. Keep each PR reviewable.
+- Describe scope, dependencies, acceptance and verification before building.
+  Review the affected code; the plan describes intent, not proof of behavior.
+- Mark an item complete only when its acceptance criteria have evidence. Add
+  the PR or commit and result beside it. Do not tick UI checks based only on a
+  build. Existing unchecked baseline phases were not evidence of missing code.
+- Use a named feature branch, then implement and run `npm run verify`, use
+  `/complete` to prepare review drafts, and wait for `/approve` before commit,
+  push and PR publication. The person squash-merges the PR.
+- Automated verification is server unit/API tests and client type-check/build.
+  Browser tests are removed while the UI is being edited. Record manual UI
+  observations separately; restore browser tests only when requested.
+- Bugs use a `fix/` branch. Unspecified visual refinements need a concrete
+  request or approved reference change before becoming features.
 
-**Build**
-- [ ] API accepts **one CSV per upload action** using the browser's normal file selector (users can upload more files over time).
-- [ ] Parse headers and rows; preserve the **unchanged original columns and original cell strings**.
-- [ ] Detect the fictional partner schema and normalize IDs, dates, units, and three refrigerant percentages.
-- [ ] Validate missing values, nonnumeric values, composition totals, duplicates, and unsupported headers; do not silently replace invalid values with zero.
-- [ ] Store source CSVs locally, plus a small metadata index (filename, ID, upload time, row/column counts, status, source type).
-- [ ] Provide list/search/date/status filters and a paginated or limited preview through the API.
+### Existing implementation baseline (former phases 1–7)
 
-**Done when:** all five example CSVs upload and preview, and the intentional malformed rows are flagged with understandable messages. Original data remains available for export.
+These capabilities exist in the current code; this is an inventory, not a claim
+that every manual acceptance check has passed. Preserve them during new work.
 
-### Phase 4 — Three processing functions and results preview
-
-**Build**
-- [ ] **Composition Validation:** append validation status and issues for each row.
-- [ ] **Component Mass Calculation:** append `r32_mass_kg`, `r125_mass_kg`, and `r134a_mass_kg` from normalized total mass and composition; leave derived numeric values blank/invalid where inputs are unusable.
-- [ ] **Batch Classification:** append a simple category based on documented, **demo-only** composition rules; do not suggest it is Icorium's actual operating policy.
-- [ ] Keep each function in its own module with a consistent interface.
-- [ ] Process **every row** (including invalid rows, which receive an explicit error/result state).
-- [ ] On **Run Processing**, show the selected source row as **Processing…**, then create a new result entry and open the results modal. Surface errors visibly.
-
-**Done when:** each selectable function processes every row of at least one sample file, and the corresponding result columns appear in the modal.
-
-### Phase 5 — Export processed CSVs
-
-**Build**
-- [ ] Generate a **new CSV file** for each processing run.
-- [ ] Preserve every original input header and cell value, in original order; **append** new result columns without overwriting the originals.
-- [ ] Support CSV escaping for commas, quotes, and line breaks.
-- [ ] Let users download a processed result and preview it again from the file list.
-- [ ] Keep processed output in local file storage with its function name, source file ID, and creation time.
-
-**Done when:** a downloaded output opens as CSV, has the same number of data rows as its source, includes all original columns unchanged, and includes the correct new columns.
-
-### Phase 6 — Compare two saved result files
-
-**Build**
-- [ ] Populate footer **File A** / **File B** dropdowns with previously generated result files.
-- [ ] Let users import two saved result CSVs from disk too, so comparison **does not depend on the current app session**.
-- [ ] Enforce two distinct files and validate compatible processing-result schemas before comparing.
-- [ ] Display a graph and a small summary table inside the **Comparison** modal.
-- [ ] For mass-calculation outputs, compare average or total calculated component masses **using explicitly labeled units and aggregation**. For other functions, show a compatible metric (e.g., validation counts or classification distribution). Do not compare unrelated metrics as if equivalent.
-- [ ] If files cannot be compared, show a plain-language explanation rather than an empty graph.
-
-**Done when:** two previously exported CSVs can be loaded and the modal clearly shows at least one genuine difference between them.
-
-### Phase 7 — Test and polish
-
-**Automated tests (Vitest)**
-- [ ] Partner A/B/C headers and unit conversions (kg, lb, g; percentage vs fraction).
-- [ ] Missing, invalid, negative, duplicate, and inconsistent-composition rows.
-- [ ] Exactly the selected function runs against **all** rows; unchanged source fields.
-- [ ] Output row count, column preservation, formatting, and CSV escaping.
-- [ ] Comparison calculations, file compatibility, and error messages.
-
-**Manual checks**
-- [ ] Upload each sample CSV using a normal file chooser.
-- [ ] Preview large-enough files without overflowing the page.
-- [ ] Run all three functions; observe spinner, success, and failure states.
-- [ ] Download a result, reopen it, and confirm source + generated columns.
-- [ ] Select two saved result CSVs and inspect the comparison graph.
-- [ ] Search by filename and filter by date and status.
-- [ ] Confirm keyboard use and modal close/focus behavior.
-- [ ] Test on the intended interview computer/browser, plus one alternate browser if possible.
-
-**Done when:** every item in the interview brief is demonstrated from the UI and basic failure cases do not crash the app.
-
-### Phase 8 — Partial processing (planned, not built)
-
-**Principle:** never silently correct bad data or produce misleading results. Validate automatically → flag errors → process valid rows → keep every row in the output. Only block a whole file when it is unreadable or cannot be mapped to a partner schema.
-
-| Error type | Example | Behaviour |
+| Former phase | Existing capability | Evidence/location |
 | --- | --- | --- |
-| File-level | Missing required columns, unsupported format, malformed CSV | Block (already built) |
-| Row-level | Missing mass, negative percentage, non-numeric value, duplicate batch ID | Skip that row's calculation; keep the row with its reason |
-| Warning | Extra columns, total within the ±0.5 % rounding tolerance | Allow (already allowed; no separate warning list, to avoid noise from rows at 99.99 %) |
+| 1 | Vite/React client, Fastify API, shared contracts, local sample data and startup commands | `package.json`, `client/`, `server/`, `shared/types.ts`, `sample-data/`, `README.md` |
+| 2 | Two-column workspace, file table, filters, selection, preview/results/comparison dialogs and fixed/collapsible comparison footer | `client/src/App.tsx`, `client/src/components/`; visual and keyboard review remains part of 7.1 |
+| 3 | Upload, schema detection, normalization, validation, file metadata and paginated preview | `server/src/adapters/`, `server/src/routes/files.ts`, `server/src/lib/`, core/API tests |
+| 4 | Validation, component mass and demo classification; every row retained; processing feedback and results preview | `server/src/processing/index.ts`, `shared/types.ts`, `client/src/App.tsx`; unified invalid-row behavior remains 8.1 |
+| 5 | CSV export preserving source headers/values, generated columns, escaping, preview/download and local storage | `server/src/lib/csv.ts`, `server/src/lib/storage.ts`, core/API tests |
+| 6 | Two compatible saved or re-uploaded results, schema-based detection, comparison metrics/graphs and readable errors | `server/src/lib/compare.ts`, routes, `client/src/components/Modals.tsx`, core/API tests |
+| 7 | Vitest unit/API tests and client type-check/build | `server/src/core.test.ts`, `server/src/api.test.ts`, `npm run verify`; manual interview checks remain open |
 
-| Function | Behaviour with invalid rows |
-| --- | --- |
-| Composition Validation | Analyse every row and report its errors (no warning step: finding problems is its job) |
-| Component Mass Calculation | Calculate valid rows; invalid rows get empty mass values |
-| Batch Classification | Classify valid rows; invalid rows get `Needs review` |
+Result names remain `result_<input name without .csv>_<function id>.csv`.
+Re-running the same function replaces that result. A result is recognized by
+its columns even if renamed. Preserve all original rows, headers, cell strings
+and column order; processors append generated columns only. Do not edit samples.
 
-**Already in place:** file-level blocking, invalid rows kept with no made-up values, Validation runs on every row, problem rows listed per file in the list, preview and comparison.
+### M8 — Partial processing
 
-**Build**
-- [ ] Every result ends with the same two columns: `processing_status` (`Valid` / `Invalid`) and `validation_errors` (the reasons, empty when valid). They replace `validation_status`/`validation_message` and `mass_status`; Validation keeps `composition_total_pct`.
-- [ ] Classification writes `Needs review` (not `Unclassifiable`) for invalid rows.
-- [ ] One definition of "invalid" for all functions: the Composition Validation rules, including duplicate and missing batch IDs. A row tagged invalid is never also calculated.
-- [ ] Input files with invalid rows show the status **Needs Review** instead of Ready, with an "N invalid" tag; result files keep **Processed** with the tag. Add Needs Review to the Status filter.
-- [ ] **Data Quality Warning** dialog before Mass or Classification runs on files with invalid rows: per file, valid rows and rows with errors; text "Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values."; buttons **Cancel** and **Process Valid Rows**.
-- [ ] Update the result-file detection, README demo steps and tests (unit, API, browser) for the new columns, status and dialog.
+**Principle:** never silently correct bad data or calculate misleading results.
+Validate every row, process valid rows, and keep invalid rows with their reasons.
+Block a whole file only when it is unreadable or cannot map to a partner schema.
 
-**Done when:** for each sample file, Mass and Classification results have 24 (B follow-up: 23) `Valid` rows with calculated values and the planted rows `Invalid` with their reason; the warning dialog appears for those functions and not for Validation; Cancel processes nothing.
+| Error type | Example | Required behavior |
+| --- | --- | --- |
+| File-level | Missing required columns, unsupported format, malformed CSV | Reject with a clear message; existing behavior |
+| Row-level | Missing mass, negative percentage, nonnumeric value, missing or duplicate batch ID | Keep the row and reason; skip its calculation |
+| Allowed input | Extra columns, composition within ±0.5 percentage points of 100% | Allow; do not add a noisy warning list for rounding |
 
-**Interview answer — "What happens when someone uploads a CSV with bad data?"** Unreadable or unmappable files are rejected with a clear message. Otherwise every row is checked; valid rows are processed, invalid rows stay in the output marked `Invalid` with the reason and no calculated values, and the user is warned before calculating on a file with problems.
+- [ ] **8.1** `feature/8.1-shared-row-validation` — Use the same Composition Validation rules for all three functions, including missing and duplicate batch IDs. End every result with `processing_status` (`Valid` / `Invalid`) and `validation_errors` (empty when valid), replacing `validation_status`, `validation_message` and `mass_status`. Validation retains `composition_total_pct`; invalid mass rows have empty calculated values and invalid classification rows use `Needs review`. Update result detection and comparison so newly exported or renamed/re-uploaded results work in this same PR.
+
+  **Depends on:** existing processing, export and comparison baseline.
+  **Done when:** unit/API tests prove consistent invalid-row decisions across
+  all functions, unchanged source columns and row counts, correct final column
+  order, blank invalid mass values, `Needs review` classification, and result
+  recognition/download/re-upload/comparison for the new schema. For each sample,
+  expect 24 valid rows (23 for B follow-up) with the known invalid rows retained.
+  Review existing saved-result compatibility before building; document whether
+  legacy columns remain accepted rather than silently breaking saved files.
+  **Verification:** extend `server/src/core.test.ts` and `server/src/api.test.ts`;
+  run `npm run verify`. No new UI or browser testing framework in this feature.
+
+- [ ] **8.2** `feature/8.2-needs-review-status` — Show invalid input files as **Needs Review** with an **N invalid** tag and add that status to the filter. Results remain **Processed** with the invalid-row tag. Keep processing/error feedback and file eligibility consistent with the new input status.
+
+  **Depends on:** 8.1.
+  **Done when:** metadata/list API and UI agree on status and invalid counts;
+  Ready inputs have no invalid rows; Needs Review inputs remain selectable;
+  result files remain unselectable for processing; the status filter includes
+  and correctly filters Needs Review. Existing stored metadata is handled
+  consistently rather than leaving older files mislabeled.
+  **Verification:** API tests for statuses/counts; `npm run verify`; manual
+  list, filtering and selection checks reported separately.
+
+- [ ] **8.3** `feature/8.3-data-quality-warning` — Before Mass or Classification runs on selected inputs with invalid rows, show a **Data Quality Warning** dialog with valid/error row counts per file. Explain: "Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values." Provide **Cancel** and **Process Valid Rows**. Validation runs without this warning.
+
+  **Depends on:** 8.1 and 8.2.
+  **Done when:** a mixed selection reports each affected file correctly;
+  Cancel sends no processing requests; confirmation processes the selected
+  files once; clean inputs and Validation do not trigger the warning. Counts
+  and subsequent processing refer to the same selected files. Dialog focus,
+  close behavior and narrow-screen layout are checked manually.
+  **Verification:** unit/API coverage for any new logic or endpoint changes;
+  `npm run verify`; manual confirm/cancel, multi-file, keyboard and phone checks.
+
+- [ ] **8.4** `feature/8.4-partial-processing-demo` — Update README examples and the interview walkthrough for the new columns, Needs Review status and confirmation dialog; verify all three functions against all five samples and the saved-result round trip.
+
+  **Depends on:** 8.1–8.3.
+  **Done when:** the documented walkthrough matches the running UI; sample
+  counts match 8.1; invalid rows remain with reasons and no invented values;
+  Validation has no confirmation step; incompatible comparisons still explain
+  the error. Record the actual manual observations and remaining limitations.
+  **Verification:** `npm run verify` and the updated manual demo. Do not
+  reintroduce browser tests or change the sample CSVs.
+
+**Interview answer after M8 is built:** unreadable/unmappable files are rejected;
+otherwise every row is checked, valid rows are processed, invalid rows stay in
+the output marked Invalid with their reason and no calculated values, and the
+user confirms before calculating on a file with problems. This is target
+behavior until 8.1–8.4 are complete, not a claim about today's application.
+
+### M7 — Final interview readiness
+
+- [ ] **7.1** `feature/7.1-interview-readiness` — Complete the final manual acceptance pass after partial processing and any explicitly requested UI changes. This is a final integration pass, not a redesign or permission to add unspecified features.
+
+  **Depends on:** 8.1–8.4 and any subsequently approved UI feature affecting the demo.
+  **Done when:** upload all five samples through the chooser; preview large
+  files; run all three functions and inspect spinner/success/error behavior;
+  download/reopen a result preserving original and generated columns; compare
+  two saved results and inspect the graph; check search/date/status filters,
+  keyboard/modal focus and phone layout against `blueprint/reference-ui.png`.
+  Run on the intended interview browser and one alternate if available; record
+  any unavailable environment as not checked. Complete section 9 only from
+  evidence. P0 failures block readiness; report any P1/P2 limitations.
+  **Verification:** `npm run verify` plus documented manual results. A client
+  build alone never proves browser interaction or visual match.
 
 ## 5. Minimal API outline (suggested, not prescribed)
 
@@ -188,9 +206,9 @@ A single repository and **one API** are sufficient. Avoid microservices, task qu
 | Upload CSV | `POST /api/files` | File ID + metadata |
 | List/filter files | `GET /api/files` | Files with status and counts |
 | Preview rows | `GET /api/files/:id/preview` | Headers + limited/pageable rows |
-| Run one function | `POST /api/files/:id/process` | Result file ID + status |
+| Run one function | `POST /api/process` | Result file ID + status |
 | Download CSV | `GET /api/files/:id/download` | Original or processed CSV |
-| Compare two results | `POST /api/compare` | Compatible comparison metrics/chart data |
+| Compare two results | `GET /api/compare?a=<id>&b=<id>` | Compatible comparison metrics/chart data |
 
 For the **interview-sized datasets**, synchronous processing is acceptable if responsive. Still show a Processing state during the request; don't add a queue unless measured workloads justify it.
 
