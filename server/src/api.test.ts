@@ -1,10 +1,12 @@
 // API tests: the real Fastify app, called in memory with app.inject(), using a throwaway data folder.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { FileMeta, FileRows, ProcessorId } from '../../shared/types';
+import { parseCsv } from './lib/csv';
+import { processors } from './processing';
 
 // Storage reads RECLAIM_DATA_DIR when first imported, so set it before loading the app.
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reclaim-api-'));
@@ -13,7 +15,7 @@ const { buildApp } = await import('./app');
 
 const SAMPLES = path.resolve(import.meta.dirname, '../../sample-data');
 const sample = (name: string) => fs.readFileSync(path.join(SAMPLES, name), 'utf8');
-const MASS_COLUMNS = ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status'];
+const MASS_COLUMNS = ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'processing_status', 'validation_errors'];
 
 let app: FastifyInstance;
 beforeAll(async () => { app = await buildApp(false); });
@@ -21,30 +23,6 @@ afterAll(async () => {
   await app.close();
   fs.rmSync(dataDir, { recursive: true, force: true });
 });
-
-const listFiles = async () => (await app.inject('/api/files')).json<FileMeta[]>();
-const fileNamed = async (name: string) => {
-  const f = (await listFiles()).find((x) => x.name === name);
-  if (!f) throw new Error(`no file named ${name}`);
-  return f;
-};
-const rowsOf = async (id: string) => (await app.inject(`/api/files/${id}/rows`)).json<FileRows>();
-const processFile = (fileId: string, processor: string) => app.inject({ method: 'POST', url: '/api/process', payload: { fileId, processor } });
-const processSample = async (name: string, processor: ProcessorId) => (await processFile((await fileNamed(name)).id, processor)).json<FileMeta>();
-const compare = (a: string, b: string) => app.inject(`/api/compare?a=${a}&b=${b}`);
-
-/** Sends a real multipart upload, as the browser's file chooser does. */
-async function upload(name: string, text: string) {
-  const form = new FormData();
-  form.append('file', new Blob([text], { type: 'text/csv' }), name);
-  const req = new Request('http://localhost/', { method: 'POST', body: form });
-  return app.inject({
-    method: 'POST',
-    url: '/api/files',
-    headers: { 'content-type': req.headers.get('content-type')! },
-    payload: Buffer.from(await req.arrayBuffer()),
-  });
-}
 
 describe('loading files', () => {
   it('starts with the five sample files, ready to process', async () => {
@@ -127,9 +105,9 @@ describe('processing', () => {
   ])('flags exactly the planted problem in %s', async (name, rows, message) => {
     const result = await processSample(name, 'validation');
     const { rows: out } = await rowsOf(result.id);
-    const flagged = out.flatMap((r, i) => (r.validation_status === 'ERROR' ? [i + 1] : []));
+    const flagged = out.flatMap((r, i) => (r.processing_status === 'Invalid' ? [i + 1] : []));
     expect(flagged).toEqual(rows);
-    for (const row of rows) expect(out[row - 1].validation_message).toContain(message);
+    for (const row of rows) expect(out[row - 1].validation_errors).toContain(message);
   });
 
   it.each(['validation', 'mass', 'classification'] as const)('runs %s on every row and keeps every original column and value', async (processor) => {
@@ -148,10 +126,10 @@ describe('processing', () => {
   it('calculates component masses in kg from pounds', async () => {
     const { id } = await processSample('partner_b_baseline.csv', 'mass');
     const { headers, rows } = await rowsOf(id);
-    expect(headers.slice(-4)).toEqual(MASS_COLUMNS);
+    expect(headers.slice(-5)).toEqual(MASS_COLUMNS);
     // Row 1: 266.713 lb x 37.09 % R-32
     expect(Number(rows[0].r32_mass_kg)).toBeCloseTo(266.713 * 0.45359237 * 0.3709, 2);
-    expect(rows[4]).toMatchObject({ r32_mass_kg: '', mass_status: 'Skipped (invalid input)' });
+    expect(rows[4]).toMatchObject({ r32_mass_kg: '', processing_status: 'Invalid' });
   });
 
   it('replaces the earlier result when the same function runs again', async () => {
@@ -244,3 +222,157 @@ describe('comparing results', () => {
     expect((await compare(result.id, input.id)).json().message).toContain('is an input file');
   });
 });
+
+describe('current result contract', () => {
+  const samples = [
+    ['partner_a_baseline.csv', [8]], ['partner_a_followup.csv', [13]],
+    ['partner_b_baseline.csv', [5]], ['partner_b_followup.csv', [10, 11]],
+    ['partner_c_baseline.csv', [18]],
+  ] as const;
+  const cases = samples.flatMap(([name, invalid]) =>
+    (['validation', 'mass', 'classification'] as const).map((id) => ({ name, invalid, id })));
+
+  it.each(cases)('$name / $id retains every row and round-trips its exact schema', async ({ name, invalid, id }) => {
+    const source = await fileNamed(name);
+    const before = await rowsOf(source.id);
+    const result = await processSample(name, id);
+    const after = await rowsOf(result.id);
+    expect(after.headers).toEqual([...before.headers, ...processors[id].columns]);
+    expect(result.columns).toBe(after.headers.length);
+    expect(result.generatedColumns).toEqual(processors[id].columns);
+    expect(result.problemRows).toBe(invalid.length);
+    expect(after.rows).toHaveLength(25);
+    expect(after.rows.flatMap((r, i) => r.processing_status === 'Invalid' ? [i + 1] : [])).toEqual(invalid);
+    expect(after.rows.filter((r) => r.processing_status === 'Valid')).toHaveLength(25 - invalid.length);
+    after.rows.forEach((r, i) => {
+      before.headers.forEach((h) => expect(r[h]).toBe(before.rows[i][h]));
+      if (r.processing_status === 'Valid') expect(r.validation_errors).toBe('');
+      else {
+        expect(r.validation_errors).toBe(after.problems.items.find((p) => p.row === i + 1)?.message);
+        if (id === 'mass') expect([r.r32_mass_kg, r.r125_mass_kg, r.r134a_mass_kg]).toEqual(['', '', '']);
+        if (id === 'classification') expect(r).toMatchObject({ blend_class: 'Needs review', dominant_component: '' });
+      }
+    });
+    const download = (await app.inject(`/api/files/${result.id}/download`)).body;
+    expect(parseCsv(download)).toEqual({ headers: after.headers, rows: after.rows });
+    const imported = (await upload(`renamed_${name}_${id}.csv`, download)).json<FileMeta>();
+    expect(imported).toMatchObject({ status: 'Processed', processor: id, generatedColumns: result.generatedColumns });
+    expect((await rowsOf(imported.id)).generatedColumns).toEqual(after.generatedColumns);
+    expect((await app.inject(`/api/files/${imported.id}/download`)).body).toBe(download);
+    const compared = await compare(result.id, imported.id);
+    expect(compared.statusCode).toBe(200);
+    expect(compared.json().columns.every((c: { rowsDiffering: number }) => c.rowsDiffering === 0)).toBe(true);
+    if (id === 'mass') {
+      const col = compared.json().columns[0];
+      expect(col.valueA).toBeCloseTo(after.rows.reduce((s, r) => s + Number(r.r32_mass_kg || 0), 0), 8);
+      for (const row of invalid) expect(col.data[row - 1]).toMatchObject({ a: null, b: null });
+    }
+    expect((await rowsOf(source.id)).rows).toEqual(before.rows);
+  });
+
+  it('rejects a source-column collision without saving a result or changing the input', async () => {
+    const csv = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct,processing_status,notes\nA,d,100,40,30,30,original,keep';
+    const input = (await upload('collision.csv', csv)).json<FileMeta>();
+    expect(input.status).toBe('Ready');
+    const before = (await listFiles()).length;
+    for (const id of ['validation', 'mass', 'classification']) {
+      const response = await processFile(input.id, id);
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toContain('processing_status');
+    }
+    expect((await listFiles()).length).toBe(before);
+    expect((await app.inject(`/api/files/${input.id}/download`)).body).toBe(csv);
+  });
+
+  it('compares actual CSV schemas even if stored generated-column metadata is stale', async () => {
+    const result = await processSample('partner_a_baseline.csv', 'mass');
+    const text = (await app.inject(`/api/files/${result.id}/download`)).body;
+    const imported = (await upload('current_mass_stale_metadata.csv', text)).json<FileMeta>();
+    const { storage } = await import('./lib/storage');
+    storage.patch(imported.id, { generatedColumns: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status'] });
+    const response = await compare(imported.id, result.id);
+    expect(response.statusCode).toBe(200);
+    expect(response.json().columns.map((c: { name: string }) => c.name)).toEqual(processors.mass.columns);
+    expect((await app.inject(`/api/files/${imported.id}/download`)).body).toBe(text);
+  });
+});
+
+describe('legacy result compatibility', () => {
+  const originalHeaders = ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'];
+  const legacy = {
+    validation: { columns: ['composition_total_pct', 'validation_status', 'validation_message'], values: ['100', 'OK', 'Composition valid'] },
+    mass: { columns: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status'], values: ['40', '30', '30', 'OK'] },
+    classification: { columns: ['blend_class', 'dominant_component'], values: ['R-32-rich (demo)', 'R-32'] },
+  };
+  const legacyCsv = (id: ProcessorId) => `${[...originalHeaders, ...legacy[id].columns].join(',')}\nA,d,100,40,30,30,${legacy[id].values.join(',')}\n`;
+
+  it.each(['validation', 'mass', 'classification'] as const)('keeps old %s files unchanged and rejects mixed schemas in either order', async (id) => {
+    const text = legacyCsv(id);
+    const a = (await upload(`old_${id}.csv`, text)).json<FileMeta>();
+    const b = (await upload(`renamed_old_${id}.csv`, text)).json<FileMeta>();
+    expect(a).toMatchObject({ status: 'Processed', processor: id, generatedColumns: legacy[id].columns });
+    expect((await rowsOf(a.id)).generatedColumns).toEqual(legacy[id].columns);
+    expect((await app.inject(`/api/files/${a.id}/download`)).body).toBe(text);
+    const same = await compare(a.id, b.id);
+    expect(same.statusCode).toBe(200);
+    expect(same.json().columns.map((c: { name: string }) => c.name)).toEqual(legacy[id].columns);
+    expect((await processFile(a.id, id)).statusCode).toBe(400);
+    const current = await processSample('partner_a_baseline.csv', id);
+    for (const [left, right] of [[a.id, current.id], [current.id, a.id]]) {
+      const response = await compare(left, right);
+      expect(response.statusCode).toBe(400);
+      expect(response.json().message).toContain('Regenerate the older result');
+    }
+  });
+
+  it('loads persisted legacy metadata after restarting without rewriting CSVs', async () => {
+    const { storage } = await import('./lib/storage');
+    const saved = (['validation', 'mass', 'classification'] as const).map((id) => {
+      const text = legacyCsv(id);
+      const meta = storage.save({ name: `persisted_${id}.csv`, text, rows: 1, columns: originalHeaders.length + legacy[id].columns.length,
+        status: 'Processed', processor: id, generatedColumns: legacy[id].columns, problemRows: 0 });
+      return { meta, text };
+    });
+    vi.resetModules();
+    const { buildApp: restart } = await import('./app');
+    const restarted = await restart(false);
+    try {
+      const files = (await restarted.inject('/api/files')).json<FileMeta[]>();
+      for (const { meta, text } of saved) {
+        expect(files.find((f) => f.id === meta.id)).toEqual(meta);
+        const preview = (await restarted.inject(`/api/files/${meta.id}/rows`)).json<FileRows>();
+        expect(preview.generatedColumns).toEqual(meta.generatedColumns);
+        expect((await restarted.inject(`/api/files/${meta.id}/download`)).body).toBe(text);
+        const uploaded = (await restarted.inject({ method: 'POST', url: '/api/process', payload: { fileId: meta.id, processor: meta.processor } }));
+        expect(uploaded.statusCode).toBe(400);
+      }
+      // A second legacy result of the same function is still comparable after restart.
+      const other = files.find((f) => f.name === 'old_mass.csv')!;
+      expect((await restarted.inject(`/api/compare?a=${saved[1].meta.id}&b=${other.id}`)).statusCode).toBe(200);
+    } finally { await restarted.close(); }
+  });
+});
+
+const listFiles = async () => (await app.inject('/api/files')).json<FileMeta[]>();
+const fileNamed = async (name: string) => {
+  const f = (await listFiles()).find((x) => x.name === name);
+  if (!f) throw new Error(`no file named ${name}`);
+  return f;
+};
+const rowsOf = async (id: string) => (await app.inject(`/api/files/${id}/rows`)).json<FileRows>();
+const processFile = (fileId: string, processor: string) => app.inject({ method: 'POST', url: '/api/process', payload: { fileId, processor } });
+const processSample = async (name: string, processor: ProcessorId) => (await processFile((await fileNamed(name)).id, processor)).json<FileMeta>();
+const compare = (a: string, b: string) => app.inject(`/api/compare?a=${a}&b=${b}`);
+
+/** Sends a real multipart upload, as the browser's file chooser does. */
+async function upload(name: string, text: string) {
+  const form = new FormData();
+  form.append('file', new Blob([text], { type: 'text/csv' }), name);
+  const req = new Request('http://localhost/', { method: 'POST', body: form });
+  return app.inject({
+    method: 'POST',
+    url: '/api/files',
+    headers: { 'content-type': req.headers.get('content-type')! },
+    payload: Buffer.from(await req.arrayBuffer()),
+  });
+}
