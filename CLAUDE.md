@@ -15,13 +15,22 @@ Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of thre
 
 - **Keep it simple.** No accounts, database, cloud, queues or extra layers (see "Do not add" in `blueprint/stack.md`). Prefer editing an existing file over adding one.
 - **Match the reference.** UI changes follow `blueprint/reference-ui.png` and must still work at phone width with no sideways page scroll.
-- **Verify before saying done.** Run `npm run verify` and report the real result. It includes the browser tests, so a passing run means the acceptance checklist works in a real browser; still say when a visual change was not looked at.
-- **Every change keeps or adds tests.** Rules and calculations → `server/src/core.test.ts`. Endpoints and errors → `server/src/api.test.ts`. Anything a user does in the UI → `e2e/*.spec.ts`. Find elements by role and accessible name (`getByRole`), not CSS classes; set up unrelated state through the API (`processViaApi`); give uploaded files a `uniqueName` so tests don't depend on each other.
-- **Commit and push only when the person asks.** Commit messages end with the attribution line from the session.
+- **Verify before saying done.** Run `npm run verify` and report the real result. It runs server tests and the client type-check/build. Browser tests are removed while the UI is being edited; report browser behavior and visual checks separately and never claim the acceptance checklist passed from this command alone.
+- **Every change keeps or adds tests.** Rules and calculations → `server/src/core.test.ts`. Endpoints and errors → `server/src/api.test.ts`. For UI changes, run the client build and report whether the affected flow was checked manually. Do not add browser tests unless the person asks to restore them.
+- **Branch, draft, then wait for approval.** Follow `blueprint/commit-rules.md`: create a new branch before editing a new work item, implement and verify, then present the full commit message and PR description. Wait for explicit approval before committing. Push and publish a PR only when explicitly authorized. Never commit directly to `main`, merge or force-push. Commit messages end with the attribution line from the session.
 - **Never edit the sample CSVs.** They are the person's test data; adapters adapt to them, not the other way round.
 - **Results keep every original column.** Processors only append columns.
 - **Result file names:** `result_<input name without .csv>_<function id>.csv`, e.g. `result_partner_a_baseline_mass.csv`. Function ids are fixed: `validation`, `mass`, `classification`. Re-running the same function on the same input replaces the earlier result (no timestamps or versions). The name is only a label: a result is recognised by its columns, so a renamed result still uploads and compares.
 - Only `server/src/lib/storage.ts` touches the disk.
+
+## Completion and approval skills
+
+- `/complete`: run verification and present the full commit and PR drafts;
+  nothing is committed or published. See `.claude/skills/complete/SKILL.md`.
+- `/approve`: only the person invokes it after reviewing the drafts. It
+  authorizes one commit, push and PR creation/update. See
+  `.claude/skills/approve/SKILL.md`. Never run it automatically.
+- Codex equivalents: `$complete` and `$approve` in `.agents/skills/`.
 
 ## Ending a turn
 
@@ -34,7 +43,7 @@ Next: <one exact command, reply or action>
 
 - **Name the exact state, never a later one.** In order: changed (uncommitted), verified (`npm run verify` ran and passed), committed, pushed, CI passed. Say plainly when verify was not run.
 - **One next action**, the single best step: real work or a real decision. Mention an alternative above the two lines only if it is a real option.
-- **Never ask the person to check by hand what the tests cover** (demo steps, the acceptance checklist, any flow in `e2e/`). Run `npm run verify` instead. If a flow has no test yet, add one. Ask them to look only at what a test can't judge: visual match with `blueprint/reference-ui.png`, taste, wording.
+- **Separate automated checks from manual UI checks.** Run `npm run verify` for server behavior and client compilation. Browser workflows and visual match require manual checks while browser tests are removed. State what was checked and what remains unchecked.
 - **Blocked:** `Status: Blocked - <reason>.` and `Next:` names the decision or action needed.
 - **Ask only for a real decision** (scope, design choice, a risk), with 2–4 options and the recommended one first.
 - No vague endings: never "let me know", "shall I continue?" or "anything else?".
@@ -44,7 +53,7 @@ Examples:
 | After | Status | Next |
 | --- | --- | --- |
 | Visual change | Changed (uncommitted); verify passed; layout not compared with the reference. | Refresh http://localhost:5173 and compare the <area> with `blueprint/reference-ui.png`. |
-| Feature done | Changed (uncommitted); verify passed, incl. new browser test for <feature>. | Reply "commit" to commit and push. |
+| Feature done | Changed (uncommitted); server tests and client build passed; UI checks reported separately. | Run `/complete` to prepare review drafts. |
 | Commit | Committed and pushed; CI passed. | <the next open item in `blueprint/build-plan.md`, or a decision> |
 
 ## Extending
@@ -56,14 +65,11 @@ Examples:
 
 ```bash
 npm run dev       # API :3001 + UI :5173 (Vite picks the next free port if taken)
-npm run verify    # server tests + client type-check and build + browser tests (~30 s)
+npm run verify    # server tests + client type-check and build
 npm test          # unit + API tests only (~2 s)
-npm run test:e2e  # browser tests only; add --ui to watch them, -g "<name>" for one
 ```
 
-- Browser tests start their own API (:3101) and UI (:5199) with a throwaway data folder, so they never touch the dev server's data. On failure, `npx playwright show-report` shows a screenshot and a step-by-step trace.
-- First time on a new machine: `npx playwright install chromium`.
-- CI (`.github/workflows/ci.yml`) runs `npm run verify` on every push to `main` and every PR. A failed run uploads the Playwright report as an artifact.
+- CI (`.github/workflows/ci.yml`) runs `npm run verify` on every push to `main` and every PR.
 
 - Reset the demo data: stop the servers, delete `server/data/`, start again.
 - On Windows, stopping a background `npm run dev` can leave the tsx server holding port 3001. Check the port and stop only that process.
