@@ -45,7 +45,7 @@ Next: <one exact command, reply or action>
 - **One next action**, the single best step: real work or a real decision. Mention an alternative above the two lines only if it is a real option.
 - **Separate automated checks from manual UI checks.** Run `npm run verify` for server behavior and client compilation. Browser workflows and visual match require manual checks while browser tests are removed. State what was checked and what remains unchecked.
 - **Blocked:** `Status: Blocked - <reason>.` and `Next:` names the decision or action needed.
-- **Ask only for a real decision** (scope, design choice, a risk), with 2–4 options and the recommended one first.
+- **Ask only for a real decision** (scope, design choice, a risk), with 2–4 options. Mark the preferred option **Recommended** and put it first, with a brief reason; if none is preferable, say so instead of labeling one.
 - No vague endings: never "let me know", "shall I continue?" or "anything else?".
 
 Examples:
