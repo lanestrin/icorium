@@ -24,7 +24,7 @@ see [deployment configuration and outstanding checks](blueprint/vercel-deploymen
 | Unit (Vitest) | `server/src/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths |
 | API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message; each sample file flags exactly its planted problem; results keep every original column and value; saved results compare after re-upload |
 
-`npm test` runs the unit and API tests. `npm run verify` also type-checks and builds the client. Browser tests have been removed while the UI is being edited; a passing verification run does not establish browser behavior or visual correctness. Use the demo steps below for manual UI checks.
+`npm test` runs server unit/API tests and client unit/component tests. Client tests use Vitest, React Testing Library and jsdom; API calls are mocked at the client boundary while server behavior has separate API coverage. `npm run verify` also type-checks and builds the client. These replace required manual acceptance checks; they do not establish real-browser layout or visual correctness. Run `npm test -w client` for client tests only.
 
 The five synthetic sample CSVs in `sample-data/` (described in `sample-data/README.txt`) are loaded the first time the server starts. To reset the demo, delete `server/data/`.
 
