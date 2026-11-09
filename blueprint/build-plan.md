@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** Baseline and partial processing (M8) implemented; final interview readiness (7.1) remains. See the next feature in section 4.
+**Status:** All planned features implemented; 7.1 interview readiness awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -38,23 +38,24 @@ This is a general-purpose interview exercise illustrated with synthetic refriger
 ## 3. Repository layout
 
 ```text
-reclaim-studio/
+icorium/
 ├── client/
 │   └── src/
-│       ├── components/       # FileTable, UploadArea, ProcessPanel, modals, CompareFooter
-│       ├── pages/            # One main workspace
-│       ├── lib/              # Typed API client and UI helpers
-│       └── types/
+│       ├── App.tsx           # The one workspace screen
+│       ├── api.ts            # Typed API client
+│       ├── components/       # Sidebar, FileTable, CompareFooter, Modals
+│       └── *.test.ts(x)      # Unit and component tests
 ├── server/
 │   └── src/
-│       ├── routes/           # Upload, list, preview, process, download, compare
+│       ├── routes/files.ts   # Upload, list, rows, process, download, compare
 │       ├── adapters/         # Partner A/B/C CSV mapping
-│       ├── processing/       # Three independent functions
-│       ├── lib/              # CSV parsing, validation, file storage
-│       └── tests/
-├── shared/                   # Common TypeScript types and result metadata
+│       ├── processing/       # Three independent functions and shared row validation
+│       ├── lib/              # CSV parse/export, storage (local or private Blob), compare
+│       └── *.test.ts         # Unit and API tests
+├── shared/types.ts           # Common TypeScript types and the processor list
 ├── sample-data/              # Five synthetic partner CSVs
-└── README.md                 # Setup, commands, design choices, demo steps
+├── blueprint/                # Plan, stack, commit rules, feature records
+└── README.md                 # Setup, tests, demo steps, limitations
 ```
 
 A single repository and **one API** are sufficient. Avoid microservices, task queues, authentication, and a database for the first version.
@@ -67,12 +68,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 7.1 — Final interview readiness** (after 8.4 merges).
-Branch: `feature/7.1-interview-readiness`.
-
-8.4 is implemented on `feature/8.4-partial-processing-demo` and awaiting review.
-Once it merges, start 7.1 by reading the whole README against the code and the
-test list, as an integration review rather than a redesign.
+**Next: none planned.** Every item below is complete once 7.1 merges.
+New work needs a new request. Add it as a new stable ID with its scope before
+building, or use a `fix/` branch for a bug.
 
 **Selection rule:** take the first unchecked item below whose dependencies are
 satisfied. Completed baseline capabilities are not new work. If an item is
@@ -176,7 +174,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.4** `feature/8.4-partial-processing-demo` — Update README examples and the interview walkthrough for the new columns, Needs Review status and confirmation dialog; verify all three functions against all five samples and the saved-result round trip.
 
-  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR. The API contract test pins every sample's invalid rows and reasons for all three functions. See [feature scope and results](features/8.4-partial-processing-demo.md).
+  **Result:** merged in PR #14 (`0b87809`); automated verification passed (2026-11-09). The API contract test pins every sample's invalid rows and reasons for all three functions. See [feature scope and results](features/8.4-partial-processing-demo.md).
   **Depends on:** 8.1–8.3.
   **Done when:** the documented walkthrough matches the running UI; sample
   counts match 8.1; invalid rows remain with reasons and no invented values;
@@ -193,8 +191,9 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 ### M7 — Final interview readiness
 
-- [ ] **7.1** `feature/7.1-interview-readiness` — Review final interview documentation and automated verification after partial processing and any explicitly requested UI changes. This is an integration review, not a redesign.
+- [x] **7.1** `feature/7.1-interview-readiness` — Review final interview documentation and automated verification after partial processing and any explicitly requested UI changes. This is an integration review, not a redesign.
 
+  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR. Added client component coverage for upload, preview paging, compare footer and comparison. Aligned README, plan layout and stack doc with the code. See [feature scope and results](features/7.1-interview-readiness.md).
   **Depends on:** 8.1–8.4 and any subsequently approved UI feature affecting the demo.
   **Done when:** README setup and demo instructions match the implementation;
   unit/API and component coverage supports the CSV workflow; known limitations are documented.

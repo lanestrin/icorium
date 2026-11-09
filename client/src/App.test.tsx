@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileMeta } from '../../shared/types';
 import App from './App';
 import { api } from './api';
@@ -231,5 +231,123 @@ describe('data quality warning', () => {
     expect(screen.queryByRole('dialog', { name: 'Data Quality Warning' })).not.toBeInTheDocument();
     expect(api.process).toHaveBeenCalledTimes(1);
     expect(api.process).toHaveBeenCalledWith('clean', 'classification');
+  });
+});
+
+describe('upload', () => {
+  const fileInput = () => document.querySelector<HTMLInputElement>('input[type="file"]')!;
+
+  it('uploads each chosen file and refreshes the list', async () => {
+    const user = await setup();
+    vi.mocked(api.upload).mockResolvedValue(clean);
+    const added: FileMeta = { ...clean, id: 'added', name: 'added.csv' };
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, added]);
+    await user.upload(fileInput(), [new File(['a'], 'added.csv', { type: 'text/csv' })]);
+    expect(api.upload).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole('checkbox', { name: 'Select added.csv' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('names each failed file and still uploads the others', async () => {
+    const user = await setup();
+    vi.mocked(api.upload).mockResolvedValueOnce(clean).mockRejectedValueOnce(new Error('Unrecognized CSV schema'));
+    await user.upload(fileInput(), [new File(['a'], 'good.csv'), new File(['b'], 'bad.csv')]);
+    expect(api.upload).toHaveBeenCalledTimes(2);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Upload failed');
+    expect(alert).toHaveTextContent('bad.csv: Unrecognized CSV schema');
+    expect(alert).not.toHaveTextContent('good.csv');
+    expect(api.list).toHaveBeenCalledTimes(2); // initial load + refresh after upload
+  });
+});
+
+describe('preview', () => {
+  const page = (offset: number, count: number) => ({
+    headers: ['batch_id'], rows: Array.from({ length: count }, (_, i) => ({ batch_id: `A-${offset + i + 1}` })),
+    offset, totalRows: 150, generatedColumns: [], problems: { total: 0, items: [] },
+  });
+
+  it('loads further pages on request and offers the download', async () => {
+    const user = await setup();
+    vi.mocked(api.rows).mockResolvedValueOnce(page(0, 100)).mockResolvedValueOnce(page(100, 50));
+    await user.click(within(row('clean.csv')).getByRole('button', { name: 'Preview' }));
+    const dialog = await screen.findByRole('dialog', { name: 'clean.csv' });
+    expect(await within(dialog).findByText('Showing 100 of 150 rows')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Download CSV' })).toHaveAttribute('href', '/api/files/clean/download');
+    await user.click(within(dialog).getByRole('button', { name: 'Show 50 more' }));
+    expect(await within(dialog).findByText('Showing 150 of 150 rows')).toBeInTheDocument();
+    expect(api.rows).toHaveBeenLastCalledWith('clean', 100, 100);
+    expect(within(dialog).getByText('A-150')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /more/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the error when rows cannot be loaded', async () => {
+    const user = await setup();
+    vi.mocked(api.rows).mockRejectedValueOnce(new Error('File not found'));
+    await user.click(within(row('clean.csv')).getByRole('button', { name: 'Preview' }));
+    expect(await within(await screen.findByRole('dialog')).findByText('File not found')).toBeInTheDocument();
+  });
+});
+
+describe('comparing results', () => {
+  const massA: FileMeta = { ...result, id: 'mass-a', name: 'result_a_mass.csv' };
+  const massB: FileMeta = { ...result, id: 'mass-b', name: 'result_b_mass.csv', problemRows: 0 };
+  const validation: FileMeta = { ...result, id: 'val-a', name: 'result_a_validation.csv', processor: 'validation' };
+  const fileA = () => screen.getByRole('combobox', { name: /File A/ });
+  const fileB = () => screen.getByRole('combobox', { name: /File B/ });
+  const compareButton = () => screen.getByRole('button', { name: 'Compare Selected' });
+  const optionLabels = (select: HTMLElement) => within(select).getAllByRole('option').map((o) => o.textContent);
+
+  beforeEach(() => {
+    vi.mocked(api.list).mockResolvedValue([clean, massA, massB, validation]);
+    // Recharts' ResponsiveContainer needs ResizeObserver, which jsdom lacks.
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it('enables Compare only for two different results from the same function', async () => {
+    const user = await setup();
+    expect(optionLabels(fileA())).toEqual(['Select result file…', 'a · Mass', 'b · Mass', 'a · Validation']);
+    expect(compareButton()).toBeDisabled();
+    await user.selectOptions(fileA(), 'mass-a');
+    expect(optionLabels(fileB())).toEqual(['Select result file…', 'b · Mass']);
+    expect(compareButton()).toBeDisabled();
+    await user.selectOptions(fileB(), 'mass-b');
+    expect(compareButton()).toBeEnabled();
+    await user.selectOptions(fileA(), 'val-a'); // another function clears File B
+    expect(fileB()).toHaveValue('');
+    expect(compareButton()).toBeDisabled();
+  });
+
+  it('opens the comparison with both names, problem cards and the summary', async () => {
+    const user = await setup();
+    vi.mocked(api.compare).mockResolvedValue({
+      processor: 'mass', fileA: massA.name, fileB: massB.name,
+      columns: [{ name: 'r32_mass_kg', kind: 'numeric', unit: 'kg', measure: 'total',
+        data: [{ label: '#1', a: 1, b: 2 }], valueA: 10, valueB: 12.5, rowsDiffering: 3, rowsCompared: 25 }],
+      problemsA: { total: 1, items: [{ row: 8, batchId: 'A-008', message: 'mass missing' }] },
+      problemsB: { total: 0, items: [] },
+    });
+    await user.selectOptions(fileA(), 'mass-a');
+    await user.selectOptions(fileB(), 'mass-b');
+    await user.click(compareButton());
+    expect(api.compare).toHaveBeenCalledWith('mass-a', 'mass-b');
+    const dialog = await screen.findByRole('dialog', { name: `${massA.name} vs ${massB.name}` });
+    expect(within(dialog).getByRole('region', { name: `Problems in A · ${massA.name}` })).toHaveTextContent('Row 8 · A-008: mass missing');
+    expect(within(dialog).getByRole('region', { name: `Problems in B · ${massB.name}` })).toHaveTextContent('No problems');
+    const summary = within(dialog).getAllByRole('row').find((r) => r.textContent?.startsWith('r32_mass_kg'))!;
+    expect(summary).toHaveTextContent('Total across rows (kg)');
+    expect(summary).toHaveTextContent('2.5'); // B − A
+    expect(summary).toHaveTextContent('3 / 25');
+  });
+
+  it('explains a failed comparison', async () => {
+    const user = await setup();
+    vi.mocked(api.compare).mockRejectedValue(new Error("These files can't be compared"));
+    await user.selectOptions(fileA(), 'mass-a');
+    await user.selectOptions(fileB(), 'mass-b');
+    await user.click(compareButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent("Comparison failed: These files can't be compared");
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
