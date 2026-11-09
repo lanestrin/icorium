@@ -1,5 +1,5 @@
 import { Check, CircleAlert, Download, Eye, Layers, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react';
-import { isInputFile, type FileMeta } from '../../../shared/types';
+import { isInputFile, type FileMeta, type ProcessorId } from '../../../shared/types';
 import { api } from '../api';
 
 export type Status = FileMeta['status'] | 'Processing' | 'Error';
@@ -7,6 +7,23 @@ export type Status = FileMeta['status'] | 'Processing' | 'Error';
 /** Stored status, overridden while this file is processing or after its processing failed. */
 export const displayStatus = (f: FileMeta, processingId?: string, failedIds?: Set<string>): Status =>
   f.id === processingId ? 'Processing' : failedIds?.has(f.id) ? 'Error' : f.status;
+
+export interface QualityWarning {
+  affected: { id: string; name: string; valid: number; invalid: number }[];
+  cleanCount: number; // selected inputs with no invalid rows
+}
+
+/**
+ * Mass and Classification only calculate valid rows, so warn before running them on
+ * inputs with invalid rows. Validation never warns. Returns undefined when no warning is needed.
+ */
+export function qualityWarning(batch: FileMeta[], processor: ProcessorId): QualityWarning | undefined {
+  if (processor === 'validation') return undefined;
+  const affected = batch
+    .filter((f) => (f.problemRows ?? 0) > 0)
+    .map((f) => ({ id: f.id, name: f.name, invalid: f.problemRows!, valid: Math.max(0, f.rows - f.problemRows!) }));
+  return affected.length ? { affected, cleanCount: batch.length - affected.length } : undefined;
+}
 
 const BADGE: Record<Status, [string, LucideIcon]> = {
   Ready: ['bg-green-50 text-green-700', Check],

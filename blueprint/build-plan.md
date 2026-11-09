@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** Baseline implemented; warning dialog, demo documentation and final readiness remain. See the next feature in section 4.
+**Status:** Baseline implemented; warning dialog awaiting review; demo documentation and final readiness remain. See the next feature in section 4.
 
 ## 1. What “done” means
 
@@ -67,12 +67,12 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 8.3 — Data Quality Warning dialog.**
-Branch: `feature/8.3-data-quality-warning`.
+**Next: 8.4 — Partial-processing demo and documentation** (after 8.3 merges).
+Branch: `feature/8.4-partial-processing-demo`.
 
-8.1 and 8.2 are merged. On 2026-11-06 the person confirmed filters work and
-removed the remaining manual UI acceptance gates. Start by reviewing App's
-processing flow and preparing the warning dialog scope and acceptance criteria.
+8.3 is implemented on `feature/8.3-data-quality-warning` and awaiting review.
+Once it merges, start 8.4 by comparing the README walkthrough with the current
+UI: the new result columns, the Needs Review status and the warning dialog.
 
 **Selection rule:** take the first unchecked item below whose dependencies are
 satisfied. Completed baseline capabilities are not new work. If an item is
@@ -161,8 +161,9 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
   eligibility, filtering, selection, processing locks and failure/retry;
   `npm run verify`.
 
-- [ ] **8.3** `feature/8.3-data-quality-warning` — Before Mass or Classification runs on selected inputs with invalid rows, show a **Data Quality Warning** dialog with valid/error row counts per file. Explain: "Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values." Provide **Cancel** and **Process Valid Rows**. Validation runs without this warning.
+- [x] **8.3** `feature/8.3-data-quality-warning` — Before Mass or Classification runs on selected inputs with invalid rows, show a **Data Quality Warning** dialog with valid/error row counts per file. Explain: "Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values." Provide **Cancel** and **Process Valid Rows**. Validation runs without this warning.
 
+  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR. See [feature scope and results](features/8.3-data-quality-warning.md).
   **Depends on:** 8.1 and 8.2.
   **Done when:** a mixed selection reports each affected file correctly;
   Cancel sends no processing requests; confirmation processes the selected

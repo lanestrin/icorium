@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Calendar, Check, CircleAlert, Filter, Search, X } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta, type ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
-import { displayStatus, FileTable, type Status } from './components/FileTable';
+import { displayStatus, FileTable, qualityWarning, type QualityWarning, type Status } from './components/FileTable';
 import { CompareFooter } from './components/CompareFooter';
-import { CompareModal, PreviewModal } from './components/Modals';
+import { CompareModal, PreviewModal, QualityWarningModal } from './components/Modals';
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -14,6 +14,8 @@ export default function App() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [processor, setProcessor] = useState<ProcessorId>('validation');
   const [processingId, setProcessingId] = useState<string>(); // batches run one file at a time
+  const busy = useRef(false); // set synchronously, so a double click cannot start a second batch
+  const [pending, setPending] = useState<{ batch: FileMeta[]; processor: ProcessorId; warning: QualityWarning }>();
   const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string>();
@@ -67,10 +69,26 @@ export default function App() {
     refresh();
   }
 
-  /** Processes every checked input file, one after another, with the chosen function. */
-  async function run() {
+  /** Run Processing: asks first when Mass or Classification would skip invalid rows. */
+  function requestRun() {
     const batch = selectedInputs;
-    if (!batch.length) return;
+    if (!batch.length || busy.current) return;
+    const warning = qualityWarning(batch, processor);
+    if (warning) return setPending({ batch, processor, warning });
+    run(batch, processor);
+  }
+
+  /** Process Valid Rows: runs exactly the files whose counts the warning showed. */
+  function confirmRun() {
+    if (!pending) return;
+    setPending(undefined);
+    run(pending.batch, pending.processor);
+  }
+
+  /** Processes the given input files, one after another, with the given function. */
+  async function run(batch: FileMeta[], processor: ProcessorId) {
+    if (!batch.length || busy.current) return;
+    busy.current = true;
     setError(undefined);
     setNotice(undefined);
     setFailedIds(new Set());
@@ -87,6 +105,7 @@ export default function App() {
         errors.push(`${f.name}: ${msg(e)}`);
       }
     }
+    busy.current = false; // per-file errors are caught above, so this always runs
     setProcessingId(undefined);
     setFailedIds(failed);
     setSelectedIds(failed); // failed files stay checked so they can be retried
@@ -109,7 +128,7 @@ export default function App() {
           processor={processor}
           setProcessor={setProcessor}
           onUpload={upload}
-          onRun={run}
+          onRun={requestRun}
           canRun={selectedInputs.length > 0 && !processingId}
           running={!!processingId}
           uploading={uploading}
@@ -191,6 +210,7 @@ export default function App() {
       <CompareFooter files={files} results={results} a={compareA} b={compareB} setA={setCompareA} setB={setCompareB} onCompare={compare} />
 
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}
+      {pending && <QualityWarningModal warning={pending.warning} processor={pending.processor} onCancel={() => setPending(undefined)} onConfirm={confirmRun} />}
       {comparison && <CompareModal result={comparison} onClose={() => setComparison(undefined)} />}
     </div>
   );
