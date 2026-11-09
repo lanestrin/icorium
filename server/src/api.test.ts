@@ -224,15 +224,18 @@ describe('comparing results', () => {
 });
 
 describe('current result contract', () => {
+  // Planted problems, with the exact reasons documented in the README.
   const samples = [
-    ['partner_a_baseline.csv', [8]], ['partner_a_followup.csv', [13]],
-    ['partner_b_baseline.csv', [5]], ['partner_b_followup.csv', [10, 11]],
-    ['partner_c_baseline.csv', [18]],
+    ['partner_a_baseline.csv', [8], ['mass missing']],
+    ['partner_a_followup.csv', [13], ['R-125 out of range']],
+    ['partner_b_baseline.csv', [5], ['mass invalid']],
+    ['partner_b_followup.csv', [10, 11], ['duplicate batch ID B-010', 'duplicate batch ID B-010']],
+    ['partner_c_baseline.csv', [18], ['composition totals 78.37%']],
   ] as const;
-  const cases = samples.flatMap(([name, invalid]) =>
-    (['validation', 'mass', 'classification'] as const).map((id) => ({ name, invalid, id })));
+  const cases = samples.flatMap(([name, invalid, reasons]) =>
+    (['validation', 'mass', 'classification'] as const).map((id) => ({ name, invalid, reasons, id })));
 
-  it.each(cases)('$name / $id retains every row and round-trips its exact schema', async ({ name, invalid, id }) => {
+  it.each(cases)('$name / $id retains every row and round-trips its exact schema', async ({ name, invalid, reasons, id }) => {
     const source = await fileNamed(name);
     const before = await rowsOf(source.id);
     const result = await processSample(name, id);
@@ -244,6 +247,7 @@ describe('current result contract', () => {
     expect(after.rows).toHaveLength(25);
     expect(after.rows.flatMap((r, i) => r.processing_status === 'Invalid' ? [i + 1] : [])).toEqual(invalid);
     expect(after.rows.filter((r) => r.processing_status === 'Valid')).toHaveLength(25 - invalid.length);
+    expect(invalid.map((row) => after.rows[row - 1].validation_errors)).toEqual(reasons);
     after.rows.forEach((r, i) => {
       before.headers.forEach((h) => expect(r[h]).toBe(before.rows[i][h]));
       if (r.processing_status === 'Valid') expect(r.validation_errors).toBe('');

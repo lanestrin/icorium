@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** Baseline implemented; warning dialog awaiting review; demo documentation and final readiness remain. See the next feature in section 4.
+**Status:** Baseline and partial processing (M8) implemented; final interview readiness (7.1) remains. See the next feature in section 4.
 
 ## 1. What “done” means
 
@@ -67,12 +67,12 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 8.4 — Partial-processing demo and documentation** (after 8.3 merges).
-Branch: `feature/8.4-partial-processing-demo`.
+**Next: 7.1 — Final interview readiness** (after 8.4 merges).
+Branch: `feature/7.1-interview-readiness`.
 
-8.3 is implemented on `feature/8.3-data-quality-warning` and awaiting review.
-Once it merges, start 8.4 by comparing the README walkthrough with the current
-UI: the new result columns, the Needs Review status and the warning dialog.
+8.4 is implemented on `feature/8.4-partial-processing-demo` and awaiting review.
+Once it merges, start 7.1 by reading the whole README against the code and the
+test list, as an integration review rather than a redesign.
 
 **Selection rule:** take the first unchecked item below whose dependencies are
 satisfied. Completed baseline capabilities are not new work. If an item is
@@ -163,7 +163,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.3** `feature/8.3-data-quality-warning` — Before Mass or Classification runs on selected inputs with invalid rows, show a **Data Quality Warning** dialog with valid/error row counts per file. Explain: "Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values." Provide **Cancel** and **Process Valid Rows**. Validation runs without this warning.
 
-  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR. See [feature scope and results](features/8.3-data-quality-warning.md).
+  **Result:** merged in PR #13 (`9425c11`); automated verification passed (2026-11-09). See [feature scope and results](features/8.3-data-quality-warning.md).
   **Depends on:** 8.1 and 8.2.
   **Done when:** a mixed selection reports each affected file correctly;
   Cancel sends no processing requests; confirmation processes the selected
@@ -174,8 +174,9 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
   component tests for warning counts, cancel/confirm, mixed selections,
   keyboard close/focus and duplicate submission protection; `npm run verify`.
 
-- [ ] **8.4** `feature/8.4-partial-processing-demo` — Update README examples and the interview walkthrough for the new columns, Needs Review status and confirmation dialog; verify all three functions against all five samples and the saved-result round trip.
+- [x] **8.4** `feature/8.4-partial-processing-demo` — Update README examples and the interview walkthrough for the new columns, Needs Review status and confirmation dialog; verify all three functions against all five samples and the saved-result round trip.
 
+  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR. The API contract test pins every sample's invalid rows and reasons for all three functions. See [feature scope and results](features/8.4-partial-processing-demo.md).
   **Depends on:** 8.1–8.3.
   **Done when:** the documented walkthrough matches the running UI; sample
   counts match 8.1; invalid rows remain with reasons and no invented values;
@@ -185,11 +186,10 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
   of the walkthrough against the implementation. Do not
   reintroduce browser tests or change the sample CSVs.
 
-**Interview answer after M8 is built:** unreadable/unmappable files are rejected;
+**Interview answer (M8 built):** unreadable/unmappable files are rejected;
 otherwise every row is checked, valid rows are processed, invalid rows stay in
 the output marked Invalid with their reason and no calculated values, and the
-user confirms before calculating on a file with problems. This is target
-behavior until 8.1–8.4 are complete, not a claim about today's application.
+user confirms before Mass or Classification calculates on a file with problems.
 
 ### M7 — Final interview readiness
 
@@ -237,13 +237,13 @@ If time is limited, prioritize **working P0 functionality over appearance refine
 
 ## 8. Suggested interview demo script
 
-1. Upload `partner_a_baseline.csv`; open **Preview** and explain the file's original columns.
-2. Select the file, choose **Component Mass Calculation**, click **Run Processing**.
-3. Show the row spinner (when visible), then open the processed results modal.
-4. Download the new result CSV and show that original columns remain intact.
-5. Repeat with `partner_a_followup.csv` and the same function.
-6. Load/select those two **processed result** CSVs in the footer and open **Compare Selected**.
-7. Point out the graph's measured differences, the input validation behavior, and how a fourth adapter or processing function would be added.
+1. Open **Preview** on `partner_a_baseline.csv`: original columns, **Needs Review** status, **1 invalid** tag and the highlighted row 8 (`mass missing`).
+2. Select it, choose **Component Mass Calculation**, click **Run Processing**. The **Data Quality Warning** shows 24 valid / 1 invalid; click **Process Valid Rows**.
+3. Show the row spinner (when visible), then the processed results modal.
+4. Download the result CSV: original columns intact, generated columns appended, row 8 `Invalid` with its reason and blank masses.
+5. Check both Partner A files and run the same function once; confirm the warning. Both results fill the footer.
+6. Click **Compare Selected** and point out the graph's measured differences and each file's invalid-row card.
+7. Run **Composition Validation** to show it needs no confirmation, then explain how a fourth adapter or processing function would be added.
 
 **Be ready to explain tradeoffs:** why TypeScript for both ends, why Fastify, why local CSV storage instead of a database, why only two comparison files at a time, and how the code handles changing requirements.
 
