@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { CircleCheck, Download, TriangleAlert, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { PROCESSORS, type CompareColumn, type CompareResult, type FileMeta, type FileRows, type ProblemList } from '../../../shared/types';
+import { PROCESSORS, type CompareColumn, type CompareResult, type FileMeta, type FileRows, type ProblemList, type ProcessorId } from '../../../shared/types';
 import { api } from '../api';
+import type { QualityWarning } from './FileTable';
 
-const rowsWord = (n: number) => `${n.toLocaleString()} ${n === 1 ? 'row' : 'rows'}`;
+/** "1 row", "3 rows", or with a qualifier "1 valid row". */
+const rowsWord = (n: number, kind?: string) => `${n.toLocaleString()} ${kind ? `${kind} ` : ''}${n === 1 ? 'row' : 'rows'}`;
 
 /** "Row 8 · A-008: mass missing", one per problem row. */
 function ProblemItems({ list }: { list: ProblemList }) {
@@ -52,7 +54,7 @@ const measureLabel = (c: CompareColumn) =>
 const FOCUSABLE = 'a[href],button:not([disabled]),select,input,[tabindex]:not([tabindex="-1"])';
 
 /** Accessible dialog: focus moves in on open, Tab stays inside, Escape closes, focus returns on close. */
-function Modal({ title, subtitle, actions, onClose, children }: { title: string; subtitle?: string; actions?: ReactNode; onClose: () => void; children: ReactNode }) {
+function Modal({ title, subtitle, actions, narrow, onClose, children }: { title: string; subtitle?: string; actions?: ReactNode; narrow?: boolean; onClose: () => void; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -83,7 +85,7 @@ function Modal({ title, subtitle, actions, onClose, children }: { title: string;
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="flex max-h-[88vh] w-full max-w-6xl flex-col rounded-2xl bg-white shadow-2xl outline-none"
+        className={`flex max-h-[88vh] w-full ${narrow ? 'max-w-lg' : 'max-w-6xl'} flex-col rounded-2xl bg-white shadow-2xl outline-none`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-4 border-b border-slate-200 px-6 py-4">
@@ -97,6 +99,39 @@ function Modal({ title, subtitle, actions, onClose, children }: { title: string;
         <div className="overflow-auto px-6 pb-6">{children}</div>
       </div>
     </div>
+  );
+}
+
+/** Asks before Mass or Classification calculates only the valid rows of files with invalid rows. */
+export function QualityWarningModal({ warning, processor, onCancel, onConfirm }: {
+  warning: QualityWarning; processor: ProcessorId; onCancel: () => void; onConfirm: () => void;
+}) {
+  const others = warning.cleanCount;
+  return (
+    <Modal title="Data Quality Warning" subtitle={processorLabel(processor)} narrow onClose={onCancel}>
+      <div className="flex items-start gap-3 pt-5 text-amber-900">
+        <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden />
+        <p>Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values.</p>
+      </div>
+      <ul aria-label="Files with invalid rows" className="mt-4 max-h-60 space-y-2 overflow-auto">
+        {warning.affected.map((f) => (
+          <li key={f.id} className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm">
+            <span className="block break-all font-semibold text-slate-900">{f.name}</span>
+            <span className="text-slate-700">{rowsWord(f.valid, 'valid')} · </span>
+            <span className="font-medium text-amber-800">{rowsWord(f.invalid, 'invalid')}</span>
+          </li>
+        ))}
+      </ul>
+      {others > 0 && (
+        <p className="mt-3 text-sm text-slate-600">
+          {others} other selected {others === 1 ? 'file has' : 'files have'} no invalid rows and will be processed normally.
+        </p>
+      )}
+      <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+        <button onClick={onConfirm} className="rounded-xl bg-green-600 px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-green-700">Process Valid Rows</button>
+      </div>
+    </Modal>
   );
 }
 

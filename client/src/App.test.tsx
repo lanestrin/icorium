@@ -97,6 +97,14 @@ describe('input selection and status filtering', () => {
       await user.click(screen.getByRole('radio', { name: new RegExp(label) }));
       await user.click(screen.getByRole('button', { name: 'Run Processing' }));
       const processor = label.startsWith('Component') ? 'mass' : label.startsWith('Batch') ? 'classification' : 'validation';
+      if (processor !== 'validation') {
+        const warning = screen.getByRole('dialog', { name: 'Data Quality Warning' });
+        expect(warning).toHaveTextContent(label);
+        expect(api.process).not.toHaveBeenCalled();
+        await user.click(within(warning).getByRole('button', { name: 'Process Valid Rows' }));
+      } else {
+        expect(screen.queryByRole('dialog', { name: 'Data Quality Warning' })).not.toBeInTheDocument();
+      }
       await waitFor(() => expect(api.process).toHaveBeenCalledWith('invalid', processor));
       expect(api.process).toHaveBeenCalledTimes(1);
       await screen.findByRole('dialog');
@@ -153,5 +161,75 @@ describe('input selection and status filtering', () => {
     await screen.findByRole('dialog');
     expect(api.process).toHaveBeenCalledTimes(2);
     expect(screen.getByText('No CSV files match your filters.')).toBeInTheDocument();
+  });
+});
+
+describe('data quality warning', () => {
+  const runButton = (n?: number) => screen.getByRole('button', { name: n ? `Run Processing (${n})` : 'Run Processing' });
+  const warning = () => screen.getByRole('dialog', { name: 'Data Quality Warning' });
+  async function warnMixedMass() {
+    const user = await setup();
+    await user.click(screen.getByRole('checkbox', { name: 'Select all input files' }));
+    await user.click(screen.getByRole('radio', { name: /Component Mass Calculation/ }));
+    await user.click(runButton(2));
+    return user;
+  }
+
+  it('lists only the files with invalid rows, with valid and invalid counts', async () => {
+    await warnMixedMass();
+    const files = within(warning()).getByRole('list', { name: 'Files with invalid rows' });
+    expect(within(files).getAllByRole('listitem')).toHaveLength(1);
+    expect(files).toHaveTextContent('invalid.csv23 valid rows · 2 invalid rows');
+    expect(files).not.toHaveTextContent('clean.csv');
+    expect(warning()).toHaveTextContent('1 other selected file has no invalid rows and will be processed normally.');
+    expect(warning()).toHaveTextContent('Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values.');
+    expect(warning()).toHaveFocus();
+  });
+
+  it.each([
+    ['Cancel', (user: ReturnType<typeof userEvent.setup>) => user.click(within(warning()).getByRole('button', { name: 'Cancel' }))],
+    ['Escape', (user: ReturnType<typeof userEvent.setup>) => user.keyboard('{Escape}')],
+    ['the close button', (user: ReturnType<typeof userEvent.setup>) => user.click(within(warning()).getByRole('button', { name: 'Close' }))],
+  ])('%s sends no requests, keeps the selection and returns focus to Run Processing', async (_, cancel) => {
+    const user = await warnMixedMass();
+    await cancel(user);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.process).not.toHaveBeenCalled();
+    expect(check('clean.csv')).toBeChecked();
+    expect(check('invalid.csv')).toBeChecked();
+    expect(runButton(2)).toHaveFocus();
+  });
+
+  it('keeps Tab inside the dialog', async () => {
+    const user = await warnMixedMass();
+    const buttons = within(warning()).getAllByRole('button');
+    buttons[buttons.length - 1].focus();
+    await user.tab();
+    expect(buttons[0]).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(buttons[buttons.length - 1]).toHaveFocus();
+  });
+
+  it('processes the shown files once each, even on a double click', async () => {
+    vi.mocked(api.process).mockResolvedValue(result);
+    const user = await warnMixedMass();
+    await user.dblClick(within(warning()).getByRole('button', { name: 'Process Valid Rows' }));
+    await screen.findByRole('status');
+    expect(api.process).toHaveBeenCalledTimes(2);
+    expect(api.process).toHaveBeenNthCalledWith(1, 'clean', 'mass');
+    expect(api.process).toHaveBeenNthCalledWith(2, 'invalid', 'mass');
+    expect(screen.queryByRole('dialog', { name: 'Data Quality Warning' })).not.toBeInTheDocument();
+  });
+
+  it('runs clean-only selections without a warning, once on a double click', async () => {
+    vi.mocked(api.process).mockResolvedValue(result);
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    await user.click(screen.getByRole('radio', { name: /Batch Classification/ }));
+    await user.dblClick(runButton());
+    await screen.findByRole('dialog');
+    expect(screen.queryByRole('dialog', { name: 'Data Quality Warning' })).not.toBeInTheDocument();
+    expect(api.process).toHaveBeenCalledTimes(1);
+    expect(api.process).toHaveBeenCalledWith('clean', 'classification');
   });
 });
