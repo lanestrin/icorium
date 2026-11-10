@@ -57,7 +57,7 @@ A database is **not required** by the assignment. Keep processing logic independ
 Reference image: `blueprint/reference-ui.png`.
 
 - **Main window:** two-column layout with upload and processing controls on the left and a searchable CSV file list on the right.
-- **File list:** filename, row/column counts, date, status, Preview, and Download. Search, date-range and status filters (All / Ready / Needs Review / Processing / Processed / Error).
+- **File list:** filename, row/column counts, date, status, Preview, and Download. Search, date-range and status filters (All / Ready / Needs Review / Processing / Processed / Error / Archived). **Archive** hides selected files; in the Archived view the button reads **Restore**.
 - **File selection:** click a row to select the input for processing; highlight the active row.
 - **Processing status:** inputs are Ready (clean) or Needs Review (has invalid rows). They show Processing (spinner) while running and Error if the request fails; each run adds a Processed result. Mass and Classification ask for confirmation (Data Quality Warning) before running on Needs Review inputs.
 - **Preview modal:** show input data without expanding a potentially large CSV inside the main window.

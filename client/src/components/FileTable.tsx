@@ -1,5 +1,5 @@
 import { Check, CircleAlert, Download, Eye, Layers, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react';
-import { isInputFile, type FileMeta, type ProcessorId } from '../../../shared/types';
+import type { FileMeta, ProcessorId } from '../../../shared/types';
 import { api } from '../api';
 
 export type Status = FileMeta['status'] | 'Processing' | 'Error';
@@ -60,10 +60,10 @@ interface Props {
 }
 
 export function FileTable({ files, selectedIds, processingId, failedIds, locked, onToggle, onToggleAll, onPreview }: Props) {
-  // Only input files can be processed, so only they are selectable.
-  const inputs = files.filter(isInputFile).map((f) => f.id);
-  const checkedCount = inputs.filter((id) => selectedIds.has(id)).length;
-  const allChecked = inputs.length > 0 && checkedCount === inputs.length;
+  // Every file can be selected for archiving; Run Processing uses only the selected inputs.
+  const ids = files.map((f) => f.id);
+  const checkedCount = ids.filter((id) => selectedIds.has(id)).length;
+  const allChecked = ids.length > 0 && checkedCount === ids.length;
 
   return (
     // On desktop the list scrolls inside this box (header pinned) so the page and footer stay put.
@@ -81,11 +81,11 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
               <input
                 type="checkbox"
                 className={CHECKBOX}
-                aria-label="Select all input files"
+                aria-label="Select all files"
                 checked={allChecked}
                 ref={(el) => { if (el) el.indeterminate = checkedCount > 0 && !allChecked; }}
-                disabled={locked || !inputs.length}
-                onChange={() => onToggleAll(inputs, !allChecked)}
+                disabled={locked || !ids.length}
+                onChange={() => onToggleAll(ids, !allChecked)}
               />
             </th>
             <th className="pl-1">File Name</th>
@@ -99,8 +99,8 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
         <tbody>
           {files.map((f) => {
             const status = displayStatus(f, processingId, failedIds);
-            const selectable = isInputFile(f) && !locked;
-            const checked = selectedIds.has(f.id) && isInputFile(f);
+            const selectable = !locked;
+            const checked = selectedIds.has(f.id);
             return (
               <tr
                 key={f.id}
@@ -112,7 +112,6 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                     type="checkbox"
                     className={CHECKBOX}
                     aria-label={`Select ${f.name}`}
-                    title={f.status === 'Processed' ? 'Result files cannot be processed again' : undefined}
                     checked={checked}
                     disabled={!selectable}
                     onClick={(e) => e.stopPropagation()}

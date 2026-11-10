@@ -6,7 +6,7 @@ import App from './App';
 import { api } from './api';
 
 vi.mock('./api', () => ({ api: {
-  list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(),
+  list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(),
   downloadUrl: (id: string) => `/api/files/${id}/download`,
 } }));
 
@@ -32,9 +32,9 @@ async function setup() {
 }
 
 describe('input selection and status filtering', () => {
-  it('selects both input statuses, excludes results, and toggles rows and checkboxes', async () => {
+  it('selects every file but processes only the selected inputs', async () => {
     const user = await setup();
-    expect(check('result.csv')).toBeDisabled();
+    expect(check('result.csv')).toBeEnabled();
     // The status badge is the only status marker; no separate "N invalid" tag on inputs or results.
     for (const name of ['clean.csv', 'invalid.csv', 'result.csv']) expect(within(row(name)).queryByText(/\d+ invalid/)).not.toBeInTheDocument();
     expect(within(row('invalid.csv')).getByText('Needs Review')).toBeInTheDocument();
@@ -45,25 +45,31 @@ describe('input selection and status filtering', () => {
     expect(check('invalid.csv')).toBeChecked();
     expect(screen.getByRole('button', { name: 'Run Processing (2)' })).toBeEnabled();
     expect(screen.getByRole('list', { name: 'Selected input files' })).toHaveTextContent('clean.csvinvalid.csv');
-    await user.click(screen.getByRole('checkbox', { name: 'Select all input files' }));
-    expect(check('clean.csv')).not.toBeChecked();
-    expect(check('invalid.csv')).not.toBeChecked();
-    await user.click(screen.getByRole('checkbox', { name: 'Select all input files' }));
+    expect(screen.getByRole('checkbox', { name: 'Select all files' })).toBePartiallyChecked();
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
     expect(check('clean.csv')).toBeChecked();
     expect(check('invalid.csv')).toBeChecked();
-    expect(check('result.csv')).not.toBeChecked();
+    expect(check('result.csv')).toBeChecked();
+    // A selected result is not processed: the count and list name only the inputs.
+    expect(screen.getByRole('button', { name: 'Run Processing (2)' })).toBeEnabled();
+    expect(screen.getByRole('list', { name: 'Selected input files' })).toHaveTextContent('clean.csvinvalid.csv');
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
+    for (const name of ['clean.csv', 'invalid.csv', 'result.csv']) expect(check(name)).not.toBeChecked();
+    await user.click(row('result.csv'));
+    expect(check('result.csv')).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Run Processing' })).toBeDisabled();
   });
 
   it('filters Needs Review and toggles only visible inputs while retaining hidden selections', async () => {
     const user = await setup();
     await user.click(check('clean.csv'));
-    expect(screen.getByRole('checkbox', { name: 'Select all input files' })).toBePartiallyChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select all files' })).toBePartiallyChecked();
     await user.selectOptions(statusFilter(), 'Needs Review');
     expect(screen.queryByRole('checkbox', { name: 'Select clean.csv' })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Select result.csv' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox', { name: 'Select all input files' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
     expect(screen.getByRole('list', { name: 'Selected input files' })).toHaveTextContent('clean.csvinvalid.csv');
-    await user.click(screen.getByRole('checkbox', { name: 'Select all input files' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
     await user.selectOptions(statusFilter(), 'All');
     expect(check('clean.csv')).toBeChecked();
     expect(check('invalid.csv')).not.toBeChecked();
@@ -75,7 +81,8 @@ describe('input selection and status filtering', () => {
     expect(check('clean.csv')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Select invalid.csv' })).not.toBeInTheDocument();
     await user.selectOptions(statusFilter(), 'Processed');
-    expect(check('result.csv')).toBeDisabled();
+    expect(check('result.csv')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Select clean.csv' })).not.toBeInTheDocument();
     await user.selectOptions(statusFilter(), 'Needs Review');
     await user.type(screen.getByPlaceholderText('Search CSV files...'), 'clean');
     expect(screen.getByText('No CSV files match your filters.')).toBeInTheDocument();
@@ -131,7 +138,7 @@ describe('input selection and status filtering', () => {
   it('processes mixed selections once and retains only failed inputs', async () => {
     const user = await setup();
     vi.mocked(api.process).mockResolvedValueOnce(result).mockRejectedValueOnce(new Error('Retry invalid'));
-    await user.click(screen.getByRole('checkbox', { name: 'Select all input files' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
     await user.click(screen.getByRole('button', { name: 'Run Processing (2)' }));
     await screen.findByRole('dialog');
     expect(api.process).toHaveBeenCalledTimes(2);
@@ -170,7 +177,7 @@ describe('data quality warning', () => {
   const warning = () => screen.getByRole('dialog', { name: 'Data Quality Warning' });
   async function warnMixedMass() {
     const user = await setup();
-    await user.click(screen.getByRole('checkbox', { name: 'Select all input files' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
     await user.click(screen.getByRole('radio', { name: /Component Mass Calculation/ }));
     await user.click(runButton(2));
     return user;
@@ -232,6 +239,106 @@ describe('data quality warning', () => {
     expect(screen.queryByRole('dialog', { name: 'Data Quality Warning' })).not.toBeInTheDocument();
     expect(api.process).toHaveBeenCalledTimes(1);
     expect(api.process).toHaveBeenCalledWith('clean', 'classification');
+  });
+});
+
+describe('archive and restore', () => {
+  const archived = (f: FileMeta): FileMeta => ({ ...f, archived: true });
+  const actionButton = (name: RegExp) => screen.getByRole('button', { name });
+
+  it('archives the selected files, hides them, and restores them from the Archived view', async () => {
+    const user = await setup();
+    expect(actionButton(/^Archive/)).toBeDisabled();
+    await user.click(check('invalid.csv'));
+    await user.click(check('result.csv'));
+    vi.mocked(api.archive).mockResolvedValueOnce([archived(invalid), archived(result)]);
+    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid), archived(result)]);
+    await user.click(actionButton(/^Archive \(2\)$/));
+
+    expect(api.archive).toHaveBeenCalledWith(['invalid', 'result'], true);
+    expect(await screen.findByRole('status')).toHaveTextContent('Archived 2 files. Choose Archived in Status to see or restore them.');
+    expect(screen.queryByRole('checkbox', { name: 'Select invalid.csv' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Select result.csv' })).not.toBeInTheDocument();
+    expect(check('clean.csv')).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter(), 'Archived');
+    expect(screen.queryByRole('checkbox', { name: 'Select clean.csv' })).not.toBeInTheDocument();
+    expect(within(row('invalid.csv')).getByText('Needs Review')).toBeInTheDocument(); // status is kept
+    expect(check('invalid.csv')).not.toBeChecked(); // archiving cleared the selection
+    expect(actionButton(/^Restore/)).toBeDisabled();
+    await user.click(check('invalid.csv'));
+    vi.mocked(api.archive).mockResolvedValueOnce([{ ...invalid, archived: false }]);
+    vi.mocked(api.list).mockResolvedValue([clean, { ...invalid, archived: false }, archived(result)]);
+    await user.click(actionButton(/^Restore \(1\)$/));
+
+    expect(api.archive).toHaveBeenLastCalledWith(['invalid'], false);
+    expect(await screen.findByRole('status')).toHaveTextContent('Restored 1 file.');
+    expect(screen.queryByRole('checkbox', { name: 'Select invalid.csv' })).not.toBeInTheDocument();
+    expect(check('result.csv')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(check('invalid.csv')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Select result.csv' })).not.toBeInTheDocument();
+  });
+
+  it('acts only on selected files in view, not on selections hidden by a filter', async () => {
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    await user.click(check('invalid.csv'));
+    await user.selectOptions(statusFilter(), 'Needs Review');
+    vi.mocked(api.archive).mockResolvedValueOnce([archived(invalid)]);
+    await user.click(actionButton(/^Archive \(1\)$/));
+    expect(api.archive).toHaveBeenCalledWith(['invalid'], true);
+  });
+
+  it('keeps the files and selection and explains a failed archive', async () => {
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    vi.mocked(api.archive).mockRejectedValueOnce(new Error('File not found'));
+    await user.click(actionButton(/^Archive/));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Archive failed: File not found');
+    expect(check('clean.csv')).toBeChecked();
+    expect(actionButton(/^Archive \(1\)$/)).toBeEnabled();
+  });
+
+  it('archives once on a double click and works from the keyboard', async () => {
+    const user = await setup();
+    let resolve!: (files: FileMeta[]) => void;
+    vi.mocked(api.archive).mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    await user.click(check('clean.csv'));
+    await user.dblClick(actionButton(/^Archive/));
+    expect(actionButton(/^Archive/)).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Run Processing/ })).toBeDisabled();
+    await act(async () => resolve([archived(clean)]));
+    expect(api.archive).toHaveBeenCalledTimes(1);
+
+    await user.click(check('invalid.csv'));
+    vi.mocked(api.archive).mockResolvedValueOnce([archived(invalid)]);
+    actionButton(/^Archive/).focus();
+    await user.keyboard('{Enter}');
+    expect(api.archive).toHaveBeenLastCalledWith(['invalid'], true);
+  });
+
+  it('keeps archived files out of processing and the compare pickers', async () => {
+    const other: FileMeta = { ...result, id: 'other', name: 'other.csv' };
+    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid), result, archived(other)]);
+    const user = await setup();
+    const fileA = () => screen.getByRole('combobox', { name: /File A/ });
+    expect(within(fileA()).getAllByRole('option').map((o) => o.getAttribute('value'))).toEqual(['', 'result']);
+    await user.selectOptions(statusFilter(), 'Archived');
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
+    expect(check('invalid.csv')).toBeChecked();
+    expect(screen.getByRole('button', { name: /^Run Processing/ })).toBeDisabled();
+  });
+
+  it('clears a compare choice when that result is archived', async () => {
+    const user = await setup();
+    await user.selectOptions(screen.getByRole('combobox', { name: /File A/ }), 'result');
+    await user.click(check('result.csv'));
+    vi.mocked(api.archive).mockResolvedValueOnce([archived(result)]);
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, archived(result)]);
+    await user.click(actionButton(/^Archive/));
+    await screen.findByRole('status');
+    expect(screen.getByRole('combobox', { name: /File A/ })).toHaveValue('');
   });
 });
 

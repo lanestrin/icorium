@@ -431,6 +431,63 @@ describe('legacy result compatibility', () => {
   });
 });
 
+describe('archiving', () => {
+  const archive = (ids: string[], archived: boolean) => app.inject({ method: 'POST', url: '/api/files/archive', payload: { ids, archived } });
+
+  it('archives and restores several files, changing nothing else', async () => {
+    const input = (await upload('archive_me.csv', sample('partner_a_baseline.csv'))).json<FileMeta>();
+    const result = (await processFile(input.id, 'mass')).json<FileMeta>();
+    const text = (await app.inject(`/api/files/${result.id}/download`)).body;
+
+    const res = await archive([input.id, result.id, input.id], true);
+    expect(res.statusCode).toBe(200);
+    expect(res.json<FileMeta[]>()).toEqual([{ ...input, archived: true }, { ...result, archived: true }]);
+    const listed = await listFiles();
+    expect(listed.find((f) => f.id === input.id)).toEqual({ ...input, archived: true });
+    expect(listed.find((f) => f.id === result.id)).toEqual({ ...result, archived: true });
+    expect((await app.inject(`/api/files/${result.id}/download`)).body).toBe(text);
+
+    expect((await archive([input.id, result.id], false)).json<FileMeta[]>()).toEqual([{ ...input, archived: false }, { ...result, archived: false }]);
+    expect((await listFiles()).filter((f) => f.id === input.id || f.id === result.id).map((f) => f.archived)).toEqual([false, false]);
+  });
+
+  it('refuses to process an archived input until it is restored', async () => {
+    const input = (await upload('archived_input.csv', sample('partner_a_baseline.csv'))).json<FileMeta>();
+    await archive([input.id], true);
+    const res = await processFile(input.id, 'validation');
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toBe('Restore archived_input.csv before processing it');
+    await archive([input.id], false);
+    expect((await processFile(input.id, 'validation')).statusCode).toBe(200);
+  });
+
+  it('brings back an archived result when its function runs again', async () => {
+    const input = (await upload('rerun.csv', sample('partner_a_baseline.csv'))).json<FileMeta>();
+    const first = (await processFile(input.id, 'classification')).json<FileMeta>();
+    await archive([first.id], true);
+    const second = (await processFile(input.id, 'classification')).json<FileMeta>();
+    const results = (await listFiles()).filter((f) => f.name === 'result_rerun_classification.csv');
+    expect(results).toEqual([second]);
+    expect(second.archived).toBeUndefined();
+  });
+
+  it('changes nothing when any file is missing', async () => {
+    const input = (await upload('kept.csv', sample('partner_a_baseline.csv'))).json<FileMeta>();
+    const res = await archive([input.id, 'missing'], true);
+    expect(res.statusCode).toBe(404);
+    expect((await listFiles()).find((f) => f.id === input.id)?.archived).toBeUndefined();
+  });
+
+  it.each([
+    ['no files', { ids: [], archived: true }],
+    ['no archived flag', { ids: ['x'] }],
+    ['a non-boolean flag', { ids: ['x'], archived: 'yes' }],
+  ])('rejects a request with %s', async (_, payload) => {
+    const res = await app.inject({ method: 'POST', url: '/api/files/archive', payload });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
 const listFiles = async () => (await app.inject('/api/files')).json<FileMeta[]>();
 const fileNamed = async (name: string) => {
   const f = (await listFiles()).find((x) => x.name === name);
