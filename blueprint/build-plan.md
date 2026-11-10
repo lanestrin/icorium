@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged; 9.5 comparison dashboard awaiting review. See section 4.
+**Status:** All planned features merged; 9.6 CSV generator awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,7 +68,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: none planned.** 9.5 is implemented and awaiting review.
+**Next: none planned.** 9.6 is implemented and awaiting review.
 New work needs a new request. Add it as a new stable ID with its scope before
 building, or use a `fix/` branch for a bug.
 
@@ -224,9 +224,15 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 - [x] **9.5** `feature/9.5-compare-dashboard` — Rework the comparison workspace as a dashboard, at the person's request on 2026-11-09 after reviewing 9.4b (they supplied a mockup; Export was left out). Selected files become chips with a tick or warning for flagged rows. Reference file, metric pills and an **Overview** / **Row differences** switch share one row. Overview puts a row chart (one line per file, axis fitted to the data, optional deviation from 100%) or, for categories, horizontal grouped bars and a count table beside **Summary by file** (mean or total, Δ vs reference, flagged rows; rows differing from the reference for categories). Below, **Comparison at a glance** shows the reference file, rows differing and flagged files, and **Top differences** lists the 3 rows that differ most from the reference for the metric (largest gap first; rows differing only by a missing value or row after; categories in row order) with **View all row details**. Row differences opens filtered to differing rows. The row-matching note stays; labels stay *Partner A · Baseline*. No API change.
 
-  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Result:** merged in PR #22 (`dc210fb`); automated verification and CI passed (2026-11-09).
   **Done when:** the dashboard shows chips, controls, chart, summary, at-a-glance figures and top differences for numeric and category metrics; changing the reference updates Δ, highlights and top differences; View all row details opens the filtered row differences.
   **Verification:** unit tests for top-difference ranking (gaps, missing values and rows, reference changes, categories, none) and the fitted axis; component tests for the dashboard, category metric, reference change, deviation toggle and row differences; `npm run verify`.
+
+- [x] **9.6** `feature/9.6-csv-generator` — A CSV generator page at `/generator`, at the person's request on 2026-11-09, to make more synthetic partner CSVs. The person chooses Partner A, B or C, 1–5,000 rows, 1–10 files (added the same day at their request, with no two files having the same data), and no errors or a number of rows with errors per file. `POST /api/generate` (`partner`, `rows`, `errorRows`, `files`, optional `seed`) returns `{ files }` in that partner's own columns and units with their planted errors, and saves nothing; each file gets its own seed and a file matching another is regenerated. Files are named `partnerA-MMDDYYYY-001.csv`, `-002`, … (the person's naming; numbering restarts per batch). The page lists the files with editable names, previews any file's first 10 rows and planted errors, and offers **Download** per file (through the browser) and **Add all to CSV Files** (the normal upload, reporting each failure). Clean rows always pass Composition Validation; with errors, exactly the requested number of rows fail it (missing or non-numeric mass, negative R-125, composition total 15 points short, missing batch ID, or a duplicate batch ID, which always marks two rows). Batch IDs and dates follow the samples. Links join the two pages; `Root` in `App.tsx` picks the page from the URL, with no router library.
+
+  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Done when:** each partner's generated file is recognised by its adapter and uploads like a sample; clean files have no problem rows; with errors, the flagged rows and reasons match the planted ones exactly; files in a batch never share their data and follow the naming; invalid requests are refused in plain words; the page generates, previews, downloads and adds files and reports failures.
+  **Verification:** unit tests for formats, units, IDs, dates, exact error counts and reasons across partners and seeds, every error kind, file names, distinct files in a batch, seeds and limits; API tests for the endpoint, no saving, several files, no repeats across requests, upload round trip and validation; component tests for the page and routing; `npm run verify`.
 
 ### M7 — Final interview readiness
 

@@ -6,7 +6,7 @@ import App from './App';
 import { api } from './api';
 
 vi.mock('./api', () => ({ api: {
-  list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(),
+  list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
   downloadUrl: (id: string) => `/api/files/${id}/download`,
 } }));
 

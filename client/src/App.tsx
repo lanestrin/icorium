@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArrowLeftRight, Calendar, Check, CircleAlert, Filter, RotateCcw, Search, X } from 'lucide-react';
+import { Archive, ArrowLeftRight, Calendar, Check, CircleAlert, Filter, RotateCcw, Search, Wand2, X } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta, type ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
 import { displayStatus, FileTable, FileTabs, qualityWarning, type QualityWarning, type Status, type Tab } from './components/FileTable';
 import { compareBlocker, CompareWorkspace } from './components/CompareWorkspace';
 import { PreviewModal, QualityWarningModal } from './components/Modals';
+import { GeneratorPage } from './components/GeneratorPage';
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const plural = (n: number) => `${n} file${n === 1 ? '' : 's'}`;
@@ -191,6 +192,9 @@ export default function App() {
           <div className="flex flex-wrap items-baseline gap-4">
             <h1 className="text-3xl font-bold tracking-tight">CSV Files</h1>
             <p className="text-slate-600">Upload, preview, process, and compare refrigerant datasets.</p>
+            <a href="/generator" className="ml-auto flex items-center gap-2 self-center text-sm font-medium text-blue-700 hover:underline">
+              <Wand2 className="h-4 w-4" /> CSV Generator
+            </a>
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -326,4 +330,9 @@ export default function App() {
       {comparison && <CompareWorkspace result={comparison} onClose={() => setComparison(undefined)} />}
     </div>
   );
+}
+
+/** Picks the page from the URL: /generator is the CSV generator, anything else the file workspace. */
+export function Root() {
+  return window.location.pathname.replace(/\/+$/, '') === '/generator' ? <GeneratorPage /> : <App />;
 }

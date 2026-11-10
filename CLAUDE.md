@@ -4,7 +4,7 @@ Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of thre
 
 ## Layout
 
-- `client/` React 19 + Vite + Tailwind 4 + Recharts + Lucide. Screen in `src/App.tsx`, pieces in `src/components/`.
+- `client/` React 19 + Vite + Tailwind 4 + Recharts + Lucide. File workspace in `src/App.tsx` (its `Root` shows `src/components/GeneratorPage.tsx` at `/generator`), pieces in `src/components/`.
 - `server/` Fastify 5 + Papa Parse + Zod, run with tsx. `src/adapters/` (partner columns and units), `src/processing/` (the three functions), `src/lib/` (csv, storage, compare), `src/routes/files.ts` (all endpoints).
 - `shared/types.ts` types and the processor list used by both sides.
 - `sample-data/` the person's five synthetic partner CSVs. `README.txt` there lists columns, units and the one planted error per file.
@@ -58,7 +58,7 @@ Examples:
 
 ## Extending
 
-- New partner CSV format: add an entry to `ADAPTERS` in `server/src/adapters/index.ts`.
+- New partner CSV format: add an entry to `ADAPTERS` in `server/src/adapters/index.ts`. To generate it, also add it to `GENERATOR_PARTNERS` in `shared/types.ts` and `DIGITS` in `server/src/lib/generate.ts`.
 - New processing function: add it to `processors` in `server/src/processing/index.ts`, to `PROCESSORS` in `shared/types.ts`, and to the Zod enum in `server/src/routes/files.ts`. Add a test in `server/src/core.test.ts`.
 
 ## Commands

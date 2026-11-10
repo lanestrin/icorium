@@ -95,3 +95,25 @@ export interface CompareResult {
   rows: MatchedRow[];
   columns: CompareColumn[];
 }
+
+/** Partners the CSV generator can write for (see server/src/lib/generate.ts). */
+export const GENERATOR_PARTNERS = ['A', 'B', 'C'] as const;
+export type GeneratorPartner = (typeof GENERATOR_PARTNERS)[number];
+
+/** One planted error. A duplicate batch ID is reported on both rows that share it. 1-based rows. */
+export interface GeneratedError {
+  row: number;
+  kind: 'mass missing' | 'mass not a number' | 'negative percentage' | 'composition total off' | 'batch ID missing' | 'duplicate batch ID';
+}
+
+/** A generated partner CSV, returned for download or for adding to the file list. Nothing is saved. */
+export interface GeneratedFile {
+  name: string;
+  partner: GeneratorPartner;
+  rows: number;
+  text: string;
+  errors: GeneratedError[];
+}
+
+/** POST /api/generate: 1–10 files with the same settings and different data. */
+export interface GeneratedBatch { files: GeneratedFile[] }
