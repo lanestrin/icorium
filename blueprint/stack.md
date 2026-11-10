@@ -27,7 +27,7 @@ This project is an interview exercise, **not** an industrial production system o
 | Validation | Zod | Validate API inputs and normalized records |
 | Charting | Recharts | Visualize differences between two result files |
 | Testing | Vitest | Unit tests for adapters, validation, processing, and export logic |
-| Storage | Local files, initially | Keep original/processed CSVs for the demo |
+| Storage | Local files; private Vercel Blob when deployed | Keep original/processed CSVs for the demo |
 
 All free and open source. Expected local software cost: $0.
 
@@ -57,9 +57,9 @@ A database is **not required** by the assignment. Keep processing logic independ
 Reference image: `blueprint/reference-ui.png`.
 
 - **Main window:** two-column layout with upload and processing controls on the left and a searchable CSV file list on the right.
-- **File list:** filename, row/column counts, date, status, Preview, and Download. Date-range and Ready/Processed filters.
+- **File list:** filename, row/column counts, date, status, Preview, and Download. Search, date-range and status filters (All / Ready / Needs Review / Processing / Processed / Error).
 - **File selection:** click a row to select the input for processing; highlight the active row.
-- **Processing status:** Ready → Processing (spinner) → Processed, with visible error feedback on failure.
+- **Processing status:** inputs are Ready (clean) or Needs Review (has invalid rows). They show Processing (spinner) while running and Error if the request fails; each run adds a Processed result. Mass and Classification ask for confirmation (Data Quality Warning) before running on Needs Review inputs.
 - **Preview modal:** show input data without expanding a potentially large CSV inside the main window.
 - **Result preview modal:** show original columns plus generated result columns after processing.
 - **Fixed compare footer:** select File A and File B from dropdowns; enable Compare Selected for two different, compatible result CSVs. On mobile it collapses to the icon and title and slides up when tapped.
@@ -83,14 +83,21 @@ Base CSV parsing and schema checks run on upload regardless of the processing fu
 
 **Do not add:** user accounts, cloud infrastructure, PostgreSQL, Convex, notifications, AI features, microservices, queues, or an analytics dashboard.
 
-## Acceptance Checks Before the Interview
+**Approved exception:** an optional Vercel deployment with private Blob storage (PR #6, confirmed by the person on 2026-11-06; see `blueprint/vercel-deployment.md`). It is server-side only and needs no accounts. Local development still uses local files and no cloud service. Any further cloud addition needs a new decision.
 
-- [ ] Upload a CSV through the normal file chooser.
-- [ ] View input rows in the preview modal.
-- [ ] Select one of three functions and process **all** rows.
-- [ ] View results in the application.
-- [ ] Export a new CSV preserving **every original input column** and adding the generated columns.
-- [ ] Load two saved result CSVs (not just original inputs).
-- [ ] Show a graph that makes differences apparent.
-- [ ] Show errors clearly for invalid input and incompatible comparison files.
-- [ ] Test parsing, normalization, processing, and export; explain how a new function or CSV schema could be added.
+## Acceptance evidence
+
+These product checks are covered by automated tests (`npm run verify`), not a
+manual checklist. Real-browser layout and chart drawing are not verified by them.
+
+| Check | Evidence |
+| --- | --- |
+| Upload a CSV through the normal file chooser | `App.test.tsx` upload tests; `api.test.ts` loading files |
+| View input rows in the preview modal | `App.test.tsx` preview paging and errors; `api.test.ts` preview paging |
+| Select one of three functions and process **all** rows | `App.test.tsx` processor choice and batches; `api.test.ts` all functions × all samples |
+| View results in the application | `App.test.tsx` result preview after processing |
+| Export a new CSV keeping **every original column** plus generated columns | `api.test.ts` current result contract (headers, values, download) |
+| Load two saved result CSVs and compare them | `api.test.ts` renamed re-upload and compare; `App.test.tsx` compare footer and modal |
+| A graph that makes differences apparent | `core.test.ts`/`api.test.ts` comparison data; `App.test.tsx` modal summary. Chart drawing not verified in a browser |
+| Clear errors for invalid input and incompatible comparisons | `api.test.ts` schema and comparison errors; `App.test.tsx` upload and comparison failures |
+| Explain adding a new function or CSV schema | README **Extending** |

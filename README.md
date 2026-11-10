@@ -8,27 +8,29 @@ Interview exercise. All data is fictional and the classification rules are demo-
 
 ## Run
 
+Requires Node.js 24 (the version CI uses).
+
 ```bash
 npm install
-npm run dev       # API on :3001, UI on http://localhost:5173
+npm run dev       # API on :3001, UI on http://localhost:5173 (Vite picks the next free port if 5173 is taken)
 npm run verify    # every test + the production build
 ```
 
-## Tests
+The five synthetic sample CSVs in `sample-data/` (described in `sample-data/README.txt`) are loaded the first time the server starts. To reset the demo, stop the servers, delete `server/data/` and start again.
 
-For the proposed Vercel multi-service setup and durable private Blob storage,
-see [deployment configuration and outstanding checks](blueprint/vercel-deployment.md).
+## Tests
 
 | Level | File | What it proves |
 | --- | --- | --- |
 | Unit (Vitest) | `server/src/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths |
 | API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message; all three functions on all five samples: exact invalid rows and reasons, every original column and value kept, download, renamed re-upload and compare |
+| Unit + API (Vitest, Blob SDK mocked in memory) | `server/src/blob-storage.test.ts` | The private Blob storage adapter: shared files across instances, atomic result replacement, idempotent sample seeding, conflict and failure handling, and refusing a Vercel start without storage configured |
 | Unit (Vitest) | `client/src/file-status.test.ts` | Input eligibility, status precedence, when the Data Quality Warning appears and its per-file counts |
-| Component (Vitest + React Testing Library) | `client/src/App.test.tsx` | Selection, status/search/date filters, processing locks, failure and retry, warning dialog counts, cancel/confirm, focus and duplicate clicks |
+| Component (Vitest + React Testing Library) | `client/src/App.test.tsx` | Upload success and failure; selection and status/search/date filters; processing locks, failure and retry; warning dialog counts, cancel/confirm, focus and duplicate clicks; preview paging and errors; compare-footer choices, the comparison modal and comparison errors |
 
 `npm test` runs server unit/API tests and client unit/component tests. Client tests use Vitest, React Testing Library and jsdom; API calls are mocked at the client boundary while server behavior has separate API coverage. `npm run verify` also type-checks and builds the client. These replace required manual acceptance checks; they do not establish real-browser layout or visual correctness. Run `npm test -w client` for client tests only.
 
-The five synthetic sample CSVs in `sample-data/` (described in `sample-data/README.txt`) are loaded the first time the server starts. To reset the demo, delete `server/data/`.
+## File status and selection
 
 Input files without invalid rows are **Ready**; inputs with invalid rows are **Needs Review** and remain selectable for all three functions. The status filter includes both states. Results remain **Processed**, with an **N invalid** tag when applicable. Existing saved file metadata is updated automatically without rewriting CSVs or resetting data.
 
@@ -74,14 +76,21 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 ## Layout
 
 ```
-client/   React + Vite + Tailwind UI (App, Sidebar, FileTable, CompareFooter, Modals)
-server/   Fastify API
+client/        React + Vite + Tailwind UI
+  src/App.tsx      the one screen; src/api.ts is the typed API client
+  src/components/  Sidebar, FileTable, CompareFooter, Modals
+server/        Fastify API
   src/adapters/    partner header and unit mappings -> one normalized record
   src/processing/  the three processing functions
-  src/lib/         csv parse/export, local storage, compare
-  src/routes/      /api/files, /api/process, /api/compare
-shared/   types shared by client and server
+  src/lib/         csv parse/export, storage (local files, or private Blob via blob-storage.ts), compare
+  src/routes/      files.ts: /api/files, /api/process, /api/compare
+shared/        types and the processor list used by both sides
+sample-data/   the five synthetic partner CSVs (never edited)
 ```
+
+## Deploy
+
+Local development needs no account or cloud service. An optional Vercel deployment (client and server services, private Blob storage) is configured; see [deployment configuration and outstanding checks](blueprint/vercel-deployment.md).
 
 ## Extending
 
