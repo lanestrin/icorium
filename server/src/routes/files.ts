@@ -72,8 +72,9 @@ export async function fileRoutes(app: FastifyInstance) {
     const { ids, archived } = archiveBody.parse(req.body);
     const unique = [...new Set(ids)];
     for (const id of unique) await storage.get(id); // 404 before changing anything
+    const archivedAt = archived ? new Date().toISOString() : undefined; // undefined is dropped when saved
     const updated: FileMeta[] = [];
-    for (const id of unique) updated.push(await storage.patch(id, { archived }));
+    for (const id of unique) updated.push(await storage.patch(id, { archived, archivedAt }));
     return updated;
   });
 

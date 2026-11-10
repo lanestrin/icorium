@@ -439,16 +439,23 @@ describe('archiving', () => {
     const result = (await processFile(input.id, 'mass')).json<FileMeta>();
     const text = (await app.inject(`/api/files/${result.id}/download`)).body;
 
+    const before = Date.now();
     const res = await archive([input.id, result.id, input.id], true);
     expect(res.statusCode).toBe(200);
-    expect(res.json<FileMeta[]>()).toEqual([{ ...input, archived: true }, { ...result, archived: true }]);
+    const [archivedInput, archivedResult] = res.json<FileMeta[]>();
+    expect(archivedInput).toEqual({ ...input, archived: true, archivedAt: expect.any(String) });
+    expect(archivedResult).toEqual({ ...result, archived: true, archivedAt: archivedInput.archivedAt }); // one time for the batch
+    expect(Date.parse(archivedInput.archivedAt!)).toBeGreaterThanOrEqual(before);
     const listed = await listFiles();
-    expect(listed.find((f) => f.id === input.id)).toEqual({ ...input, archived: true });
-    expect(listed.find((f) => f.id === result.id)).toEqual({ ...result, archived: true });
+    expect(listed.find((f) => f.id === input.id)).toEqual(archivedInput);
+    expect(listed.find((f) => f.id === result.id)).toEqual(archivedResult);
     expect((await app.inject(`/api/files/${result.id}/download`)).body).toBe(text);
 
+    // Restoring clears the archive time.
     expect((await archive([input.id, result.id], false)).json<FileMeta[]>()).toEqual([{ ...input, archived: false }, { ...result, archived: false }]);
-    expect((await listFiles()).filter((f) => f.id === input.id || f.id === result.id).map((f) => f.archived)).toEqual([false, false]);
+    const restored = (await listFiles()).filter((f) => f.id === input.id || f.id === result.id);
+    expect(restored).toEqual([{ ...input, archived: false }, { ...result, archived: false }]);
+    expect(restored.every((f) => !('archivedAt' in f))).toBe(true);
   });
 
   it('refuses to process an archived input until it is restored', async () => {
