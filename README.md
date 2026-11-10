@@ -23,10 +23,10 @@ The five synthetic sample CSVs in `sample-data/` (described in `sample-data/READ
 | Level | File | What it proves |
 | --- | --- | --- |
 | Unit (Vitest) | `server/src/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths |
-| API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message; all three functions on all five samples: exact invalid rows and reasons, every original column and value kept, download, renamed re-upload and compare |
+| API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message, including archive and restore; all three functions on all five samples: exact invalid rows and reasons, every original column and value kept, download, renamed re-upload and compare |
 | Unit + API (Vitest, Blob SDK mocked in memory) | `server/src/blob-storage.test.ts` | The private Blob storage adapter: shared files across instances, atomic result replacement, idempotent sample seeding, conflict and failure handling, and refusing a Vercel start without storage configured |
 | Unit (Vitest) | `client/src/file-status.test.ts` | Input eligibility, status precedence, when the Data Quality Warning appears and its per-file counts |
-| Component (Vitest + React Testing Library) | `client/src/App.test.tsx` | Upload success and failure; selection and status/search/date filters; processing locks, failure and retry; warning dialog counts, cancel/confirm, focus and duplicate clicks; preview paging and errors; compare-footer choices, the comparison modal and comparison errors |
+| Component (Vitest + React Testing Library) | `client/src/App.test.tsx` | Upload success and failure; selection and status/search/date filters; archive and restore, including failure, double clicks and keyboard use; processing locks, failure and retry; warning dialog counts, cancel/confirm, focus and duplicate clicks; preview paging and errors; compare-footer choices, the comparison modal and comparison errors |
 
 `npm test` runs server unit/API tests and client unit/component tests. Client tests use Vitest, React Testing Library and jsdom; API calls are mocked at the client boundary while server behavior has separate API coverage. `npm run verify` also type-checks and builds the client. These replace required manual acceptance checks; they do not establish real-browser layout or visual correctness. Run `npm test -w client` for client tests only.
 
@@ -34,7 +34,9 @@ The five synthetic sample CSVs in `sample-data/` (described in `sample-data/READ
 
 Input files without invalid rows are **Ready**; inputs with invalid rows are **Needs Review** and remain selectable for all three functions. The status filter includes both states. Results remain **Processed**; open **Preview** to see which rows are invalid and why. Existing saved file metadata is updated automatically without rewriting CSVs or resetting data.
 
-Filters do not clear selected inputs. Select-all affects the visible input rows, while the processing panel lists every selected filename, including selections hidden by filters. Processing a file does not repair its source data, so an invalid input remains Needs Review after a successful run.
+Every row, input or result, can be selected. **Run Processing** uses only the selected inputs, and the processing panel lists every selected input filename, including selections hidden by filters. Filters do not clear selections; select-all affects the visible rows. Processing a file does not repair its source data, so an invalid input remains Needs Review after a successful run.
+
+**Archive** hides the selected files that are in view. Choose **Archived** in the Status filter to see them; there the button reads **Restore** and brings the selected files back with their status unchanged. Archiving only sets a flag: no CSV is moved or deleted, and archived files can still be previewed and downloaded. Archived files are left out of processing and the compare dropdowns. Re-running a function on an input replaces its result as before, so an archived result comes back as a new, unarchived one.
 
 ## Demo steps
 
@@ -83,7 +85,7 @@ server/        Fastify API
   src/adapters/    partner header and unit mappings -> one normalized record
   src/processing/  the three processing functions
   src/lib/         csv parse/export, storage (local files, or private Blob via blob-storage.ts), compare
-  src/routes/      files.ts: /api/files, /api/process, /api/compare
+  src/routes/      files.ts: /api/files, /api/files/archive, /api/process, /api/compare
 shared/        types and the processor list used by both sides
 sample-data/   the five synthetic partner CSVs (never edited)
 ```

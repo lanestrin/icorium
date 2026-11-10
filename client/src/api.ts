@@ -21,5 +21,11 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ fileId, processor }),
     }).then(json<FileMeta>),
+  archive: (ids: string[], archived: boolean) =>
+    fetch('/api/files/archive', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids, archived }),
+    }).then(json<FileMeta[]>),
   compare: (a: string, b: string) => fetch(`/api/compare?a=${a}&b=${b}`).then(json<CompareResult>),
 };

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { FileMeta } from '../../../shared/types';
 import { getAdapter } from '../adapters';
 import { detectResult, findProblems, processRows } from '../processing';
 import { compareResults } from '../lib/compare';
@@ -7,6 +8,7 @@ import { httpError, parseCsv, toCsv } from '../lib/csv';
 import { storage } from '../lib/storage';
 
 const processBody = z.object({ fileId: z.string().min(1), processor: z.enum(['validation', 'mass', 'classification']) });
+const archiveBody = z.object({ ids: z.array(z.string().min(1)).min(1), archived: z.boolean() });
 const compareQuery = z.object({ a: z.string().min(1), b: z.string().min(1) }).refine((q) => q.a !== q.b, 'Choose two different files');
 // Previews load a page at a time so a large CSV never has to be rendered all at once.
 const pageQuery = z.object({
@@ -65,10 +67,21 @@ export async function fileRoutes(app: FastifyInstance) {
     return storage.read(meta.id);
   });
 
+  // Archive or restore several files at once. Only the flag changes; no CSV is moved or deleted.
+  app.post('/files/archive', async (req) => {
+    const { ids, archived } = archiveBody.parse(req.body);
+    const unique = [...new Set(ids)];
+    for (const id of unique) await storage.get(id); // 404 before changing anything
+    const updated: FileMeta[] = [];
+    for (const id of unique) updated.push(await storage.patch(id, { archived }));
+    return updated;
+  });
+
   app.post('/process', async (req) => {
     const { fileId, processor } = processBody.parse(req.body);
     const meta = await storage.get(fileId);
     if (meta.status === 'Processed') throw httpError(400, 'Select an input file, not a result file');
+    if (meta.archived) throw httpError(400, `Restore ${meta.name} before processing it`);
     const { headers, rows } = parseCsv(await storage.read(fileId));
     const out = processRows(headers, rows, processor);
     const base = meta.name.replace(/\.csv$/i, '');

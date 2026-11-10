@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged; UI refinement 9.1 awaiting review. See section 4.
+**Status:** All planned features merged; 9.2 batch archive awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -22,8 +22,8 @@ This is a general-purpose interview exercise illustrated with synthetic refriger
 ### Main desktop screen
 
 - **Left control column:** CSV upload/drop area; three processing functions; selected input filename; **Run Processing** button.
-- **Right file workspace:** one-line “CSV Files” heading/subtitle; search; upload-date range filter; status filter (**All / Ready / Processing / Processed / Error**); scrollable file table with filename, rows, columns, upload date, status, **Preview** and **Download**.
-- **Select files for processing:** each input row has a checkbox (or click the row); a header checkbox selects all visible inputs. **Run Processing** processes every checked file in turn with the chosen function. Result rows are not selectable. Do *not* add compare buttons to each row.
+- **Right file workspace:** one-line “CSV Files” heading/subtitle; search; upload-date range filter; status filter (**All / Ready / Needs Review / Processing / Processed / Error / Archived**); scrollable file table with filename, rows, columns, upload date, status, **Preview** and **Download**.
+- **Select files:** every row has a checkbox (or click the row); a header checkbox selects all visible rows. **Run Processing** processes every checked input in turn with the chosen function; checked results are ignored by it (since 9.2, results are selectable so they can be archived). **Archive** / **Restore** acts on the checked rows in view. Do *not* add compare buttons to each row.
 - **Processing feedback:** the selected input row displays a spinner and **Processing…** while the request runs; if it fails, show **Error** and an actionable message. On success, keep the input available and add a **new processed result file** to the list.
 - **Fixed bottom comparison footer:** **File A** dropdown, **File B** dropdown, **Compare Selected**. Populate with compatible processed results. Button disabled until two distinct files are selected.
 
@@ -68,7 +68,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: none planned.** 9.1 is implemented and awaiting review.
+**Next: none planned.** 9.2 is implemented and awaiting review.
 New work needs a new request. Add it as a new stable ID with its scope before
 building, or use a `fix/` branch for a bug.
 
@@ -193,9 +193,15 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 - [x] **9.1** `feature/9.1-remove-invalid-row-tags` — Remove the amber **N invalid** tag from every file-table row (inputs and results), at the person's request on 2026-11-09 (they chose "everywhere"). This supersedes the tag from 8.2. Inputs still show **Needs Review**. Invalid rows stay visible in Preview's problem panel, the Data Quality Warning counts and the comparison cards. `problemRows` and all API behavior are unchanged.
 
-  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Result:** merged in PR #16 (`3cae28a`); automated verification passed (2026-11-09).
   **Done when:** no row shows the tag; the status badge, filter, selection and warning behavior are unchanged; docs no longer mention the tag.
   **Verification:** component test asserts no tag on clean, Needs Review and Processed rows; `npm run verify`.
+
+- [x] **9.2** `feature/9.2-batch-archive` — Select files (inputs and results), click **Archive** to hide them from the list, and bring them back with **Restore**, at the person's request on 2026-11-09 (they chose archive over delete, and the label **Restore** over "Unarchive"). Archiving sets an `archived` flag through `POST /api/files/archive` (`ids`, `archived`); no CSV is moved or deleted. A new **Archived** option in the Status filter shows only archived files, and there the button reads **Restore**. The button acts only on checked rows in view. Archived files are excluded from Run Processing (the API also refuses them) and from the compare dropdowns; a compare choice is cleared when its file is archived. Result rows become selectable so they can be archived; Run Processing still uses only checked inputs. Re-running a function replaces an archived result with a new, unarchived one.
+
+  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Done when:** archive and restore round-trip without changing any other metadata or CSV; a missing id changes nothing (404); invalid bodies are rejected; archived inputs cannot be processed; the Archived view, Clear filters, selection, compare pickers and Run Processing behave as above.
+  **Verification:** API tests for archive/restore, 404, validation, processing refusal and re-run; component tests for archive, restore, hidden selections, failure, double click, keyboard, compare pickers and processing exclusion; `npm run verify`.
 
 ### M7 — Final interview readiness
 

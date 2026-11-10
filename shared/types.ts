@@ -18,6 +18,7 @@ export interface FileMeta {
   sourceId?: string;
   generatedColumns?: string[];
   problemRows?: number; // rows with missing, invalid or duplicate values
+  archived?: boolean; // hidden from the main list and the compare pickers until restored
 }
 
 /** Both clean and invalid input files can be processed; result files cannot. */

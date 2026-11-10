@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, Check, CircleAlert, Filter, Search, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Calendar, Check, CircleAlert, Filter, Search, X } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta, type ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
@@ -18,13 +18,15 @@ export default function App() {
   const [pending, setPending] = useState<{ batch: FileMeta[]; processor: ProcessorId; warning: QualityWarning }>();
   const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
 
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [status, setStatus] = useState<'All' | Status>('All');
+  const [status, setStatus] = useState<'All' | Status | 'Archived'>('All');
+  const viewArchived = status === 'Archived';
 
   const [preview, setPreview] = useState<FileMeta>();
   const [compareA, setCompareA] = useState('');
@@ -37,25 +39,52 @@ export default function App() {
   const filtersActive = !!(search || from || to || status !== 'All');
   const clearFilters = () => { setSearch(''); setFrom(''); setTo(''); setStatus('All'); };
 
-  const selectedInputs = files.filter((f) => selectedIds.has(f.id) && isInputFile(f));
+  const selectedInputs = files.filter((f) => selectedIds.has(f.id) && isInputFile(f) && !f.archived);
   const toggle = (id: string) =>
     setSelectedIds((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const toggleAll = (ids: string[], on: boolean) =>
     setSelectedIds((s) => { const n = new Set(s); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; });
-  const results = files.filter((f) => f.status === 'Processed');
+  const results = files.filter((f) => f.status === 'Processed' && !f.archived);
   const visible = useMemo(
     () =>
       files.filter((f) => {
         const day = new Date(f.uploadedAt).toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
         return (
           f.name.toLowerCase().includes(search.toLowerCase()) &&
-          (status === 'All' || displayStatus(f, processingId, failedIds) === status) &&
+          // Archived files appear only in the Archived view, whatever their status.
+          (viewArchived ? !!f.archived : !f.archived && (status === 'All' || displayStatus(f, processingId, failedIds) === status)) &&
           (!from || day >= from) &&
           (!to || day <= to)
         );
       }),
-    [files, search, status, from, to, processingId, failedIds],
+    [files, search, status, viewArchived, from, to, processingId, failedIds],
   );
+  // Archive and Restore act only on the selected files in view, never on hidden selections.
+  const archiveTargets = visible.filter((f) => selectedIds.has(f.id));
+
+  /** Archive hides the selected files; in the Archived view, Restore brings them back. */
+  async function toggleArchive() {
+    const ids = archiveTargets.map((f) => f.id);
+    if (!ids.length || busy.current) return;
+    busy.current = true;
+    setArchiving(true);
+    setError(undefined);
+    setNotice(undefined);
+    const archive = !viewArchived;
+    try {
+      await api.archive(ids, archive);
+      toggleAll(ids, false);
+      if (archive && ids.includes(compareA)) setCompareA('');
+      if (archive && ids.includes(compareB)) setCompareB('');
+      const n = `${ids.length} file${ids.length === 1 ? '' : 's'}`;
+      setNotice(archive ? `Archived ${n}. Choose Archived in Status to see or restore them.` : `Restored ${n}.`);
+    } catch (e) {
+      setError(`${archive ? 'Archive' : 'Restore'} failed: ${msg(e)}`);
+    }
+    await refresh();
+    busy.current = false;
+    setArchiving(false);
+  }
 
   async function upload(list: File[]) {
     setUploading(true);
@@ -129,7 +158,7 @@ export default function App() {
           setProcessor={setProcessor}
           onUpload={upload}
           onRun={requestRun}
-          canRun={selectedInputs.length > 0 && !processingId}
+          canRun={selectedInputs.length > 0 && !processingId && !archiving}
           running={!!processingId}
           uploading={uploading}
           selectedNames={selectedInputs.map((f) => f.name)}
@@ -165,8 +194,17 @@ export default function App() {
                 <option>Processing</option>
                 <option>Processed</option>
                 <option>Error</option>
+                <option>Archived</option>
               </select>
             </label>
+            <button
+              onClick={toggleArchive}
+              disabled={!archiveTargets.length || !!processingId || archiving}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {viewArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+              {viewArchived ? 'Restore' : 'Archive'}{archiveTargets.length ? ` (${archiveTargets.length})` : ''}
+            </button>
             {filtersActive && (
               <button
                 onClick={clearFilters}
