@@ -35,8 +35,9 @@ describe('input selection and status filtering', () => {
   it('selects both input statuses, excludes results, and toggles rows and checkboxes', async () => {
     const user = await setup();
     expect(check('result.csv')).toBeDisabled();
-    expect(within(row('clean.csv')).queryByText(/invalid row/)).not.toBeInTheDocument();
-    expect(within(row('invalid.csv')).getByText(/2 invalid/)).toHaveTextContent('2 invalid rows');
+    // The status badge is the only status marker; no separate "N invalid" tag on inputs or results.
+    for (const name of ['clean.csv', 'invalid.csv', 'result.csv']) expect(within(row(name)).queryByText(/\d+ invalid/)).not.toBeInTheDocument();
+    expect(within(row('invalid.csv')).getByText('Needs Review')).toBeInTheDocument();
     expect(within(row('result.csv')).getByText('Processed')).toBeInTheDocument();
     await user.click(check('clean.csv'));
     await user.click(row('invalid.csv'));

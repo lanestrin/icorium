@@ -124,18 +124,8 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                 <td className="px-3 text-center">{f.columns}</td>
                 <td className="whitespace-nowrap pl-4 pr-3">{fmtDate(f.uploadedAt)}</td>
                 <td>
-                  <div className="flex items-center gap-2 whitespace-nowrap pr-3">
+                  <div className="whitespace-nowrap pr-3">
                     <StatusBadge status={status} />
-                    {!!f.problemRows && (
-                      <span
-                        // relative: keeps the sr-only text inside the table's scroll box, not the page's
-                        className="relative inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800"
-                        title="Rows with missing, invalid or duplicate values. Open Preview to see which."
-                      >
-                        <TriangleAlert className="h-3.5 w-3.5" />
-                        {f.problemRows} invalid<span className="sr-only"> {f.problemRows === 1 ? 'row' : 'rows'}</span>
-                      </span>
-                    )}
                   </div>
                 </td>
                 <td>

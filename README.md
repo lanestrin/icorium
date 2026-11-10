@@ -32,13 +32,13 @@ The five synthetic sample CSVs in `sample-data/` (described in `sample-data/READ
 
 ## File status and selection
 
-Input files without invalid rows are **Ready**; inputs with invalid rows are **Needs Review** and remain selectable for all three functions. The status filter includes both states. Results remain **Processed**, with an **N invalid** tag when applicable. Existing saved file metadata is updated automatically without rewriting CSVs or resetting data.
+Input files without invalid rows are **Ready**; inputs with invalid rows are **Needs Review** and remain selectable for all three functions. The status filter includes both states. Results remain **Processed**; open **Preview** to see which rows are invalid and why. Existing saved file metadata is updated automatically without rewriting CSVs or resetting data.
 
 Filters do not clear selected inputs. Select-all affects the visible input rows, while the processing panel lists every selected filename, including selections hidden by filters. Processing a file does not repair its source data, so an invalid input remains Needs Review after a successful run.
 
 ## Demo steps
 
-1. Open **Preview** on `partner_a_baseline.csv` to show its original columns. It is **Needs Review** with a **1 invalid** tag; Preview lists and highlights row 8 (`mass missing`).
+1. Open **Preview** on `partner_a_baseline.csv` to show its original columns. It is **Needs Review**; Preview lists and highlights row 8 (`mass missing`).
 2. Click the row to select it, choose **Component Mass Calculation**, and click **Run Processing**. A **Data Quality Warning** lists the file with *24 valid rows · 1 invalid row* and explains that valid rows will be calculated, while invalid rows stay in the output with error details and no calculated values. Click **Process Valid Rows**. The row shows *Processing…*, then the result preview opens with the new columns highlighted. (**Cancel** sends nothing and keeps the selection.)
 3. **Download** the result and open it: every original column is unchanged, and `r32_mass_kg`, `r125_mass_kg`, `r134a_mass_kg`, `processing_status` and `validation_errors` are added at the end. Row 8 is `Invalid` with `mass missing` and blank masses; every other row is `Valid` with an empty `validation_errors`.
 4. Check both Partner A files and run **Component Mass Calculation** once. The warning lists both files with their counts; after **Process Valid Rows** they are processed in turn, and the two results fill **File A** and **File B** in the footer. (Running each file on its own works too.)

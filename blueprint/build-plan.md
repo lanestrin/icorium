@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features implemented; 7.1 interview readiness awaiting review. See section 4.
+**Status:** All planned features merged; UI refinement 9.1 awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,7 +68,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: none planned.** Every item below is complete once 7.1 merges.
+**Next: none planned.** 9.1 is implemented and awaiting review.
 New work needs a new request. Add it as a new stable ID with its scope before
 building, or use a `fix/` branch for a bug.
 
@@ -189,11 +189,19 @@ otherwise every row is checked, valid rows are processed, invalid rows stay in
 the output marked Invalid with their reason and no calculated values, and the
 user confirms before Mass or Classification calculates on a file with problems.
 
+### M9 — UI refinements
+
+- [x] **9.1** `feature/9.1-remove-invalid-row-tags` — Remove the amber **N invalid** tag from every file-table row (inputs and results), at the person's request on 2026-11-09 (they chose "everywhere"). This supersedes the tag from 8.2. Inputs still show **Needs Review**. Invalid rows stay visible in Preview's problem panel, the Data Quality Warning counts and the comparison cards. `problemRows` and all API behavior are unchanged.
+
+  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Done when:** no row shows the tag; the status badge, filter, selection and warning behavior are unchanged; docs no longer mention the tag.
+  **Verification:** component test asserts no tag on clean, Needs Review and Processed rows; `npm run verify`.
+
 ### M7 — Final interview readiness
 
 - [x] **7.1** `feature/7.1-interview-readiness` — Review final interview documentation and automated verification after partial processing and any explicitly requested UI changes. This is an integration review, not a redesign.
 
-  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR. Added client component coverage for upload, preview paging, compare footer and comparison. Aligned README, plan layout and stack doc with the code. See [feature scope and results](features/7.1-interview-readiness.md).
+  **Result:** merged in PR #15 (`d28064b`); automated verification passed (2026-11-09). Added client component coverage for upload, preview paging, compare footer and comparison. Aligned README, plan layout and stack doc with the code. See [feature scope and results](features/7.1-interview-readiness.md).
   **Depends on:** 8.1–8.4 and any subsequently approved UI feature affecting the demo.
   **Done when:** README setup and demo instructions match the implementation;
   unit/API and component coverage supports the CSV workflow; known limitations are documented.
@@ -236,7 +244,7 @@ If time is limited, prioritize **working P0 functionality over appearance refine
 
 ## 8. Suggested interview demo script
 
-1. Open **Preview** on `partner_a_baseline.csv`: original columns, **Needs Review** status, **1 invalid** tag and the highlighted row 8 (`mass missing`).
+1. Open **Preview** on `partner_a_baseline.csv`: original columns, **Needs Review** status and the highlighted row 8 (`mass missing`).
 2. Select it, choose **Component Mass Calculation**, click **Run Processing**. The **Data Quality Warning** shows 24 valid / 1 invalid; click **Process Valid Rows**.
 3. Show the row spinner (when visible), then the processed results modal.
 4. Download the result CSV: original columns intact, generated columns appended, row 8 `Invalid` with its reason and blank masses.
