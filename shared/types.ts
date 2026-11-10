@@ -19,6 +19,7 @@ export interface FileMeta {
   generatedColumns?: string[];
   problemRows?: number; // rows with missing, invalid or duplicate values
   archived?: boolean; // hidden from the main list and the compare pickers until restored
+  archivedAt?: string; // ISO; when it was last archived, cleared on restore
 }
 
 /** Both clean and invalid input files can be processed; result files cannot. */

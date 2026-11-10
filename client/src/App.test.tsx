@@ -243,41 +243,163 @@ describe('data quality warning', () => {
 });
 
 describe('archive and restore', () => {
-  const archived = (f: FileMeta): FileMeta => ({ ...f, archived: true });
-  const actionButton = (name: RegExp) => screen.getByRole('button', { name });
+  const archived = (f: FileMeta, archivedAt = '2026-11-08T10:00:00Z'): FileMeta => ({ ...f, archived: true, archivedAt });
+  const tab = (name: RegExp) => screen.getByRole('tab', { name });
+  const bar = () => screen.getByRole('toolbar', { name: 'Selected files' });
+  const barButton = (name: RegExp) => within(bar()).getByRole('button', { name });
+  const toast = () => screen.getByRole('status');
+  const openMenu = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
+    await user.click(screen.getByRole('button', { name: `Actions for ${name}` }));
+    return screen.getByRole('menu', { name: `Actions for ${name}` });
+  };
 
-  it('archives the selected files, hides them, and restores them from the Archived view', async () => {
+  it('shows Active Files and Archived tabs with counts, and a selection bar only while rows are selected', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, archived(result)]);
     const user = await setup();
-    expect(actionButton(/^Archive/)).toBeDisabled();
+    expect(tab(/Active Files/)).toHaveAttribute('aria-selected', 'true');
+    expect(tab(/Active Files/)).toHaveTextContent('Active Files2');
+    expect(tab(/Archived/)).toHaveTextContent('Archived1');
+    expect(screen.queryByRole('toolbar', { name: 'Selected files' })).not.toBeInTheDocument();
+    expect(within(statusFilter()).queryByRole('option', { name: 'Archived' })).not.toBeInTheDocument();
+    await user.click(check('clean.csv'));
+    await user.click(check('invalid.csv'));
+    expect(bar()).toHaveTextContent('2 selected');
+    expect(barButton(/^Archive 2 files$/)).toBeEnabled();
+    await user.click(barButton(/Clear selection/));
+    expect(check('clean.csv')).not.toBeChecked();
+    expect(screen.queryByRole('toolbar', { name: 'Selected files' })).not.toBeInTheDocument();
+  });
+
+  it('archives the selected files, confirms in a toast and lists them in the Archived tab', async () => {
+    const user = await setup();
     await user.click(check('invalid.csv'));
     await user.click(check('result.csv'));
     vi.mocked(api.archive).mockResolvedValueOnce([archived(invalid), archived(result)]);
-    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid), archived(result)]);
-    await user.click(actionButton(/^Archive \(2\)$/));
+    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid, '2026-11-08T09:00:00Z'), archived(result, '2026-11-08T11:00:00Z')]);
+    await user.click(barButton(/^Archive 2 files$/));
 
     expect(api.archive).toHaveBeenCalledWith(['invalid', 'result'], true);
-    expect(await screen.findByRole('status')).toHaveTextContent('Archived 2 files. Choose Archived in Status to see or restore them.');
+    expect(await screen.findByRole('status')).toHaveTextContent('2 files archived');
+    expect(toast()).toHaveTextContent('Moved out of Active Files.');
     expect(screen.queryByRole('checkbox', { name: 'Select invalid.csv' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('checkbox', { name: 'Select result.csv' })).not.toBeInTheDocument();
-    expect(check('clean.csv')).toBeInTheDocument();
+    expect(tab(/Archived/)).toHaveTextContent('Archived2');
 
-    await user.selectOptions(statusFilter(), 'Archived');
-    expect(screen.queryByRole('checkbox', { name: 'Select clean.csv' })).not.toBeInTheDocument();
+    await user.click(tab(/Archived/));
+    expect(screen.getByText('Archived files are excluded from processing and comparison.')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Archived On/ })).toHaveAttribute('aria-sort', 'descending');
+    expect(screen.getByRole('columnheader', { name: 'Original Upload' })).toBeInTheDocument();
+    // Most recently archived first, with the archive time and the original upload time.
+    const names = screen.getAllByRole('checkbox', { name: /^Select (?!all)/ }).map((c) => c.getAttribute('aria-label'));
+    expect(names).toEqual(['Select result.csv', 'Select invalid.csv']);
+    expect(row('result.csv')).toHaveTextContent(/Nov 8, 2026.*Nov 6, 2026/);
     expect(within(row('invalid.csv')).getByText('Needs Review')).toBeInTheDocument(); // status is kept
     expect(check('invalid.csv')).not.toBeChecked(); // archiving cleared the selection
-    expect(actionButton(/^Restore/)).toBeDisabled();
-    await user.click(check('invalid.csv'));
-    vi.mocked(api.archive).mockResolvedValueOnce([{ ...invalid, archived: false }]);
-    vi.mocked(api.list).mockResolvedValue([clean, { ...invalid, archived: false }, archived(result)]);
-    await user.click(actionButton(/^Restore \(1\)$/));
+  });
 
-    expect(api.archive).toHaveBeenLastCalledWith(['invalid'], false);
-    expect(await screen.findByRole('status')).toHaveTextContent('Restored 1 file.');
+  it('undoes an archive from the toast', async () => {
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    vi.mocked(api.archive).mockResolvedValueOnce([archived(clean)]);
+    await user.click(barButton(/^Archive 1 file$/));
+    await screen.findByRole('status');
+    vi.mocked(api.archive).mockResolvedValueOnce([clean]);
+    await user.click(within(toast()).getByRole('button', { name: 'Undo' }));
+    expect(api.archive).toHaveBeenLastCalledWith(['clean'], false);
+    await waitFor(() => expect(toast()).toHaveTextContent('1 file restored'));
+    expect(within(toast()).queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument(); // an undo cannot be undone
+    await user.click(within(toast()).getByRole('button', { name: 'Dismiss notification' }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('hides the toast on its own after a few seconds', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<App />);
+      await screen.findByRole('checkbox', { name: 'Select clean.csv' });
+      await user.click(check('clean.csv'));
+      vi.mocked(api.archive).mockResolvedValueOnce([archived(clean)]);
+      await user.click(barButton(/^Archive 1 file$/));
+      await screen.findByRole('status');
+      await act(async () => { vi.advanceTimersByTime(8000); });
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('restores one file from its row menu, and previews from it', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid), archived(result)]);
+    const user = await setup();
+    await user.click(tab(/Archived/));
+    let menu = await openMenu(user, 'invalid.csv');
+    expect(within(menu).getByRole('menuitem', { name: 'Download file' })).toHaveAttribute('href', '/api/files/invalid/download');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Preview file' }));
+    expect(await screen.findByRole('dialog', { name: 'invalid.csv' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    vi.mocked(api.archive).mockResolvedValueOnce([invalid]);
+    vi.mocked(api.list).mockResolvedValue([clean, { ...invalid, archived: false }, archived(result)]);
+    menu = await openMenu(user, 'invalid.csv');
+    await user.click(within(menu).getByRole('menuitem', { name: 'Restore file' }));
+    expect(api.archive).toHaveBeenCalledWith(['invalid'], false);
+    expect(await screen.findByRole('status')).toHaveTextContent('1 file restored');
+    expect(toast()).toHaveTextContent('Back in Active Files.');
     expect(screen.queryByRole('checkbox', { name: 'Select invalid.csv' })).not.toBeInTheDocument();
-    expect(check('result.csv')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    await user.click(tab(/Active Files/));
     expect(check('invalid.csv')).toBeInTheDocument();
-    expect(screen.queryByRole('checkbox', { name: 'Select result.csv' })).not.toBeInTheDocument();
+  });
+
+  it('operates the row menu from the keyboard and closes it with Escape or a click outside', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid)]);
+    const user = await setup();
+    await user.click(tab(/Archived/));
+    const trigger = screen.getByRole('button', { name: 'Actions for invalid.csv' });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    const menu = screen.getByRole('menu');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(within(menu).getByRole('menuitem', { name: 'Preview file' })).toHaveFocus();
+    await user.keyboard('{ArrowDown}{ArrowDown}');
+    expect(within(menu).getByRole('menuitem', { name: 'Restore file' })).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(within(menu).getByRole('menuitem', { name: 'Preview file' })).toHaveFocus(); // wraps around
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(check('invalid.csv')).not.toBeChecked(); // menu clicks never toggle the row
+
+    await user.click(trigger);
+    await user.click(screen.getByRole('heading', { name: 'CSV Files' }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(api.archive).not.toHaveBeenCalled();
+  });
+
+  it('restores several files from the selection bar', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid), archived(result)]);
+    const user = await setup();
+    await user.click(tab(/Archived/));
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
+    vi.mocked(api.archive).mockResolvedValueOnce([invalid, result]);
+    await user.click(barButton(/^Restore 2 files$/));
+    expect(api.archive).toHaveBeenCalledWith(expect.arrayContaining(['invalid', 'result']), false);
+  });
+
+  it('explains an empty Archived tab', async () => {
+    const user = await setup();
+    await user.click(tab(/Archived/));
+    expect(screen.getByText('No archived files. Select files in Active Files and click Archive to move them here.')).toBeInTheDocument();
+  });
+
+  it('switches tabs with the arrow keys', async () => {
+    const user = await setup();
+    tab(/Active Files/).focus();
+    await user.keyboard('{ArrowRight}');
+    expect(tab(/Archived/)).toHaveFocus();
+    expect(tab(/Archived/)).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{ArrowLeft}');
+    expect(tab(/Active Files/)).toHaveFocus();
+    expect(check('clean.csv')).toBeInTheDocument();
   });
 
   it('acts only on selected files in view, not on selections hidden by a filter', async () => {
@@ -285,8 +407,9 @@ describe('archive and restore', () => {
     await user.click(check('clean.csv'));
     await user.click(check('invalid.csv'));
     await user.selectOptions(statusFilter(), 'Needs Review');
+    expect(bar()).toHaveTextContent('1 selected');
     vi.mocked(api.archive).mockResolvedValueOnce([archived(invalid)]);
-    await user.click(actionButton(/^Archive \(1\)$/));
+    await user.click(barButton(/^Archive 1 file$/));
     expect(api.archive).toHaveBeenCalledWith(['invalid'], true);
   });
 
@@ -294,10 +417,21 @@ describe('archive and restore', () => {
     const user = await setup();
     await user.click(check('clean.csv'));
     vi.mocked(api.archive).mockRejectedValueOnce(new Error('File not found'));
-    await user.click(actionButton(/^Archive/));
+    await user.click(barButton(/^Archive/));
     expect(await screen.findByRole('alert')).toHaveTextContent('Archive failed: File not found');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(check('clean.csv')).toBeChecked();
-    expect(actionButton(/^Archive \(1\)$/)).toBeEnabled();
+    expect(barButton(/^Archive 1 file$/)).toBeEnabled();
+  });
+
+  it('explains a failed restore and keeps the file archived', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid)]);
+    const user = await setup();
+    await user.click(tab(/Archived/));
+    vi.mocked(api.archive).mockRejectedValueOnce(new Error('File changed'));
+    await user.click(within(await openMenu(user, 'invalid.csv')).getByRole('menuitem', { name: 'Restore file' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Restore failed: File changed');
+    expect(check('invalid.csv')).toBeInTheDocument();
   });
 
   it('archives once on a double click and works from the keyboard', async () => {
@@ -305,15 +439,15 @@ describe('archive and restore', () => {
     let resolve!: (files: FileMeta[]) => void;
     vi.mocked(api.archive).mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
     await user.click(check('clean.csv'));
-    await user.dblClick(actionButton(/^Archive/));
-    expect(actionButton(/^Archive/)).toBeDisabled();
+    await user.dblClick(barButton(/^Archive/));
+    expect(barButton(/^Archive/)).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Run Processing/ })).toBeDisabled();
     await act(async () => resolve([archived(clean)]));
     expect(api.archive).toHaveBeenCalledTimes(1);
 
     await user.click(check('invalid.csv'));
     vi.mocked(api.archive).mockResolvedValueOnce([archived(invalid)]);
-    actionButton(/^Archive/).focus();
+    barButton(/^Archive/).focus();
     await user.keyboard('{Enter}');
     expect(api.archive).toHaveBeenLastCalledWith(['invalid'], true);
   });
@@ -324,7 +458,7 @@ describe('archive and restore', () => {
     const user = await setup();
     const fileA = () => screen.getByRole('combobox', { name: /File A/ });
     expect(within(fileA()).getAllByRole('option').map((o) => o.getAttribute('value'))).toEqual(['', 'result']);
-    await user.selectOptions(statusFilter(), 'Archived');
+    await user.click(tab(/Archived/));
     await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
     expect(check('invalid.csv')).toBeChecked();
     expect(screen.getByRole('button', { name: /^Run Processing/ })).toBeDisabled();
@@ -336,7 +470,7 @@ describe('archive and restore', () => {
     await user.click(check('result.csv'));
     vi.mocked(api.archive).mockResolvedValueOnce([archived(result)]);
     vi.mocked(api.list).mockResolvedValue([clean, invalid, archived(result)]);
-    await user.click(actionButton(/^Archive/));
+    await user.click(barButton(/^Archive/));
     await screen.findByRole('status');
     expect(screen.getByRole('combobox', { name: /File A/ })).toHaveValue('');
   });
