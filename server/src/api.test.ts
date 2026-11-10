@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import type { FileMeta, FileRows, ProcessorId } from '../../shared/types';
+import type { CompareResult, FileMeta, FileRows, ProcessorId } from '../../shared/types';
 import { parseCsv } from './lib/csv';
 import { processors } from './processing';
 
@@ -170,9 +170,9 @@ describe('problem rows', () => {
   it('says which file of a comparison each problem row is in', async () => {
     const a = await processSample('partner_a_baseline.csv', 'validation');
     const c = await processSample('partner_c_baseline.csv', 'validation');
-    const { problemsA, problemsB } = (await compare(a.id, c.id)).json();
-    expect(problemsA.items).toEqual([expect.objectContaining({ row: 8, message: 'mass missing' })]);
-    expect(problemsB.items).toEqual([expect.objectContaining({ row: 18, message: expect.stringContaining('composition totals') })]);
+    const { files } = (await compare(a.id, c.id)).json<CompareResult>();
+    expect(files[0].problems.items).toEqual([expect.objectContaining({ row: 8, message: 'mass missing' })]);
+    expect(files[1].problems.items).toEqual([expect.objectContaining({ row: 18, message: expect.stringContaining('composition totals') })]);
   });
 
   it('fills in the count for files saved before it existed', async () => {
@@ -189,11 +189,49 @@ describe('comparing results', () => {
     const b = await processSample('partner_a_followup.csv', 'mass');
     const res = await compare(a.id, b.id);
     expect(res.statusCode).toBe(200);
-    const { columns } = res.json();
-    expect(columns.map((c: { name: string }) => c.name)).toEqual(MASS_COLUMNS);
+    const { columns, files } = res.json<CompareResult>();
+    expect(files.map((f) => [f.name, f.source, f.rows])).toEqual([[a.name, 'Partner A', 25], [b.name, 'Partner A', 25]]);
+    expect(columns.map((c) => c.name)).toEqual(MASS_COLUMNS);
     expect(columns[0]).toMatchObject({ unit: 'kg', measure: 'total', rowsCompared: 25 });
     expect(columns[0].rowsDiffering).toBeGreaterThan(0);
-    expect(columns[0].valueB).not.toBe(columns[0].valueA);
+    expect(columns[0].summary![1]).not.toBe(columns[0].summary![0]);
+  });
+
+  it("matches a partner's baseline and follow-up by batch ID", async () => {
+    const a = await processSample('partner_a_baseline.csv', 'validation');
+    const b = await processSample('partner_a_followup.csv', 'validation');
+    const res = (await compare(a.id, b.id)).json<CompareResult>();
+    expect(res.rowMatch).toBe('batch_id');
+    expect(res.rows[0]).toEqual({ key: 'A-001', rowNumbers: [1, 1] });
+    expect(res.rows).toHaveLength(25);
+  });
+
+  it('matches files from different partners by position, and compares up to five at once', async () => {
+    const names = ['partner_a_baseline.csv', 'partner_a_followup.csv', 'partner_b_baseline.csv', 'partner_b_followup.csv', 'partner_c_baseline.csv'];
+    const results = [];
+    for (const name of names) results.push(await processSample(name, 'validation'));
+    const res = await compare(...results.map((r) => r.id));
+    expect(res.statusCode).toBe(200);
+    const body = res.json<CompareResult>();
+    expect(body.rowMatch).toBe('position');
+    expect(body.files.map((f) => f.source)).toEqual(['Partner A', 'Partner A', 'Partner B', 'Partner B', 'Partner C']);
+    expect(body.files.map((f) => f.problems.total)).toEqual([1, 1, 1, 2, 1]);
+    expect(body.rows[0]).toEqual({ key: '#1', rowNumbers: [1, 1, 1, 1, 1] });
+    const total = body.columns.find((c) => c.name === 'composition_total_pct')!;
+    expect(total.summary).toHaveLength(5);
+    expect(total.values[0]).toHaveLength(5);
+    const status = body.columns.find((c) => c.name === 'processing_status')!;
+    expect(status.categories).toEqual(expect.arrayContaining([{ label: 'Invalid', counts: [1, 1, 1, 2, 1] }]));
+  });
+
+  it.each([
+    ['one file', 1, 'Choose 2 to 5 results to compare'],
+    ['six files', 6, 'Choose 2 to 5 results to compare'],
+  ])('rejects %s', async (_, n, message) => {
+    const result = await processSample('partner_c_baseline.csv', 'validation');
+    const res = await compare(...Array.from({ length: n }, (_, i) => (i === 0 ? result.id : `other-${i}`)));
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toBe(message);
   });
 
   it('accepts result CSVs uploaded from disk, even when renamed', async () => {
@@ -218,7 +256,7 @@ describe('comparing results', () => {
   it('rejects comparing a file with itself or with an input file', async () => {
     const result = await processSample('partner_c_baseline.csv', 'mass');
     const input = await fileNamed('partner_c_baseline.csv');
-    expect((await compare(result.id, result.id)).json().message).toBe('Choose two different files');
+    expect((await compare(result.id, result.id)).json().message).toBe('Choose different files');
     expect((await compare(result.id, input.id)).json().message).toContain('is an input file');
   });
 });
@@ -265,11 +303,11 @@ describe('current result contract', () => {
     expect((await app.inject(`/api/files/${imported.id}/download`)).body).toBe(download);
     const compared = await compare(result.id, imported.id);
     expect(compared.statusCode).toBe(200);
-    expect(compared.json().columns.every((c: { rowsDiffering: number }) => c.rowsDiffering === 0)).toBe(true);
+    expect(compared.json<CompareResult>().columns.every((c) => c.rowsDiffering === 0)).toBe(true);
     if (id === 'mass') {
-      const col = compared.json().columns[0];
-      expect(col.valueA).toBeCloseTo(after.rows.reduce((s, r) => s + Number(r.r32_mass_kg || 0), 0), 8);
-      for (const row of invalid) expect(col.data[row - 1]).toMatchObject({ a: null, b: null });
+      const col = compared.json<CompareResult>().columns[0];
+      expect(col.summary![0]).toBeCloseTo(after.rows.reduce((s, r) => s + Number(r.r32_mass_kg || 0), 0), 8);
+      for (const row of invalid) expect(col.values[row - 1]).toEqual([null, null]);
     }
     expect((await rowsOf(source.id)).rows).toEqual(before.rows);
   });
@@ -426,7 +464,7 @@ describe('legacy result compatibility', () => {
       }
       // A second legacy result of the same function is still comparable after restart.
       const other = files.find((f) => f.name === 'old_mass.csv')!;
-      expect((await restarted.inject(`/api/compare?a=${saved[1].meta.id}&b=${other.id}`)).statusCode).toBe(200);
+      expect((await restarted.inject(`/api/compare?ids=${saved[1].meta.id},${other.id}`)).statusCode).toBe(200);
     } finally { await restarted.close(); }
   });
 });
@@ -504,7 +542,7 @@ const fileNamed = async (name: string) => {
 const rowsOf = async (id: string) => (await app.inject(`/api/files/${id}/rows`)).json<FileRows>();
 const processFile = (fileId: string, processor: string) => app.inject({ method: 'POST', url: '/api/process', payload: { fileId, processor } });
 const processSample = async (name: string, processor: ProcessorId) => (await processFile((await fileNamed(name)).id, processor)).json<FileMeta>();
-const compare = (a: string, b: string) => app.inject(`/api/compare?a=${a}&b=${b}`);
+const compare = (...ids: string[]) => app.inject(`/api/compare?ids=${ids.join(',')}`);
 
 /** Sends a real multipart upload, as the browser's file chooser does. */
 async function upload(name: string, text: string) {

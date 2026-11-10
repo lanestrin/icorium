@@ -165,7 +165,7 @@ export default function App() {
 
   async function compare() {
     setError(undefined);
-    try { setComparison(await api.compare(compareA, compareB)); } catch (e) { setError(`Comparison failed: ${msg(e)}`); }
+    try { setComparison(await api.compare([compareA, compareB])); } catch (e) { setError(`Comparison failed: ${msg(e)}`); }
   }
 
   return (

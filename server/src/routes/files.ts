@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { FileMeta } from '../../../shared/types';
+import { COMPARE_MAX, COMPARE_MIN, type FileMeta } from '../../../shared/types';
 import { getAdapter } from '../adapters';
 import { detectResult, findProblems, processRows } from '../processing';
 import { compareResults } from '../lib/compare';
@@ -9,7 +9,12 @@ import { storage } from '../lib/storage';
 
 const processBody = z.object({ fileId: z.string().min(1), processor: z.enum(['validation', 'mass', 'classification']) });
 const archiveBody = z.object({ ids: z.array(z.string().min(1)).min(1), archived: z.boolean() });
-const compareQuery = z.object({ a: z.string().min(1), b: z.string().min(1) }).refine((q) => q.a !== q.b, 'Choose two different files');
+// ?ids=a,b,c — 2 to 5 different results.
+const compareQuery = z.object({
+  ids: z.string().transform((s) => s.split(',').map((id) => id.trim()).filter(Boolean)),
+}).transform((q) => q.ids)
+  .refine((ids) => ids.length >= COMPARE_MIN && ids.length <= COMPARE_MAX, `Choose ${COMPARE_MIN} to ${COMPARE_MAX} results to compare`)
+  .refine((ids) => new Set(ids).size === ids.length, 'Choose different files');
 // Previews load a page at a time so a large CSV never has to be rendered all at once.
 const pageQuery = z.object({
   offset: z.coerce.number().int().min(0).default(0),
@@ -103,7 +108,7 @@ export async function fileRoutes(app: FastifyInstance) {
   });
 
   app.get('/compare', async (req) => {
-    const { a, b } = compareQuery.parse(req.query);
+    const ids = compareQuery.parse(req.query);
     const load = async (id: string) => {
       const meta = await storage.get(id);
       const csv = parseCsv(await storage.read(id));
@@ -112,8 +117,9 @@ export async function fileRoutes(app: FastifyInstance) {
       if (!result) throw httpError(400, `${meta.name} has an unrecognized result schema. Regenerate it from its original input.`);
       return { meta: { ...meta, ...result }, ...csv };
     };
-    const [A, B] = await Promise.all([load(a), load(b)]);
+    const loaded = await Promise.all(ids.map(load));
+    const result = compareResults(loaded);
     // Which rows in each file have problems, so the comparison can say which file an error is in.
-    return { ...compareResults(A, B), problemsA: findProblems(A.headers, A.rows), problemsB: findProblems(B.headers, B.rows) };
+    return { ...result, files: result.files.map((f, k) => ({ ...f, problems: findProblems(loaded[k].headers, loaded[k].rows) })) };
   });
 }

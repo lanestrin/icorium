@@ -44,7 +44,7 @@ Node.js + Fastify API
         +-- Validation (Zod + business rules)
         +-- Three independent processing functions
         +-- CSV result export (original + generated columns)
-        +-- Comparison calculations for two result CSVs
+        +-- Comparison calculations for 2–5 result CSVs
         |
         v
 Local file storage (original files and result files)

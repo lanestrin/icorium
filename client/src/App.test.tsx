@@ -564,17 +564,21 @@ describe('comparing results', () => {
   it('opens the comparison with both names, problem cards and the summary', async () => {
     const user = await setup();
     vi.mocked(api.compare).mockResolvedValue({
-      processor: 'mass', fileA: massA.name, fileB: massB.name,
+      processor: 'mass', rowMatch: 'batch_id',
+      files: [
+        { id: 'mass-a', name: massA.name, source: 'Partner A', rows: 25, problems: { total: 1, items: [{ row: 8, batchId: 'A-008', message: 'mass missing' }] } },
+        { id: 'mass-b', name: massB.name, source: 'Partner A', rows: 25, problems: { total: 0, items: [] } },
+      ],
+      rows: [{ key: 'A-001', rowNumbers: [1, 1] }],
       columns: [{ name: 'r32_mass_kg', kind: 'numeric', unit: 'kg', measure: 'total',
-        data: [{ label: '#1', a: 1, b: 2 }], valueA: 10, valueB: 12.5, rowsDiffering: 3, rowsCompared: 25 }],
-      problemsA: { total: 1, items: [{ row: 8, batchId: 'A-008', message: 'mass missing' }] },
-      problemsB: { total: 0, items: [] },
+        summary: [10, 12.5], values: [[1, 2]], rowsDiffering: 3, rowsCompared: 25 }],
     });
     await user.selectOptions(fileA(), 'mass-a');
     await user.selectOptions(fileB(), 'mass-b');
     await user.click(compareButton());
-    expect(api.compare).toHaveBeenCalledWith('mass-a', 'mass-b');
+    expect(api.compare).toHaveBeenCalledWith(['mass-a', 'mass-b']);
     const dialog = await screen.findByRole('dialog', { name: `${massA.name} vs ${massB.name}` });
+    expect(dialog).toHaveTextContent('Rows matched by batch ID');
     expect(within(dialog).getByRole('region', { name: `Problems in A · ${massA.name}` })).toHaveTextContent('Row 8 · A-008: mass missing');
     expect(within(dialog).getByRole('region', { name: `Problems in B · ${massB.name}` })).toHaveTextContent('No problems');
     const summary = within(dialog).getAllByRole('row').find((r) => r.textContent?.startsWith('r32_mass_kg'))!;
