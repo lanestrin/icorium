@@ -593,7 +593,7 @@ describe('comparing results', () => {
     expect(compareButton()).toHaveAccessibleDescription('Compare up to 5 results at a time.');
   });
 
-  it('opens the workspace with file cards, the overview and Δ against a chosen reference', async () => {
+  it('opens the dashboard with file chips, the row chart, summary by file and the at-a-glance figures', async () => {
     const user = await setup();
     vi.mocked(api.compare).mockResolvedValue(comparison);
     for (const f of [valA, valB, valC]) await user.click(check(f.name));
@@ -601,52 +601,70 @@ describe('comparing results', () => {
     expect(api.compare).toHaveBeenCalledWith(['val-a', 'val-b', 'val-c']);
 
     const dialog = await screen.findByRole('dialog', { name: 'Compare Files' });
-    expect(dialog).toHaveTextContent('Composition Validation · 3 files · 1–2 rows');
-    const cards = within(within(dialog).getByRole('list', { name: 'Compared files' })).getAllByRole('listitem');
-    expect(cards.map((c) => c.textContent)).toEqual([
-      `Partner A · Baseline${valA.name}1 flagged`, `Partner B · Followup${valB.name}2 flagged`, `Partner C · Baseline${valC.name}0 flagged`,
-    ]);
+    expect(dialog).toHaveTextContent('3 files · Composition Validation');
+    expect(dialog).toHaveTextContent('Selected files (3)');
+    const chips = within(within(dialog).getByRole('list', { name: 'Compared files' })).getAllByRole('listitem');
+    expect(chips.map((c) => c.textContent)).toEqual(['Partner A · Baseline', 'Partner B · Followup', 'Partner C · Baseline']);
+    expect(within(chips[0]).getByLabelText('1 flagged')).toBeInTheDocument();
+    expect(within(chips[2]).getByLabelText('0 flagged')).toBeInTheDocument();
     expect(dialog).toHaveTextContent('Rows matched by position: these files share no batch IDs');
-    expect(within(dialog).getByRole('radio', { name: 'Composition total (%)' })).toBeChecked();
+    expect(within(dialog).getByRole('button', { name: 'Composition total (%)' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(dialog).getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-pressed', 'true');
+    expect(dialog).toHaveTextContent('Composition total (%) by row');
 
-    const summaryRow = (label: string) => within(dialog).getAllByRole('row').find((r) => r.textContent?.startsWith(label))!;
-    expect(summaryRow('Partner A · Baseline *')).toHaveTextContent('100.00%—1');
-    expect(summaryRow('Partner B · Followup')).toHaveTextContent('98.73%-1.27 pp2');
-    expect(summaryRow('Partner C · Baseline')).toHaveTextContent('99.50%-0.50 pp0');
-    expect(dialog).toHaveTextContent('pp = percentage points.');
+    const summary = within(dialog).getByRole('table', { name: 'Summary by file' });
+    const summaryRow = (label: string) => within(summary).getAllByRole('row').find((r) => r.textContent?.startsWith(label))!;
+    expect(summaryRow('Partner A · Baseline')).toHaveTextContent('Partner A · Baseline(ref)100.00—1');
+    expect(summaryRow('Partner B · Followup')).toHaveTextContent('98.73-1.27 pp2');
+    expect(summaryRow('Partner C · Baseline')).toHaveTextContent('99.50-0.50 pp0');
 
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Reference' }), 'Partner C · Baseline');
-    expect(summaryRow('Partner A · Baseline')).toHaveTextContent('100.00%+0.50 pp');
-    expect(summaryRow('Partner C · Baseline *')).toHaveTextContent('99.50%—');
+    const glance = within(dialog).getByText('Comparison at a glance').parentElement!;
+    expect(glance).toHaveTextContent('Reference filePartner A · Baseline');
+    expect(glance).toHaveTextContent('Rows differing1 / 2 (50%)');
+    expect(glance).toHaveTextContent('Flagged files2 / 3');
+    const top = within(dialog).getByRole('table', { name: 'Top differences' });
+    expect(within(top).getAllByRole('row').slice(1).map((r) => r.textContent))
+      .toEqual(['#2Composition total 97.46% (Δ -2.54 pp)Partner B · FollowupPartner C · Baseline']);
+
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Reference file' }), 'Partner C · Baseline');
+    expect(summaryRow('Partner A · Baseline')).toHaveTextContent('100.00+0.50 pp');
+    expect(summaryRow('Partner C · Baseline')).toHaveTextContent('(ref)99.50—');
+    expect(glance).toHaveTextContent('Reference filePartner C · Baseline');
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Show deviation from 100%' }));
+    expect(dialog).toHaveTextContent('Composition total (%) by row, deviation from 100%');
   });
 
-  it('shows category counts and row details with highlighted differences', async () => {
+  it('switches to a category metric and to the row differences view', async () => {
     const user = await setup();
     vi.mocked(api.compare).mockResolvedValue(comparison);
     for (const f of [valA, valB, valC]) await user.click(check(f.name));
     await user.click(compareButton());
     const dialog = await screen.findByRole('dialog', { name: 'Compare Files' });
 
-    await user.click(within(dialog).getByRole('radio', { name: 'Processing status' }));
-    const overview = within(dialog).getByRole('region', { name: 'Overview' });
-    expect(overview).toHaveTextContent('Processing status: rows per category');
-    expect(within(overview).getAllByRole('row').find((r) => r.textContent?.startsWith('Invalid'))).toHaveTextContent('Invalid010');
+    await user.click(within(dialog).getByRole('button', { name: 'Processing status' }));
+    expect(dialog).toHaveTextContent('Processing status: rows per category');
+    const counts = within(dialog).getByRole('table', { name: 'Rows per category' });
+    expect(within(counts).getAllByRole('row').find((r) => r.textContent?.startsWith('Invalid'))).toHaveTextContent('Invalid010');
+    const summary = within(dialog).getByRole('table', { name: 'Summary by file' });
+    expect(within(summary).getAllByRole('row').slice(1).map((r) => r.textContent))
+      .toEqual(['Partner A · Baseline(ref)—1', 'Partner B · Followup12', 'Partner C · Baseline10']);
+    expect(within(within(dialog).getByRole('table', { name: 'Top differences' })).getAllByRole('row')[1]).toHaveTextContent('#2Invalid (reference: Valid)');
 
-    await user.click(within(dialog).getByRole('radio', { name: 'Composition total (%)' }));
-    await user.click(within(dialog).getByRole('button', { name: 'Row details' }));
-    expect(within(dialog).getByRole('button', { name: 'Row details' })).toHaveAttribute('aria-pressed', 'true');
-    const details = within(dialog).getByRole('region', { name: 'Row details' });
+    await user.click(within(dialog).getByRole('button', { name: 'Composition total (%)' }));
+    await user.click(within(dialog).getByRole('button', { name: /View all row details/ }));
+    expect(within(dialog).getByRole('button', { name: 'Row differences' })).toHaveAttribute('aria-pressed', 'true');
+    const details = within(dialog).getByRole('region', { name: 'Row differences' });
     expect(details).toHaveTextContent('1 of 2 rows differ between files');
-    const row2 = within(details).getByRole('row', { name: /^#2/ });
-    const cells = within(row2).getAllByRole('cell');
+    // Only differing rows are listed at first.
+    expect(within(details).getByRole('checkbox', { name: 'Only rows that differ' })).toBeChecked();
+    expect(within(details).queryByRole('row', { name: /^#1/ })).not.toBeInTheDocument();
+    const cells = within(within(details).getByRole('row', { name: /^#2/ })).getAllByRole('cell');
     expect(cells.map((c) => c.textContent)).toEqual(['100.00%', '97.46%', 'not in file']);
     expect(cells[1]).toHaveAttribute('data-differs', 'true');
     expect(cells[0]).not.toHaveAttribute('data-differs');
-
     await user.click(within(details).getByRole('checkbox', { name: 'Only rows that differ' }));
-    expect(within(details).queryByRole('row', { name: /^#1/ })).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole('checkbox', { name: 'Show deviation from 100%' }));
-    expect(within(within(details).getByRole('row', { name: /^#2/ })).getAllByRole('cell')[1]).toHaveTextContent('-2.54 pp');
+    expect(within(details).getByRole('row', { name: /^#1/ })).toBeInTheDocument();
   });
 
   it('closes with Escape and returns focus to the Compare button', async () => {

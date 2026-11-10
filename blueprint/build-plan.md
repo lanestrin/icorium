@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged; 9.4b comparison workspace awaiting review. See section 4.
+**Status:** All planned features merged; 9.5 comparison dashboard awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -31,7 +31,7 @@ This is a general-purpose interview exercise illustrated with synthetic refriger
 
 - **CSV Preview modal:** filename, row/column count, scrollable or paginated row preview, original headers, close button. Avoid rendering enormous datasets all at once.
 - **Processed Results modal:** opens after successful processing; table shows original columns **plus** generated result columns; download action.
-- **Comparison workspace (since 9.4b):** full-screen dialog opened from **Compare N files**: file cards, metric choice, Overview and Row details, Reference file, close button; no permanent graph on the main screen.
+- **Comparison dashboard (since 9.5):** full-screen dialog opened from **Compare N files**: selected-file chips, reference file, metric and view controls in one row, row chart beside summary by file, at-a-glance figures, top differences, row differences, close button; no permanent graph on the main screen.
 
 **Design constraint:** modern Apple-inspired simplicity: light neutral background, restrained blue/green accents, clear typography, generous whitespace, modest borders/shadows, and no unnecessary dashboard or navigation.
 
@@ -68,7 +68,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: none planned.** 9.4b is implemented and awaiting review.
+**Next: none planned.** 9.5 is implemented and awaiting review.
 New work needs a new request. Add it as a new stable ID with its scope before
 building, or use a `fix/` branch for a bug.
 
@@ -217,10 +217,16 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 - [x] **9.4b** `feature/9.4b-compare-workspace` — Remove the fixed compare footer. Ticking 2–5 results of one function in Active Files shows **Compare N files** in the selection bar (disabled, with the reason, otherwise). It opens a full-screen comparison workspace: file cards (short partner label, colour, flagged rows), a compare-metric choice, **Overview** (per-file bar chart and summary table with **Δ vs ref.** in pp or kg and a **Reference** file picker) and **Row details** (a line per file, deviation from 100% for composition totals, grouped horizontal bars for categories), stating how rows were matched.
 
-  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR. After a clean batch of 2+ files the new results are left selected, ready to compare. Row details also lists every matched row (with an "Only rows that differ" filter) and highlights cells that differ from the reference file; the Archived tab offers no Compare.
+  **Result:** merged in PR #21 (`3d3d4d0`); automated verification and CI passed (2026-11-09). Its layout is replaced by the 9.5 dashboard. After a clean batch of 2+ files the new results are left selected, ready to compare. Row details also lists every matched row (with an "Only rows that differ" filter) and highlights cells that differ from the reference file; the Archived tab offers no Compare.
   **Depends on:** 9.4a.
   **Done when:** the footer is gone; selection-bar compare enables only for valid selections; the workspace shows every file with a consistent colour, switches metric, view and reference, and reports failures; phone width has no sideways page scroll.
   **Verification:** unit tests for Δ vs reference and labels; component tests for the selection-bar compare, workspace controls, keyboard use and errors; `npm run verify`.
+
+- [x] **9.5** `feature/9.5-compare-dashboard` — Rework the comparison workspace as a dashboard, at the person's request on 2026-11-09 after reviewing 9.4b (they supplied a mockup; Export was left out). Selected files become chips with a tick or warning for flagged rows. Reference file, metric pills and an **Overview** / **Row differences** switch share one row. Overview puts a row chart (one line per file, axis fitted to the data, optional deviation from 100%) or, for categories, horizontal grouped bars and a count table beside **Summary by file** (mean or total, Δ vs reference, flagged rows; rows differing from the reference for categories). Below, **Comparison at a glance** shows the reference file, rows differing and flagged files, and **Top differences** lists the 3 rows that differ most from the reference for the metric (largest gap first; rows differing only by a missing value or row after; categories in row order) with **View all row details**. Row differences opens filtered to differing rows. The row-matching note stays; labels stay *Partner A · Baseline*. No API change.
+
+  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Done when:** the dashboard shows chips, controls, chart, summary, at-a-glance figures and top differences for numeric and category metrics; changing the reference updates Δ, highlights and top differences; View all row details opens the filtered row differences.
+  **Verification:** unit tests for top-difference ranking (gaps, missing values and rows, reference changes, categories, none) and the fitted axis; component tests for the dashboard, category metric, reference change, deviation toggle and row differences; `npm run verify`.
 
 ### M7 — Final interview readiness
 
@@ -265,7 +271,7 @@ For the **interview-sized datasets**, synchronous processing is acceptable if re
 
 **P2 — Nice but nonessential:** date-range filter, extra pagination controls, richer visual polish, persist file list across restarts.
 
-If time is limited, prioritize **working P0 functionality over appearance refinements**. The comparison workspace should stay simple.
+If time is limited, prioritize **working P0 functionality over appearance refinements**. The comparison dashboard should stay simple.
 
 ## 8. Suggested interview demo script
 
@@ -274,7 +280,7 @@ If time is limited, prioritize **working P0 functionality over appearance refine
 3. Show the row spinner (when visible), then the processed results modal.
 4. Download the result CSV: original columns intact, generated columns appended, row 8 `Invalid` with its reason and blank masses.
 5. Check both Partner A files and run the same function once; confirm the warning. Both results are left selected.
-6. Click **Compare 2 files** and point out the file cards, the batch-ID row matching, Δ vs the reference file and the row-details highlights.
+6. Click **Compare 2 files** and point out the file chips, the batch-ID row matching, the row chart, Δ vs the reference file, **Top differences** and the **Row differences** highlights.
 7. Run **Composition Validation** to show it needs no confirmation, then explain how a fourth adapter or processing function would be added.
 
 **Be ready to explain tradeoffs:** why TypeScript for both ends, why Fastify, why local CSV storage instead of a database, why comparison stops at five files, and how the code handles changing requirements.
