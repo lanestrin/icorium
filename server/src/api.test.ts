@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import type { CompareResult, FileMeta, FileRows, ProcessorId } from '../../shared/types';
+import type { CompareResult, FileMeta, FileRows, GeneratedBatch, ProcessorId } from '../../shared/types';
 import { parseCsv } from './lib/csv';
 import { processors } from './processing';
 
@@ -530,6 +530,60 @@ describe('archiving', () => {
   ])('rejects a request with %s', async (_, payload) => {
     const res = await app.inject({ method: 'POST', url: '/api/files/archive', payload });
     expect(res.statusCode).toBe(400);
+  });
+});
+
+describe('generating CSVs', () => {
+  const generate = (payload: object) => app.inject({ method: 'POST', url: '/api/generate', payload });
+
+  it('returns a partner CSV and its planted errors without saving anything', async () => {
+    const before = (await listFiles()).length;
+    const res = await generate({ partner: 'B', rows: 10, errorRows: 2, seed: 4 });
+    expect(res.statusCode).toBe(200);
+    const { files } = res.json<GeneratedBatch>();
+    expect(files).toHaveLength(1); // one file unless asked for more
+    const [file] = files;
+    expect(file).toMatchObject({ partner: 'B', rows: 10 });
+    expect(file.name).toMatch(/^partnerB-\d{8}-001\.csv$/);
+    expect(parseCsv(file.text).headers).toEqual(['lot_number', 'collected_on', 'weight_lb', 'hfc32_percent', 'hfc125_percent', 'hfc134a_percent']);
+    expect(file.errors).toHaveLength(2);
+    expect((await listFiles()).length).toBe(before);
+  });
+
+  it.each([[0, 'Ready'], [3, 'Needs Review']] as const)('uploads a generated file with %s error rows as %s, like any partner CSV', async (errorRows, status) => {
+    const [file] = (await generate({ partner: 'C', rows: 12, errorRows, seed: 9 })).json<GeneratedBatch>().files;
+    const meta = (await upload(file.name, file.text)).json<FileMeta>();
+    expect(meta).toMatchObject({ name: file.name, rows: 12, columns: 6, problemRows: errorRows, status });
+  });
+
+  it('makes several files with different data and names, each uploadable', async () => {
+    const { files } = (await generate({ partner: 'A', rows: 8, errorRows: 1, files: 4 })).json<GeneratedBatch>();
+    expect(files.map((f) => f.name.replace(/-\d{8}-/, '-DATE-'))).toEqual(['001', '002', '003', '004'].map((n) => `partnerA-DATE-${n}.csv`));
+    expect(new Set(files.map((f) => f.text)).size).toBe(4);
+    for (const f of files) expect((await upload(f.name, f.text)).json<FileMeta>()).toMatchObject({ rows: 8, problemRows: 1 });
+  });
+
+  it('never repeats a file across requests with the same settings', async () => {
+    const texts = new Set<string>();
+    for (let i = 0; i < 5; i++) for (const f of (await generate({ partner: 'B', rows: 3, errorRows: 0, files: 2 })).json<GeneratedBatch>().files) texts.add(f.text);
+    expect(texts.size).toBe(10);
+  });
+
+  it.each([
+    [{ partner: 'A', rows: 5, errorRows: 0, files: 0 }, 'Generate at least 1 file'],
+    [{ partner: 'A', rows: 5, errorRows: 0, files: 11 }, 'Generate at most 10 files at a time'],
+    [{ partner: 'A', rows: 5, errorRows: 0, files: 1.5 }, 'Number of files must be a whole number'],
+    [{ partner: 'D', rows: 5, errorRows: 0 }, 'Choose partner A, B or C'],
+    [{ partner: 'A', rows: 0, errorRows: 0 }, 'Generate at least 1 row'],
+    [{ partner: 'A', rows: 5001, errorRows: 0 }, 'Generate at most 5000 rows'],
+    [{ partner: 'A', rows: 2.5, errorRows: 0 }, 'Rows must be a whole number'],
+    [{ partner: 'A', rows: 5, errorRows: 6 }, 'Rows with errors must be a whole number from 0 to the number of rows.'],
+    [{ partner: 'A', rows: 5, errorRows: -1 }, 'Rows with errors cannot be negative'],
+    [{ partner: 'A', rows: '5', errorRows: 0 }, 'Rows must be a number'],
+  ])('rejects %j', async (payload, message) => {
+    const res = await generate(payload);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().message).toBe(message);
   });
 });
 

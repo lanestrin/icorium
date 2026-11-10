@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { COMPARE_MAX, COMPARE_MIN, type FileMeta } from '../../../shared/types';
+import { COMPARE_MAX, COMPARE_MIN, GENERATOR_PARTNERS, type FileMeta } from '../../../shared/types';
 import { getAdapter } from '../adapters';
 import { detectResult, findProblems, processRows } from '../processing';
 import { compareResults } from '../lib/compare';
 import { httpError, parseCsv, toCsv } from '../lib/csv';
 import { storage } from '../lib/storage';
+import { GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, generateFiles } from '../lib/generate';
 
 const processBody = z.object({ fileId: z.string().min(1), processor: z.enum(['validation', 'mass', 'classification']) });
 const archiveBody = z.object({ ids: z.array(z.string().min(1)).min(1), archived: z.boolean() });
@@ -19,6 +20,15 @@ const compareQuery = z.object({
 const pageQuery = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(1000).default(100),
+});
+const generateBody = z.object({
+  partner: z.enum(GENERATOR_PARTNERS, { message: 'Choose partner A, B or C' }),
+  rows: z.number({ message: 'Rows must be a number' }).int('Rows must be a whole number').min(1, 'Generate at least 1 row')
+    .max(GENERATOR_MAX_ROWS, `Generate at most ${GENERATOR_MAX_ROWS} rows`),
+  errorRows: z.number({ message: 'Rows with errors must be a number' }).int('Rows with errors must be a whole number').min(0, 'Rows with errors cannot be negative'),
+  files: z.number({ message: 'Number of files must be a number' }).int('Number of files must be a whole number').min(1, 'Generate at least 1 file')
+    .max(GENERATOR_MAX_FILES, `Generate at most ${GENERATOR_MAX_FILES} files at a time`).default(1),
+  seed: z.number().int().optional(), // same seed, same files; used by tests
 });
 type IdParams = { Params: { id: string } };
 
@@ -105,6 +115,12 @@ export async function fileRoutes(app: FastifyInstance) {
       },
       true,
     );
+  });
+
+  // Generates 1–10 synthetic partner CSVs with different data. Nothing is saved: the page downloads them or uploads them like any CSV.
+  app.post('/generate', async (req) => {
+    const { partner, rows, errorRows, files, seed } = generateBody.parse(req.body);
+    return { files: generateFiles(partner, rows, errorRows, files, seed) };
   });
 
   app.get('/compare', async (req) => {

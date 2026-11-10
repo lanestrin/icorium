@@ -3,7 +3,8 @@ import { parseCsv, toCsv } from './lib/csv';
 import { getAdapter } from './adapters';
 import { detectProcessor, detectResult, findProblems, issues, processors, processRows } from './processing';
 import { compareResults, matchRows } from './lib/compare';
-import type { FileMeta, Row } from '../../shared/types';
+import { generateCsv, generatedName, generateFiles } from './lib/generate';
+import type { FileMeta, GeneratedError, Row } from '../../shared/types';
 
 const A_HEADERS = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
 const A_CSV = `${A_HEADERS}
@@ -136,7 +137,7 @@ describe('compare', () => {
     id: name, name, rows: 1, columns: 1, uploadedAt: '', status: 'Processed', processor, generatedColumns: cols,
   });
   // Files without a partner schema: rows are matched by position.
-  const file = (processor: FileMeta['processor'], cols: string[], rows: Row[], name?: string) => ({ meta: meta(processor, cols, name), headers: cols, rows });
+  const file = (processor: FileMeta['processor'], cols: string[], rows: Row[] = [], name?: string) => ({ meta: meta(processor, cols, name), headers: cols, rows });
 
   it('rejects results from different processors in plain language', () => {
     expect(() => compareResults([file('mass', []), file('validation', [])])).toThrow(
@@ -281,5 +282,101 @@ A-3,d,100,40,30,30.5,upper edge`;
     ] as const) expect(detectResult([...headers, ...suffix])).toEqual({ processor: id, generatedColumns: suffix });
     expect(detectResult([...headers, 'processing_status', 'validation_errors'])).toBeUndefined();
     expect(detectResult([...headers, 'r32_mass_kg', 'processing_status', 'validation_errors'])).toBeUndefined();
+  });
+});
+
+describe('CSV generator', () => {
+  // What Composition Validation says about each planted error kind.
+  const MESSAGE: Record<GeneratedError['kind'], string> = {
+    'mass missing': 'mass missing',
+    'mass not a number': 'mass invalid',
+    'negative percentage': 'R-125 out of range',
+    'composition total off': 'composition totals',
+    'batch ID missing': 'batch ID missing',
+    'duplicate batch ID': 'duplicate batch ID',
+  };
+
+  it.each(['A', 'B', 'C'] as const)('writes clean Partner %s files in its own columns and units', (partner) => {
+    const file = generateCsv(partner, 25, 0, 1);
+    const { headers, rows } = parseCsv(file.text);
+    const adapter = getAdapter(headers);
+    expect(adapter.name).toBe(`Partner ${partner}`);
+    expect(file).toMatchObject({ partner, rows: 25, errors: [] });
+    expect(file.name).toMatch(new RegExp(`^partner${partner}-\\d{8}-001\\.csv$`));
+    expect(rows).toHaveLength(25);
+    expect(findProblems(headers, rows).total).toBe(0);
+    const norm = rows.map(adapter.normalize);
+    expect(norm.map((n) => n.batchId)).toEqual(Array.from({ length: 25 }, (_, i) => `${partner}-${String(i + 1).padStart(3, '0')}`));
+    expect(norm[0].sampleDate).toBe('2026-09-01');
+    for (const n of norm) {
+      expect(n.massKg).toBeGreaterThanOrEqual(109.9);
+      expect(n.massKg).toBeLessThanOrEqual(140.1);
+      expect(Math.abs(n.r32! + n.r125! + n.r134a! - 100)).toBeLessThan(0.05);
+    }
+  });
+
+  it('makes exactly the requested number of rows fail validation, with the reason it reports', () => {
+    for (const partner of ['A', 'B', 'C'] as const)
+      for (const errorRows of [1, 2, 3, 7, 25])
+        for (let seed = 1; seed <= 20; seed++) {
+          const file = generateCsv(partner, 25, errorRows, seed);
+          const { headers, rows } = parseCsv(file.text);
+          const problems = findProblems(headers, rows);
+          expect(problems.total).toBe(errorRows);
+          expect(file.errors.map((e) => e.row)).toEqual(problems.items.map((p) => p.row));
+          file.errors.forEach((e, i) => expect(problems.items[i].message).toContain(MESSAGE[e.kind]));
+        }
+  });
+
+  it('plants every kind of error across seeds', () => {
+    const kinds = new Set<string>();
+    for (let seed = 1; seed <= 60; seed++) generateCsv('A', 30, 6, seed).errors.forEach((e) => kinds.add(e.kind));
+    expect([...kinds].sort()).toEqual(Object.keys(MESSAGE).sort());
+  });
+
+  it('repeats a file for the same seed and pads IDs for large files', () => {
+    expect(generateCsv('B', 10, 2, 7).text).toBe(generateCsv('B', 10, 2, 7).text);
+    expect(generateCsv('B', 10, 2, 7).text).not.toBe(generateCsv('B', 10, 2, 8).text);
+    const big = parseCsv(generateCsv('A', 1200, 0, 3).text).rows;
+    expect([big[0].batch_id, big[1199].batch_id]).toEqual(['A-0001', 'A-1200']);
+  });
+
+  it('names files by partner, the day they were made and their number', () => {
+    const made = new Date(2026, 10, 9, 23, 59); // 9 Nov 2026, local time
+    expect(generatedName('A', 1, made)).toBe('partnerA-11092026-001.csv');
+    expect(generatedName('C', 12, new Date(2027, 0, 3))).toBe('partnerC-01032027-012.csv');
+    expect(generateFiles('B', 3, 0, 3, 5, made).map((f) => f.name)).toEqual(['partnerB-11092026-001.csv', 'partnerB-11092026-002.csv', 'partnerB-11092026-003.csv']);
+    expect(generateFiles('B', 3, 0, 1, 5, made)[0].name).toBe('partnerB-11092026-001.csv');
+  });
+
+  it('makes a batch of files that never share their data', () => {
+    const files = generateFiles('C', 6, 2, 10, 11);
+    expect(new Set(files.map((f) => f.name)).size).toBe(10);
+    expect(new Set(files.map((f) => f.text)).size).toBe(10);
+    for (const f of files) {
+      const { headers, rows } = parseCsv(f.text);
+      expect(findProblems(headers, rows).total).toBe(2);
+    }
+    // Even the smallest files, with the fewest ways to differ, stay distinct in a full batch.
+    for (let seed = 1; seed <= 50; seed++) expect(new Set(generateFiles('A', 1, 1, 10, seed).map((f) => f.text)).size).toBe(10);
+  });
+
+  it('repeats a batch for the same seed, and makes different batches without one', () => {
+    expect(generateFiles('B', 5, 1, 3, 2)).toEqual(generateFiles('B', 5, 1, 3, 2));
+    expect(generateFiles('B', 5, 1, 3)[0].text).not.toBe(generateFiles('B', 5, 1, 3)[0].text);
+  });
+
+  it.each([0, 11, 2.5])('rejects %s files', (count) => {
+    expect(() => generateFiles('A', 5, 0, count, 1)).toThrow('Number of files must be a whole number from 1 to 10.');
+  });
+
+  it.each([
+    [0, 0, 'Rows must be a whole number from 1 to 5000.'],
+    [5001, 0, 'Rows must be a whole number from 1 to 5000.'],
+    [2.5, 0, 'Rows must be a whole number from 1 to 5000.'],
+    [10, 11, 'Rows with errors must be a whole number from 0 to the number of rows.'],
+    [10, -1, 'Rows with errors must be a whole number from 0 to the number of rows.'],
+  ])('rejects %s rows with %s errors', (rows, errorRows, message) => {
+    expect(() => generateCsv('A', rows, errorRows, 1)).toThrow(message);
   });
 });
