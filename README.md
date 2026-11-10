@@ -26,6 +26,8 @@ The five synthetic sample CSVs in `sample-data/` (described in `sample-data/READ
 | API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message, including archive and restore and CSV generation; all three functions on all five samples: exact invalid rows and reasons, every original column and value kept, download, renamed re-upload and compare |
 | Unit + API (Vitest, Blob SDK mocked in memory) | `server/src/blob-storage.test.ts` | The private Blob storage adapter: shared files across instances, atomic result replacement, idempotent sample seeding, conflict and failure handling, and refusing a Vercel start without storage configured |
 | Unit (Vitest) | `client/src/compare-view.test.ts` | When a selection can be compared, short file labels, metric names, Δ vs reference, number formats, top-difference ranking and the fitted chart axis |
+| Component (Vitest + React Testing Library) | `client/src/ArchitecturePage.test.tsx` | Architecture page sections and links, technology cards, selecting diagram components (mouse and keyboard), following each request flow, storage and trade-off sections, and navigation from every page |
+| Unit (Vitest) | `client/src/architecture-content.test.ts` | Every repository path, package, card version and quoted limit on the Architecture page exists in or matches the code |
 | Component (Vitest + React Testing Library) | `client/src/GeneratorPage.test.tsx` | Generator defaults, partner/rows/files/error choices, the file list, per-file preview and planted errors, download names, adding all files to CSV Files and partial failure, generate failure, double clicks, keyboard submit, and `/generator` routing |
 | Unit (Vitest) | `client/src/file-status.test.ts` | Input eligibility, status precedence, when the Data Quality Warning appears and its per-file counts |
 | Component (Vitest + React Testing Library) | `client/src/App.test.tsx` | Upload success and failure; selection and status/search/date filters; the processing function column, the filter card and Clear filters, sorting in each tab; archive tabs, selection bar, undo toast and the archived-row menu, including failures, double clicks and keyboard use; processing locks, failure and retry; warning dialog counts, cancel/confirm, focus and duplicate clicks; preview paging and errors; selection-bar Compare and its reasons, the comparison dashboard (file chips, metric and view switches, summary by file with Δ vs reference, at-a-glance figures, top differences, row differences, deviation view, keyboard close) and comparison errors |
@@ -39,6 +41,10 @@ The **Processing function** column says which function made each file: **Origina
 Every row, input or result, can be selected. **Run Processing** uses only the selected inputs, and the processing panel lists every selected input filename, including selections hidden by filters. Filters do not clear selections; select-all affects the visible rows. Processing a file does not repair its source data, so an invalid input remains Needs Review after a successful run.
 
 The list has two tabs, **Active Files** and **Archived**, each showing its file count. Selecting rows shows a bar at the top of the table with the count, **Clear selection** and **Archive N files**. A toast confirms the change and offers **Undo** for a few seconds. The **Archived** tab notes that archived files are excluded from processing and comparison, lists them most recently archived first with **Archived On** and **Original Upload** dates, and offers **Restore N files** in the selection bar. Each archived row has a ⋯ menu with **Preview file**, **Download file** and **Restore file**. Restored files keep their status. Search, date and status filters apply within the current tab. Archiving only sets a flag: no CSV is moved or deleted, and archived files can still be previewed and downloaded. Archived files are left out of processing and the compare dropdowns. Re-running a function on an input replaces its result as before, so an archived result comes back as a new, unarchived one.
+
+## Architecture page
+
+**Architecture** (top right of the file list), or `/architecture`, is an engineering case study for walking through the design: the technology stack with the reason and trade-off for each tool, an interactive architecture diagram that follows the Upload, Process, Compare and Generate requests and shows which files implement each component, the main design decisions, how storage is kept separate from hosting, trade-offs, and what would change as the product scales. `client/src/architecture-content.test.ts` checks that every repository path, package and quoted limit on the page matches the code.
 
 ## CSV generator
 
@@ -84,14 +90,14 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 - Processing is synchronous and handles one file at a time, which suits interview-sized files. Preview lists the first 100 problem rows in detail.
 - Classification thresholds are demo-only, and no purity or recovery is inferred from feed composition.
 - Automated tests cover behavior in jsdom; they do not check real-browser layout or visuals.
-- `/generator` is a client-side page. The Vite dev and preview servers serve it directly; opening `/generator` directly on the optional Vercel deployment has not been verified.
+- `/generator` and `/architecture` are client-side pages. The Vite dev and preview servers serve them directly; opening them directly on the optional Vercel deployment has not been verified.
 
 ## Layout
 
 ```
 client/        React + Vite + Tailwind UI
-  src/App.tsx      the file workspace, and Root, which shows the generator at /generator; src/api.ts is the typed API client
-  src/components/  Sidebar, FileTable, CompareWorkspace, Modals, GeneratorPage
+  src/App.tsx      the file workspace, and Root, which shows /generator and /architecture; src/api.ts is the typed API client
+  src/components/  Sidebar, FileTable, CompareWorkspace, Modals, GeneratorPage, ArchitecturePage
 server/        Fastify API
   src/adapters/    partner header and unit mappings -> one normalized record
   src/processing/  the three processing functions

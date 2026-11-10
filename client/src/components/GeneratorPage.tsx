@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from 'react';
-import { ArrowLeft, Check, CircleAlert, Download, Eye, FilePlus2, LoaderCircle, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Check, Network, CircleAlert, Download, Eye, FilePlus2, LoaderCircle, Wand2, X } from 'lucide-react';
 import { GENERATOR_PARTNERS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
 import { api } from '../api';
 
@@ -101,9 +101,14 @@ export function GeneratorPage() {
 
   return (
     <div className="min-h-screen overflow-x-clip px-4 pb-10 pt-8 text-slate-900 sm:px-6 sm:pt-10">
-      <a href="/" className="inline-flex items-center gap-2 text-sm font-medium text-blue-700 hover:underline">
-        <ArrowLeft className="h-4 w-4" /> Back to CSV Files
-      </a>
+      <nav aria-label="Pages" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium">
+        <a href="/" className="inline-flex items-center gap-2 text-blue-700 hover:underline">
+          <ArrowLeft className="h-4 w-4" /> Back to CSV Files
+        </a>
+        <a href="/architecture" className="inline-flex items-center gap-2 text-blue-700 hover:underline">
+          <Network className="h-4 w-4" /> Architecture
+        </a>
+      </nav>
       <div className="mt-3 flex flex-wrap items-baseline gap-4">
         <h1 className="text-3xl font-bold tracking-tight">CSV Generator</h1>
         <p className="text-slate-600">Create synthetic partner CSVs for testing. All values are invented.</p>

@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged; 9.7 processing function column, filter card and sorting awaiting review. See section 4.
+**Status:** All planned features merged; 9.8 Architecture & Tech Stack page awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,7 +68,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: none planned.** 9.7 is implemented and awaiting review.
+**Next: none planned.** 9.8 is implemented and awaiting review.
 New work needs a new request. Add it as a new stable ID with its scope before
 building, or use a `fix/` branch for a bug.
 
@@ -236,9 +236,15 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 - [x] **9.7** `feature/9.7-processing-function-column` — Add a **Processing function** column before **Status** in the file table, in both tabs, at the person's request on 2026-11-09 (from their screenshot). Inputs read **Original**; results read **Validation**, **Mass Calculation** or **Classification**, from the stored `processor`. Small grey text, as in the screenshot. At their follow-up requests, a **Processing Function** filter (All functions / Original / Validation / Mass Calculation / Classification) was added, then the filter bar and tabs were restyled from their mockup: search, Date Range, Processing Function and Status share one card, each with its label above its value, ending in **Clear filters** (disabled until a filter is set); the tabs briefly became pills with count badges but were returned to the underline style at the person's request; and **Sort by** at the right of the tabs offers Uploaded (newest), the new default for Active Files, Uploaded (oldest), Name (A–Z) and Name (Z–A), plus Archived (newest), the Archived tab's default. Each tab keeps its own sort, and the sorted column header shows an arrow and `aria-sort`. Open dropdown lists get inside padding on their options: a plain rule for Firefox, and for the filter and Sort by dropdowns (class `menu-select`) Chrome and Edge's customizable select (`appearance: base-select`), which styles the open list as a padded, rounded panel; browsers without it keep the native list. No API change.
 
-  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Result:** merged in PR #24 (`3ffd992`); automated verification and CI passed (2026-11-10).
   **Done when:** every row shows the right label in Active Files and Archived, next to Status; the filter shows only the chosen function's files in either tab, combines with the other filters and clears with them; Clear filters is disabled with no filter set; each sort orders the list as named, per tab, and marks its column.
   **Verification:** unit test for the label rule (inputs, each function, unknown function); unit test for each sort order; component tests for the column and labels in both tabs, the filter (each choice, combined with status, Clear filters, Archived tab), the filter card and Clear filters, and sorting in both tabs with header `aria-sort`; `npm run verify`.
+
+- [x] **9.8** `feature/9.8-architecture-page` — An **Architecture & Tech Stack** page at `/architecture` for explaining the engineering decisions in the interview, at the person's request on 2026-11-10 (their brief was cut off in its last section; the final bullet was completed as monitoring and logging). Sections: engineering overview and guiding principle; a card per technology (role, reasons, one trade-off, files); an interactive diagram (select a component to see what it does and which files implement it; follow the Upload, Process, Compare or Generate request step by step); the main decisions (React + Fastify vs Next.js, TypeScript, file storage vs PostgreSQL, the modular pipeline, synchronous processing); storage and deployment, separating hosting from storage, with S3/R2 shown as a possible future backend that is not built and Vercel described as configured but not deployed; a trade-offs table; and what would evolve as the product scales. Linked from the file workspace and the generator. No new dependencies; no API change.
+
+  **Result:** implemented; automated verification passed (2026-11-10), awaiting review and PR.
+  **Done when:** every section renders; the diagram's components and flows are selectable by mouse and keyboard and name real files; every path, package, card version and quoted limit matches the code; the page is reachable from the other pages.
+  **Verification:** content test reading the repository (paths, packages, versions, flows, quoted limits and deployment status); component tests for sections, cards, diagram selection and flows, storage and trade-offs, and navigation; `npm run verify`.
 
 ### M7 — Final interview readiness
 
