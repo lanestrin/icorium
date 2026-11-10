@@ -1,6 +1,6 @@
 # Reclaim Studio
 
-Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of three processing functions on every row, export the result (all original columns + generated columns), and compare two result files in a chart. All data is fictional; classification rules are demo-only.
+Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of three processing functions on every row, export the result (all original columns + generated columns), and compare 2 to 5 result files in charts. All data is fictional; classification rules are demo-only.
 
 ## Layout
 

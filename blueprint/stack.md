@@ -25,7 +25,7 @@ This project is an interview exercise, **not** an industrial production system o
 | Backend framework | Fastify | HTTP API, file uploads and processing endpoints |
 | CSV parsing / export | Papa Parse | Parse CSV data and serialize exported results |
 | Validation | Zod | Validate API inputs and normalized records |
-| Charting | Recharts | Visualize differences between two result files |
+| Charting | Recharts | Visualize differences between 2 to 5 result files |
 | Testing | Vitest | Unit tests for adapters, validation, processing, and export logic |
 | Storage | Local files; private Vercel Blob when deployed | Keep original/processed CSVs for the demo |
 
@@ -62,8 +62,8 @@ Reference image: `blueprint/reference-ui.png`.
 - **Processing status:** inputs are Ready (clean) or Needs Review (has invalid rows). They show Processing (spinner) while running and Error if the request fails; each run adds a Processed result. Mass and Classification ask for confirmation (Data Quality Warning) before running on Needs Review inputs.
 - **Preview modal:** show input data without expanding a potentially large CSV inside the main window.
 - **Result preview modal:** show original columns plus generated result columns after processing.
-- **Fixed compare footer:** select File A and File B from dropdowns; enable Compare Selected for two different, compatible result CSVs. On mobile it collapses to the icon and title and slides up when tapped.
-- **Comparison modal:** graph and summary table. Do not keep the graph permanently on the main screen.
+- **Compare from the selection bar:** ticking 2–5 results of one function shows **Compare N files**; otherwise the bar says why it can't run. There is no compare footer (removed in 9.4b).
+- **Comparison workspace:** a full-screen dialog with file cards, a metric choice, **Overview** (per-file chart and summary with Δ vs a reference file) and **Row details** (a line per file, highlighted differences). Do not keep the graph permanently on the main screen.
 
 ## Synthetic Data for the Demo
 
@@ -97,7 +97,7 @@ manual checklist. Real-browser layout and chart drawing are not verified by them
 | Select one of three functions and process **all** rows | `App.test.tsx` processor choice and batches; `api.test.ts` all functions × all samples |
 | View results in the application | `App.test.tsx` result preview after processing |
 | Export a new CSV keeping **every original column** plus generated columns | `api.test.ts` current result contract (headers, values, download) |
-| Load two saved result CSVs and compare them | `api.test.ts` renamed re-upload and compare; `App.test.tsx` compare footer and modal |
+| Load two saved result CSVs and compare them | `api.test.ts` renamed re-upload and compare; `App.test.tsx` selection-bar Compare and workspace |
 | A graph that makes differences apparent | `core.test.ts`/`api.test.ts` comparison data; `App.test.tsx` modal summary. Chart drawing not verified in a browser |
 | Clear errors for invalid input and incompatible comparisons | `api.test.ts` schema and comparison errors; `App.test.tsx` upload and comparison failures |
 | Explain adding a new function or CSV schema | README **Extending** |

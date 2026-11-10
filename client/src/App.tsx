@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Calendar, Check, CircleAlert, Filter, RotateCcw, Search, X } from 'lucide-react';
+import { Archive, ArrowLeftRight, Calendar, Check, CircleAlert, Filter, RotateCcw, Search, X } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta, type ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
 import { displayStatus, FileTable, FileTabs, qualityWarning, type QualityWarning, type Status, type Tab } from './components/FileTable';
-import { CompareFooter } from './components/CompareFooter';
-import { CompareModal, PreviewModal, QualityWarningModal } from './components/Modals';
+import { compareBlocker, CompareWorkspace } from './components/CompareWorkspace';
+import { PreviewModal, QualityWarningModal } from './components/Modals';
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const plural = (n: number) => `${n} file${n === 1 ? '' : 's'}`;
@@ -36,9 +36,8 @@ export default function App() {
   const viewArchived = tab === 'archived';
 
   const [preview, setPreview] = useState<FileMeta>();
-  const [compareA, setCompareA] = useState('');
-  const [compareB, setCompareB] = useState('');
   const [comparison, setComparison] = useState<CompareResult>();
+  const [comparing, setComparing] = useState(false);
 
   const refresh = () => api.list().then(setFiles).catch((e) => setError(msg(e)));
   useEffect(() => { refresh(); }, []);
@@ -56,7 +55,6 @@ export default function App() {
     setSelectedIds((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const toggleAll = (ids: string[], on: boolean) =>
     setSelectedIds((s) => { const n = new Set(s); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; });
-  const results = files.filter((f) => f.status === 'Processed' && !f.archived);
   const visible = useMemo(
     () => {
       const shown = files.filter((f) => {
@@ -89,8 +87,6 @@ export default function App() {
     try {
       await api.archive(ids, archive);
       toggleAll(ids, false);
-      if (archive && ids.includes(compareA)) setCompareA('');
-      if (archive && ids.includes(compareB)) setCompareB('');
       setToast({
         title: `${plural(ids.length)} ${archive ? 'archived' : 'restored'}`,
         detail: archive ? 'Moved out of Active Files.' : 'Back in Active Files.',
@@ -155,21 +151,30 @@ export default function App() {
     busy.current = false; // per-file errors are caught above, so this always runs
     setProcessingId(undefined);
     setFailedIds(failed);
-    setSelectedIds(failed); // failed files stay checked so they can be retried
+    // Failed files stay checked so they can be retried. After a clean batch, the new results are
+    // checked instead, so they can be compared straight away.
+    const comparable = !failed.size && made.length >= 2;
+    setSelectedIds(comparable ? new Set(made.map((m) => m.id)) : failed);
     if (errors.length) setError(`Processing failed\n${errors.join('\n')}`);
 
     if (made.length === 1) return setPreview(made[0]); // single file: show the result right away
-    if (made.length > 1) setNotice(`Processed ${made.length} files. Results are in the list${made.length === 2 ? ' and ready to compare below' : ''}.`);
-    if (made.length === 2) { setCompareA(made[0].id); setCompareB(made[1].id); }
+    if (made.length > 1) setNotice(`Processed ${made.length} files.${comparable ? ' Their results are selected, so you can compare them.' : ' Results are in the list.'}`);
   }
 
+  // Compare is offered once the selection in view includes a result; it explains when it can't run.
+  const showCompare = !viewArchived && archiveTargets.some((f) => f.status === 'Processed');
+  const compareReason = compareBlocker(archiveTargets);
+
   async function compare() {
+    if (compareReason || comparing) return;
     setError(undefined);
-    try { setComparison(await api.compare([compareA, compareB])); } catch (e) { setError(`Comparison failed: ${msg(e)}`); }
+    setComparing(true);
+    try { setComparison(await api.compare(archiveTargets.map((f) => f.id))); } catch (e) { setError(`Comparison failed: ${msg(e)}`); }
+    setComparing(false);
   }
 
   return (
-    <div className="min-h-screen overflow-x-clip pb-32 text-slate-900">
+    <div className="min-h-screen overflow-x-clip pb-10 text-slate-900">
       <div className="flex flex-col gap-6 p-4 pt-8 sm:p-6 sm:pt-10 lg:flex-row">
         <Sidebar
           processor={processor}
@@ -255,14 +260,27 @@ export default function App() {
                   <button onClick={() => toggleAll(archiveTargets.map((f) => f.id), false)} className="text-sm font-medium text-blue-700 hover:underline">
                     Clear selection
                   </button>
-                  <button
-                    onClick={() => setArchived(archiveTargets.map((f) => f.id), !viewArchived)}
-                    disabled={!!processingId || archiving}
-                    className="ml-auto flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {viewArchived ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-                    {viewArchived ? 'Restore' : 'Archive'} {plural(archiveTargets.length)}
-                  </button>
+                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                    {showCompare && compareReason && <span id="compare-reason" className="text-sm text-slate-600">{compareReason}</span>}
+                    {showCompare && (
+                      <button
+                        onClick={compare}
+                        disabled={!!compareReason || comparing}
+                        aria-describedby={compareReason ? 'compare-reason' : undefined}
+                        className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <ArrowLeftRight className="h-4 w-4" /> Compare {plural(archiveTargets.length)}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setArchived(archiveTargets.map((f) => f.id), !viewArchived)}
+                      disabled={!!processingId || archiving}
+                      className={`flex items-center gap-2 rounded-xl px-5 py-2 font-medium shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${showCompare ? 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                    >
+                      {viewArchived ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                      {viewArchived ? 'Restore' : 'Archive'} {plural(archiveTargets.length)}
+                    </button>
+                  </div>
                 </div>
               )}
               archived={viewArchived}
@@ -302,11 +320,10 @@ export default function App() {
         </div>
       )}
 
-      <CompareFooter files={files} results={results} a={compareA} b={compareB} setA={setCompareA} setB={setCompareB} onCompare={compare} />
 
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}
       {pending && <QualityWarningModal warning={pending.warning} processor={pending.processor} onCancel={() => setPending(undefined)} onConfirm={confirmRun} />}
-      {comparison && <CompareModal result={comparison} onClose={() => setComparison(undefined)} />}
+      {comparison && <CompareWorkspace result={comparison} onClose={() => setComparison(undefined)} />}
     </div>
   );
 }

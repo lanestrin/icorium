@@ -173,7 +173,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
         role="region"
         aria-label="CSV files"
         tabIndex={0}
-        className="overflow-auto rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:max-h-[calc(100vh-24rem)]"
+        className="overflow-auto rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:max-h-[calc(100vh-17rem)]"
       >
         <table className={`w-full text-sm ${archived ? 'min-w-[1080px]' : 'min-w-[920px]'}`}>
           <thead>
