@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isInputFile, type FileMeta } from '../../shared/types';
-import { displayStatus, qualityWarning } from './components/FileTable';
+import { displayStatus, processingFunction, qualityWarning, sortFiles } from './components/FileTable';
 
 const file: FileMeta = { id: 'input', name: 'input.csv', rows: 25, columns: 7,
   uploadedAt: '2026-11-06T12:00:00Z', status: 'Needs Review', problemRows: 1 };
@@ -14,6 +14,33 @@ describe('file eligibility and feedback', () => {
     expect(displayStatus(file, undefined, new Set([file.id]))).toBe('Error');
     expect(displayStatus(file)).toBe('Needs Review');
     expect(displayStatus({ ...file, status: 'Processed' })).toBe('Processed');
+  });
+});
+
+describe('processing function label', () => {
+  it('calls inputs Original and names the function that made a result', () => {
+    expect(processingFunction({ ...file, status: 'Ready' })).toBe('Original');
+    expect(processingFunction(file)).toBe('Original'); // Needs Review
+    const result = { ...file, status: 'Processed' as const };
+    expect(processingFunction({ ...result, processor: 'validation' })).toBe('Validation');
+    expect(processingFunction({ ...result, processor: 'mass' })).toBe('Mass Calculation');
+    expect(processingFunction({ ...result, processor: 'classification' })).toBe('Classification');
+    expect(processingFunction(result)).toBe('—'); // a result whose function is unknown
+  });
+});
+
+describe('sorting files', () => {
+  const at = (id: string, uploadedAt: string, archivedAt?: string): FileMeta => ({ ...file, id, name: `${id}.csv`, uploadedAt, archivedAt });
+  const files = [at('b', '2026-11-02'), at('A10', '2026-11-03', '2026-11-05'), at('a2', '2026-11-01', '2026-11-09'), at('c', '2026-11-02')];
+  const ids = (key: Parameters<typeof sortFiles>[1]) => sortFiles(files, key).map((f) => f.id);
+
+  it('orders by upload time, name or archive time, keeping ties in place', () => {
+    expect(ids('uploaded-desc')).toEqual(['A10', 'b', 'c', 'a2']);
+    expect(ids('uploaded-asc')).toEqual(['a2', 'b', 'c', 'A10']);
+    expect(ids('name-asc')).toEqual(['a2', 'A10', 'b', 'c']); // numbers in names sort as numbers, case ignored
+    expect(ids('name-desc')).toEqual(['c', 'b', 'A10', 'a2']);
+    expect(ids('archived-desc')).toEqual(['a2', 'A10', 'b', 'c']); // never-archived files last, in their order
+    expect(files.map((f) => f.id)).toEqual(['b', 'A10', 'a2', 'c']); // the input is not changed
   });
 });
 

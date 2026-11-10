@@ -60,6 +60,107 @@ describe('input selection and status filtering', () => {
     expect(screen.getByRole('button', { name: 'Run Processing' })).toBeDisabled();
   });
 
+  it('shows which processing function made each file, in both tabs', async () => {
+    const classified: FileMeta = { ...result, id: 'cls', name: 'classified.csv', processor: 'classification', archived: true, archivedAt: '2026-11-08T10:00:00Z' };
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, classified]);
+    const user = await setup();
+    const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
+    expect(headers.indexOf('Processing function')).toBe(headers.indexOf('Status') - 1);
+    expect(row('clean.csv')).toHaveTextContent('OriginalReady');
+    expect(row('invalid.csv')).toHaveTextContent('OriginalNeeds Review');
+    expect(row('result.csv')).toHaveTextContent('Mass CalculationProcessed');
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    expect(screen.getByRole('columnheader', { name: 'Processing function' })).toBeInTheDocument();
+    expect(row('classified.csv')).toHaveTextContent('ClassificationProcessed');
+  });
+
+  it('filters by processing function, together with the other filters and in both tabs', async () => {
+    const classified: FileMeta = { ...result, id: 'cls', name: 'classified.csv', processor: 'classification', archived: true, archivedAt: '2026-11-08T10:00:00Z' };
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, classified]);
+    const user = await setup();
+    const fnFilter = screen.getByRole('combobox', { name: 'Processing Function' });
+    expect(within(screen.getByRole('search', { name: 'Filter files' })).getByRole('combobox', { name: 'Processing Function' })).toBe(fnFilter);
+    expect(within(fnFilter).getAllByRole('option').map((o) => o.textContent))
+      .toEqual(['All functions', 'Original', 'Validation', 'Mass Calculation', 'Classification']);
+    const shown = () => screen.queryAllByRole('checkbox', { name: /^Select (?!all)/ }).map((c) => c.getAttribute('aria-label'));
+
+    await user.selectOptions(fnFilter, 'Original');
+    expect(shown()).toEqual(['Select clean.csv', 'Select invalid.csv']);
+    await user.selectOptions(fnFilter, 'Mass Calculation');
+    expect(shown()).toEqual(['Select result.csv']);
+    await user.selectOptions(fnFilter, 'Validation');
+    expect(screen.getByText('No CSV files match your filters.')).toBeInTheDocument();
+
+    await user.selectOptions(fnFilter, 'Original');
+    await user.selectOptions(statusFilter(), 'Needs Review');
+    expect(shown()).toEqual(['Select invalid.csv']);
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(fnFilter).toHaveValue('All');
+    expect(shown()).toEqual(['Select clean.csv', 'Select invalid.csv', 'Select result.csv']);
+
+    await user.selectOptions(fnFilter, 'Classification');
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    expect(shown()).toEqual(['Select classified.csv']);
+    await user.selectOptions(fnFilter, 'Original');
+    expect(shown()).toEqual([]);
+  });
+
+  it('groups the filters in one card, and only enables Clear filters once a filter is set', async () => {
+    const user = await setup();
+    const card = screen.getByRole('search', { name: 'Filter files' });
+    expect(within(card).getByRole('textbox', { name: 'Search file name' })).toHaveAttribute('placeholder', 'Search file name...');
+    expect(within(card).getByRole('group', { name: 'Date Range' })).toContainElement(screen.getByLabelText('From date'));
+    expect(within(card).getByRole('combobox', { name: 'Processing Function' })).toHaveDisplayValue('All functions');
+    expect(within(card).getByRole('combobox', { name: 'Status' })).toHaveDisplayValue('All statuses');
+    // The filter and Sort by dropdowns opt into the styled open list (index.css, Chrome and Edge).
+    for (const name of ['Processing Function', 'Status', 'Sort by']) expect(screen.getByRole('combobox', { name })).toHaveClass('menu-select');
+    const clear = within(card).getByRole('button', { name: 'Clear filters' });
+    expect(clear).toBeDisabled();
+    await user.type(within(card).getByRole('textbox', { name: 'Search file name' }), 'x');
+    expect(clear).toBeEnabled();
+    await user.click(clear);
+    expect(within(card).getByRole('textbox', { name: 'Search file name' })).toHaveValue('');
+    expect(clear).toBeDisabled();
+  });
+
+  it('sorts each tab on its own, newest uploads and latest archives first', async () => {
+    const older: FileMeta = { ...clean, id: 'older', name: 'b_older.csv', uploadedAt: '2026-11-01T09:00:00Z' };
+    const newer: FileMeta = { ...invalid, id: 'newer', name: 'C_newer.csv', uploadedAt: '2026-11-07T09:00:00Z' };
+    const middle: FileMeta = { ...result, id: 'middle', name: 'a_middle.csv', uploadedAt: '2026-11-04T09:00:00Z' };
+    const archivedEarly: FileMeta = { ...clean, id: 'ae', name: 'z_early.csv', archived: true, archivedAt: '2026-11-02T09:00:00Z' };
+    const archivedLate: FileMeta = { ...clean, id: 'al', name: 'y_late.csv', archived: true, archivedAt: '2026-11-08T09:00:00Z' };
+    vi.mocked(api.list).mockResolvedValue([older, newer, middle, archivedEarly, archivedLate]);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('checkbox', { name: 'Select b_older.csv' });
+    const order = () => screen.getAllByRole('checkbox', { name: /^Select (?!all)/ }).map((c) => c.getAttribute('aria-label')!.replace('Select ', ''));
+    const sortBy = () => screen.getByRole('combobox', { name: 'Sort by' });
+
+    expect(sortBy()).toHaveDisplayValue('Uploaded (newest)');
+    expect(within(sortBy()).getAllByRole('option').map((o) => o.textContent)).toEqual(['Uploaded (newest)', 'Uploaded (oldest)', 'Name (A–Z)', 'Name (Z–A)']);
+    expect(order()).toEqual(['C_newer.csv', 'a_middle.csv', 'b_older.csv']);
+    expect(screen.getByRole('columnheader', { name: 'Uploaded' })).toHaveAttribute('aria-sort', 'descending');
+    await user.selectOptions(sortBy(), 'Uploaded (oldest)');
+    expect(order()).toEqual(['b_older.csv', 'a_middle.csv', 'C_newer.csv']);
+    expect(screen.getByRole('columnheader', { name: 'Uploaded' })).toHaveAttribute('aria-sort', 'ascending');
+    await user.selectOptions(sortBy(), 'Name (A–Z)');
+    expect(order()).toEqual(['a_middle.csv', 'b_older.csv', 'C_newer.csv']); // ignores case
+    expect(screen.getByRole('columnheader', { name: 'File Name' })).toHaveAttribute('aria-sort', 'ascending');
+    expect(screen.getByRole('columnheader', { name: 'Uploaded' })).not.toHaveAttribute('aria-sort');
+    await user.selectOptions(sortBy(), 'Name (Z–A)');
+    expect(order()).toEqual(['C_newer.csv', 'b_older.csv', 'a_middle.csv']);
+
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    expect(sortBy()).toHaveDisplayValue('Archived (newest)');
+    expect(within(sortBy()).getAllByRole('option')[0]).toHaveTextContent('Archived (newest)');
+    expect(order()).toEqual(['y_late.csv', 'z_early.csv']);
+    await user.selectOptions(sortBy(), 'Name (Z–A)');
+    expect(order()).toEqual(['z_early.csv', 'y_late.csv']);
+    await user.click(screen.getByRole('tab', { name: /Active Files/ }));
+    expect(sortBy()).toHaveDisplayValue('Name (Z–A)'); // each tab keeps its own choice
+    expect(order()).toEqual(['C_newer.csv', 'b_older.csv', 'a_middle.csv']);
+  });
+
   it('filters Needs Review and toggles only visible inputs while retaining hidden selections', async () => {
     const user = await setup();
     await user.click(check('clean.csv'));
@@ -84,9 +185,9 @@ describe('input selection and status filtering', () => {
     expect(check('result.csv')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: 'Select clean.csv' })).not.toBeInTheDocument();
     await user.selectOptions(statusFilter(), 'Needs Review');
-    await user.type(screen.getByPlaceholderText('Search CSV files...'), 'clean');
+    await user.type(screen.getByRole('textbox', { name: 'Search file name' }), 'clean');
     expect(screen.getByText('No CSV files match your filters.')).toBeInTheDocument();
-    await user.clear(screen.getByPlaceholderText('Search CSV files...'));
+    await user.clear(screen.getByRole('textbox', { name: 'Search file name' }));
     // Native date inputs do not support user-event typing consistently in jsdom.
     fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-11-07' } });
     expect(screen.getByText('No CSV files match your filters.')).toBeInTheDocument();
