@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged; 9.4a multi-file compare API awaiting review. See section 4.
+**Status:** All planned features merged; 9.4b comparison workspace awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -25,13 +25,13 @@ This is a general-purpose interview exercise illustrated with synthetic refriger
 - **Right file workspace:** one-line “CSV Files” heading/subtitle; search; upload-date range filter; status filter (**All / Ready / Needs Review / Processing / Processed / Error**); **Active Files** / **Archived** tabs with counts (since 9.3); scrollable file table with filename, rows, columns, upload date, status, **Preview** and **Download**.
 - **Select files:** every row has a checkbox (or click the row); a header checkbox selects all visible rows. **Run Processing** processes every checked input in turn with the chosen function; checked results are ignored by it (since 9.2, results are selectable so they can be archived). While rows are checked, a selection bar at the top of the table offers **Archive N files** (or **Restore N files** in the Archived tab) for the checked rows in view; archived rows also have a ⋯ menu with **Restore file**. Do *not* add compare buttons to each row.
 - **Processing feedback:** the selected input row displays a spinner and **Processing…** while the request runs; if it fails, show **Error** and an actionable message. On success, keep the input available and add a **new processed result file** to the list.
-- **Fixed bottom comparison footer:** **File A** dropdown, **File B** dropdown, **Compare Selected**. Populate with compatible processed results. Button disabled until two distinct files are selected.
+- **Comparison start (since 9.4b):** no footer. Ticking 2–5 results of one function shows **Compare N files** in the selection bar; otherwise the bar explains why it can't run.
 
 ### Modals
 
 - **CSV Preview modal:** filename, row/column count, scrollable or paginated row preview, original headers, close button. Avoid rendering enormous datasets all at once.
 - **Processed Results modal:** opens after successful processing; table shows original columns **plus** generated result columns; download action.
-- **Comparison modal:** opens on **Compare Selected**; names of both files, a graph, concise difference table, close button; no permanent graph on the main screen.
+- **Comparison workspace (since 9.4b):** full-screen dialog opened from **Compare N files**: file cards, metric choice, Overview and Row details, Reference file, close button; no permanent graph on the main screen.
 
 **Design constraint:** modern Apple-inspired simplicity: light neutral background, restrained blue/green accents, clear typography, generous whitespace, modest borders/shadows, and no unnecessary dashboard or navigation.
 
@@ -43,7 +43,7 @@ icorium/
 │   └── src/
 │       ├── App.tsx           # The one workspace screen
 │       ├── api.ts            # Typed API client
-│       ├── components/       # Sidebar, FileTable, CompareFooter, Modals
+│       ├── components/       # Sidebar, FileTable, CompareWorkspace, Modals
 │       └── *.test.ts(x)      # Unit and component tests
 ├── server/
 │   └── src/
@@ -68,7 +68,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 9.4b** `feature/9.4b-compare-workspace`, after 9.4a merges. 9.4a is implemented and awaiting review.
+**Next: none planned.** 9.4b is implemented and awaiting review.
 New work needs a new request. Add it as a new stable ID with its scope before
 building, or use a `fix/` branch for a bug.
 
@@ -211,12 +211,13 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 - [x] **9.4a** `feature/9.4a-multi-file-compare-api` — Compare 2 to 5 results at once instead of exactly two, at the person's request on 2026-11-09 (they supplied a multi-file comparison concept and chose to remove the compare footer). `GET /api/compare?ids=a,b,c` replaces `?a=&b=`. It returns `files` (name, partner, rows, problems), `rowMatch`, the matched `rows`, and per column a `summary` per file (total for kg, mean otherwise), `categories` with counts per file, and `values[row][file]`. Rows are matched by batch ID when every pair of files shares at least one ID (a partner's baseline and follow-up); otherwise by position, which is what files from different partners always get. Repeated IDs match occurrence by occurrence; blank IDs never match. The existing modal reads the new shape (any number of files, Δ only for two) until 9.4b replaces it.
 
-  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Result:** merged in PR #20 (`a9f75a0`); automated verification and CI passed (2026-11-09).
   **Done when:** 2–5 different results of one function and output schema compare; fewer, more, repeated, input or mixed-function selections are refused in plain words; per-file summaries, categories and values follow the matched rows; matching by ID or position follows the rule above.
   **Verification:** unit tests for summaries, categories, padding, ID matching (reordered, repeated, blank, partial overlap) and fallback; API tests for 2- and 5-file comparisons of the samples, batch-ID and position matching, limits and errors; `npm run verify`.
 
-- [ ] **9.4b** `feature/9.4b-compare-workspace` — Remove the fixed compare footer. Ticking 2–5 results of one function in Active Files shows **Compare N files** in the selection bar (disabled, with the reason, otherwise). It opens a full-screen comparison workspace: file cards (short partner label, colour, flagged rows), a compare-metric choice, **Overview** (per-file bar chart and summary table with **Δ vs ref.** in pp or kg and a **Reference** file picker) and **Row details** (a line per file, deviation from 100% for composition totals, grouped horizontal bars for categories), stating how rows were matched.
+- [x] **9.4b** `feature/9.4b-compare-workspace` — Remove the fixed compare footer. Ticking 2–5 results of one function in Active Files shows **Compare N files** in the selection bar (disabled, with the reason, otherwise). It opens a full-screen comparison workspace: file cards (short partner label, colour, flagged rows), a compare-metric choice, **Overview** (per-file bar chart and summary table with **Δ vs ref.** in pp or kg and a **Reference** file picker) and **Row details** (a line per file, deviation from 100% for composition totals, grouped horizontal bars for categories), stating how rows were matched.
 
+  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR. After a clean batch of 2+ files the new results are left selected, ready to compare. Row details also lists every matched row (with an "Only rows that differ" filter) and highlights cells that differ from the reference file; the Archived tab offers no Compare.
   **Depends on:** 9.4a.
   **Done when:** the footer is gone; selection-bar compare enables only for valid selections; the workspace shows every file with a consistent colour, switches metric, view and reference, and reports failures; phone width has no sideways page scroll.
   **Verification:** unit tests for Δ vs reference and labels; component tests for the selection-bar compare, workspace controls, keyboard use and errors; `npm run verify`.
@@ -242,7 +243,7 @@ user confirms before Mass or Classification calculates on a file with problems.
 | Preview rows | `GET /api/files/:id/preview` | Headers + limited/pageable rows |
 | Run one function | `POST /api/process` | Result file ID + status |
 | Download CSV | `GET /api/files/:id/download` | Original or processed CSV |
-| Compare two results | `GET /api/compare?a=<id>&b=<id>` | Compatible comparison metrics/chart data |
+| Compare 2–5 results | `GET /api/compare?ids=<id>,<id>[,...]` | Per-file summaries, matched rows and chart data |
 
 For the **interview-sized datasets**, synchronous processing is acceptable if responsive. Still show a Processing state during the request; don't add a queue unless measured workloads justify it.
 
@@ -264,7 +265,7 @@ For the **interview-sized datasets**, synchronous processing is acceptable if re
 
 **P2 — Nice but nonessential:** date-range filter, extra pagination controls, richer visual polish, persist file list across restarts.
 
-If time is limited, prioritize **working P0 functionality over appearance refinements**. The fixed comparison footer and modal should stay simple.
+If time is limited, prioritize **working P0 functionality over appearance refinements**. The comparison workspace should stay simple.
 
 ## 8. Suggested interview demo script
 
@@ -272,11 +273,11 @@ If time is limited, prioritize **working P0 functionality over appearance refine
 2. Select it, choose **Component Mass Calculation**, click **Run Processing**. The **Data Quality Warning** shows 24 valid / 1 invalid; click **Process Valid Rows**.
 3. Show the row spinner (when visible), then the processed results modal.
 4. Download the result CSV: original columns intact, generated columns appended, row 8 `Invalid` with its reason and blank masses.
-5. Check both Partner A files and run the same function once; confirm the warning. Both results fill the footer.
-6. Click **Compare Selected** and point out the graph's measured differences and each file's invalid-row card.
+5. Check both Partner A files and run the same function once; confirm the warning. Both results are left selected.
+6. Click **Compare 2 files** and point out the file cards, the batch-ID row matching, Δ vs the reference file and the row-details highlights.
 7. Run **Composition Validation** to show it needs no confirmation, then explain how a fourth adapter or processing function would be added.
 
-**Be ready to explain tradeoffs:** why TypeScript for both ends, why Fastify, why local CSV storage instead of a database, why only two comparison files at a time, and how the code handles changing requirements.
+**Be ready to explain tradeoffs:** why TypeScript for both ends, why Fastify, why local CSV storage instead of a database, why comparison stops at five files, and how the code handles changing requirements.
 
 ## 9. Required product capabilities
 

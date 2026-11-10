@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/lanestrin/icorium/actions/workflows/ci.yml/badge.svg)](https://github.com/lanestrin/icorium/actions/workflows/ci.yml)
 
-Upload partner refrigerant CSVs, run one of three processing functions on every row, export results (original columns + generated columns), and compare two result files.
+Upload partner refrigerant CSVs, run one of three processing functions on every row, export results (original columns + generated columns), and compare 2 to 5 result files.
 
 Interview exercise. All data is fictional and the classification rules are demo-only.
 
@@ -25,8 +25,9 @@ The five synthetic sample CSVs in `sample-data/` (described in `sample-data/READ
 | Unit (Vitest) | `server/src/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths and row matching for 2–5 files |
 | API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message, including archive and restore; all three functions on all five samples: exact invalid rows and reasons, every original column and value kept, download, renamed re-upload and compare |
 | Unit + API (Vitest, Blob SDK mocked in memory) | `server/src/blob-storage.test.ts` | The private Blob storage adapter: shared files across instances, atomic result replacement, idempotent sample seeding, conflict and failure handling, and refusing a Vercel start without storage configured |
+| Unit (Vitest) | `client/src/compare-view.test.ts` | When a selection can be compared, short file labels, metric names, Δ vs reference and number formats |
 | Unit (Vitest) | `client/src/file-status.test.ts` | Input eligibility, status precedence, when the Data Quality Warning appears and its per-file counts |
-| Component (Vitest + React Testing Library) | `client/src/App.test.tsx` | Upload success and failure; selection and status/search/date filters; archive tabs, selection bar, undo toast and the archived-row menu, including failures, double clicks and keyboard use; processing locks, failure and retry; warning dialog counts, cancel/confirm, focus and duplicate clicks; preview paging and errors; compare-footer choices, the comparison modal and comparison errors |
+| Component (Vitest + React Testing Library) | `client/src/App.test.tsx` | Upload success and failure; selection and status/search/date filters; archive tabs, selection bar, undo toast and the archived-row menu, including failures, double clicks and keyboard use; processing locks, failure and retry; warning dialog counts, cancel/confirm, focus and duplicate clicks; preview paging and errors; selection-bar Compare and its reasons, the comparison workspace (file cards, metrics, overview, Δ vs reference, row details, deviation view, keyboard close) and comparison errors |
 
 `npm test` runs server unit/API tests and client unit/component tests. Client tests use Vitest, React Testing Library and jsdom; API calls are mocked at the client boundary while server behavior has separate API coverage. `npm run verify` also type-checks and builds the client. These replace required manual acceptance checks; they do not establish real-browser layout or visual correctness. Run `npm test -w client` for client tests only.
 
@@ -43,10 +44,10 @@ The list has two tabs, **Active Files** and **Archived**, each showing its file 
 1. Open **Preview** on `partner_a_baseline.csv` to show its original columns. It is **Needs Review**; Preview lists and highlights row 8 (`mass missing`).
 2. Click the row to select it, choose **Component Mass Calculation**, and click **Run Processing**. A **Data Quality Warning** lists the file with *24 valid rows · 1 invalid row* and explains that valid rows will be calculated, while invalid rows stay in the output with error details and no calculated values. Click **Process Valid Rows**. The row shows *Processing…*, then the result preview opens with the new columns highlighted. (**Cancel** sends nothing and keeps the selection.)
 3. **Download** the result and open it: every original column is unchanged, and `r32_mass_kg`, `r125_mass_kg`, `r134a_mass_kg`, `processing_status` and `validation_errors` are added at the end. Row 8 is `Invalid` with `mass missing` and blank masses; every other row is `Valid` with an empty `validation_errors`.
-4. Check both Partner A files and run **Component Mass Calculation** once. The warning lists both files with their counts; after **Process Valid Rows** they are processed in turn, and the two results fill **File A** and **File B** in the footer. (Running each file on its own works too.)
-5. Click **Compare Selected**. The chart shows per-row kg values (row 8 of A and row 13 of B have no value). The summary shows total kg per component and how many rows differ, and each file's invalid rows appear in its own card (A or B).
+4. Check both Partner A files and run **Component Mass Calculation** once. The warning lists both files with their counts; after **Process Valid Rows** they are processed in turn, and the two new results are selected in the list. (Running each file on its own works too.)
+5. Click **Compare 2 files** in the selection bar. The full-screen comparison shows a card per file (*Partner A · Baseline*, *Partner A · Followup*) with its flagged rows, and says rows are matched by batch ID. Choose **R32 mass (kg)**: **Overview** shows each file's total and its Δ against the **Reference** file; **Row details** draws one line per file (A-008 has no baseline value, A-013 no follow-up value) and highlights cells that differ. Selecting up to five results, e.g. all five Composition Validation results, compares them together; files from different partners are matched by position, and the workspace says so.
 6. Run **Composition Validation** on any sample: it runs straight away with no warning, since reporting invalid rows is its job. It adds `composition_total_pct`, `processing_status` and `validation_errors`.
-7. Optional: upload a downloaded result CSV, even renamed. It is recognised as a result by its columns and appears in the compare dropdowns, so results from an earlier session can be compared. **File B** only offers results from the same function as **File A**; if two results still have different column layouts (an older export against a new one), comparison is refused with a plain explanation.
+7. Optional: upload a downloaded result CSV, even renamed. It is recognised as a result by its columns and can be selected and compared like any other result, so results from an earlier session can be compared. **Compare** is offered for 2–5 results from the same function and says why when it can't run; if results still have different column layouts (an older export against a new one), comparison is refused with a plain explanation.
 
 Each sample has one planted problem (B follow-up's duplicate makes two rows invalid):
 
@@ -80,7 +81,7 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 ```
 client/        React + Vite + Tailwind UI
   src/App.tsx      the one screen; src/api.ts is the typed API client
-  src/components/  Sidebar, FileTable, CompareFooter, Modals
+  src/components/  Sidebar, FileTable, CompareWorkspace, Modals
 server/        Fastify API
   src/adapters/    partner header and unit mappings -> one normalized record
   src/processing/  the three processing functions

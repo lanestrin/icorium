@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FileMeta } from '../../shared/types';
+import type { CompareResult, FileMeta } from '../../shared/types';
 import App from './App';
 import { api } from './api';
 
@@ -452,27 +452,17 @@ describe('archive and restore', () => {
     expect(api.archive).toHaveBeenLastCalledWith(['invalid'], true);
   });
 
-  it('keeps archived files out of processing and the compare pickers', async () => {
+  it('keeps archived files out of processing and comparison', async () => {
     const other: FileMeta = { ...result, id: 'other', name: 'other.csv' };
-    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid), result, archived(other)]);
+    vi.mocked(api.list).mockResolvedValue([clean, archived(invalid), archived(result), archived(other)]);
     const user = await setup();
-    const fileA = () => screen.getByRole('combobox', { name: /File A/ });
-    expect(within(fileA()).getAllByRole('option').map((o) => o.getAttribute('value'))).toEqual(['', 'result']);
     await user.click(tab(/Archived/));
     await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
     expect(check('invalid.csv')).toBeChecked();
     expect(screen.getByRole('button', { name: /^Run Processing/ })).toBeDisabled();
-  });
-
-  it('clears a compare choice when that result is archived', async () => {
-    const user = await setup();
-    await user.selectOptions(screen.getByRole('combobox', { name: /File A/ }), 'result');
-    await user.click(check('result.csv'));
-    vi.mocked(api.archive).mockResolvedValueOnce([archived(result)]);
-    vi.mocked(api.list).mockResolvedValue([clean, invalid, archived(result)]);
-    await user.click(barButton(/^Archive/));
-    await screen.findByRole('status');
-    expect(screen.getByRole('combobox', { name: /File A/ })).toHaveValue('');
+    // Two archived results are selected, but the Archived tab offers no Compare.
+    expect(within(bar()).queryByRole('button', { name: /^Compare/ })).not.toBeInTheDocument();
+    expect(barButton(/^Restore 3 files$/)).toBeEnabled();
   });
 });
 
@@ -532,68 +522,172 @@ describe('preview', () => {
 });
 
 describe('comparing results', () => {
-  const massA: FileMeta = { ...result, id: 'mass-a', name: 'result_a_mass.csv' };
-  const massB: FileMeta = { ...result, id: 'mass-b', name: 'result_b_mass.csv', problemRows: 0 };
-  const validation: FileMeta = { ...result, id: 'val-a', name: 'result_a_validation.csv', processor: 'validation' };
-  const fileA = () => screen.getByRole('combobox', { name: /File A/ });
-  const fileB = () => screen.getByRole('combobox', { name: /File B/ });
-  const compareButton = () => screen.getByRole('button', { name: 'Compare Selected' });
-  const optionLabels = (select: HTMLElement) => within(select).getAllByRole('option').map((o) => o.textContent);
+  const val = (id: string, name: string, extra: Partial<FileMeta> = {}): FileMeta =>
+    ({ ...result, id, name, processor: 'validation', ...extra });
+  const valA = val('val-a', 'result_partner_a_baseline_validation.csv');
+  const valB = val('val-b', 'result_partner_b_followup_validation.csv');
+  const valC = val('val-c', 'result_partner_c_baseline_validation.csv');
+  const massA: FileMeta = { ...result, id: 'mass-a', name: 'result_partner_a_baseline_mass.csv' };
+  const bar = () => screen.getByRole('toolbar', { name: 'Selected files' });
+  const compareButton = () => within(bar()).getByRole('button', { name: /^Compare/ });
+  const workspace = () => screen.getByRole('dialog', { name: 'Compare Files' });
+
+  const comparison: CompareResult = {
+    processor: 'validation',
+    rowMatch: 'position',
+    files: [
+      { id: 'val-a', name: valA.name, source: 'Partner A', rows: 2, problems: { total: 1, items: [{ row: 2, batchId: 'A-002', message: 'mass missing' }] } },
+      { id: 'val-b', name: valB.name, source: 'Partner B', rows: 2, problems: { total: 2, items: [] } },
+      { id: 'val-c', name: valC.name, source: 'Partner C', rows: 1, problems: { total: 0, items: [] } },
+    ],
+    rows: [{ key: '#1', rowNumbers: [1, 1, 1] }, { key: '#2', rowNumbers: [2, 2, null] }],
+    columns: [
+      { name: 'composition_total_pct', kind: 'numeric', unit: '%', measure: 'mean', summary: [100, 98.73, 99.5],
+        values: [[100, 100, 100], [100, 97.46, null]], rowsDiffering: 1, rowsCompared: 2 },
+      { name: 'processing_status', kind: 'category', measure: 'count',
+        categories: [{ label: 'Valid', counts: [2, 1, 1] }, { label: 'Invalid', counts: [0, 1, 0] }],
+        values: [['Valid', 'Valid', 'Valid'], ['Valid', 'Invalid', null]], rowsDiffering: 1, rowsCompared: 2 },
+    ],
+  };
 
   beforeEach(() => {
-    vi.mocked(api.list).mockResolvedValue([clean, massA, massB, validation]);
+    vi.mocked(api.list).mockResolvedValue([clean, valA, valB, valC, massA]);
     // Recharts' ResponsiveContainer needs ResizeObserver, which jsdom lacks.
     vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   });
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it('enables Compare only for two different results from the same function', async () => {
-    const user = await setup();
-    expect(optionLabels(fileA())).toEqual(['Select result file…', 'a · Mass', 'b · Mass', 'a · Validation']);
-    expect(compareButton()).toBeDisabled();
-    await user.selectOptions(fileA(), 'mass-a');
-    expect(optionLabels(fileB())).toEqual(['Select result file…', 'b · Mass']);
-    expect(compareButton()).toBeDisabled();
-    await user.selectOptions(fileB(), 'mass-b');
-    expect(compareButton()).toBeEnabled();
-    await user.selectOptions(fileA(), 'val-a'); // another function clears File B
-    expect(fileB()).toHaveValue('');
-    expect(compareButton()).toBeDisabled();
+  it('has no compare footer', async () => {
+    await setup();
+    expect(screen.queryByRole('combobox', { name: /File A/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Compare Files')).not.toBeInTheDocument();
   });
 
-  it('opens the comparison with both names, problem cards and the summary', async () => {
+  it('offers Compare in the selection bar and explains when it cannot run', async () => {
     const user = await setup();
-    vi.mocked(api.compare).mockResolvedValue({
-      processor: 'mass', rowMatch: 'batch_id',
-      files: [
-        { id: 'mass-a', name: massA.name, source: 'Partner A', rows: 25, problems: { total: 1, items: [{ row: 8, batchId: 'A-008', message: 'mass missing' }] } },
-        { id: 'mass-b', name: massB.name, source: 'Partner A', rows: 25, problems: { total: 0, items: [] } },
-      ],
-      rows: [{ key: 'A-001', rowNumbers: [1, 1] }],
-      columns: [{ name: 'r32_mass_kg', kind: 'numeric', unit: 'kg', measure: 'total',
-        summary: [10, 12.5], values: [[1, 2]], rowsDiffering: 3, rowsCompared: 25 }],
-    });
-    await user.selectOptions(fileA(), 'mass-a');
-    await user.selectOptions(fileB(), 'mass-b');
+    await user.click(check('clean.csv'));
+    expect(within(bar()).queryByRole('button', { name: /^Compare/ })).not.toBeInTheDocument(); // inputs only
+    await user.click(check('clean.csv'));
+
+    await user.click(check(valA.name));
+    expect(compareButton()).toBeDisabled();
+    expect(compareButton()).toHaveAccessibleDescription('Select at least 2 results to compare.');
+    await user.click(check(valB.name));
+    expect(compareButton()).toHaveAccessibleName('Compare 2 files');
+    expect(compareButton()).toBeEnabled();
+    await user.click(check(massA.name));
+    expect(compareButton()).toHaveAccessibleDescription('Pick results from the same function.');
+    await user.click(check(massA.name));
+    await user.click(check('clean.csv'));
+    expect(compareButton()).toHaveAccessibleDescription('Comparison uses result files only. Unselect input files to compare.');
+    expect(api.compare).not.toHaveBeenCalled();
+  });
+
+  it('refuses more than five results', async () => {
+    const many = Array.from({ length: 6 }, (_, i) => val(`v${i}`, `result_extra_${i}_validation.csv`));
+    vi.mocked(api.list).mockResolvedValue(many);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('checkbox', { name: `Select ${many[0].name}` });
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
+    expect(compareButton()).toHaveAccessibleDescription('Compare up to 5 results at a time.');
+  });
+
+  it('opens the workspace with file cards, the overview and Δ against a chosen reference', async () => {
+    const user = await setup();
+    vi.mocked(api.compare).mockResolvedValue(comparison);
+    for (const f of [valA, valB, valC]) await user.click(check(f.name));
     await user.click(compareButton());
-    expect(api.compare).toHaveBeenCalledWith(['mass-a', 'mass-b']);
-    const dialog = await screen.findByRole('dialog', { name: `${massA.name} vs ${massB.name}` });
-    expect(dialog).toHaveTextContent('Rows matched by batch ID');
-    expect(within(dialog).getByRole('region', { name: `Problems in A · ${massA.name}` })).toHaveTextContent('Row 8 · A-008: mass missing');
-    expect(within(dialog).getByRole('region', { name: `Problems in B · ${massB.name}` })).toHaveTextContent('No problems');
-    const summary = within(dialog).getAllByRole('row').find((r) => r.textContent?.startsWith('r32_mass_kg'))!;
-    expect(summary).toHaveTextContent('Total across rows (kg)');
-    expect(summary).toHaveTextContent('2.5'); // B − A
-    expect(summary).toHaveTextContent('3 / 25');
+    expect(api.compare).toHaveBeenCalledWith(['val-a', 'val-b', 'val-c']);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Compare Files' });
+    expect(dialog).toHaveTextContent('Composition Validation · 3 files · 1–2 rows');
+    const cards = within(within(dialog).getByRole('list', { name: 'Compared files' })).getAllByRole('listitem');
+    expect(cards.map((c) => c.textContent)).toEqual([
+      `Partner A · Baseline${valA.name}1 flagged`, `Partner B · Followup${valB.name}2 flagged`, `Partner C · Baseline${valC.name}0 flagged`,
+    ]);
+    expect(dialog).toHaveTextContent('Rows matched by position: these files share no batch IDs');
+    expect(within(dialog).getByRole('radio', { name: 'Composition total (%)' })).toBeChecked();
+
+    const summaryRow = (label: string) => within(dialog).getAllByRole('row').find((r) => r.textContent?.startsWith(label))!;
+    expect(summaryRow('Partner A · Baseline *')).toHaveTextContent('100.00%—1');
+    expect(summaryRow('Partner B · Followup')).toHaveTextContent('98.73%-1.27 pp2');
+    expect(summaryRow('Partner C · Baseline')).toHaveTextContent('99.50%-0.50 pp0');
+    expect(dialog).toHaveTextContent('pp = percentage points.');
+
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Reference' }), 'Partner C · Baseline');
+    expect(summaryRow('Partner A · Baseline')).toHaveTextContent('100.00%+0.50 pp');
+    expect(summaryRow('Partner C · Baseline *')).toHaveTextContent('99.50%—');
+  });
+
+  it('shows category counts and row details with highlighted differences', async () => {
+    const user = await setup();
+    vi.mocked(api.compare).mockResolvedValue(comparison);
+    for (const f of [valA, valB, valC]) await user.click(check(f.name));
+    await user.click(compareButton());
+    const dialog = await screen.findByRole('dialog', { name: 'Compare Files' });
+
+    await user.click(within(dialog).getByRole('radio', { name: 'Processing status' }));
+    const overview = within(dialog).getByRole('region', { name: 'Overview' });
+    expect(overview).toHaveTextContent('Processing status: rows per category');
+    expect(within(overview).getAllByRole('row').find((r) => r.textContent?.startsWith('Invalid'))).toHaveTextContent('Invalid010');
+
+    await user.click(within(dialog).getByRole('radio', { name: 'Composition total (%)' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Row details' }));
+    expect(within(dialog).getByRole('button', { name: 'Row details' })).toHaveAttribute('aria-pressed', 'true');
+    const details = within(dialog).getByRole('region', { name: 'Row details' });
+    expect(details).toHaveTextContent('1 of 2 rows differ between files');
+    const row2 = within(details).getByRole('row', { name: /^#2/ });
+    const cells = within(row2).getAllByRole('cell');
+    expect(cells.map((c) => c.textContent)).toEqual(['100.00%', '97.46%', 'not in file']);
+    expect(cells[1]).toHaveAttribute('data-differs', 'true');
+    expect(cells[0]).not.toHaveAttribute('data-differs');
+
+    await user.click(within(details).getByRole('checkbox', { name: 'Only rows that differ' }));
+    expect(within(details).queryByRole('row', { name: /^#1/ })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Show deviation from 100%' }));
+    expect(within(within(details).getByRole('row', { name: /^#2/ })).getAllByRole('cell')[1]).toHaveTextContent('-2.54 pp');
+  });
+
+  it('closes with Escape and returns focus to the Compare button', async () => {
+    const user = await setup();
+    vi.mocked(api.compare).mockResolvedValue(comparison);
+    await user.click(check(valA.name));
+    await user.click(check(valB.name));
+    compareButton().focus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByRole('dialog', { name: 'Compare Files' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(compareButton()).toHaveFocus();
   });
 
   it('explains a failed comparison', async () => {
     const user = await setup();
     vi.mocked(api.compare).mockRejectedValue(new Error("These files can't be compared"));
-    await user.selectOptions(fileA(), 'mass-a');
-    await user.selectOptions(fileB(), 'mass-b');
+    await user.click(check(valA.name));
+    await user.click(check(valB.name));
     await user.click(compareButton());
     expect(await screen.findByRole('alert')).toHaveTextContent("Comparison failed: These files can't be compared");
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(compareButton()).toBeEnabled();
+  });
+
+  it('selects the new results after a clean batch so they can be compared', async () => {
+    const inputA: FileMeta = { ...clean, id: 'in-a', name: 'a.csv' };
+    const inputB: FileMeta = { ...clean, id: 'in-b', name: 'b.csv' };
+    vi.mocked(api.list).mockResolvedValue([inputA, inputB, valA, valB]);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('checkbox', { name: 'Select a.csv' });
+    vi.mocked(api.process).mockResolvedValueOnce(valA).mockResolvedValueOnce(valB);
+    await user.click(check('a.csv'));
+    await user.click(check('b.csv'));
+    await user.click(screen.getByRole('button', { name: 'Run Processing (2)' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Processed 2 files. Their results are selected, so you can compare them.');
+    expect(check(valA.name)).toBeChecked();
+    expect(check(valB.name)).toBeChecked();
+    expect(check('a.csv')).not.toBeChecked();
+    expect(compareButton()).toBeEnabled();
   });
 });
