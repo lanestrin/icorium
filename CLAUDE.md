@@ -4,7 +4,7 @@ Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of thre
 
 ## Layout
 
-- `client/` React 19 + Vite + Tailwind 4 + Recharts + Lucide. File workspace in `src/App.tsx` (its `Root` shows `src/components/GeneratorPage.tsx` at `/generator`), pieces in `src/components/`.
+- `client/` React 19 + Vite + Tailwind 4 + Recharts + Lucide. File workspace in `src/App.tsx` (its `Root` shows `src/components/GeneratorPage.tsx` at `/generator` and `src/components/ArchitecturePage.tsx` at `/architecture`), pieces in `src/components/`.
 - `server/` Fastify 5 + Papa Parse + Zod, run with tsx. `src/adapters/` (partner columns and units), `src/processing/` (the three functions), `src/lib/` (csv, storage, compare), `src/routes/files.ts` (all endpoints).
 - `shared/types.ts` types and the processor list used by both sides.
 - `sample-data/` the person's five synthetic partner CSVs. `README.txt` there lists columns, units and the one planted error per file.
@@ -22,6 +22,7 @@ Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of thre
 - **Results keep every original column.** Processors only append columns.
 - **Result file names:** `result_<input name without .csv>_<function id>.csv`, e.g. `result_partner_a_baseline_mass.csv`. Function ids are fixed: `validation`, `mass`, `classification`. Re-running the same function on the same input replaces the earlier result (no timestamps or versions). The name is only a label: a result is recognised by its columns, so a renamed result still uploads and compares.
 - Only `server/src/lib/storage.ts` touches the disk.
+- The Architecture page (`client/src/components/ArchitecturePage.tsx`) describes the real stack. When a dependency, route, limit or file it names changes, update the page; `client/src/architecture-content.test.ts` fails if a named path, package or quoted limit no longer matches.
 
 ## Completion and approval skills
 

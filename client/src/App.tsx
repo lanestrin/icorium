@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Archive, ArrowDownUp, ArrowLeftRight, Calendar, Check, ChevronDown, CircleAlert, Filter, Layers, RotateCcw, Search, Wand2, X, type LucideIcon } from 'lucide-react';
+import { Archive, ArrowDownUp, ArrowLeftRight, Calendar, Check, ChevronDown, CircleAlert, Filter, Layers, Network, RotateCcw, Search, Wand2, X, type LucideIcon } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta, type ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
@@ -7,6 +7,7 @@ import { displayStatus, FileTable, FileTabs, PROCESSING_FUNCTIONS, processingFun
 import { compareBlocker, CompareWorkspace } from './components/CompareWorkspace';
 import { PreviewModal, QualityWarningModal } from './components/Modals';
 import { GeneratorPage } from './components/GeneratorPage';
+import { ArchitecturePage } from './components/ArchitecturePage';
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const plural = (n: number) => `${n} file${n === 1 ? '' : 's'}`;
@@ -219,9 +220,14 @@ export default function App() {
           <div className="flex flex-wrap items-baseline gap-4">
             <h1 className="text-3xl font-bold tracking-tight">CSV Files</h1>
             <p className="text-slate-600">Upload, preview, process, and compare refrigerant datasets.</p>
-            <a href="/generator" className="ml-auto flex items-center gap-2 self-center text-sm font-medium text-blue-700 hover:underline">
-              <Wand2 className="h-4 w-4" /> CSV Generator
-            </a>
+            <nav aria-label="Pages" className="ml-auto flex items-center gap-5 self-center text-sm font-medium">
+              <a href="/generator" className="flex items-center gap-2 text-blue-700 hover:underline">
+                <Wand2 className="h-4 w-4" /> CSV Generator
+              </a>
+              <a href="/architecture" className="flex items-center gap-2 text-blue-700 hover:underline">
+                <Network className="h-4 w-4" /> Architecture
+              </a>
+            </nav>
           </div>
 
           <div role="search" aria-label="Filter files" className="mt-5 flex flex-wrap items-stretch gap-3 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm">
@@ -378,7 +384,10 @@ export default function App() {
   );
 }
 
-/** Picks the page from the URL: /generator is the CSV generator, anything else the file workspace. */
+/** Picks the page from the URL: /generator and /architecture have their own pages; anything else is the file workspace. */
 export function Root() {
-  return window.location.pathname.replace(/\/+$/, '') === '/generator' ? <GeneratorPage /> : <App />;
+  const path = window.location.pathname.replace(/\/+$/, '');
+  if (path === '/generator') return <GeneratorPage />;
+  if (path === '/architecture') return <ArchitecturePage />;
+  return <App />;
 }
