@@ -4,3 +4,47 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, sans-serif;
   background: #f3f6fb;
 }
+
+/* Space inside open dropdown lists, so options don't sit against the left edge. Firefox honours this. */
+select option {
+  padding: 0.375rem 0.75rem;
+}
+
+/*
+ * Chrome and Edge ignore option padding in a native list, so the filter and Sort by dropdowns
+ * (class menu-select) use the customizable select there, which lets the open list be styled.
+ * Browsers without it keep the native list. These dropdowns draw their own chevron.
+ */
+@supports (appearance: base-select) {
+  select.menu-select,
+  select.menu-select::picker(select) {
+    appearance: base-select;
+  }
+  select.menu-select::picker-icon {
+    display: none;
+  }
+  select.menu-select::picker(select) {
+    margin-top: 0.375rem;
+    padding: 0.25rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #fff;
+    box-shadow: 0 10px 25px -5px rgb(15 23 42 / 0.15);
+  }
+  select.menu-select option {
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+  }
+  select.menu-select option:hover,
+  select.menu-select option:focus-visible {
+    background: #f1f5f9;
+  }
+  select.menu-select option:checked {
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 500;
+  }
+  select.menu-select option::checkmark {
+    display: none;
+  }
+}

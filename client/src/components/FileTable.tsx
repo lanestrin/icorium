@@ -1,4 +1,4 @@
-import { ArrowDown, Check, CircleAlert, Download, Eye, FileSpreadsheet, Layers, LoaderCircle, MoreHorizontal, RotateCcw, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, CircleAlert, Download, Eye, FileSpreadsheet, Layers, LoaderCircle, MoreHorizontal, RotateCcw, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { FileMeta, ProcessorId } from '../../../shared/types';
 import { api } from '../api';
@@ -44,6 +44,36 @@ function StatusBadge({ status }: { status: Status }) {
   );
 }
 
+const FUNCTION_LABEL: Record<ProcessorId, string> = { validation: 'Validation', mass: 'Mass Calculation', classification: 'Classification' };
+/** Choices for the processing function filter, in the order the functions are listed. */
+export const PROCESSING_FUNCTIONS = ['Original', ...Object.values(FUNCTION_LABEL)];
+/** Which processing function made a file: "Original" for inputs, the function's name for results. */
+export const processingFunction = (f: FileMeta) =>
+  f.status !== 'Processed' ? 'Original' : f.processor ? FUNCTION_LABEL[f.processor] : '—';
+
+export type SortKey = 'archived-desc' | 'uploaded-desc' | 'uploaded-asc' | 'name-asc' | 'name-desc';
+/** Sort by choices. "Archived (newest)" is offered only in the Archived tab, where it is the default. */
+export const SORT_OPTIONS: { key: SortKey; label: string; archivedOnly?: boolean }[] = [
+  { key: 'archived-desc', label: 'Archived (newest)', archivedOnly: true },
+  { key: 'uploaded-desc', label: 'Uploaded (newest)' },
+  { key: 'uploaded-asc', label: 'Uploaded (oldest)' },
+  { key: 'name-asc', label: 'Name (A–Z)' },
+  { key: 'name-desc', label: 'Name (Z–A)' },
+];
+
+const byName = (a: FileMeta, b: FileMeta) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' });
+/** A sorted copy. Ties keep their existing order. Files archived before the date was kept sort last. */
+export function sortFiles(files: FileMeta[], key: SortKey): FileMeta[] {
+  const compare: Record<SortKey, (a: FileMeta, b: FileMeta) => number> = {
+    'archived-desc': (a, b) => (b.archivedAt ?? '').localeCompare(a.archivedAt ?? ''),
+    'uploaded-desc': (a, b) => b.uploadedAt.localeCompare(a.uploadedAt),
+    'uploaded-asc': (a, b) => a.uploadedAt.localeCompare(b.uploadedAt),
+    'name-asc': byName,
+    'name-desc': (a, b) => byName(b, a),
+  };
+  return [...files].sort(compare[key]);
+}
+
 export const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
@@ -52,7 +82,8 @@ export type Tab = 'active' | 'archived';
 const TABS: { id: Tab; label: string }[] = [{ id: 'active', label: 'Active Files' }, { id: 'archived', label: 'Archived' }];
 
 /** Active Files / Archived tabs with counts. Arrow keys move between tabs, as in any tab list. */
-export function FileTabs({ tab, setTab, counts }: { tab: Tab; setTab: (t: Tab) => void; counts: Record<Tab, number> }) {
+/** Active Files / Archived tabs. `extra` sits at the right end of the tab row (e.g. a filter), outside the tab list. */
+export function FileTabs({ tab, setTab, counts, extra }: { tab: Tab; setTab: (t: Tab) => void; counts: Record<Tab, number>; extra?: ReactNode }) {
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     const next = TABS[(TABS.findIndex((t) => t.id === tab) + 1) % TABS.length].id; // only two tabs, so either arrow switches
@@ -60,25 +91,28 @@ export function FileTabs({ tab, setTab, counts }: { tab: Tab; setTab: (t: Tab) =
     document.getElementById(`tab-${next}`)?.focus();
   };
   return (
-    <div role="tablist" aria-label="File list" onKeyDown={onKeyDown} className="mt-5 flex gap-1 border-b border-slate-200">
-      {TABS.map((t) => {
-        const active = t.id === tab;
-        return (
-          <button
-            key={t.id}
-            id={`tab-${t.id}`}
-            role="tab"
-            aria-selected={active}
-            aria-controls="file-tabpanel"
-            tabIndex={active ? 0 : -1}
-            onClick={() => setTab(t.id)}
-            className={`-mb-px flex items-center gap-3 rounded-t-lg border-b-2 px-5 py-2.5 font-medium transition ${active ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
-          >
-            {t.label}
-            <span className={`text-sm ${active ? 'text-blue-700' : 'text-slate-500'}`}>{counts[t.id]}</span>
-          </button>
-        );
-      })}
+    <div className="mt-5 flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-slate-200">
+      <div role="tablist" aria-label="File list" onKeyDown={onKeyDown} className="flex gap-1">
+        {TABS.map((t) => {
+          const active = t.id === tab;
+          return (
+            <button
+              key={t.id}
+              id={`tab-${t.id}`}
+              role="tab"
+              aria-selected={active}
+              aria-controls="file-tabpanel"
+              tabIndex={active ? 0 : -1}
+              onClick={() => setTab(t.id)}
+              className={`-mb-px flex items-center gap-3 rounded-t-lg border-b-2 px-5 py-2.5 font-medium transition ${active ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
+            >
+              {t.label}
+              <span className={`text-sm ${active ? 'text-blue-700' : 'text-slate-500'}`}>{counts[t.id]}</span>
+            </button>
+          );
+        })}
+      </div>
+      {extra && <div className="mb-2 ml-auto">{extra}</div>}
     </div>
   );
 }
@@ -154,15 +188,27 @@ interface Props {
   onRestore?: (f: FileMeta) => void;
   restoreDisabled?: boolean;
   selectionBar?: ReactNode; // shown at the top of the card while rows are selected
+  sort: SortKey;
   emptyMessage?: string;
 }
 
-export function FileTable({ files, selectedIds, processingId, failedIds, locked, onToggle, onToggleAll, onPreview, archived, onRestore, restoreDisabled, selectionBar, emptyMessage }: Props) {
+export function FileTable({ files, selectedIds, processingId, failedIds, locked, onToggle, onToggleAll, onPreview, archived, onRestore, restoreDisabled, selectionBar, sort, emptyMessage }: Props) {
   // Every file can be selected for archiving; Run Processing uses only the selected inputs.
   const ids = files.map((f) => f.id);
   const checkedCount = ids.filter((id) => selectedIds.has(id)).length;
   const allChecked = ids.length > 0 && checkedCount === ids.length;
-  const columns = archived ? 8 : 7;
+  const columns = archived ? 9 : 8;
+  // aria-sort and an arrow on whichever column the list is sorted by.
+  const sortedBy = (column: 'name' | 'uploaded' | 'archived') => {
+    if (!sort.startsWith(column)) return {};
+    const descending = sort.endsWith('desc');
+    const Arrow = descending ? ArrowDown : ArrowUp;
+    return { 'aria-sort': descending ? 'descending' as const : 'ascending' as const, arrow: <Arrow className="h-3.5 w-3.5" aria-hidden /> };
+  };
+  const header = (label: string, column: 'name' | 'uploaded' | 'archived', className: string) => {
+    const { arrow, ...aria } = sortedBy(column);
+    return <th className={className} {...aria}><span className="inline-flex items-center gap-1">{label}{arrow}</span></th>;
+  };
 
   return (
     // On desktop the list scrolls inside this box (header pinned) so the page and footer stay put.
@@ -175,7 +221,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
         tabIndex={0}
         className="overflow-auto rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:max-h-[calc(100vh-17rem)]"
       >
-        <table className={`w-full text-sm ${archived ? 'min-w-[1080px]' : 'min-w-[920px]'}`}>
+        <table className={`w-full text-sm ${archived ? 'min-w-[1220px]' : 'min-w-[1060px]'}`}>
           <thead>
             <tr className="text-left text-slate-700 [&>th]:sticky [&>th]:top-0 [&>th]:z-[1] [&>th]:bg-slate-50 [&>th]:py-3 [&>th]:font-semibold">
               <th className="w-14 rounded-l-xl pl-6">
@@ -189,19 +235,18 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   onChange={() => onToggleAll(ids, !allChecked)}
                 />
               </th>
-              <th className="pl-1">File Name</th>
+              {header('File Name', 'name', 'pl-1')}
               <th className="px-3 text-center">Rows</th>
               <th className="px-3 text-center">Columns</th>
               {archived ? (
                 <>
-                  <th className="pl-4 pr-3" aria-sort="descending">
-                    <span className="inline-flex items-center gap-1">Archived On <ArrowDown className="h-3.5 w-3.5" aria-hidden /></span>
-                  </th>
-                  <th className="pr-3">Original Upload</th>
+                  {header('Archived On', 'archived', 'pl-4 pr-3')}
+                  {header('Original Upload', 'uploaded', 'pr-3')}
                 </>
               ) : (
-                <th className="pl-4 pr-3">Uploaded</th>
+                header('Uploaded', 'uploaded', 'pl-4 pr-3')
               )}
+              <th className="pr-3">Processing function</th>
               <th>Status</th>
               <th className={`rounded-r-xl ${archived ? 'pr-4 text-center' : ''}`}>Actions</th>
             </tr>
@@ -238,6 +283,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   <td className="px-3 text-center">{f.columns}</td>
                   {archived && <td className="whitespace-nowrap pl-4 pr-3">{f.archivedAt ? fmtDate(f.archivedAt) : '—'}</td>}
                   <td className={`whitespace-nowrap pr-3 ${archived ? '' : 'pl-4'}`}>{fmtDate(f.uploadedAt)}</td>
+                  <td className="whitespace-nowrap pr-3 text-slate-500">{processingFunction(f)}</td>
                   <td>
                     <div className="whitespace-nowrap pr-3">
                       <StatusBadge status={status} />

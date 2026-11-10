@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArrowLeftRight, Calendar, Check, CircleAlert, Filter, RotateCcw, Search, Wand2, X } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Archive, ArrowDownUp, ArrowLeftRight, Calendar, Check, ChevronDown, CircleAlert, Filter, Layers, RotateCcw, Search, Wand2, X, type LucideIcon } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta, type ProcessorId } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
-import { displayStatus, FileTable, FileTabs, qualityWarning, type QualityWarning, type Status, type Tab } from './components/FileTable';
+import { displayStatus, FileTable, FileTabs, PROCESSING_FUNCTIONS, processingFunction, qualityWarning, SORT_OPTIONS, sortFiles, type SortKey, type QualityWarning, type Status, type Tab } from './components/FileTable';
 import { compareBlocker, CompareWorkspace } from './components/CompareWorkspace';
 import { PreviewModal, QualityWarningModal } from './components/Modals';
 import { GeneratorPage } from './components/GeneratorPage';
@@ -14,6 +14,29 @@ const TOAST_MS = 8000;
 
 /** Archive/restore confirmation. undo reverses exactly the files it names. */
 interface Toast { title: string; detail: string; undo?: { ids: string[]; archive: boolean } }
+
+const FIELD = 'flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm sm:w-auto';
+const Divider = () => <div className="hidden w-px self-stretch bg-slate-200 xl:block" aria-hidden />;
+
+/** A filter dropdown with its label above the chosen value, as in the filter card design. */
+function SelectFilter({ icon: Icon, label, value, onChange, children }: {
+  icon: LucideIcon; label: string; value: string; onChange: (v: string) => void; children: ReactNode;
+}) {
+  const id = useId();
+  return (
+    <div className={`${FIELD} relative sm:min-w-56`}>
+      <Icon className="h-5 w-5 shrink-0 text-slate-600" aria-hidden />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <label htmlFor={id} className="text-sm font-semibold">{label}</label>
+        <select id={id} value={value} onChange={(e) => onChange(e.target.value)}
+          className="menu-select w-full cursor-pointer appearance-none bg-transparent pr-7 text-sm text-slate-600 outline-none">
+          {children}
+        </select>
+      </div>
+      <ChevronDown className="pointer-events-none absolute right-4 h-4 w-4 text-slate-600" aria-hidden />
+    </div>
+  );
+}
 
 export default function App() {
   const [files, setFiles] = useState<FileMeta[]>([]);
@@ -33,8 +56,12 @@ export default function App() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [status, setStatus] = useState<'All' | Status>('All');
+  const [fn, setFn] = useState('All'); // processing function filter: 'All', 'Original' or a function name
+  // Each tab keeps its own order: newest uploads first, and most recently archived first.
+  const [sortBy, setSortBy] = useState<Record<'active' | 'archived', SortKey>>({ active: 'uploaded-desc', archived: 'archived-desc' });
   const [tab, setTab] = useState<Tab>('active');
   const viewArchived = tab === 'archived';
+  const sort = sortBy[tab];
 
   const [preview, setPreview] = useState<FileMeta>();
   const [comparison, setComparison] = useState<CompareResult>();
@@ -48,8 +75,8 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const filtersActive = !!(search || from || to || status !== 'All');
-  const clearFilters = () => { setSearch(''); setFrom(''); setTo(''); setStatus('All'); };
+  const filtersActive = !!(search || from || to || status !== 'All' || fn !== 'All');
+  const clearFilters = () => { setSearch(''); setFrom(''); setTo(''); setStatus('All'); setFn('All'); };
 
   const selectedInputs = files.filter((f) => selectedIds.has(f.id) && isInputFile(f) && !f.archived);
   const toggle = (id: string) =>
@@ -65,14 +92,14 @@ export default function App() {
           // Each tab shows only its own files; the status filter applies within the tab.
           !!f.archived === viewArchived &&
           (status === 'All' || displayStatus(f, processingId, failedIds) === status) &&
+          (fn === 'All' || processingFunction(f) === fn) &&
           (!from || day >= from) &&
           (!to || day <= to)
         );
       });
-      // Archived tab: most recently archived first; files archived before the date was kept go last.
-      return viewArchived ? shown.sort((a, b) => (b.archivedAt ?? '').localeCompare(a.archivedAt ?? '')) : shown;
+      return sortFiles(shown, sort);
     },
-    [files, search, status, viewArchived, from, to, processingId, failedIds],
+    [files, search, status, fn, viewArchived, sort, from, to, processingId, failedIds],
   );
   const archivedCount = files.filter((f) => f.archived).length;
   // Archive and Restore act only on the selected files in view, never on hidden selections.
@@ -197,40 +224,41 @@ export default function App() {
             </a>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <label className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm sm:w-auto sm:min-w-64 sm:flex-1">
-              <Search className="h-5 w-5 shrink-0 text-slate-500" />
-              <input className="w-full min-w-0 bg-transparent outline-none" placeholder="Search CSV files..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div role="search" aria-label="Filter files" className="mt-5 flex flex-wrap items-stretch gap-3 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm">
+            <label className={`${FIELD} min-w-0 sm:min-w-64 sm:flex-1`}>
+              <Search className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
+              <input aria-label="Search file name" className="w-full min-w-0 bg-transparent py-1.5 outline-none" placeholder="Search file name..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </label>
-            <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm sm:w-auto">
-              <Calendar className="h-5 w-5 shrink-0 text-slate-600" />
-              <span className="mr-1 font-semibold">Date Range</span>
-              <span className="flex min-w-0 flex-1 items-center gap-2">
-                <input type="date" aria-label="From date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
-                <span className="text-slate-400">–</span>
-                <input type="date" aria-label="To date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
-              </span>
+            <Divider />
+            <div role="group" aria-labelledby="date-range-label" className={FIELD}>
+              <Calendar className="h-5 w-5 shrink-0 text-slate-600" aria-hidden />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span id="date-range-label" className="text-sm font-semibold">Date Range</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <input type="date" aria-label="From date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-slate-600 outline-none" />
+                  <span className="text-slate-400">–</span>
+                  <input type="date" aria-label="To date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-slate-600 outline-none" />
+                </span>
+              </div>
             </div>
-            <label className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm sm:w-auto">
-              <Filter className="h-5 w-5 shrink-0 text-slate-600" />
-              <span className="font-semibold">Status</span>
-              <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className="min-w-0 flex-1 bg-transparent pr-2 outline-none">
-                <option value="All">All Statuses</option>
-                <option>Ready</option>
-                <option>Needs Review</option>
-                <option>Processing</option>
-                <option>Processed</option>
-                <option>Error</option>
-              </select>
-            </label>
-            {filtersActive && (
-              <button
-                onClick={clearFilters}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 sm:w-auto"
-              >
-                <X className="h-4 w-4" /> Clear filters
-              </button>
-            )}
+            <SelectFilter icon={Layers} label="Processing Function" value={fn} onChange={setFn}>
+              <option value="All">All functions</option>
+              {PROCESSING_FUNCTIONS.map((name) => <option key={name}>{name}</option>)}
+            </SelectFilter>
+            <Divider />
+            <SelectFilter icon={Filter} label="Status" value={status} onChange={(v) => setStatus(v as typeof status)}>
+              <option value="All">All statuses</option>
+              <option>Ready</option>
+              <option>Needs Review</option>
+              <option>Processing</option>
+              <option>Processed</option>
+              <option>Error</option>
+            </SelectFilter>
+            <Divider />
+            <button onClick={clearFilters} disabled={!filtersActive}
+              className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-slate-950 disabled:cursor-default disabled:text-slate-400">
+              Clear filters
+            </button>
           </div>
 
           {notice && (
@@ -248,7 +276,24 @@ export default function App() {
             </div>
           )}
 
-          <FileTabs tab={tab} setTab={setTab} counts={{ active: files.length - archivedCount, archived: archivedCount }} />
+          <FileTabs
+            tab={tab}
+            setTab={setTab}
+            counts={{ active: files.length - archivedCount, archived: archivedCount }}
+            extra={
+              <label className="flex items-center gap-3 text-slate-700">
+                <ArrowDownUp className="h-5 w-5 shrink-0" aria-hidden />
+                <span>Sort by</span>
+                <span className="relative">
+                  <select value={sort} onChange={(e) => setSortBy((b) => ({ ...b, [tab]: e.target.value as SortKey }))}
+                    className="menu-select cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-4 pr-10 shadow-sm outline-none focus:border-blue-400">
+                    {SORT_OPTIONS.filter((o) => viewArchived || !o.archivedOnly).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
+                </span>
+              </label>
+            }
+          />
 
           <div role="tabpanel" id="file-tabpanel" aria-labelledby={`tab-${tab}`} className="mt-4">
             {viewArchived && (
@@ -288,6 +333,7 @@ export default function App() {
                 </div>
               )}
               archived={viewArchived}
+              sort={sort}
               files={visible}
               selectedIds={selectedIds}
               processingId={processingId}
