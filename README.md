@@ -22,7 +22,7 @@ The five synthetic sample CSVs in `sample-data/` (described in `sample-data/READ
 
 | Level | File | What it proves |
 | --- | --- | --- |
-| Unit (Vitest) | `server/src/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths |
+| Unit (Vitest) | `server/src/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths and row matching for 2–5 files |
 | API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message, including archive and restore; all three functions on all five samples: exact invalid rows and reasons, every original column and value kept, download, renamed re-upload and compare |
 | Unit + API (Vitest, Blob SDK mocked in memory) | `server/src/blob-storage.test.ts` | The private Blob storage adapter: shared files across instances, atomic result replacement, idempotent sample seeding, conflict and failure handling, and refusing a Vercel start without storage configured |
 | Unit (Vitest) | `client/src/file-status.test.ts` | Input eligibility, status precedence, when the Data Quality Warning appears and its per-file counts |
@@ -68,7 +68,7 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 
 - Source data is never repaired. A Needs Review input stays Needs Review after processing; fix the CSV and upload it again.
 - Both rows of a duplicate batch ID are marked Invalid; neither is picked as the correct one.
-- Comparison pairs rows by their position in each file, not by batch ID, up to the longer file's row count.
+- Comparison matches rows by batch ID only when every pair of compared files shares IDs (a partner's baseline and follow-up); files from different partners share none, so their rows are matched by position, up to the longest file. The comparison states which was used. A repeated ID is matched occurrence by occurrence, and a blank ID never matches.
 - Only results from the same function and the current column layout can be compared. Regenerate an older result before comparing it with a new one.
 - Re-running a function on the same input replaces the earlier result; there is no version history.
 - Processing is synchronous and handles one file at a time, which suits interview-sized files. Preview lists the first 100 problem rows in detail.

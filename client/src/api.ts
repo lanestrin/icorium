@@ -27,5 +27,5 @@ export const api = {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ids, archived }),
     }).then(json<FileMeta[]>),
-  compare: (a: string, b: string) => fetch(`/api/compare?a=${a}&b=${b}`).then(json<CompareResult>),
+  compare: (ids: string[]) => fetch(`/api/compare?ids=${ids.map(encodeURIComponent).join(',')}`).then(json<CompareResult>),
 };

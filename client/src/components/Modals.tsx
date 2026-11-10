@@ -24,11 +24,11 @@ function ProblemItems({ list }: { list: ProblemList }) {
 }
 
 /** One file's problem rows in the comparison, marked with that file's chart colour. */
-function ProblemCard({ side, name, list, dot }: { side: 'A' | 'B'; name: string; list: ProblemList; dot: string }) {
+function ProblemCard({ side, name, list, color }: { side: string; name: string; list: ProblemList; color: string }) {
   return (
     <section aria-label={`Problems in ${side} · ${name}`} className="min-w-0 rounded-xl border border-slate-200 px-4 py-3">
       <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold">
-        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden />
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
         <span className="truncate">{side} · {name}</span>
         {list.total ? (
           <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs text-amber-800">
@@ -225,16 +225,25 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
   );
 }
 
+// One letter and colour per compared file, in order. A file keeps its colour in the chart and the cards.
+const SIDES = ['A', 'B', 'C', 'D', 'E'];
+const COLORS = ['#2563eb', '#f59e0b', '#14b8a6', '#a855f7', '#ef4444'];
+
 export function CompareModal({ result, onClose }: { result: CompareResult; onClose: () => void }) {
   const [i, setI] = useState(0);
   const col = result.columns[i];
   const isCat = col?.kind === 'category';
+  const { files } = result;
+  const two = files.length === 2;
+  const matched = result.rowMatch === 'batch_id' ? 'Rows matched by batch ID' : 'Rows matched by position';
+  const chartData = !col ? [] : isCat
+    ? (col.categories ?? []).map((c) => Object.fromEntries([['label', c.label], ...c.counts.map((n, k) => [`f${k}`, n])]))
+    : result.rows.map((r, row) => Object.fromEntries([['label', r.key], ...col.values[row].map((v, k) => [`f${k}`, v])]));
 
   return (
-    <Modal title={`${result.fileA}  vs  ${result.fileB}`} subtitle={`${processorLabel(result.processor)} · ${result.columns.length} generated columns compared`} onClose={onClose}>
+    <Modal title={files.map((f) => f.name).join('  vs  ')} subtitle={`${processorLabel(result.processor)} · ${result.columns.length} generated columns compared · ${matched}`} onClose={onClose}>
       <div className="grid gap-3 pt-5 md:grid-cols-2">
-        <ProblemCard side="A" name={result.fileA} list={result.problemsA} dot="bg-blue-600" />
-        <ProblemCard side="B" name={result.fileB} list={result.problemsB} dot="bg-amber-500" />
+        {files.map((f, k) => <ProblemCard key={f.id} side={SIDES[k]} name={f.name} list={f.problems} color={COLORS[k]} />)}
       </div>
 
       <div className="flex flex-wrap gap-2 pt-5">
@@ -248,11 +257,11 @@ export function CompareModal({ result, onClose }: { result: CompareResult; onClo
       {col && (
         <>
           <p className="mt-4 text-sm text-slate-500">
-            {isCat ? 'Count of rows in each category, A vs B' : `Value per row${withUnit(col)}, A vs B. Row # is the row's position in each file.`}
+            {isCat ? 'Count of rows in each category, per file' : `Value per row${withUnit(col)}, per file. ${matched}.`}
           </p>
           <div className="h-80">
             <ResponsiveContainer>
-              <BarChart data={col.data} margin={{ top: 10, right: 10, bottom: isCat ? 50 : 0, left: 10 }}>
+              <BarChart data={chartData} margin={{ top: 10, right: 10, bottom: isCat ? 50 : 0, left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={isCat ? 0 : 'preserveStartEnd'} angle={isCat ? -20 : 0} textAnchor={isCat ? 'end' : 'middle'} />
                 <YAxis
@@ -262,8 +271,7 @@ export function CompareModal({ result, onClose }: { result: CompareResult; onClo
                 />
                 <Tooltip formatter={(v) => `${fmt(Number(v))}${isCat ? ' rows' : col.unit ? ` ${col.unit}` : ''}`} />
                 <Legend verticalAlign="top" />
-                <Bar dataKey="a" name={`A · ${result.fileA}`} fill="#2563eb" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="b" name={`B · ${result.fileB}`} fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                {files.map((f, k) => <Bar key={f.id} dataKey={`f${k}`} name={`${SIDES[k]} · ${f.name}`} fill={COLORS[k]} radius={[4, 4, 0, 0]} />)}
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -275,20 +283,25 @@ export function CompareModal({ result, onClose }: { result: CompareResult; onClo
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 text-left [&>th]:whitespace-nowrap [&>th]:px-3 [&>th]:py-2 [&>th]:font-semibold">
-              <th>Column</th><th>Measure</th><th className="text-right">A</th><th className="text-right">B</th><th className="text-right">Δ (B − A)</th><th className="text-right">Rows differing</th>
+              <th>Column</th><th>Measure</th>
+              {files.map((f, k) => <th key={f.id} className="text-right">{SIDES[k]}</th>)}
+              {two && <th className="text-right">Δ (B − A)</th>}
+              <th className="text-right">Rows differing</th>
             </tr>
           </thead>
           <tbody>
-            {result.columns.map((c, k) => (
-              <tr key={c.name} onClick={() => setI(k)} className={`cursor-pointer border-t border-slate-100 [&>td]:px-3 [&>td]:py-2 ${k === i ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                <td className="font-medium">{c.name}</td>
-                <td className="text-slate-600">{measureLabel(c)}</td>
-                <td className="text-right">{fmt(c.valueA)}</td>
-                <td className="text-right">{fmt(c.valueB)}</td>
-                <td className="text-right">{c.valueA != null && c.valueB != null ? fmt(c.valueB - c.valueA) : '—'}</td>
-                <td className="text-right">{c.rowsDiffering} / {c.rowsCompared}</td>
-              </tr>
-            ))}
+            {result.columns.map((c, k) => {
+              const [a, b] = c.summary ?? [];
+              return (
+                <tr key={c.name} onClick={() => setI(k)} className={`cursor-pointer border-t border-slate-100 [&>td]:px-3 [&>td]:py-2 ${k === i ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                  <td className="font-medium">{c.name}</td>
+                  <td className="text-slate-600">{measureLabel(c)}</td>
+                  {files.map((f, n) => <td key={f.id} className="text-right">{fmt(c.summary?.[n])}</td>)}
+                  {two && <td className="text-right">{a != null && b != null ? fmt(b - a) : '—'}</td>}
+                  <td className="text-right">{c.rowsDiffering} / {c.rowsCompared}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

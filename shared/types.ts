@@ -50,25 +50,48 @@ export interface FileRows {
   problems: ProblemList; // for the whole file, not just this page
 }
 
+/** Compare 2 to 5 results at a time. */
+export const COMPARE_MIN = 2;
+export const COMPARE_MAX = 5;
+
+/** How rows were lined up across files: by batch ID when every pair of files shares IDs, otherwise by position. */
+export type RowMatch = 'batch_id' | 'position';
+
+/** One compared file. Arrays elsewhere in CompareResult list files in this order. */
+export interface CompareFile {
+  id: string;
+  name: string;
+  source?: string; // partner adapter, e.g. 'Partner A'
+  rows: number;
+  problems: ProblemList;
+}
+
+/** One matched row: its key (batch ID or "#n") and its 1-based row number in each file, null where the file lacks it. */
+export interface MatchedRow {
+  key: string;
+  rowNumbers: (number | null)[];
+}
+
 export interface CompareColumn {
   name: string;
   kind: 'numeric' | 'category';
   unit?: string; // 'kg' or '%'
-  /** How valueA/valueB summarize the rows. 'count' = the chart shows rows per category. */
+  /** How summary describes each file. 'count' = categories hold rows per category. */
   measure: 'total' | 'mean' | 'count';
-  /** numeric: one point per row; category: one point per category with row counts */
-  data: { label: string; a: number | null; b: number | null }[];
-  valueA?: number;
-  valueB?: number;
-  rowsDiffering: number;
+  /** numeric: each file's total or mean (null when it has no values). */
+  summary?: (number | null)[];
+  /** category: rows per category in each file. */
+  categories?: { label: string; counts: number[] }[];
+  /** values[row][file], following CompareResult.rows. null = blank number or no such row in that file. */
+  values: (number | string | null)[][];
+  rowsDiffering: number; // matched rows whose values differ between files, or that some file lacks
   rowsCompared: number;
 }
 
 export interface CompareResult {
   processor: ProcessorId;
-  fileA: string;
-  fileB: string;
+  rowMatch: RowMatch;
+  files: CompareFile[];
+  rows: MatchedRow[];
   columns: CompareColumn[];
-  problemsA: ProblemList;
-  problemsB: ProblemList;
 }

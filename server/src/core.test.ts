@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from './lib/csv';
 import { getAdapter } from './adapters';
 import { detectProcessor, detectResult, findProblems, issues, processors, processRows } from './processing';
-import { compareResults } from './lib/compare';
+import { compareResults, matchRows } from './lib/compare';
 import type { FileMeta, Row } from '../../shared/types';
 
 const A_HEADERS = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
@@ -132,31 +132,91 @@ describe('processing and export', () => {
 });
 
 describe('compare', () => {
-  const meta = (processor: FileMeta['processor'], cols: string[]): FileMeta => ({
-    id: processor!, name: `${processor}.csv`, rows: 1, columns: 1, uploadedAt: '', status: 'Processed', processor, generatedColumns: cols,
+  const meta = (processor: FileMeta['processor'], cols: string[], name = `${processor}.csv`): FileMeta => ({
+    id: name, name, rows: 1, columns: 1, uploadedAt: '', status: 'Processed', processor, generatedColumns: cols,
   });
+  // Files without a partner schema: rows are matched by position.
+  const file = (processor: FileMeta['processor'], cols: string[], rows: Row[], name?: string) => ({ meta: meta(processor, cols, name), headers: cols, rows });
 
   it('rejects results from different processors in plain language', () => {
-    expect(() => compareResults({ meta: meta('mass', []), rows: [] }, { meta: meta('validation', []), rows: [] })).toThrow(
+    expect(() => compareResults([file('mass', []), file('validation', [])])).toThrow(
       /Component Mass Calculation result but .* Composition Validation result/,
     );
   });
   it('rejects input files', () => {
-    const input: FileMeta = { ...meta('mass', []), status: 'Ready', processor: undefined };
-    expect(() => compareResults({ meta: input, rows: [] }, { meta: meta('mass', []), rows: [] })).toThrow(/input file/);
+    const input = { ...file('mass', []), meta: { ...meta('mass', []), status: 'Ready' as const, processor: undefined } };
+    expect(() => compareResults([input, file('mass', [])])).toThrow(/input file/);
   });
-  it('totals kg columns and averages others', () => {
+  it('accepts 2 to 5 files only', () => {
+    const one = file('mass', ['x'], [{ x: '1' }]);
+    expect(() => compareResults([one])).toThrow(/Choose 2 to 5/);
+    expect(() => compareResults(Array(6).fill(one))).toThrow(/Choose 2 to 5/);
+    expect(compareResults(Array(5).fill(one)).files).toHaveLength(5);
+  });
+  it('rejects a file whose output columns differ from the others', () => {
+    expect(() => compareResults([file('mass', ['x']), file('mass', ['x']), file('mass', ['y'])])).toThrow(/Regenerate the older result/);
+  });
+  it('totals kg columns and averages others, per file', () => {
     const cols = ['r32_mass_kg', 'composition_total_pct'];
-    const A = { meta: meta('mass', cols), rows: [{ r32_mass_kg: '1', composition_total_pct: '100' }, { r32_mass_kg: '2', composition_total_pct: '98' }] };
-    const B = { meta: meta('mass', cols), rows: [{ r32_mass_kg: '1', composition_total_pct: '100' }, { r32_mass_kg: '4', composition_total_pct: '100' }] };
-    const [kg, pct] = compareResults(A, B).columns;
-    expect(kg).toMatchObject({ unit: 'kg', measure: 'total', valueA: 3, valueB: 5, rowsDiffering: 1, rowsCompared: 2 });
-    expect(pct).toMatchObject({ unit: '%', measure: 'mean', valueA: 99, valueB: 100 });
+    const A = file('mass', cols, [{ r32_mass_kg: '1', composition_total_pct: '100' }, { r32_mass_kg: '2', composition_total_pct: '98' }], 'a');
+    const B = file('mass', cols, [{ r32_mass_kg: '1', composition_total_pct: '100' }, { r32_mass_kg: '4', composition_total_pct: '100' }], 'b');
+    const C = file('mass', cols, [{ r32_mass_kg: '', composition_total_pct: '' }, { r32_mass_kg: '', composition_total_pct: '' }], 'c');
+    const [kg, pct] = compareResults([A, B, C]).columns;
+    expect(kg).toMatchObject({ unit: 'kg', measure: 'total', summary: [3, 5, null], rowsDiffering: 2, rowsCompared: 2 });
+    expect(kg.values).toEqual([[1, 1, null], [2, 4, null]]);
+    expect(pct).toMatchObject({ unit: '%', measure: 'mean', summary: [99, 100, null] });
   });
-  it('counts rows per category', () => {
-    const A = { meta: meta('validation', ['s']), rows: [{ s: 'OK' }, { s: 'ERROR' }] };
-    const B = { meta: meta('validation', ['s']), rows: [{ s: 'OK' }, { s: 'OK' }] };
-    expect(compareResults(A, B).columns[0]).toMatchObject({ kind: 'category', measure: 'count', data: [{ label: 'OK', a: 1, b: 2 }, { label: 'ERROR', a: 1, b: 0 }] });
+  it('counts rows per category in each file', () => {
+    const A = file('validation', ['s'], [{ s: 'OK' }, { s: 'ERROR' }], 'a');
+    const B = file('validation', ['s'], [{ s: 'OK' }, { s: 'OK' }], 'b');
+    const C = file('validation', ['s'], [{ s: 'ERROR' }, { s: '' }], 'c');
+    expect(compareResults([A, B, C]).columns[0]).toMatchObject({
+      kind: 'category', measure: 'count', rowsDiffering: 2,
+      categories: [{ label: 'OK', counts: [1, 2, 0] }, { label: 'ERROR', counts: [1, 0, 1] }, { label: '(blank)', counts: [0, 0, 1] }],
+    });
+  });
+  it('matches by position when files have no shared batch IDs, padding shorter files', () => {
+    const A = file('mass', ['x'], [{ x: '1' }, { x: '2' }], 'a');
+    const B = file('mass', ['x'], [{ x: '1' }], 'b');
+    const out = compareResults([A, B]);
+    expect(out.rowMatch).toBe('position');
+    expect(out.rows).toEqual([{ key: '#1', rowNumbers: [1, 1] }, { key: '#2', rowNumbers: [2, null] }]);
+    expect(out.columns[0]).toMatchObject({ values: [[1, 1], [2, null]], rowsDiffering: 1 });
+  });
+});
+
+describe('matching rows by batch ID', () => {
+  const cols = ['composition_total_pct'];
+  const meta: FileMeta = { id: 'm', name: 'm.csv', rows: 1, columns: 1, uploadedAt: '', status: 'Processed', processor: 'validation', generatedColumns: cols };
+  const headers = [...A_HEADERS.split(','), ...cols];
+  const file = (ids: string[], totals = ids.map(() => '100')) =>
+    ({ meta, headers, rows: ids.map((id, i) => ({ batch_id: id, sample_date: 'd', feed_mass_kg: '1', r32_pct: '40', r125_pct: '30', r134a_pct: '30', composition_total_pct: totals[i] })) });
+
+  it('lines rows up by ID when every pair of files shares one, whatever their order', () => {
+    const out = matchRows([file(['A-1', 'A-2', 'A-3']), file(['A-3', 'A-1', 'A-2']), file(['A-2', 'A-9'])]);
+    expect(out.rowMatch).toBe('batch_id');
+    expect(out.rows).toEqual([
+      { key: 'A-1', rowNumbers: [1, 2, null] },
+      { key: 'A-2', rowNumbers: [2, 3, 1] },
+      { key: 'A-3', rowNumbers: [3, 1, null] },
+      { key: 'A-9', rowNumbers: [null, null, 2] },
+    ]);
+  });
+  it('falls back to position when any pair of files shares no ID', () => {
+    expect(matchRows([file(['A-1']), file(['A-1']), file(['B-1'])]).rowMatch).toBe('position');
+  });
+  it('matches repeated IDs occurrence by occurrence and never matches blank IDs', () => {
+    const out = matchRows([file(['B-1', 'B-1', '']), file(['B-1', '', 'B-1'])]);
+    expect(out.rows).toEqual([
+      { key: 'B-1', rowNumbers: [1, 1] },
+      { key: 'B-1 (2)', rowNumbers: [2, 3] },
+      { key: '(blank ID) file 1 row 3', rowNumbers: [3, null] },
+      { key: '(blank ID) file 2 row 2', rowNumbers: [null, 2] },
+    ]);
+  });
+  it('compares the matched rows, so reordered files do not differ', () => {
+    const out = compareResults([file(['A-1', 'A-2'], ['100', '98']), file(['A-2', 'A-1'], ['98', '100'])]);
+    expect(out.columns[0]).toMatchObject({ values: [[100, 100], [98, 98]], rowsDiffering: 0 });
   });
 });
 

@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged; 9.3 archive tabs awaiting review. See section 4.
+**Status:** All planned features merged; 9.4a multi-file compare API awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,7 +68,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: none planned.** 9.3 is implemented and awaiting review.
+**Next: 9.4b** `feature/9.4b-compare-workspace`, after 9.4a merges. 9.4a is implemented and awaiting review.
 New work needs a new request. Add it as a new stable ID with its scope before
 building, or use a `fix/` branch for a bug.
 
@@ -205,9 +205,21 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 - [x] **9.3** `feature/9.3-archive-tabs` — Make archived files easy to find and restore, at the person's request on 2026-11-09 after reviewing 9.2 (restoring was hidden in the Status dropdown, and they disliked the Archive button in the filter bar; they chose tabs plus a selection bar, then supplied a mockup to follow). **Active Files** / **Archived** tabs with counts sit above the table and replace the Archived status option. While rows in view are selected, a bar at the top of the table shows "N selected", **Clear selection** and a primary **Archive N files** (or **Restore N files**) button. A top-right toast confirms each archive or restore, offers **Undo** (not on an undo) and hides after 8 seconds. The Archived tab shows a note that archived files are excluded from processing and comparison, sorts by **Archived On** (newest first) beside **Original Upload**, and replaces Preview/Download with a ⋯ menu (**Preview file**, **Download file**, **Restore file**; arrow keys, Escape, click outside). Rows show a file icon. The API now stores `archivedAt` when archiving and clears it on restore; files archived before this show "—" and sort last. Filters apply within the current tab.
 
-  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Result:** merged in PR #19 (`7d1f474`); automated verification and CI passed (2026-11-09).
   **Done when:** tabs show correct counts and switch by click and arrow keys; the selection bar appears only with selected rows in view and clears them; bulk archive, bulk restore, menu restore and Undo call the API with the right ids and report success or failure; archived rows sort by archive time; the Status filter no longer offers Archived; 9.2's processing and compare exclusions still hold.
   **Verification:** API test for `archivedAt` set and cleared; component tests for tabs, counts, keyboard, selection bar, toast and Undo, auto-hide, row menu (mouse and keyboard), sorting and columns, failures, empty state, double click and exclusions; `npm run verify`.
+
+- [x] **9.4a** `feature/9.4a-multi-file-compare-api` — Compare 2 to 5 results at once instead of exactly two, at the person's request on 2026-11-09 (they supplied a multi-file comparison concept and chose to remove the compare footer). `GET /api/compare?ids=a,b,c` replaces `?a=&b=`. It returns `files` (name, partner, rows, problems), `rowMatch`, the matched `rows`, and per column a `summary` per file (total for kg, mean otherwise), `categories` with counts per file, and `values[row][file]`. Rows are matched by batch ID when every pair of files shares at least one ID (a partner's baseline and follow-up); otherwise by position, which is what files from different partners always get. Repeated IDs match occurrence by occurrence; blank IDs never match. The existing modal reads the new shape (any number of files, Δ only for two) until 9.4b replaces it.
+
+  **Result:** implemented; automated verification passed (2026-11-09), awaiting review and PR.
+  **Done when:** 2–5 different results of one function and output schema compare; fewer, more, repeated, input or mixed-function selections are refused in plain words; per-file summaries, categories and values follow the matched rows; matching by ID or position follows the rule above.
+  **Verification:** unit tests for summaries, categories, padding, ID matching (reordered, repeated, blank, partial overlap) and fallback; API tests for 2- and 5-file comparisons of the samples, batch-ID and position matching, limits and errors; `npm run verify`.
+
+- [ ] **9.4b** `feature/9.4b-compare-workspace` — Remove the fixed compare footer. Ticking 2–5 results of one function in Active Files shows **Compare N files** in the selection bar (disabled, with the reason, otherwise). It opens a full-screen comparison workspace: file cards (short partner label, colour, flagged rows), a compare-metric choice, **Overview** (per-file bar chart and summary table with **Δ vs ref.** in pp or kg and a **Reference** file picker) and **Row details** (a line per file, deviation from 100% for composition totals, grouped horizontal bars for categories), stating how rows were matched.
+
+  **Depends on:** 9.4a.
+  **Done when:** the footer is gone; selection-bar compare enables only for valid selections; the workspace shows every file with a consistent colour, switches metric, view and reference, and reports failures; phone width has no sideways page scroll.
+  **Verification:** unit tests for Δ vs reference and labels; component tests for the selection-bar compare, workspace controls, keyboard use and errors; `npm run verify`.
 
 ### M7 — Final interview readiness
 
