@@ -63,7 +63,7 @@ Reference image: `blueprint/reference-ui.png`.
 - **Preview modal:** show input data without expanding a potentially large CSV inside the main window.
 - **Result preview modal:** show original columns plus generated result columns after processing.
 - **Compare from the selection bar:** ticking 2–5 results of one function shows **Compare N files**; otherwise the bar says why it can't run. There is no compare footer (removed in 9.4b).
-- **Comparison workspace:** a full-screen dialog with file cards, a metric choice, **Overview** (per-file chart and summary with Δ vs a reference file) and **Row details** (a line per file, highlighted differences). Do not keep the graph permanently on the main screen.
+- **Comparison dashboard:** a full-screen dialog with selected-file chips, one control row (reference file, metric, Overview / Row differences), a row chart with one line per file beside **Summary by file** (Δ vs reference, flagged rows), and **Comparison at a glance** with **Top differences**. **Row differences** lists differing rows with highlighted cells. Do not keep the graph permanently on the main screen.
 
 ## Synthetic Data for the Demo
 
