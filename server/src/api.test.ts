@@ -45,8 +45,26 @@ describe('loading files', () => {
     expect(preview.rows).toHaveLength(25);
 
     const download = await app.inject(`/api/files/${meta.id}/download`);
-    expect(download.headers['content-disposition']).toBe('attachment; filename="uploaded_c.csv"');
+    expect(download.headers['content-disposition']).toBe(`attachment; filename="uploaded_c.csv"; filename*=UTF-8''uploaded_c.csv`);
     expect(download.body).toBe(text);
+  });
+
+  it.each(['報告.csv', 'café_ñ.csv', "it's (final) * draft!.csv", 'résumé "v2".csv'])('downloads %s under its own name', async (name) => {
+    const text = sample('partner_a_baseline.csv');
+    const meta = (await upload(name, text)).json<FileMeta>();
+    const download = await app.inject(`/api/files/${meta.id}/download`);
+    expect(download.statusCode).toBe(200);
+    expect(download.body).toBe(text);
+    const header = download.headers['content-disposition'] as string;
+    // RFC 5987: the exact name, UTF-8 and percent-encoded, for browsers that read filename*.
+    const encoded = header.match(/filename\*=UTF-8''([^;\s]+)/)![1];
+    expect(encoded).toMatch(/^[A-Za-z0-9%._~-]+$/);
+    expect(decodeURIComponent(encoded)).toBe(meta.name);
+    // A plain ASCII fallback for older clients, with nothing that could break the quoted string.
+    const fallback = header.match(/filename="([^"]*)"/)![1];
+    expect(fallback).toMatch(/^[\x20-\x7e]+$/);
+    expect(fallback).not.toMatch(/["\\]/);
+    expect(fallback.endsWith('.csv')).toBe(true);
   });
 
   it.each([

@@ -32,6 +32,18 @@ const generateBody = z.object({
 });
 type IdParams = { Params: { id: string } };
 
+/**
+ * Content-Disposition for a download. Node rejects header values with characters outside Latin-1,
+ * so the exact name goes in RFC 5987 `filename*` (UTF-8, percent-encoded), and `filename` carries a
+ * plain ASCII fallback for older clients: accents dropped, anything else replaced with "_".
+ */
+function attachment(name: string) {
+  const fallback = name.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7e]|["\\]/g, '_');
+  // encodeURIComponent leaves ! ' ( ) * as they are; RFC 5987 needs ' ( ) * encoded, and ! is encoded too for safety.
+  const exact = encodeURIComponent(name).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${exact}`;
+}
+
 export async function fileRoutes(app: FastifyInstance) {
   // Backfill missing counts and reconcile historical input statuses without rewriting CSVs.
   app.get('/files', async () =>
@@ -78,7 +90,7 @@ export async function fileRoutes(app: FastifyInstance) {
 
   app.get<IdParams>('/files/:id/download', async (req, reply) => {
     const meta = await storage.get(req.params.id);
-    reply.header('content-disposition', `attachment; filename="${meta.name}"`).type('text/csv');
+    reply.header('content-disposition', attachment(meta.name)).type('text/csv');
     return storage.read(meta.id);
   });
 
