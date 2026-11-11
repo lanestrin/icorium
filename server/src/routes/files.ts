@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { codeOf, COMPARE_MAX, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, resultFileId, type FileMeta, type ReplaceConflict } from '../../../shared/types';
+import { codeOf, COMPARE_MAX, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ReplaceConflict, type Row } from '../../../shared/types';
 import { getAdapter } from '../adapters';
-import { detectResult, findProblems, processRows, stampFileIds } from '../processing';
+import { detectResult, embeddedSourceId, findProblems, matchesInput, processRows, stampFileIds } from '../processing';
 import { compareResults } from '../lib/compare';
 import { httpError, parseCsv, toCsv } from '../lib/csv';
 import { storage } from '../lib/storage';
@@ -58,6 +58,19 @@ async function findFile(id: string) {
   }
 }
 
+/**
+ * The original input an uploaded result belongs to, or undefined when it is not linked: sourceId must
+ * be the base ID of an input in this workspace (archived included) whose data the result's original
+ * columns hold exactly.
+ */
+async function originalMatching(sourceId: string, headers: string[], rows: Row[], generatedColumns: string[]) {
+  if (parseFileId(sourceId)?.code) return undefined; // names a result, not an original
+  const source = await findFile(sourceId);
+  if (!source || !isInputFile(source)) return undefined;
+  const input = parseCsv(await storage.read(source.id));
+  return matchesInput(headers, rows, generatedColumns, input.headers, input.rows) ? source.id : undefined;
+}
+
 export async function fileRoutes(app: FastifyInstance) {
   // A pure read: metadata from older versions is corrected once at startup (reconcileMetadata).
   app.get('/files', async () => storage.list());
@@ -77,14 +90,22 @@ export async function fileRoutes(app: FastifyInstance) {
     // replacing any IDs the uploaded CSV brought with it.
     // A result exported before File ID columns has none to stamp, so it is stored exactly as uploaded.
     const hasIdColumns = headers.includes(FILE_ID_COLUMN) || headers.includes(RESULT_ID_COLUMN);
+    // An uploaded result keeps the source File ID it names as provenance (importedFrom). It is linked
+    // to that original (sourceId, and the original's base ID stays in file_id) only when the original
+    // is an input in this workspace and the result's original columns hold exactly its data.
+    const importedFrom = result ? embeddedSourceId(headers, rows) : undefined;
+    const linkedTo = result && importedFrom ? await originalMatching(importedFrom, headers, rows, result.generatedColumns) : undefined;
     const textFor = (id: string) => {
       if (result && !hasIdColumns) return text;
-      const stored = stampFileIds(headers, rows, id, !!result);
+      const stored = stampFileIds(headers, rows, id, !!result, linkedTo);
       return toCsv(stored.headers, stored.rows);
     };
     const columns = result || headers.includes(FILE_ID_COLUMN) ? headers.length : headers.length + 1;
     const base = { name: file.filename, text: textFor, rows: rows.length, columns, problemRows: findProblems(headers, rows).total };
-    if (result) return storage.create({ ...base, status: 'Processed', imported: true, ...result }, codeOf(result.processor));
+    if (result) {
+      const lineage = { ...(importedFrom ? { importedFrom } : {}), ...(linkedTo ? { sourceId: linkedTo } : {}) };
+      return storage.create({ ...base, status: 'Processed', imported: true, ...result, ...lineage }, codeOf(result.processor));
+    }
     return storage.create({ ...base, status: base.problemRows > 0 ? 'Needs Review' : 'Ready' });
   });
 

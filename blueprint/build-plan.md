@@ -32,8 +32,8 @@ This is a demonstration with synthetic refrigerant-batch data, not a production 
 - Processing the same original with the same function again targets the **same full result ID**. Require explicit replacement confirmation; no extra run-specific file ID or automatic version is created.
 - Different originals—even when named exactly the same—produce different result IDs.
 - Results carry `file_id` (base/original ID) and `result_id` (full result ID) in their CSV data as currently planned. Keep the partner's filename separate from these column values.
-- Rename, preview, download, archive, restore and compare operations address stored artifacts by ID. A rename must not change identity.
-- **Imported processed-result lineage is a special case**: existing 11.2 behavior rewrites ID columns on re-upload, potentially losing the original link. Do not claim that imported artifacts remain linked to their original source unless the import policy explicitly preserves that link. Resolve and test this before calling File ID work complete.
+- Preview, download, archive, restore and compare operations address stored artifacts by ID. **Renaming is not supported** (decided 2026-11-11); if it is added later as its own item, a rename must not change identity.
+- **Imported processed-result lineage (decided 2026-11-11, built in 11.7):** an uploaded result always gets a new base ID plus its function code and is marked Imported. It is **linked** to an original only when its embedded source File ID names an original input in the workspace *and* its original input columns and values match that input exactly (generated columns excluded, column order ignored). Otherwise it keeps the embedded source ID as provenance but stays unlinked, and is never presented as linked.
 - “Never reused” is guaranteed only within a persistent ID allocation namespace. Resetting demo storage may restart allocations; document this limitation unless an ID registry survives resets.
 
 ## 2. Frozen UI scope
@@ -114,15 +114,11 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 11.3a** `fix/11.3a-atomic-result-create`, after 11.3 merges; then 11.4:
+**Next: 11.7** `feature/11.7-link-imported-results`, then 11.6. Start with an API
 
-the **Replace existing result?** dialog, which sends `replace: true` only for
+test that re-uploading an unchanged export of a result links it to its original. **Order:**
 
-the files it lists. Start with a component test that re-running a processed
-
-file opens the dialog and sends nothing. **Order:**
-
-10.1–10.3, then M11 (11.1–11.6, including 11.3a), then 10.4–10.12; M11 changes how files are
+10.1–10.3, then M11 (11.1–11.7, including 11.3a; 11.7 before 11.6), then 10.4–10.12; M11 changes how files are
 
 identified and stored, so the P2 refactors build on it.
 
@@ -630,7 +626,7 @@ The filename `data.csv` is permitted for every row above. A partner may name a f
 #### Import behavior requiring explicit validation
 
 - A new original upload always gets a new base ID, including when content and filename duplicate an earlier original.
-- Existing 11.2 code reportedly treats uploaded processed CSVs as **Imported**, assigns a new full result ID and rewrites embedded IDs. This should **not** be described as retaining the original-to-result link. Before additional implementation, define whether an imported result is an independent imported artifact or should explicitly retain original source identity. Preserve the existing behavior until the decision is recorded; do not silently change lineage semantics.
+- 11.2 treats uploaded processed CSVs as **Imported**, assigns a new full result ID and rewrites embedded IDs, with no link. **Decided 2026-11-11:** link only on a matching source ID *and* matching original data; otherwise keep provenance, unlinked (see 11.7).
 - If older exports have no `file_id`/`result_id` columns, specify whether the importer adds them or supports them as a documented legacy exception. The current 11.2 result records a legacy exception, so the statement “every stored result carries IDs” is not yet unconditionally true.
 - Sample files remain untouched on disk; ID columns are added only to stored copies.
 
@@ -734,11 +730,19 @@ The filename `data.csv` is permitted for every row above. A partner may name a f
 
   **Verification:** component tests for the column, search, sort, preview, comparison chips and Imported marker; `npm run verify`.
 
-- [ ] **11.6** `test/11.6-file-identity-regression` · **P1** — End-to-end identity regression: upload two CSVs with the same filename and independent contents, verify unique base IDs, run the same function on each, verify separate results, cancel a repeat run, then confirm replacement of only one result. Repeat with archiving, restoring, renaming display metadata where supported, downloading, re-uploading and 2–5 file comparison. Verify every lookup and action is keyed by full ID. Decide and document imported result lineage as an explicit acceptance case before marking this item done.
+- [x] **11.7** `feature/11.7-link-imported-results` · **P1** — Link an imported result to its original only when both its identity and its data match. On upload of a result CSV, read the embedded source File ID (`file_id`, the same base ID on every row). The result is **linked** when that ID names an original input in the workspace (archived included) and the result's original input columns and values match that input exactly: compare the result's columns minus its generated processing columns (including `result_id`) with the stored input's columns, as the same set of column names regardless of order, with the same row count and the same value in every row for each column. A linked result records `sourceId` = the original's ID and keeps `file_id` = the original's base ID in its stored CSV. When the source ID is missing, inconsistent across rows, unknown, names a result, or the contents differ, the result **retains provenance** (the embedded source ID stored as `importedFrom` metadata, when there was one) but stays **unlinked**: no `sourceId`, `file_id` rewritten to the new base ID as today. Either way it gets a new base ID plus its function code and stays **Imported**; it never takes the original's result ID or replaces that result. Exports without ID columns keep the 11.2 legacy exception (stored unchanged, unlinked). The Imported marker and preview say "Imported from 101010" when linked, and "original input not linked" (naming the claimed source when there is one) otherwise.
 
-  **Depends on:** 11.3a, 11.4 and 11.5.
+  **Depends on:** 11.2 and 11.5.
 
-  **Done when:** duplicate names never collide; one original's re-run never replaces another original's result; the ID relationships are stable; imported results are correctly labeled and never silently misrepresented as linked; tests cover all three suffixes.
+  **Done when:** re-uploading an unchanged export of `101010-V` is stored as a new ID such as `101012-V` with `sourceId` `101010` and `file_id` `101010`; the same export with reordered original columns still links; an edited value, an added or removed row or original column, a missing, mixed or unknown `file_id`, or a `file_id` naming a result leaves it unlinked with `importedFrom` kept where present; re-run replacement and Sort by File ID are unchanged; the UI never shows an unlinked result as linked.
+
+  **Verification:** server unit tests for the match rule; API tests for each linked and unlinked case, archived originals and legacy exports; component tests for the marker and preview wording; `npm run verify`.
+
+- [ ] **11.6** `test/11.6-file-identity-regression` · **P1** — End-to-end identity regression: upload two CSVs with the same filename and independent contents, verify unique base IDs, run the same function on each, verify separate results, cancel a repeat run, then confirm replacement of only one result. Repeat with archiving, restoring, downloading, re-uploading and 2–5 file comparison. Verify every lookup and action is keyed by full ID. Renaming is not supported, so it is not covered. Imported lineage acceptance case: the 11.7 rule (linked only on matching source ID and data; otherwise provenance kept, unlinked).
+
+  **Depends on:** 11.3a, 11.4, 11.5 and 11.7.
+
+  **Done when:** duplicate names never collide; one original's re-run never replaces another original's result; the ID relationships are stable; imported results follow the 11.7 rule and are never misrepresented as linked; tests cover all three suffixes.
 
   **Verification:** server API/storage tests, client component tests, full `npm run verify`; manual demo optional, not an unperformed acceptance claim.
 

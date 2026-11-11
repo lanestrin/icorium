@@ -197,6 +197,7 @@ export const FLOWS: Flow[] = [
     { node: 'adapters', text: 'The headers must match a partner adapter, or the upload is refused.' },
     { node: 'validation', text: 'Every row is checked; the invalid-row count sets Ready or Needs Review.' },
     { node: 'storage', text: 'The CSV is saved under the next File ID, with that ID in a file_id column, and its metadata goes back to the browser.' },
+    { node: 'storage', text: 'An uploaded result gets a new ID and is linked to its original only when its file_id names that input and its original columns and values match.' },
   ] },
   { id: 'process', label: 'Process', steps: [
     { node: 'browser', text: 'The person ticks inputs, picks a function and runs it (after a warning if rows are invalid).' },

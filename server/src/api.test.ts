@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { codeOf, type CompareResult, type FileMeta, type ReplaceConflict, type FileRows, type GeneratedBatch, type ProcessorId } from '../../shared/types';
-import { parseCsv } from './lib/csv';
+import { parseCsv, toCsv } from './lib/csv';
 import { processors } from './processing';
 
 // Storage reads RECLAIM_DATA_DIR when first imported, so set it before loading the app.
@@ -323,12 +323,13 @@ describe('current result contract', () => {
     const download = (await app.inject(`/api/files/${result.id}/download`)).body;
     expect(parseCsv(download)).toEqual({ headers: after.headers, rows: after.rows });
     const imported = (await upload(`renamed_${name}_${id}.csv`, download)).json<FileMeta>();
-    expect(imported).toMatchObject({ status: 'Processed', processor: id, generatedColumns: result.generatedColumns, imported: true });
+    // An unchanged export of a sample's result links back to that sample.
+    expect(imported).toMatchObject({ status: 'Processed', processor: id, generatedColumns: result.generatedColumns, imported: true, sourceId: source.id, importedFrom: source.id });
     expect((await rowsOf(imported.id)).generatedColumns).toEqual(after.generatedColumns);
-    // The copy is a new file: its ID columns carry its new IDs; every other value is unchanged.
+    // The copy is a new file with its own result_id; file_id still names its original, and every other value is unchanged.
     const copy = parseCsv((await app.inject(`/api/files/${imported.id}/download`)).body);
     expect(copy.headers).toEqual(after.headers);
-    expect(copy.rows).toEqual(after.rows.map((r) => ({ ...r, file_id: imported.id.slice(0, 6), result_id: imported.id })));
+    expect(copy.rows).toEqual(after.rows.map((r) => ({ ...r, file_id: source.id, result_id: imported.id })));
     const compared = await compare(result.id, imported.id);
     expect(compared.statusCode).toBe(200);
     expect(compared.json<CompareResult>().columns.every((c) => c.rowsDiffering === 0)).toBe(true);
@@ -723,6 +724,8 @@ describe('File ID columns', () => {
     const oldText = [headers.join(','), ...current.rows.map((r) => headers.map((h) => r[h]).join(','))].join('\n');
     const old = (await upload('old_export.csv', oldText)).json<FileMeta>();
     expect(old).toMatchObject({ status: 'Processed', processor: 'mass', imported: true });
+    expect(old.sourceId).toBeUndefined(); // no file_id to link by, and no provenance to keep
+    expect(old.importedFrom).toBeUndefined();
     expect(old.id).toMatch(/^\d{6}-M$/);
     expect((await app.inject(`/api/files/${old.id}/download`)).body).toBe(oldText);
     const compared = await compare(result.id, old.id);
@@ -857,6 +860,79 @@ const storedInput = (text: string, id: string) => {
   const { headers, rows } = parseCsv(text);
   return { headers: [...headers, 'file_id'], rows: rows.map((r) => ({ ...r, file_id: id })) };
 };
+describe('linking imported results', () => {
+  const csv = sample('partner_a_baseline.csv');
+  const exportOf = async (id: string) => parseCsv((await app.inject(`/api/files/${id}/download`)).body);
+  const reupload = async (name: string, headers: string[], rows: Record<string, string>[]) =>
+    (await upload(name, toCsv(headers, rows))).json<FileMeta>();
+  /** A fresh input, its Validation result and that result's export. */
+  async function exported() {
+    const input = (await upload('link_source.csv', csv)).json<FileMeta>();
+    const result = (await processFile(input.id, 'validation')).json<FileMeta>();
+    return { input, result, ...(await exportOf(result.id)) };
+  }
+  const unlinked = (meta: FileMeta) => {
+    expect(meta).toMatchObject({ status: 'Processed', processor: 'validation', imported: true });
+    expect(meta.sourceId).toBeUndefined();
+  };
+
+  it('links an unchanged export to its original, under a new ID that keeps the original in file_id', async () => {
+    const { input, result, headers, rows } = await exported();
+    const copy = await reupload('my_copy.csv', headers, rows);
+    expect(copy.id).toMatch(/^\d{6}-V$/);
+    expect(copy.id).not.toBe(result.id);
+    expect(copy).toMatchObject({ imported: true, sourceId: input.id, importedFrom: input.id });
+    const stored = await exportOf(copy.id);
+    expect(stored.rows.every((r) => r.file_id === input.id && r.result_id === copy.id)).toBe(true);
+    // The original's own result is untouched, and re-running it still asks before replacing that result.
+    expect((await rowsOf(result.id)).rows[0].result_id).toBe(result.id);
+    const again = await processFile(input.id, 'validation');
+    expect(again.statusCode).toBe(409);
+    expect(again.json<ReplaceConflict>().existing.id).toBe(result.id);
+  });
+
+  it('links an export whose original columns are in another order', async () => {
+    const { input, headers, rows } = await exported();
+    const swapped = [headers[1], headers[0], ...headers.slice(2)];
+    expect(await reupload('reordered.csv', swapped, rows)).toMatchObject({ sourceId: input.id, importedFrom: input.id });
+  });
+
+  it('links to an archived original', async () => {
+    const { input, headers, rows } = await exported();
+    await app.inject({ method: 'POST', url: '/api/files/archive', payload: { ids: [input.id], archived: true } });
+    expect(await reupload('archived_source.csv', headers, rows)).toMatchObject({ sourceId: input.id, importedFrom: input.id });
+  });
+
+  it('keeps the named source but does not link when the data differs', async () => {
+    const { input, headers, rows } = await exported();
+    const column = headers[1]; // an original partner column
+    const edited = await reupload('edited.csv', headers, rows.map((r, i) => (i === 0 ? { ...r, [column]: `${r[column]}0` } : r)));
+    const shorter = await reupload('shorter.csv', headers, rows.slice(1));
+    const wider = await reupload('wider.csv', ['notes', ...headers], rows.map((r) => ({ ...r, notes: 'x' })));
+    for (const meta of [edited, shorter, wider]) {
+      unlinked(meta);
+      expect(meta.importedFrom).toBe(input.id);
+      // Not linked, so file_id carries the copy's own new base ID.
+      expect((await exportOf(meta.id)).rows.every((r) => r.file_id === meta.id.slice(0, 6))).toBe(true);
+    }
+  });
+
+  it('does not link when file_id is mixed, unknown, a result ID or another input', async () => {
+    const { input, result, headers, rows } = await exported();
+    const other = (await upload('other_input.csv', sample('partner_b_baseline.csv'))).json<FileMeta>();
+    const withFileId = (value: string) => rows.map((r) => ({ ...r, file_id: value }));
+    const mixed = await reupload('mixed.csv', headers, rows.map((r, i) => ({ ...r, file_id: i === 0 ? other.id : input.id })));
+    unlinked(mixed);
+    expect(mixed.importedFrom).toBeUndefined();
+    const cases: [string, string][] = [['999999', 'unknown.csv'], [result.id, 'result_id.csv'], [other.id, 'other.csv']];
+    for (const [value, name] of cases) {
+      const meta = await reupload(name, headers, withFileId(value));
+      unlinked(meta);
+      expect(meta.importedFrom).toBe(value);
+    }
+  });
+});
+
 const listFiles = async () => (await app.inject('/api/files')).json<FileMeta[]>();
 const fileNamed = async (name: string) => {
   const f = (await listFiles()).find((x) => x.name === name);

@@ -114,8 +114,18 @@ export function sortFiles(files: FileMeta[], key: SortKey): FileMeta[] {
   return [...files].sort(compare[key]);
 }
 
-/** Why an imported result has no original: shown on the Imported marker and in the preview. */
-export const IMPORTED_NOTE = 'Uploaded result file. Its original input is not linked in this workspace.';
+/**
+ * What an imported result is linked to, for the Imported marker (note) and the preview subtitle (short).
+ * It is linked only when sourceId is set; importedFrom is just the source the file named.
+ */
+export function importedLineage(f: Pick<FileMeta, 'sourceId' | 'importedFrom'>): { note: string; short: string } {
+  if (f.sourceId) return { note: `Uploaded result file, linked to original input ${f.sourceId}.`, short: `Imported from ${f.sourceId}` };
+  if (f.importedFrom) return {
+    note: `Uploaded result file. It names ${f.importedFrom} as its source, but that original input is not in this workspace or its data differs, so it is not linked.`,
+    short: `Imported: not linked to ${f.importedFrom}`,
+  };
+  return { note: 'Uploaded result file. Its original input is not linked in this workspace.', short: 'Imported: original input not linked' };
+}
 
 export const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -325,7 +335,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                     <span className="flex items-center gap-2">
                       {f.id}
                       {f.imported && (
-                        <span title={IMPORTED_NOTE} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">Imported</span>
+                        <span title={importedLineage(f).note} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">Imported</span>
                       )}
                     </span>
                   </td>

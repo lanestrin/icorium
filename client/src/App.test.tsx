@@ -787,6 +787,33 @@ describe('file IDs', () => {
     expect(screen.getByRole('columnheader', { name: 'File ID' })).toHaveAttribute('aria-sort', 'descending');
   });
 
+  it('says whether an imported result is linked to its original, in the marker and the preview', async () => {
+    const linked: FileMeta = { ...imported, id: '101014-V', name: 'linked_copy.csv', processor: 'validation', sourceId: '101010', importedFrom: '101010' };
+    const claimed: FileMeta = { ...imported, id: '101015-V', name: 'edited_copy.csv', processor: 'validation', importedFrom: '101011' };
+    vi.mocked(api.list).mockResolvedValue([input, twin, linked, claimed, imported]);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('checkbox', { name: 'Select 101010 data.csv' });
+    const marker = (id: string) => within(screen.getByRole('row', { name: new RegExp(id) })).getByText('Imported');
+    expect(marker('101014-V')).toHaveAttribute('title', 'Uploaded result file, linked to original input 101010.');
+    expect(marker('101015-V')).toHaveAttribute('title',
+      'Uploaded result file. It names 101011 as its source, but that original input is not in this workspace or its data differs, so it is not linked.');
+    expect(marker('101012-C')).toHaveAttribute('title', 'Uploaded result file. Its original input is not linked in this workspace.');
+
+    const preview = async (id: string) => {
+      await user.click(within(screen.getByRole('row', { name: new RegExp(id) })).getByRole('button', { name: 'Preview' }));
+      const dialog = await screen.findByRole('dialog');
+      const text = dialog.textContent;
+      await user.click(within(dialog).getByRole('button', { name: /Close/ }));
+      return text;
+    };
+    expect(await preview('101014-V')).toContain('· Imported from 101010');
+    const unlinked = await preview('101015-V');
+    expect(unlinked).toContain('· Imported: not linked to 101011');
+    expect(unlinked).not.toContain('Imported from');
+    expect(await preview('101012-C')).toContain('· Imported: original input not linked');
+  });
+
   it('shows the File ID in the preview, and explains an imported result', async () => {
     const user = await open();
     await user.click(within(screen.getByRole('row', { name: /101012-C/ })).getByRole('button', { name: 'Preview' }));
