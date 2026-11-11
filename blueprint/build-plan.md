@@ -738,7 +738,7 @@ The filename `data.csv` is permitted for every row above. A partner may name a f
 
   **Verification:** server unit tests for the match rule; API tests for each linked and unlinked case, archived originals and legacy exports; component tests for the marker and preview wording; `npm run verify`.
 
-- [ ] **11.6** `test/11.6-file-identity-regression` · **P1** — End-to-end identity regression: upload two CSVs with the same filename and independent contents, verify unique base IDs, run the same function on each, verify separate results, cancel a repeat run, then confirm replacement of only one result. Repeat with archiving, restoring, downloading, re-uploading and 2–5 file comparison. Verify every lookup and action is keyed by full ID. Renaming is not supported, so it is not covered. Imported lineage acceptance case: the 11.7 rule (linked only on matching source ID and data; otherwise provenance kept, unlinked).
+- [x] **11.6** `test/11.6-file-identity-regression` · **P1** — End-to-end identity regression: upload two CSVs with the same filename and independent contents, verify unique base IDs, run the same function on each, verify separate results, cancel a repeat run, then confirm replacement of only one result. Repeat with archiving, restoring, downloading, re-uploading and 2–5 file comparison. Verify every lookup and action is keyed by full ID. Renaming is not supported, so it is not covered. Imported lineage acceptance case: the 11.7 rule (linked only on matching source ID and data; otherwise provenance kept, unlinked).
 
   **Depends on:** 11.3a, 11.4, 11.5 and 11.7.
 

@@ -169,6 +169,48 @@ describe('durable Blob storage', () => {
     } finally { await first.close(); await second?.close(); }
   });
 
+  it('keeps same-named uploads and their results apart by File ID across fresh API instances', async () => {
+    vi.stubEnv('VERCEL', '1');
+    vi.stubEnv('RECLAIM_DATA_DIR', undefined);
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-only-token');
+    vi.stubEnv('RECLAIM_BLOB_PREFIX', 'test/identity');
+    vi.resetModules();
+    const first = await (await import('./app')).buildApp(false);
+    let second: Awaited<ReturnType<typeof import('./app')['buildApp']>> | undefined;
+    try {
+      // Two different partner A files uploaded under one name, as the browser's file chooser sends them.
+      const samples = (await first.inject('/api/files')).json<FileMeta[]>().filter((f) => f.name.startsWith('partner_a_'));
+      const texts = await Promise.all(samples.map(async (f) => (await first.inject(`/api/files/${f.id}/download`)).body));
+      const uploads: FileMeta[] = [];
+      for (const text of texts) {
+        const form = new FormData();
+        form.append('file', new Blob([text], { type: 'text/csv' }), 'same.csv');
+        const req = new Request('http://localhost/', { method: 'POST', body: form });
+        const res = await first.inject({ method: 'POST', url: '/api/files', headers: { 'content-type': req.headers.get('content-type')! }, payload: Buffer.from(await req.arrayBuffer()) });
+        uploads.push(res.json<FileMeta>());
+      }
+      expect(uploads.map((u) => u.name)).toEqual(['same.csv', 'same.csv']);
+      expect(uploads[0].id).not.toBe(uploads[1].id);
+      const results: FileMeta[] = [];
+      for (const u of uploads) results.push((await first.inject({ method: 'POST', url: '/api/process', payload: { fileId: u.id, processor: 'validation' } })).json<FileMeta>());
+      expect(results.map((r) => r.id)).toEqual(uploads.map((u) => `${u.id}-V`));
+
+      // A fresh instance reads each file back by its ID alone.
+      vi.resetModules();
+      second = await (await import('./app')).buildApp(false);
+      const listed = (await second.inject('/api/files')).json<FileMeta[]>();
+      for (const id of [...uploads, ...results].map((f) => f.id)) expect(listed.filter((f) => f.id === id)).toHaveLength(1);
+      const bodies = [];
+      for (const r of results) {
+        const download = await second.inject(`/api/files/${r.id}/download`);
+        expect(download.statusCode).toBe(200);
+        expect(download.body).toContain(r.id); // its own result_id
+        bodies.push(download.body);
+      }
+      expect(bodies[0]).not.toBe(bodies[1]);
+    } finally { await first.close(); await second?.close(); }
+  });
+
   it('reconciles stale metadata when two servers start together, without failing either', async () => {
     const csv = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct\nA-1,2026-09-01,,40,30,30\n';
     const stale = await createBlobStorage('test/reconcile').create({ name: 'old.csv', text: csv, rows: 1, columns: 6, status: 'Ready' });

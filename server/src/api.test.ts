@@ -860,6 +860,97 @@ const storedInput = (text: string, id: string) => {
   const { headers, rows } = parseCsv(text);
   return { headers: [...headers, 'file_id'], rows: rows.map((r) => ({ ...r, file_id: id })) };
 };
+describe('file identity regression', () => {
+  // One scenario per function, so every suffix (-V, -M, -C) is covered. Each run uploads its own files.
+  const body = async (id: string) => (await app.inject(`/api/files/${id}/download`)).body;
+  const metaOf = async (id: string) => (await listFiles()).filter((f) => f.id === id);
+
+  it.each(PROCESSOR_IDS)('keeps same-named files apart through every action, by full ID (%s)', async (fn) => {
+    const code = codeOf(fn);
+    // 1. Three uploads share a filename; the first and third also share their content.
+    const [a, b, c] = [
+      (await upload('identity.csv', sample('partner_a_baseline.csv'))).json<FileMeta>(),
+      (await upload('identity.csv', sample('partner_a_followup.csv'))).json<FileMeta>(),
+      (await upload('identity.csv', sample('partner_a_baseline.csv'))).json<FileMeta>(),
+    ];
+    expect([a.name, b.name, c.name]).toEqual(['identity.csv', 'identity.csv', 'identity.csv']);
+    expect(Number(b.id)).toBe(Number(a.id) + 1);
+    expect(Number(c.id)).toBe(Number(b.id) + 1);
+    for (const input of [a, b, c]) expect((await rowsOf(input.id)).rows.every((r) => r.file_id === input.id)).toBe(true);
+
+    // 2. Each input gets its own result, named alike but identified by its input's ID plus the code.
+    const results = [];
+    for (const input of [a, b, c]) results.push((await processFile(input.id, fn)).json<FileMeta>());
+    const [ra, rb, rc] = results;
+    expect(results.map((r) => r.id)).toEqual([`${a.id}-${code}`, `${b.id}-${code}`, `${c.id}-${code}`]);
+    expect(new Set(results.map((r) => r.name))).toEqual(new Set([`result_identity_${fn}.csv`]));
+    for (const [result, input] of [[ra, a], [rb, b], [rc, c]] as const) {
+      const rows = (await rowsOf(result.id)).rows;
+      expect(rows.every((r) => r.result_id === result.id && r.file_id === input.id)).toBe(true);
+    }
+    expect(await body(ra.id)).not.toBe(await body(rb.id));
+    const before = { a: await body(ra.id), b: await body(rb.id), c: await body(rc.id) };
+
+    // 3. A repeat run that is not confirmed is refused and changes nothing.
+    const refused = await processFile(a.id, fn);
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json<ReplaceConflict>().existing.id).toBe(ra.id);
+    expect({ a: await body(ra.id), b: await body(rb.id), c: await body(rc.id) }).toEqual(before);
+
+    // 4. A confirmed repeat replaces exactly that one result, under the same ID.
+    const replaced = await processFile(a.id, fn, true);
+    expect(replaced.statusCode).toBe(200);
+    expect(replaced.json<FileMeta>().id).toBe(ra.id);
+    expect(await metaOf(ra.id)).toHaveLength(1);
+    expect(await body(rb.id)).toBe(before.b);
+    expect(await body(rc.id)).toBe(before.c);
+
+    // 5. Archive and restore act on one ID, not on every file with that name.
+    await app.inject({ method: 'POST', url: '/api/files/archive', payload: { ids: [rb.id], archived: true } });
+    const named = (await listFiles()).filter((f) => f.name === `result_identity_${fn}.csv` && [ra.id, rb.id, rc.id].includes(f.id));
+    expect(named.filter((f) => f.archived).map((f) => f.id)).toEqual([rb.id]);
+    await app.inject({ method: 'POST', url: '/api/files/archive', payload: { ids: [rb.id], archived: false } });
+    expect((await metaOf(rb.id))[0].archived).toBeFalsy();
+    expect(await body(rb.id)).toBe(before.b);
+
+    // 6. Downloads share the filename label but each carries its own data and result_id.
+    const downloads = await Promise.all([ra, rb].map((r) => app.inject(`/api/files/${r.id}/download`)));
+    expect(downloads[0].headers['content-disposition']).toBe(downloads[1].headers['content-disposition']);
+    expect(parseCsv(downloads[0].body).rows[0].result_id).toBe(ra.id);
+    expect(parseCsv(downloads[1].body).rows[0].result_id).toBe(rb.id);
+
+    // 7. Re-uploads follow the 11.7 rule: an unchanged copy links; an edited copy keeps its source but is not linked.
+    const linked = (await upload(`result_identity_${fn}.csv`, downloads[0].body)).json<FileMeta>();
+    expect(linked.id).toMatch(new RegExp(`^[0-9]{6}-${code}$`));
+    expect(Number(linked.id.slice(0, 6))).toBeGreaterThan(Number(c.id));
+    expect(linked.imported).toBe(true);
+    expect(linked.sourceId).toBe(a.id);
+    expect(linked.importedFrom).toBe(a.id);
+    const copy = parseCsv(downloads[1].body);
+    const column = copy.headers[1]; // an original partner column
+    const edited = (await upload(`result_identity_${fn}.csv`, toCsv(copy.headers, copy.rows.map((r, i) => (i === 0 ? { ...r, [column]: `${r[column]}0` } : r))))).json<FileMeta>();
+    expect(edited.imported).toBe(true);
+    expect(edited.sourceId).toBeUndefined();
+    expect(edited.importedFrom).toBe(b.id);
+    expect(await body(rb.id)).toBe(before.b);
+    expect(await metaOf(ra.id)).toHaveLength(1);
+
+    // 8. Comparisons are keyed by full ID, in request order, even when names repeat.
+    const two = await compare(ra.id, rb.id);
+    expect(two.statusCode).toBe(200);
+    expect(two.json<CompareResult>().files.map((f) => f.id)).toEqual([ra.id, rb.id]);
+    const fiveIds = [rc.id, linked.id, ra.id, edited.id, rb.id];
+    const five = await compare(...fiveIds);
+    expect(five.statusCode).toBe(200);
+    expect(five.json<CompareResult>().files.map((f) => f.id)).toEqual(fiveIds);
+
+    // 9. A filename is never a File ID.
+    expect((await app.inject('/api/files/identity.csv/rows')).statusCode).toBe(404);
+    expect((await app.inject('/api/files/identity.csv/download')).statusCode).toBe(404);
+    expect((await processFile('identity.csv', fn)).statusCode).toBe(404);
+  });
+});
+
 describe('linking imported results', () => {
   const csv = sample('partner_a_baseline.csv');
   const exportOf = async (id: string) => parseCsv((await app.inject(`/api/files/${id}/download`)).body);
@@ -933,6 +1024,7 @@ describe('linking imported results', () => {
   });
 });
 
+const PROCESSOR_IDS = ['validation', 'mass', 'classification'] as const;
 const listFiles = async () => (await app.inject('/api/files')).json<FileMeta[]>();
 const fileNamed = async (name: string) => {
   const f = (await listFiles()).find((x) => x.name === name);
