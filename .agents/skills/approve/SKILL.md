@@ -15,6 +15,12 @@ amend, bypass hooks or commit directly to `main`.
 
 ## Check before publishing
 
+For a retry after a commit or push already succeeded, establish the existing
+commit first under the retry rule below. The original reviewed HEAD is then its
+sole parent, not the new HEAD. Require the exact intended commit tree and drafts,
+with no later content changes; do not return to Complete merely because the
+authorized commit now exists. The tested file manifest must still match.
+
 1. Read `blueprint/context/landing-review.md`, `landing-commit.txt` and
    `landing-pr.md`. They must come from completion of this branch. Compare
    branch, HEAD, exact intended paths, current file hashes, deletion state and
@@ -22,11 +28,18 @@ amend, bypass hooks or commit directly to `main`.
    untracked changes. If the reviewed content, branch or HEAD changed, or the
    record is absent, stop and use complete to prepare fresh drafts for a new
    approval. Do not silently repair the drafts and treat them as approved.
-2. Require a successful `npm run verify` recorded by complete (server tests and
-   client type-check/build; browser tests are removed). Do not treat this as
-   evidence of manual UI checks. Run it again
-   before committing. On failure, stop without committing or pushing. If repairs
-   are needed, prepare new drafts and obtain fresh approval after repair.
+2. Require successful `npm run verify` evidence recorded by Complete (server
+   unit/API tests, client unit/component tests and client type-check/build).
+   Compare the complete tested-candidate manifest, including unchanged tracked
+   files, modes, deletions and intended untracked additions. Inspect remaining
+   untracked inputs and runtime/dependency/environment changes. Reuse the pass
+   only when the exact candidate and relevant inputs are provably unchanged.
+   Missing evidence, uncertainty or a previous failure requires rerunning Verify
+   before committing. A tracked change, including archival edits, invalidates
+   reuse. Changed reviewed content still returns to Complete for new drafts and
+   fresh approval under step 1; a rerun never approves changed content. On
+   failure, stop without committing or pushing. Repairs require new drafts and
+   fresh approval. Never treat automated evidence as manual or visual UI checks.
 3. Validate the subject with `scripts/check-pr-title.ps1`. Confirm the commit
    and PR drafts follow the commit rules and reflect the actual verification.
    A message override requires presenting the revised draft before approval.

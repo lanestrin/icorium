@@ -63,8 +63,12 @@ Reuse relevant context already loaded in the session.
 ## Workflow
 
 Build one feature, fix, or rollback at a time, behind review gates. The feature
-loop is `/feature` -> `/implement` -> `/check` -> `/audit current` ->
-`/complete`; approve the Feature spec before Implement. Each command is a local
+loop is `/feature` (or `/fix`, `/rollback`) -> `/implement` -> `/complete` ->
+`/approve`; approve the spec before Implement. Check and Audit run when explicitly
+requested or selected by configured quality gates. Required independent review
+and existing pending reviews remain enforced. Complete prepares the archive and
+publication drafts; only separately authorized Approve commits, pushes and
+publishes the PR. The person performs the merge. Each command is a local
 skill at `.agents/skills/<skill>/SKILL.md` or `.claude/skills/<skill>/SKILL.md`
 that carries its own instructions. Claude Code and Google Antigravity use slash
 commands such as `/feature`, Codex uses `$feature`, and other tools can follow
@@ -105,6 +109,15 @@ npm workspaces (`client`, `server`); Node.js 24.
 There is no lint or format command and no browser test harness. Run
 `npm run verify` once after the changes are complete; rerun only if it fails or
 tracked files change afterward.
+
+Reuse passing Verify evidence only for a provably unchanged tested candidate,
+including tracked file contents, modes, deletions and intended untracked
+additions. Spec and archival edits invalidate reuse. Complete records the exact
+command, successful result, evidence reference and final candidate identity in
+the ignored `blueprint/context/landing-review.md`; Approve validates that evidence
+instead of automatically rerunning Verify. Failure, missing evidence, changed
+runtime/dependency inputs or uncertain identity requires a fresh run. A matching
+HEAD or clean status alone is insufficient.
 
 - CI (`.github/workflows/ci.yml`) runs `npm run verify` on every push to `main`
   and every PR; `.github/workflows/pr-title.yml` checks PR titles with

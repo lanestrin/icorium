@@ -93,8 +93,15 @@ possible, confirm the posted title and body after publication.
 
 ## Verification and merging
 
-Run `npm run verify` before declaring work verified or publishing it. Report
-failures honestly. The separate "PR title" workflow checks the subject format,
+Run `npm run verify` for the finished candidate before declaring work verified
+or publishing it. Reuse a passing result only with evidence identifying the exact
+unchanged candidate and relevant inputs. Complete records the command, result,
+evidence reference and candidate identity in ignored `landing-review.md` after
+tracked archival edits; Approve validates them rather than rerunning solely at
+the publication handoff. Tracked changes, failed checks, missing evidence,
+changed runtime/dependency inputs or uncertainty require a fresh run. Content
+changes after review still require fresh drafts and approval. Report failures
+honestly. The separate "PR title" workflow checks the subject format,
 length and trailing full stop; imperative wording and the body need review.
 There is no local Git commit hook enforcing these rules.
 

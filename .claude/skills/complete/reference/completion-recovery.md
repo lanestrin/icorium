@@ -5,6 +5,16 @@ Continuous selects new work. Archive and Git evidence determine the phase.
 `run.json`, modification times, archive titles, and commit subjects prove none of
 these transitions. Recovery grants no commit, merge, push, or cleanup approval.
 
+For Reclaim Studio regular work, Complete is prepare-only. The proof phases
+below identify state, never authorize mutations to Git refs or publication.
+Before a work commit, finish proven bookkeeping and return to Complete Step 2
+for final candidate verification and drafts, then stop for the person's Approve.
+After a work commit, report the proven phase and hand remaining publication to
+the separately authorized Approve retry path. Already merged work is reported
+read-only. Legacy local-merge proofs remain for history and Continuous Mode;
+regular Complete never performs a local merge or cleanup. Continuous retains its
+own explicitly authorized lifecycle while using these proof rules.
+
 ## Prepare one recoverable archive
 
 After Complete's final gates pass, but before any logging edits, record the full
@@ -197,17 +207,20 @@ live inputs are intact, use normal Complete; if both the archive and needed live
 input are missing, stop for recovery evidence.
 
 Read the recovered spec from a temporary file, preserving its exact bytes; do
-not overwrite the live stub merely to orient a fresh session. Repeat current-
-session Verify and required gates against that spec and the current product.
+not overwrite the live stub merely to orient a fresh session. Validate required
+gates against that spec and the current product. Reuse a passing Verify result
+only with evidence for the exact unchanged candidate and inputs under Complete
+Step 2; otherwise run Verify.
 Reuse a passing archived review only through the original-target checks above.
 If a gate needs active files restored, restore only proven matching originals
 with no conflicting live data, run the gate, and re-enter normal Complete. If
 verification or review changes evidence, stop and reconcile a new reviewed archive
 candidate explicitly; never silently append to the existing archive.
 
-Finish only the missing bookkeeping, with live resets last. Show the concrete
-remaining diff and proposed conventional work commit, obtain normal commit
-approval, and continue at Complete Step 2. This archive does not authorize Git.
+Finish only the missing bookkeeping, with live resets last. These tracked edits
+invalidate earlier Verify evidence. Continue at Complete Step 2 to verify the
+finished candidate and prepare drafts, then stop for Approve. Do not commit.
+Continuous instead follows its own authorized local lifecycle after proof.
 
 ## Work committed, awaiting landing
 
@@ -220,11 +233,14 @@ The tracked archive and final bookkeeping must be in that commit, not added late
 For ignored evidence require the separate proof described above. Extra commits or
 post-commit drift stop for review, not another completion commit.
 
-Rerun current-session Verify and validate all required gates using the recovered
-spec and original receipt. Resume at Complete Step 3's configured landing path.
-Never make a second work commit, reset evidence again, or treat earlier approval
-as covering new changes. Preserve the exact work commit SHA for landing
-verification.
+Validate all required gates using the recovered spec and original receipt.
+Reuse Verify only with exact unchanged-candidate evidence; otherwise rerun.
+For regular work, report the existing commit and route remaining publication to
+Approve's retry path after confirming the reviewed commit and drafts. Missing or
+changed publication evidence stops for concrete recovery and fresh approval;
+never synthesize approval from an archive. Continuous follows its own local
+landing rules. Never make a second work commit, reset evidence again, or treat
+earlier approval as covering new changes. Preserve the exact work commit SHA.
 
 ## Pull request opened or merged
 
@@ -248,10 +264,10 @@ require the remote default branch to contain it. Later default-branch commits ar
 allowed. A merge commit, rebase merge, changed head, closed-unmerged request, or
 ambiguous provider result stops with the exact mismatch.
 
-Report the remote work complete. Fast-forward a clean local default checkout and
-delete local or remote work branches only with explicit approval. Never mutate a
-default branch checked out in another worktree, and never treat pull-request
-creation approval as cleanup approval.
+Report the remote work complete. Regular Complete leaves Git unchanged; local
+checkout updates or branch cleanup are separate actions requiring explicit
+approval. Never mutate a default branch checked out in another worktree, and
+never treat pull-request creation approval as cleanup approval.
 
 ## Merge already completed
 
@@ -272,8 +288,8 @@ must stop for user identification and supporting evidence. If the default has
 advanced or several commits/archives fit, stop and name the ambiguity instead of
 weakening this proof or searching by title.
 
-Do only pending cleanup already authorized for this work item; ask if cleanup
-approval is missing. Never repeat archival, the work commit, or the squash merge,
+Regular Complete reports this historical phase read-only. Continuous may do only
+pending cleanup authorized by its own invocation. Never repeat archival, the work commit, or the squash merge,
 and never create a cleanup commit on the default branch. If nothing remains,
 report the verified local merge once and leave Git unchanged. Push still needs
 its separate approval. A repeated resume follows this same no-op path.

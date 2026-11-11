@@ -101,7 +101,8 @@ exists. Continue only after approval.
 
 Checkpoint commits are offered only when `workflow.checkpointCommits` is
 `enabled` and the current review gate was approved. Never commit without current
-approval. `/complete` owns the final work-level commit and merge.
+approval. `/complete` prepares the final review drafts; `/approve` owns the
+work-level commit, push and PR publication after explicit authorization.
 
 Do not create a separate tool round merely to narrate a passing internal step.
 Keep the durable checkbox current and continue. Split a step when its diff is too
@@ -122,10 +123,20 @@ verification.
 
 ## Verification
 
-After all steps pass, run the project's final automated gate once. If
+After all steps pass, finish the spec checkboxes and set its status to `verified`
+as part of the candidate about to be tested. That status becomes evidence only
+when the final gate passes; on failure, mark it `in progress` and repair in scope.
+Run the project's final automated gate once. If
 `AGENTS.md` declares a `Verify` command, run that exact command. Otherwise run
 the fallback build and tests that are actually declared. Never claim a check
 passed without its output.
+
+Reuse a passing result only when the exact tested candidate is provably
+unchanged. Record the command, result and candidate identity in the handoff;
+Complete records the final evidence in `blueprint/context/landing-review.md`.
+Any later tracked change, including spec or archival edits, invalidates reuse.
+Rerun on failure, missing evidence, changed runtime/dependency inputs, or uncertain
+identity. A clean status or unchanged HEAD alone does not identify dirty content.
 
 Apply configured regular gates:
 
@@ -154,9 +165,9 @@ If Verify or a required gate fails, repair only in-scope defects, rerun the
 narrow failing check, then rerun the final gate. Stop on repeated failure,
 missing infrastructure, or a product decision.
 
-After final Verify and required Check pass, set the active spec to `verified`
-with every completed box checked. Then resolve independent review before the
-final packet:
+After final Verify and required Check pass, confirm the active spec is `verified`
+with every completed box checked. If a gate changed tracked content, rerun Verify
+after those edits. Then resolve independent review before the final packet:
 
 1. If `qualityGates.regular.independentReview` does not select review and no
    request already exists, proceed directly to the final review packet.
