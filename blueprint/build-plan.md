@@ -708,7 +708,7 @@ The filename `data.csv` is permitted for every row above. A partner may name a f
 
   **Verification:** simultaneous creation/API and storage tests for local and Blob backends; replace and archived-result regressions; `npm run verify`.
 
-- [ ] **11.4** `feature/11.4-replace-confirmation-dialog` · **P1** — The confirmation in the UI, following the person's mockup: title **Replace existing result?**, "Composition Validation has already been run for file **101010**. Running it again will replace the existing result **101010-V**. This action cannot be undone.", **Cancel** and a red **Run & Replace**.
+- [x] **11.4** `feature/11.4-replace-confirmation-dialog` · **P1** — The confirmation in the UI, following the person's mockup: title **Replace existing result?**, "Composition Validation has already been run for file **101010**. Running it again will replace the existing result **101010-V**. This action cannot be undone.", **Cancel** and a red **Run & Replace**.
 
   - For several files, one dialog lists every result that would be replaced; files without an existing result are processed normally.
 

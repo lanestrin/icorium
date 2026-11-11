@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Download, TriangleAlert, X } from 'lucide-react';
 import { PROCESSORS, type FileMeta, type FileRows, type ProblemList, type ProcessorId } from '../../../shared/types';
 import { api } from '../api';
-import type { QualityWarning } from './FileTable';
+import type { QualityWarning, Replacement } from './FileTable';
 
 /** "1 row", "3 rows", or with a qualifier "1 valid row". */
 const rowsWord = (n: number, kind?: string) => `${n.toLocaleString()} ${kind ? `${kind} ` : ''}${n === 1 ? 'row' : 'rows'}`;
@@ -76,13 +76,11 @@ export function Modal({ title, subtitle, actions, narrow, full, onClose, childre
   );
 }
 
-/** Asks before Mass or Classification calculates only the valid rows of files with invalid rows. */
-export function QualityWarningModal({ warning, processor, onCancel, onConfirm }: {
-  warning: QualityWarning; processor: ProcessorId; onCancel: () => void; onConfirm: () => void;
-}) {
+/** What Mass or Classification will do with files that have invalid rows; shared by both run confirmations. */
+function QualityDetails({ warning }: { warning: QualityWarning }) {
   const others = warning.cleanCount;
   return (
-    <Modal title="Data Quality Warning" subtitle={processorLabel(processor)} narrow onClose={onCancel}>
+    <>
       <div className="flex items-start gap-3 pt-5 text-amber-900">
         <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden />
         <p>Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values.</p>
@@ -101,10 +99,76 @@ export function QualityWarningModal({ warning, processor, onCancel, onConfirm }:
           {others} other selected {others === 1 ? 'file has' : 'files have'} no invalid rows and will be processed normally.
         </p>
       )}
-      <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <button onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-        <button onClick={onConfirm} className="rounded-xl bg-green-600 px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-green-700">Process Valid Rows</button>
+    </>
+  );
+}
+
+function ConfirmButtons({ label, danger, onCancel, onConfirm }: { label: string; danger?: boolean; onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <button onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+      <button onClick={onConfirm} className={`rounded-xl px-4 py-2.5 font-semibold text-white shadow-sm ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}>{label}</button>
+    </div>
+  );
+}
+
+/** Asks before Mass or Classification calculates only the valid rows of files with invalid rows. */
+export function QualityWarningModal({ warning, processor, onCancel, onConfirm }: {
+  warning: QualityWarning; processor: ProcessorId; onCancel: () => void; onConfirm: () => void;
+}) {
+  return (
+    <Modal title="Data Quality Warning" subtitle={processorLabel(processor)} narrow onClose={onCancel}>
+      <QualityDetails warning={warning} />
+      <ConfirmButtons label="Process Valid Rows" onCancel={onCancel} onConfirm={onConfirm} />
+    </Modal>
+  );
+}
+
+const ARCHIVED_NOTE = 'Archived: replacing it returns it to Active Files.';
+
+/**
+ * Asks before a run replaces existing results (same input, same function, same File ID). When the Data
+ * Quality Warning also applies, it is shown here too, so a run never needs two confirmations.
+ */
+export function ReplaceResultModal({ items, otherCount, warning, processor, onCancel, onConfirm }: {
+  items: Replacement[]; otherCount: number; warning?: QualityWarning; processor: ProcessorId; onCancel: () => void; onConfirm: () => void;
+}) {
+  const label = processorLabel(processor);
+  const [one] = items;
+  return (
+    <Modal title="Replace existing result?" subtitle={label} narrow onClose={onCancel}>
+      <div className="flex items-start gap-3 pt-5 text-red-900">
+        <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden />
+        {items.length === 1 ? (
+          <div>
+            <p>
+              {label} has already been run for file <strong>{one.inputId}</strong>. Running it again will replace the
+              existing result <strong>{one.resultId}</strong>. This action cannot be undone.
+            </p>
+            {one.archived && <p className="mt-2 text-sm text-slate-700">{ARCHIVED_NOTE}</p>}
+          </div>
+        ) : (
+          <p>{label} has already been run for {items.length} selected files. Running it again will replace these existing results. This action cannot be undone.</p>
+        )}
       </div>
+      {items.length > 1 && (
+        <ul aria-label="Results to replace" className="mt-4 max-h-60 space-y-2 overflow-auto">
+          {items.map((r) => (
+            <li key={r.resultId} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm">
+              <span className="font-semibold text-slate-900">{r.resultId}</span>
+              <span className="block break-all text-slate-700">{r.resultName}</span>
+              {r.archived && <span className="block text-slate-700">{ARCHIVED_NOTE}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {otherCount > 0 && (
+        <p className="mt-3 text-sm text-slate-600">
+          {otherCount} other selected {otherCount === 1 ? 'file' : 'files'} will be processed normally.
+        </p>
+      )}
+      {warning && <QualityDetails warning={warning} />}
+      <ConfirmButtons label="Run & Replace" danger onCancel={onCancel} onConfirm={onConfirm} />
     </Modal>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isInputFile, type FileMeta } from '../../shared/types';
-import { displayStatus, processingFunction, qualityWarning, sortFiles } from './components/FileTable';
+import { displayStatus, processingFunction, qualityWarning, replacements, sortFiles } from './components/FileTable';
 
 const file: FileMeta = { id: 'input', name: 'input.csv', rows: 25, columns: 7,
   uploadedAt: '2026-11-06T12:00:00Z', status: 'Needs Review', problemRows: 1 };
@@ -65,5 +65,25 @@ describe('data quality warning', () => {
   });
   it('treats a missing invalid count as clean', () => {
     expect(qualityWarning([{ ...clean, problemRows: undefined }], 'mass')).toBeUndefined();
+  });
+});
+
+describe('results a run would replace', () => {
+  const a: FileMeta = { ...file, id: '101010', name: 'same.csv' };
+  const b: FileMeta = { ...file, id: '101011', name: 'same.csv' };
+  const result = (id: string, extra: Partial<FileMeta> = {}): FileMeta =>
+    ({ ...file, id, name: `result_${id}.csv`, status: 'Processed', processor: 'validation', ...extra });
+
+  it('finds each input result by its File ID, active or archived, in batch order', () => {
+    const files = [a, b, result('101011-V', { archived: true }), result('101010-V')];
+    expect(replacements([a, b], 'validation', files)).toEqual([
+      { inputId: '101010', resultId: '101010-V', resultName: 'result_101010-V.csv', archived: false },
+      { inputId: '101011', resultId: '101011-V', resultName: 'result_101011-V.csv', archived: true },
+    ]);
+  });
+  it('ignores inputs without a result and results of other functions or other inputs', () => {
+    const files = [a, b, result('101010-M', { processor: 'mass' }), { ...result('101011-V'), name: 'same.csv' }];
+    expect(replacements([a], 'validation', files)).toEqual([]);
+    expect(replacements([a, b], 'classification', files)).toEqual([]);
   });
 });
