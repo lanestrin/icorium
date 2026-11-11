@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged; 9.8 Architecture & Tech Stack page awaiting review. See section 4.
+**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review; none started. See section 4.
 
 ## 1. What “done” means
 
@@ -68,9 +68,11 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: none planned.** 9.8 is implemented and awaiting review.
-New work needs a new request. Add it as a new stable ID with its scope before
-building, or use a `fix/` branch for a bug.
+**Next: 10.1** `fix/download-file-names`: downloading a file whose name has
+non-Latin characters fails with a 500 (confirmed). It is the first M10 item and
+has no dependencies. Start by adding an API test that uploads `報告.csv` and
+downloads it. New work outside M10 needs a new request: add it as a new stable
+ID with its scope before building, or use a `fix/` branch for a bug.
 
 **Selection rule:** take the first unchecked item below whose dependencies are
 satisfied. Completed baseline capabilities are not new work. If an item is
@@ -242,9 +244,128 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 - [x] **9.8** `feature/9.8-architecture-page` — An **Architecture & Tech Stack** page at `/architecture` for explaining the engineering decisions in the interview, at the person's request on 2026-11-10 (their brief was cut off in its last section; the final bullet was completed as monitoring and logging). Sections: engineering overview and guiding principle; a card per technology (role, reasons, one trade-off, files); an interactive diagram (select a component to see what it does and which files implement it; follow the Upload, Process, Compare or Generate request step by step); the main decisions (React + Fastify vs Next.js, TypeScript, file storage vs PostgreSQL, the modular pipeline, synchronous processing); storage and deployment, separating hosting from storage, with S3/R2 shown as a possible future backend that is not built and Vercel described as configured but not deployed; a trade-offs table; and what would evolve as the product scales. Linked from the file workspace and the generator. No new dependencies; no API change.
 
-  **Result:** implemented; automated verification passed (2026-11-10), awaiting review and PR.
+  **Result:** merged in PR #25 (`38bd5b6`); automated verification passed (2026-11-10).
   **Done when:** every section renders; the diagram's components and flows are selectable by mouse and keyboard and name real files; every path, package, card version and quoted limit matches the code; the page is reachable from the other pages.
   **Verification:** content test reading the repository (paths, packages, versions, flows, quoted limits and deployment status); component tests for sections, cards, diagram selection and flows, storage and trade-offs, and navigation; `npm run verify`.
+
+### M10 — Code review fixes
+
+From a full read-only review of the code on 2026-11-10 (after 9.8), covering
+SOLID, DRY, performance, abstractions, race conditions, deadlocks, anti-patterns,
+partly implemented and dead code, and hard-coded values. The person asked for
+every finding to be planned. Items are in priority order; the selection rule
+above applies. **P1** items are user-visible bugs; **P2** items are code health
+and performance that matter only as usage grows or the Vercel deployment goes
+ahead. No deadlocks were found (nothing takes locks), and no path traversal or
+injection: files are stored under generated IDs and the upload name never
+reaches a path. If an item changes a route, limit, file or dependency named on
+the Architecture page, update the page in the same item (see `CLAUDE.md`).
+
+- [ ] **10.1** `fix/download-file-names` · **P1** — Downloading a file whose name has characters outside Latin-1 returns **500 `ERR_INVALID_CHAR`**: `/api/files/:id/download` puts the raw name in `Content-Disposition` (`server/src/routes/files.ts`). Confirmed by uploading `報告.csv` (200) and downloading it (500). Send an ASCII fallback `filename="…"` plus an RFC 5987 `filename*=UTF-8''…` so any upload name downloads.
+
+  **Depends on:** none.
+  **Done when:** files named with CJK, accented and quoted characters all download with status 200 and their original name in `filename*`; existing download tests still pass.
+  **Verification:** API tests for those names; `npm run verify`.
+
+- [ ] **10.2** `fix/read-only-file-list` · **P1** — `GET /api/files` writes: it backfills missing problem counts and reconciles old statuses with `storage.patch` while listing (`server/src/routes/files.ts`). A read with side effects is an anti-pattern, and on Vercel Blob two tabs loading together can make one list request fail with a 409 from the ETag check. Move the reconciliation to a one-off step at startup (beside sample seeding), and make the list purely a read.
+
+  **Depends on:** none.
+  **Done when:** listing never writes; files saved before counts or the Needs Review status existed are still corrected, once, at startup; concurrent list requests cannot fail.
+  **Verification:** API tests for startup reconciliation and that a list makes no writes (the existing "reconciles old statuses" and restart tests move to the startup step); a Blob storage test with two concurrent lists; `npm run verify`.
+
+- [ ] **10.3** `fix/client-request-races` · **P1** — Client requests that can apply out of order or silently do nothing:
+  - `refresh()` in `client/src/App.tsx` has no ordering guard, and the upload's refresh is not awaited, so an older file list can overwrite a newer one (for example an upload finishing during a processing batch). Ignore responses from superseded requests.
+  - The preview's first page fetch in `PreviewModal` is never cancelled, so a slow response can land after the preview closes or changes file.
+  - **Undo** on the archive toast is silently ignored while a processing batch runs, because it shares the busy flag. Disable it with a reason, or queue it.
+
+  **Depends on:** none.
+  **Done when:** a stale list or preview response never replaces newer data; Undo is never a silent no-op.
+  **Verification:** component tests with deferred promises resolving out of order for the list and the preview, and for Undo during processing; `npm run verify`.
+
+- [ ] **10.4** `fix/comparison-and-dialog-edge-cases` · **P2** — Small correctness gaps:
+  - Comparison row keys are built as `B-010 (2)` and `(blank ID) file 1 row 3` (`server/src/lib/compare.ts`), which can collide with a real batch ID of the same text. Keep the display label but key rows on something that cannot collide.
+  - "Rows differing" compares cell text, so `100` and `100.0` count as different. Compare numeric columns by value.
+  - The generator's retry loop for distinct files (`generateFiles` in `server/src/lib/generate.ts`) has no attempt cap. Stop with a clear error after a fixed number of attempts.
+  - The dialog focus trap (`FOCUSABLE` in `client/src/components/Modals.tsx`) includes disabled `select`/`input` elements.
+
+  **Depends on:** none.
+  **Done when:** each case behaves as described and is pinned by a test.
+  **Verification:** unit tests for key collisions, numeric equality and the retry cap; a component test for Tab past a disabled field; `npm run verify`.
+
+- [ ] **10.5** `chore/dead-and-partial-code` · **P2** — Remove or finish half-done code:
+  - The preview highlights cells equal to `ERROR` in red (`Modals.tsx`); only legacy exports contain that, and current results write `Invalid`. Highlight `Invalid` status cells (keeping legacy `ERROR`), or drop the rule.
+  - `detectProcessor` (`server/src/processing/index.ts`) exists only for tests; use `detectResult` there and delete it.
+  - The public `/api/generate` accepts a test-only `seed`. Keep generation deterministic in tests through `generateFiles` directly or an injected random source, and drop `seed` from the API (update the API tests).
+  - Delete the duplicated doc comment above `Modal`; stop exporting symbols nothing imports (`Adapter`, `TopDifference`, `fmtDate`, `FILE_COLORS`, `DEMO_CLASS_RULES`) unless a test needs them; rename `archiveTargets` in `App.tsx` (it also drives Compare) to `selectedInView`.
+
+  **Depends on:** none.
+  **Done when:** none of the above remains; behaviour is unchanged apart from the chosen highlight.
+  **Verification:** updated unit/API/component tests; `npm run verify`.
+
+- [ ] **10.6** `refactor/single-source-names-and-limits` · **P2** — DRY: each fact defined once.
+  - Processing function ids and names live in three places: `PROCESSORS` (`shared/types.ts`), the Zod enum in `server/src/routes/files.ts` and `FUNCTION_LABEL` in `client/src/components/FileTable.tsx`. Derive the enum from `PROCESSORS`, add the table label there, and filter the file list by processor id instead of by display label.
+  - Generator limits are repeated in `GeneratorPage.tsx`; move `GENERATOR_MAX_ROWS`/`GENERATOR_MAX_FILES` to `shared/types.ts` beside `COMPARE_MAX`.
+  - Status filter options are hard-coded in `App.tsx`; build them from one list.
+  - The three POST-JSON calls in `client/src/api.ts` repeat the same boilerplate; add one helper.
+  - Generator inputs are validated twice with different messages (Zod and `generateCsv`); keep one set of messages.
+  - Update the `CLAUDE.md` "Extending" steps to match.
+
+  **Depends on:** 10.5 (touches the same files).
+  **Done when:** adding a processing function or changing a limit needs one edit to names and limits; behaviour and messages are unchanged.
+  **Verification:** existing tests unchanged in behaviour; a unit test that the API enum matches `PROCESSORS`; `npm run verify`.
+
+- [ ] **10.7** `refactor/partner-adapter-formats` · **P2** — The generator finds an adapter by its display name (`` `Partner ${partner}` `` in `server/src/lib/generate.ts`) and keeps number formats in a separate `DIGITS` table, so a new partner needs three edits. Give each adapter an `id` (`A`/`B`/`C`) and its number formats, derive `GENERATOR_PARTNERS` from the adapters, and drop `DIGITS`. Update `CLAUDE.md`, the README and the Architecture page where they describe adding a partner.
+
+  **Depends on:** 10.6.
+  **Done when:** adding a partner (columns, units, formats) is one adapter entry, and the generator offers it.
+  **Verification:** generator unit tests unchanged in output; a test that every adapter is generatable; `npm run verify` (the Architecture content test must still pass).
+
+- [ ] **10.8** `refactor/client-structure` · **P2** — Logic at the wrong level:
+  - `client/src/components/FileTable.tsx` exports file rules (`displayStatus`, `qualityWarning`, `processingFunction`, `sortFiles`, `SORT_OPTIONS`) and `FileTabs` alongside the table. Move the rules into `client/src/file-status.ts`, which `file-status.test.ts` already tests.
+  - `App.tsx` (about 390 lines) holds state for filters, selection, processing, archiving, the toast and comparison. Extract hooks (for example `useFileList`, `useFilters`, `useArchive`) so each concern can be read and tested on its own.
+
+  **Depends on:** 10.3 and 10.5 (same files; do the fixes first).
+  **Done when:** no behaviour change; the component tests pass unchanged apart from imports.
+  **Verification:** existing component tests; unit tests for any extracted hook logic; `npm run verify`.
+
+- [ ] **10.9** `refactor/storage-interface` · **P2** — Leaky storage abstraction (`server/src/lib/storage.ts`, `blob-storage.ts`):
+  - Local and Blob storage share no declared interface: one is synchronous, one asynchronous, and only Blob has `seed`, so `seedSamples` checks `'seed' in storage`. Declare one async `Storage` interface both implement, including seeding.
+  - Local `get`/`list` return the live in-memory objects, so callers can change stored state; return copies.
+  - `meta.json` is rewritten in place, so a crash mid-write corrupts it and the server will not start; write to a temporary file and rename.
+  - Local storage uses synchronous `fs` calls inside request handlers, blocking the event loop; use `fs/promises`.
+  - The module creates folders, reads `meta.json` and may throw on Vercel when imported; move this into an explicit initialisation called from `buildApp`, so tests no longer need environment variables set before importing.
+  - Update the Architecture page's storage text if it changes.
+
+  **Depends on:** 10.2 (startup reconciliation lives here).
+  **Done when:** both backends satisfy one interface with no implementation checks outside storage; an interrupted metadata write cannot corrupt `meta.json`; importing the module has no side effects.
+  **Verification:** storage unit tests run against both backends; an atomic-write test; existing API and Blob tests; `npm run verify`.
+
+- [ ] **10.10** `perf/avoid-repeated-parsing` · **P2** — Every preview page (`GET /api/files/:id/rows`) re-reads and re-parses the whole CSV and re-validates every row to return 100 rows. Comparison normalizes each row once to match rows and again in `findProblems`. Cache the parsed rows and problem list per file id (invalidated when a file is saved or replaced), and reuse the normalized rows within one comparison.
+
+  **Depends on:** 10.9.
+  **Done when:** paging through a file parses it once; results are identical; a replaced result never serves cached rows.
+  **Verification:** API tests that page results are unchanged and that a re-run result serves its new rows; a unit test that parsing runs once per file across pages; `npm run verify`.
+
+- [ ] **10.11** `perf/blob-storage-lookups` · **P2, only if the Vercel deployment goes ahead** — With Vercel Blob, `find(id)` lists and downloads every record, CSV text included, one at a time, to find one file (`server/src/lib/blob-storage.ts`). Most routes call `get` then `read`, so a preview is two full scans and a five-file comparison ten; `patch` re-uploads the whole CSV to change a flag.
+  - Load records in parallel.
+  - Add one call that returns metadata and text together, and use it in routes.
+  - Store metadata and CSV text as separate objects, so lists and patches never transfer CSVs.
+  - Keep a small id → object index so a lookup needs no full scan.
+  - Update `blueprint/vercel-deployment.md` and the Architecture page.
+
+  **Depends on:** 10.9.
+  **Done when:** getting, reading or patching one file transfers only that file's objects; listing transfers metadata only; ETag conflict handling still returns 409.
+  **Verification:** Blob storage unit tests counting SDK calls per operation; existing Blob tests; `npm run verify`.
+
+- [ ] **10.12** `chore/configurable-server-settings` · **P2** — Hard-coded values that should be configurable:
+  - Upload size limit (10 MB) and log level (`warn`) in `server/src/app.ts`, and the bind host `0.0.0.0` in `server/src/index.ts`: read `MAX_UPLOAD_MB`, `LOG_LEVEL` and `HOST` from the environment, with today's values as defaults.
+  - `server/src/index.ts` uses `console.log`/`console.error`; use the app logger.
+  - Keep as named constants, documented in one place: preview page cap (1,000 rows), Blob listing page size, toast duration (8 s), the generator's start date (2026-09-01) and value ranges, and the demo classification thresholds.
+  - Document the variables in the README; keep the Architecture page's quoted 10 MB default true (its content test checks it).
+
+  **Depends on:** none.
+  **Done when:** each setting can be changed without editing code; defaults are unchanged.
+  **Verification:** API tests for a custom upload limit and the default; the Architecture content test updated to read the default; `npm run verify`.
 
 ### M7 — Final interview readiness
 
