@@ -2,6 +2,12 @@
 
 Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of three processing functions on every row, export the result (all original columns + generated columns), and compare 2 to 5 result files in charts. All data is fictional; classification rules are demo-only.
 
+Shared agent instructions (proportional engineering, the Blueprint workflow,
+commands and attribution) live in **AGENTS.md**. Blueprint skills load
+planning context, coding standards and the active spec only when needed.
+
+@AGENTS.md
+
 ## Layout
 
 - `client/` React 19 + Vite + Tailwind 4 + Recharts + Lucide. File workspace in `src/App.tsx` (its `Root` shows `src/components/GeneratorPage.tsx` at `/generator` and `src/components/ArchitecturePage.tsx` at `/architecture`), pieces in `src/components/`.
@@ -17,7 +23,7 @@ Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of thre
 - **Match the reference.** UI changes follow `blueprint/reference-ui.png` and must still work at phone width with no sideways page scroll.
 - **Verify before saying done.** Run `npm run verify` and report the real result. It runs server unit/API tests, client unit/component tests and the client type-check/build. Manual testing is not a completion requirement. Component tests do not establish visual correctness in a real browser.
 - **Every change keeps or adds tests.** Rules and calculations belong in server unit tests; endpoints and errors in API tests. UI changes require unit/component coverage using Vitest and React Testing Library. Exercise user-visible behavior, async success/failure and relevant keyboard interactions. Do not add browser tests unless requested.
-- **Branch, draft, then wait for approval.** Follow `blueprint/commit-rules.md`: create a new branch before editing a new work item, implement and verify, then present the full commit message and PR description. Wait for explicit approval before committing. Push and publish a PR only when explicitly authorized. Never commit directly to `main`, merge or force-push. Commit messages end with the attribution line from the session.
+- **Branch, draft, then wait for approval.** Follow `blueprint/commit-rules.md`: create a new branch before editing a new work item, implement and verify, then present the full commit message and PR description. Wait for explicit approval before committing. Push and publish a PR only when explicitly authorized. Never commit directly to `main`, merge or force-push. No AI attribution in commits or PRs (see AGENTS.md).
 - **Never edit the sample CSVs.** They are the person's test data; adapters adapt to them, not the other way round.
 - **Results keep every original column.** Processors only append columns.
 - **File IDs, not names, identify files** (`blueprint/build-plan.md` M11). Every upload gets a new six-digit base ID counting up from `100001`, never reused. A result's ID is its input's ID plus its function's fixed code: `-V` validation, `-M` mass, `-C` classification (`101010-M`). Re-running the same function on the same input replaces that result and keeps its ID (no timestamps or versions), only when the request sends `replace: true`; otherwise `POST /api/process` answers 409 naming the existing result. An uploaded result gets a new base ID plus its code. Names are labels only: results are still named `result_<input name without .csv>_<function id>.csv`, and a result is recognised by its columns, so a renamed result still uploads and compares. Nothing links, replaces or looks files up by name. The ID travels with the data: stored inputs carry a `file_id` column and results add `result_id` as their first generated column; uploads overwrite these with the new IDs.
@@ -26,8 +32,10 @@ Interview exercise for Icorium. Upload partner refrigerant CSVs, run one of thre
 
 ## Completion and approval skills
 
-- `/complete`: run verification and present the full commit and PR drafts;
-  nothing is committed or published. See `.claude/skills/complete/SKILL.md`.
+- `/complete`: the Blueprint completion step (safety pass, history logging
+  under `blueprint/history/`, commit and PR drafts). `git.landing` is
+  `pull-request` in `blueprint/config.json`, so it never merges locally.
+  See `.claude/skills/complete/SKILL.md`.
 - `/approve`: only the person invokes it after reviewing the drafts. It
   authorizes one commit, push and PR creation/update. See
   `.claude/skills/approve/SKILL.md`. Never run it automatically.
@@ -64,13 +72,4 @@ Examples:
 
 ## Commands
 
-```bash
-npm run dev       # API :3001 + UI :5173 (Vite picks the next free port if taken)
-npm run verify    # server unit/API + client unit/component tests + client build
-npm test          # server unit/API + client unit/component tests
-```
-
-- CI (`.github/workflows/ci.yml`) runs `npm run verify` on every push to `main` and every PR.
-
-- Reset the demo data: stop the servers, delete `server/data/`, start again.
-- On Windows, stopping a background `npm run dev` can leave the tsx server holding port 3001. Check the port and stop only that process.
+See **Commands** in AGENTS.md (dev, test, verify, CI, demo reset).

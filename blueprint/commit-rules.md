@@ -59,8 +59,10 @@ Choose the conventional type from the branch prefix:
 - Then 3 to 6 bullets describing what changed.
 - Trailers last, one per line: `Refs: build-plan <phase or item>` when applicable,
   or `Refs: <existing project document>` for other documented work;
-  `BREAKING CHANGE: ...` when applicable; the session's attribution line last.
-  Do not invent an identity or a reference to a nonexistent history file.
+  `BREAKING CHANGE: ...` when applicable. No AI attribution: no AI
+  `Co-Authored-By` trailer or generated-by line in commits or PRs; keep
+  genuine human attribution. Do not invent an identity or a reference to a
+  nonexistent history file.
 
 AI writes the full commit message, PR title and description from the actual
 diff, relevant project documents and verification evidence. The person reviews
