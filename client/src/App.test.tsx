@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CompareResult, FileMeta, FileRows } from '../../shared/types';
 import App from './App';
-import { PreviewModal } from './components/Modals';
+import { Modal, PreviewModal } from './components/Modals';
 import { api } from './api';
 
 vi.mock('./api', () => ({ api: {
@@ -828,6 +828,28 @@ describe('file IDs', () => {
   });
 });
 
+describe('dialog focus trap', () => {
+  it('skips disabled fields when Tab wraps around the dialog', async () => {
+    const user = userEvent.setup();
+    render(
+      <Modal title="Choices" onClose={() => {}}>
+        <button>One</button>
+        <button>Two</button>
+        <input aria-label="Disabled field" disabled />
+        <select aria-label="Disabled choice" disabled><option>x</option></select>
+      </Modal>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Choices' });
+    const focusable = within(dialog).getAllByRole('button');
+    const [first, last] = [focusable[0], screen.getByRole('button', { name: 'Two' })];
+    last.focus();
+    await user.tab();
+    expect(first).toHaveFocus(); // wraps to the start instead of stopping at the disabled fields
+    await user.tab({ shift: true });
+    expect(last).toHaveFocus(); // and back to the last enabled control
+  });
+});
+
 describe('file identity regression', () => {
   // Two inputs and their results share filenames; only the File IDs tell them apart.
   const inputA: FileMeta = { ...base, id: '101010', name: 'data.csv', status: 'Ready', problemRows: 0 };
@@ -885,7 +907,7 @@ describe('file identity regression', () => {
         processor: 'validation',
         rowMatch: 'batch_id',
         files: [resultA, resultB].map((f) => ({ id: f.id, name: f.name, source: 'Partner A', rows: 1, problems: { total: 0, items: [] } })),
-        rows: [{ key: 'A-001', rowNumbers: [1, 1] }],
+        rows: [{ key: 'A-001', label: 'A-001', rowNumbers: [1, 1] }],
         columns: [{ name: 'composition_total_pct', kind: 'numeric', unit: '%', measure: 'mean', summary: [100, 100], values: [[100, 100]], rowsDiffering: 0, rowsCompared: 1 }],
       });
       const user = await open();
@@ -946,7 +968,7 @@ describe('comparing results', () => {
       { id: 'val-b', name: valB.name, source: 'Partner B', rows: 2, problems: { total: 2, items: [] } },
       { id: 'val-c', name: valC.name, source: 'Partner C', rows: 1, problems: { total: 0, items: [] } },
     ],
-    rows: [{ key: '#1', rowNumbers: [1, 1, 1] }, { key: '#2', rowNumbers: [2, 2, null] }],
+    rows: [{ key: '#1', label: '#1', rowNumbers: [1, 1, 1] }, { key: '#2', label: '#2', rowNumbers: [2, 2, null] }],
     columns: [
       { name: 'composition_total_pct', kind: 'numeric', unit: '%', measure: 'mean', summary: [100, 98.73, 99.5],
         values: [[100, 100, 100], [100, 97.46, null]], rowsDiffering: 1, rowsCompared: 2 },
@@ -1075,6 +1097,26 @@ describe('comparing results', () => {
     expect(cells[0]).not.toHaveAttribute('data-differs');
     await user.click(within(details).getByRole('checkbox', { name: 'Only rows that differ' }));
     expect(within(details).getByRole('row', { name: /^#1/ })).toBeInTheDocument();
+  });
+
+  it('shows row labels, never the internal row keys', async () => {
+    // Batch-ID rows: the second "A-001" has its own key but is shown as "A-001 (2)".
+    vi.mocked(api.compare).mockResolvedValue({
+      ...comparison,
+      rowMatch: 'batch_id',
+      rows: [{ key: 'id:1:A-001', label: 'A-001', rowNumbers: [1, 1, 1] }, { key: 'id:2:A-001', label: 'A-001 (2)', rowNumbers: [2, 2, null] }],
+    });
+    const user = await setup();
+    for (const f of [valA, valB, valC]) await user.click(check(f.name));
+    await user.click(compareButton());
+    const dialog = await screen.findByRole('dialog', { name: 'Compare Files' });
+    const top = within(dialog).getByRole('table', { name: 'Top differences' });
+    expect(top).toHaveTextContent('A-001 (2)');
+    expect(dialog).not.toHaveTextContent('id:');
+    await user.click(within(dialog).getByRole('button', { name: /View all row details/ }));
+    const details = within(dialog).getByRole('region', { name: 'Row differences' });
+    expect(within(details).getByRole('row', { name: /^A-001 \(2\)/ })).toBeInTheDocument();
+    expect(details).not.toHaveTextContent('id:');
   });
 
   it('closes with Escape and returns focus to the Compare button', async () => {

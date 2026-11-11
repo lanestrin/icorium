@@ -7,6 +7,8 @@ import type { GeneratedError, GeneratedFile, GeneratorPartner } from '../../../s
 export const GENERATOR_MAX_ROWS = 5000;
 /** Most files one request makes. */
 export const GENERATOR_MAX_FILES = 10;
+/** Tries allowed in one generateFiles call before it gives up on making distinct files. */
+export const GENERATE_MAX_ATTEMPTS = 100;
 
 /** How each partner writes its numbers, matching the sample files: A kg/% , B lb/%, C g/fractions. */
 const DIGITS: Record<GeneratorPartner, { mass: number; pct: number }> = {
@@ -101,15 +103,20 @@ export function generateCsv(partner: GeneratorPartner, rows: number, errorRows: 
 /**
  * Makes `count` files with the same settings and different data, named partnerA-MMDDYYYY-001.csv, -002 and so on.
  * Each gets its own seed; a file whose content matches one already made is regenerated with the next
- * seed, so no two files in a batch are the same.
+ * seed, so no two files in a batch are the same. After GENERATE_MAX_ATTEMPTS tries in total it stops with
+ * a clear error instead of retrying forever. `make` is the file generator; tests can replace it.
  */
-export function generateFiles(partner: GeneratorPartner, rows: number, errorRows: number, count: number, seed = randomInt(2 ** 31), made = new Date()): GeneratedFile[] {
+export function generateFiles(partner: GeneratorPartner, rows: number, errorRows: number, count: number, seed = randomInt(2 ** 31), made = new Date(), make = generateCsv): GeneratedFile[] {
   if (!Number.isInteger(count) || count < 1 || count > GENERATOR_MAX_FILES) throw httpError(400, `Number of files must be a whole number from 1 to ${GENERATOR_MAX_FILES}.`);
   const files: GeneratedFile[] = [];
   const seen = new Set<string>();
   let next = seed;
+  let attempts = 0;
   while (files.length < count) {
-    const file = generateCsv(partner, rows, errorRows, next++, generatedName(partner, files.length + 1, made));
+    if (attempts === GENERATE_MAX_ATTEMPTS)
+      throw httpError(400, `Could not make ${count} different files with these settings. Try more rows or fewer files.`);
+    attempts++;
+    const file = make(partner, rows, errorRows, next++, generatedName(partner, files.length + 1, made));
     if (seen.has(file.text)) continue;
     seen.add(file.text);
     files.push(file);

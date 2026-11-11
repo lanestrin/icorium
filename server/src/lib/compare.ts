@@ -19,7 +19,8 @@ function adapterFor(headers: string[]) {
  * Lines rows up across files. Batch IDs are used only when every pair of files shares at least one,
  * e.g. a partner's baseline and follow-up; files from different partners never do, so they fall back
  * to position. A repeated ID is matched occurrence by occurrence ("B-010", then "B-010 (2)").
- * A blank ID never matches another row.
+ * A blank ID never matches another row. Rows are matched on a key that no batch ID can imitate
+ * (the occurrence number comes first); the label is only for display, so two rows may share one.
  */
 export function matchRows(files: Loaded[]): { rowMatch: RowMatch; rows: MatchedRow[] } {
   const adapters = files.map((f) => adapterFor(f.headers));
@@ -29,7 +30,7 @@ export function matchRows(files: Loaded[]): { rowMatch: RowMatch; rows: MatchedR
 
   if (!byId) {
     const n = Math.max(...files.map((f) => f.rows.length));
-    const rows = Array.from({ length: n }, (_, i) => ({ key: `#${i + 1}`, rowNumbers: files.map((f) => (i < f.rows.length ? i + 1 : null)) }));
+    const rows = Array.from({ length: n }, (_, i) => ({ key: `#${i + 1}`, label: `#${i + 1}`, rowNumbers: files.map((f) => (i < f.rows.length ? i + 1 : null)) }));
     return { rowMatch: 'position', rows };
   }
 
@@ -38,13 +39,17 @@ export function matchRows(files: Loaded[]): { rowMatch: RowMatch; rows: MatchedR
     const seen = new Map<string, number>();
     fileIds.forEach((id, i) => {
       let key: string;
-      if (!id) key = `(blank ID) file ${k + 1} row ${i + 1}`;
-      else {
+      let label: string;
+      if (!id) {
+        key = `blank:${k + 1}:${i + 1}`;
+        label = `(blank ID) file ${k + 1} row ${i + 1}`;
+      } else {
         const n = (seen.get(id) ?? 0) + 1;
         seen.set(id, n);
-        key = n === 1 ? id : `${id} (${n})`;
+        key = `id:${n}:${id}`;
+        label = n === 1 ? id : `${id} (${n})`;
       }
-      if (!index.has(key)) index.set(key, { key, rowNumbers: files.map(() => null) });
+      if (!index.has(key)) index.set(key, { key, label, rowNumbers: files.map(() => null) });
       index.get(key)!.rowNumbers[k] = i + 1;
     });
   });
@@ -75,8 +80,11 @@ export function compareResults(files: Loaded[]): Omit<CompareResult, 'files'> & 
   const columns = cols.map((name): CompareColumn => {
     // raw[row][file]: the cell text, or undefined when the file has no such row.
     const raw = rows.map((r) => r.rowNumbers.map((n, k) => (n === null ? undefined : (files[k].rows[n - 1][name] ?? ''))));
-    const rowsDiffering = raw.filter((vals) => vals.some((v) => v === undefined || v !== vals[0])).length;
     const numeric = raw.every((vals) => vals.every((v) => v === undefined || v === '' || Number.isFinite(Number(v))));
+    // A row differs when a file lacks it, or its values differ: as numbers for numeric columns
+    // (so 100 and 100.0 are equal; a blank is no value), as text for categories.
+    const same = (a: string, b: string) => (numeric ? (a === '' || b === '' ? a === b : Number(a) === Number(b)) : a === b);
+    const rowsDiffering = raw.filter((vals) => vals.some((v) => v === undefined || vals[0] === undefined || !same(v, vals[0]))).length;
 
     if (numeric) {
       const values = raw.map((vals) => vals.map((v) => (v === undefined || v === '' ? null : Number(v))));

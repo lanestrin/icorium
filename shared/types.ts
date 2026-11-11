@@ -113,7 +113,8 @@ export interface CompareFile {
 
 /** One matched row: its key (batch ID or "#n") and its 1-based row number in each file, null where the file lacks it. */
 export interface MatchedRow {
-  key: string;
+  key: string; // unique identifier only, never shown: "id:2:B-010", "blank:1:3" or "#4"
+  label: string; // what the dashboard shows: "B-010 (2)", "(blank ID) file 1 row 3" or "#4"
   rowNumbers: (number | null)[];
 }
 

@@ -73,7 +73,7 @@ export function yDomain(values: (number | string | null)[]): [number, number] | 
   return [Math.floor(min - pad), Math.ceil(max + pad)];
 }
 
-export interface TopDifference { key: string; text: string; files: number[] }
+export interface TopDifference { key: string; label: string; text: string; files: number[] }
 
 /**
  * The rows that differ most from the reference file for one metric. Numbers rank by the largest gap;
@@ -90,7 +90,7 @@ export function topDifferences(result: Pick<CompareResult, 'rows'>, col: Compare
       const v = col.values[r][files[0]];
       const text = row.rowNumbers[ref] === null ? 'Not in the reference file'
         : row.rowNumbers[files[0]] === null ? 'Not in file' : `${show(v)} (reference: ${show(refValue)})`;
-      return [{ key: row.key, text, files, score: 0, order: r }];
+      return [{ key: row.key, label: row.label, text, files, score: 0, order: r }];
     }
 
     const gaps = files.flatMap((k) => {
@@ -99,16 +99,16 @@ export function topDifferences(result: Pick<CompareResult, 'rows'>, col: Compare
     }).sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
     if (gaps.length) {
       const { v, gap } = gaps[0];
-      return [{ key: row.key, text: `${metricLabel(col.name).replace(/ \(.*\)$/, '')} ${fmtValue(v, col.unit)} (Δ ${fmtDelta(gap, deltaUnit(col))})`, files, score: Math.abs(gap), order: r }];
+      return [{ key: row.key, label: row.label, text: `${metricLabel(col.name).replace(/ \(.*\)$/, '')} ${fmtValue(v, col.unit)} (Δ ${fmtDelta(gap, deltaUnit(col))})`, files, score: Math.abs(gap), order: r }];
     }
     const text = row.rowNumbers[ref] === null ? 'Not in the reference file'
       : files.some((k) => row.rowNumbers[k] === null) ? 'Not in file' : 'No value';
-    return [{ key: row.key, text, files, score: -1, order: r }];
+    return [{ key: row.key, label: row.label, text, files, score: -1, order: r }];
   });
   return found
     .sort((a, b) => b.score - a.score || a.order - b.order)
     .slice(0, limit)
-    .map(({ key, text, files }) => ({ key, text, files }));
+    .map(({ key, label, text, files }) => ({ key, label, text, files }));
 }
 
 /** Composition totals read better as distance from 100%, since most rows are exactly 100. */
@@ -246,7 +246,7 @@ function Overview({ col, result, labels, refIndex, deviation, setDeviation, show
                 <tbody>
                   {top.map((d) => (
                     <tr key={d.key} className="border-t border-slate-100 [&>td]:px-3 [&>td]:py-2">
-                      <td className="whitespace-nowrap font-medium">{d.key}</td>
+                      <td className="whitespace-nowrap font-medium">{d.label}</td>
                       <td><span className="rounded-md bg-red-50 px-2 py-0.5 text-red-700">{d.text}</span></td>
                       <td>
                         <span className="flex flex-wrap gap-x-3 gap-y-1">
@@ -273,7 +273,7 @@ function RowChart({ col, result, labels, deviation, setDeviation }: {
 }) {
   const { files, rows } = result;
   const shown = (v: number | string | null) => (deviation && typeof v === 'number' ? v - 100 : v);
-  const data = rows.map((r, i) => Object.fromEntries([['label', r.key.replace(/^#/, '')], ...col.values[i].map((v, k) => [`f${k}`, shown(v)])]));
+  const data = rows.map((r, i) => Object.fromEntries([['label', r.label.replace(/^#/, '')], ...col.values[i].map((v, k) => [`f${k}`, shown(v)])]));
   const domain = yDomain(col.values.flat().map(shown));
   const unit = deviation ? 'pp' : col.unit;
   return (
@@ -439,7 +439,7 @@ function RowDifferences({ col, result, labels, refIndex, onlyDiffering, setOnlyD
           <tbody>
             {indexes.map((r) => (
               <tr key={rows[r].key} className="border-t border-slate-100 [&>td]:px-3 [&>td]:py-1.5">
-                <th scope="row" className="whitespace-nowrap px-3 text-left font-medium">{rows[r].key}</th>
+                <th scope="row" className="whitespace-nowrap px-3 text-left font-medium">{rows[r].label}</th>
                 {files.map((f, k) => {
                   const differs = differsFromRef(col, r, k, refIndex);
                   return (

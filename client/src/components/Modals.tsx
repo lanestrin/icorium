@@ -24,7 +24,8 @@ function ProblemItems({ list }: { list: ProblemList }) {
 
 const processorLabel = (id?: string) => PROCESSORS.find((p) => p.id === id)?.label ?? '';
 
-const FOCUSABLE = 'a[href],button:not([disabled]),select,input,[tabindex]:not([tabindex="-1"])';
+// Disabled fields cannot take focus, so they are left out of the Tab cycle.
+const FOCUSABLE = 'a[href],button:not([disabled]),select:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 /** Accessible dialog: focus moves in on open, Tab stays inside, Escape closes, focus returns on close. */
 /** Dialog shell: focus moves in, Tab stays inside, Escape closes, focus returns. full = fills the screen on phones, near-full on larger screens. */

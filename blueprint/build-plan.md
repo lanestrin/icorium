@@ -114,9 +114,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 11.7** `feature/11.7-link-imported-results`, then 11.6. Start with an API
+**Next: 10.5** `chore/dead-and-partial-code` (M11 and 10.4 are done), then 10.6 to 10.12
 
-test that re-uploading an unchanged export of a result links it to its original. **Order:**
+in order. Start with the `Invalid` highlight test in the preview. **Order:**
 
 10.1–10.3, then M11 (11.1–11.7, including 11.3a; 11.7 before 11.6), then 10.4–10.12; M11 changes how files are
 
@@ -456,7 +456,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   **Verification:** component tests with deferred promises resolving out of order for the list and the preview, and for Undo during processing; `npm run verify`.
 
-- [ ] **10.4** `fix/comparison-and-dialog-edge-cases` · **P2** (after M11) — Small correctness gaps:
+- [x] **10.4** `fix/comparison-and-dialog-edge-cases` · **P2** (after M11) — Small correctness gaps:
 
   - Comparison row keys are built as `B-010 (2)` and `(blank ID) file 1 row 3` (`server/src/lib/compare.ts`), which can collide with a real batch ID of the same text. Keep the display label but key rows on something that cannot collide.
 
