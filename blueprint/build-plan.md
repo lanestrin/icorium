@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; none started. See section 4.
+**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1 awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,11 +68,11 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 10.1** `fix/download-file-names`: downloading a file whose name has
-non-Latin characters fails with a 500 (confirmed). It is the first M10 item and
-has no dependencies. Start by adding an API test that uploads `報告.csv` and
-downloads it. **Order:** 10.1–10.3, then M11 (11.1–11.5), then 10.4–10.12; M11
-changes how files are identified and stored, so the P2 refactors build on it.
+**Next: 10.2** `fix/read-only-file-list`, after 10.1 merges: `GET /api/files`
+writes metadata while listing, which can fail with a 409 on Vercel Blob. It has
+no dependencies. Start with an API test that a list makes no writes. **Order:**
+10.1–10.3, then M11 (11.1–11.5), then 10.4–10.12; M11 changes how files are
+identified and stored, so the P2 refactors build on it.
 New work outside M10 and M11 needs a new request: add it as a new stable
 ID with its scope before building, or use a `fix/` branch for a bug.
 
@@ -263,8 +263,9 @@ injection: files are stored under generated IDs and the upload name never
 reaches a path. If an item changes a route, limit, file or dependency named on
 the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
-- [ ] **10.1** `fix/download-file-names` · **P1** — Downloading a file whose name has characters outside Latin-1 returns **500 `ERR_INVALID_CHAR`**: `/api/files/:id/download` puts the raw name in `Content-Disposition` (`server/src/routes/files.ts`). Confirmed by uploading `報告.csv` (200) and downloading it (500). Send an ASCII fallback `filename="…"` plus an RFC 5987 `filename*=UTF-8''…` so any upload name downloads.
+- [x] **10.1** `fix/download-file-names` · **P1** — Downloading a file whose name has characters outside Latin-1 returns **500 `ERR_INVALID_CHAR`**: `/api/files/:id/download` puts the raw name in `Content-Disposition` (`server/src/routes/files.ts`). Confirmed by uploading `報告.csv` (200) and downloading it (500). Send an ASCII fallback `filename="…"` plus an RFC 5987 `filename*=UTF-8''…` so any upload name downloads.
 
+  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. An `attachment()` helper in `server/src/routes/files.ts` writes `filename="<ASCII fallback>"` (accents dropped, other characters, quotes and backslashes replaced with `_`) and `filename*=UTF-8''<percent-encoded name>`, also encoding `! ' ( ) *`.
   **Depends on:** none.
   **Done when:** files named with CJK, accented and quoted characters all download with status 200 and their original name in `filename*`; existing download tests still pass.
   **Verification:** API tests for those names; `npm run verify`.
