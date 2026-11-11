@@ -12,6 +12,8 @@ import { processors } from './processing';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reclaim-api-'));
 process.env.RECLAIM_DATA_DIR = dataDir;
 const { buildApp } = await import('./app');
+// The app's own storage instance; importing it later, after vi.resetModules(), would give a separate copy.
+const { storage } = await import('./lib/storage');
 
 const SAMPLES = path.resolve(import.meta.dirname, '../../sample-data');
 const sample = (name: string) => fs.readFileSync(path.join(SAMPLES, name), 'utf8');
@@ -622,6 +624,44 @@ describe('replacing a result', () => {
     await processFile(input.id, 'validation');
     expect((await processFile(input.id, 'mass')).statusCode).toBe(200);
     expect((await processFile(input.id, 'mass')).statusCode).toBe(409);
+  });
+
+  it('creates a file at an exact ID only once in local storage, leaving an existing one unchanged', async () => {
+    const input = (await upload('create_at.csv', csv)).json<FileMeta>();
+    const id = `${input.id}-C`;
+    const first = await storage.createAt(id, { name: 'result_create_at_classification.csv', text: 'first', rows: 1, columns: 1, status: 'Processed' });
+    expect(first).toMatchObject({ id, name: 'result_create_at_classification.csv' });
+    expect(await storage.createAt(id, { name: 'other.csv', text: 'second', rows: 1, columns: 1, status: 'Processed' })).toBeUndefined();
+    expect(await download(id)).toBe('first');
+    expect((await listFiles()).filter((f) => f.id === id)).toEqual([first]);
+  });
+
+  it('lets only one of two simultaneous first runs save the result; the other is refused', async () => {
+    const input = (await upload('simultaneous.csv', csv)).json<FileMeta>();
+    // Hold both requests at the input read, after each has checked that no result exists yet, so
+    // both pass that check before either saves: the race the create-if-absent write closes.
+    const read = storage.read.bind(storage);
+    const waiting: (() => void)[] = [];
+    const spy = vi.spyOn(storage, 'read').mockImplementation(async (id: string) => {
+      await new Promise<void>((resolve) => {
+        waiting.push(resolve);
+        if (waiting.length === 2) waiting.forEach((release) => release());
+      });
+      return read(id);
+    });
+    let responses;
+    try {
+      responses = await Promise.all([processFile(input.id, 'validation'), processFile(input.id, 'validation')]);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(responses.map((r) => r.statusCode).sort()).toEqual([200, 409]);
+    const saved = responses.find((r) => r.statusCode === 200)!.json<FileMeta>();
+    expect(responses.find((r) => r.statusCode === 409)!.json<ReplaceConflict>()).toEqual({
+      message: `Composition Validation has already been run for file ${input.id}. Confirm to replace the existing result ${saved.id}.`,
+      existing: { id: saved.id, name: saved.name },
+    });
+    expect((await listFiles()).filter((f) => f.id === saved.id)).toEqual([saved]);
   });
 
   it('overwrites a confirmed re-run under the same ID with new content', async () => {

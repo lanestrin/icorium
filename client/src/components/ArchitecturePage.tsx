@@ -178,7 +178,7 @@ export const NODES: ArchNode[] = [
     detail: 'Used when no Blob token is set. Each CSV is a file under server/data/files and all metadata is one meta.json. Deleting server/data resets the demo; the five samples load on first start.',
     files: ['server/src/lib/storage.ts'] },
   { id: 'blob', title: 'Vercel Blob (private)', icon: Cloud, summary: 'One private JSON object per file',
-    detail: 'Used when BLOB_READ_WRITE_TOKEN is set. Each file and its metadata are one private object named by its File ID; a new ID is claimed with a create-if-absent write, so two servers never hand out the same one. Updates use ETag checks and return 409 on a conflicting change. On Vercel, startup fails rather than fall back to temporary disk.',
+    detail: 'Used when BLOB_READ_WRITE_TOKEN is set. Each file and its metadata are one private object named by its File ID; a new ID is claimed with a create-if-absent write, so two servers never hand out the same one, and a new result is saved the same way, so an unconfirmed run never overwrites one. Updates use ETag checks and return 409 on a conflicting change. On Vercel, startup fails rather than fall back to temporary disk.',
     files: ['server/src/lib/blob-storage.ts'] },
   { id: 'shared', title: 'Shared contracts', icon: Braces, summary: 'Types used by client and server',
     detail: 'FileMeta, CompareResult, GeneratedFile, the processor list and the comparison and generator limits are defined once and imported by both sides, so request and response shapes cannot silently diverge.',

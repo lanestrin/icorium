@@ -70,6 +70,16 @@ const localStorage = {
     return meta;
   },
 
+  /**
+   * Saves a file under exactly this ID only if no file has it yet; returns undefined, changing
+   * nothing, when one does. The check and the write run in one synchronous step, so a request
+   * running at the same time can never overwrite a result this one created, or the other way round.
+   */
+  createAt(id: string, input: NewFile) {
+    if (metas.some((m) => m.id === id)) return undefined;
+    return localStorage.put(id, input);
+  },
+
   /** Saves a sample under its fixed ID unless that ID is already taken. */
   seed(id: string, input: NewFile) {
     if (!metas.some((m) => m.id === id)) localStorage.put(id, input);
