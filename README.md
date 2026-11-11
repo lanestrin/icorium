@@ -16,7 +16,9 @@ npm run dev       # API on :3001, UI on http://localhost:5173 (Vite picks the ne
 npm run verify    # every test + the production build
 ```
 
-The five synthetic sample CSVs in `sample-data/` (described in `sample-data/README.txt`) are loaded the first time the server starts. To reset the demo, stop the servers, delete `server/data/` and start again.
+The five synthetic sample CSVs in `sample-data/` (described in `sample-data/README.txt`) are loaded the first time the server starts, as File IDs `100001`–`100005`. To reset the demo, stop the servers, delete `server/data/` and start again. Data saved before File IDs is not migrated: the server stops at startup with a message asking you to delete `server/data/` (it never deletes it itself).
+
+**File IDs.** Every file has a File ID. Each upload gets a new six-digit base ID, counting up from `100001` and never reused. A result's ID is its input's ID plus its function's code: `-V` Validation, `-M` Mass, `-C` Classification, e.g. `101010-M`. Re-running a function on the same input replaces that result and keeps its ID. Uploading a downloaded result gives it a new base ID plus its code. Names are labels only, so two inputs with the same name keep separate results. Anything that is not a File ID is treated as an unknown file (404).
 
 ## Tests
 
@@ -86,7 +88,7 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 - Both rows of a duplicate batch ID are marked Invalid; neither is picked as the correct one.
 - Comparison matches rows by batch ID only when every pair of compared files shares IDs (a partner's baseline and follow-up); files from different partners share none, so their rows are matched by position, up to the longest file. The comparison states which was used. A repeated ID is matched occurrence by occurrence, and a blank ID never matches.
 - Only results from the same function and the current column layout can be compared. Regenerate an older result before comparing it with a new one.
-- Re-running a function on the same input replaces the earlier result; there is no version history.
+- Re-running a function on the same input replaces the earlier result under the same File ID; there is no version history. File IDs end at `999999`.
 - Processing is synchronous and handles one file at a time, which suits interview-sized files. Preview lists the first 100 problem rows in detail.
 - Classification thresholds are demo-only, and no purity or recovery is inferred from feed composition.
 - Automated tests cover behavior in jsdom; they do not check real-browser layout or visuals.

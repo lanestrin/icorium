@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import type { FileMeta } from '../../../shared/types';
+import { FIRST_FILE_ID, nextBaseId, parseFileId, type FileMeta, type ProcessorCode } from '../../../shared/types';
 import { httpError, parseCsv } from './csv';
 import { findProblems } from '../processing';
 import { createBlobStorage } from './blob-storage';
@@ -18,14 +17,22 @@ if (process.env.VERCEL && !useBlob && !process.env.RECLAIM_DATA_DIR)
   throw new Error('Connect a private Vercel Blob store with BLOB_READ_WRITE_TOKEN before running the API on Vercel.');
 if (!useBlob) fs.mkdirSync(FILES, { recursive: true });
 let metas: FileMeta[] = !useBlob && fs.existsSync(META) ? JSON.parse(fs.readFileSync(META, 'utf8')) : [];
+// Data saved before File IDs used random IDs. It is demo data, so it is reset rather than migrated,
+// and never deleted automatically.
+if (metas.some((m) => !parseFileId(m.id)))
+  throw new Error(`${DATA} was created before File IDs. Stop the server, delete that folder (it holds demo data only) and start again.`);
 const persist = () => fs.writeFileSync(META, JSON.stringify(metas, null, 2));
 const filePath = (id: string) => path.join(FILES, `${id}.csv`);
+
+/** What saving a file needs; the ID and upload time are set by storage. */
+export type NewFile = Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string };
 
 const localStorage = {
   list: () => [...metas].sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt)),
 
+  /** Anything that is not a File ID is never looked up, so it cannot reach a file path. */
   get(id: string) {
-    const m = metas.find((m) => m.id === id);
+    const m = parseFileId(id) && metas.find((m) => m.id === id);
     if (!m) throw httpError(404, 'File not found');
     return m;
   },
@@ -39,18 +46,30 @@ const localStorage = {
     return meta;
   },
 
-  /** replaceByName: re-running the same processing overwrites the previous result. */
-  save(input: Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string }, replaceByName = false) {
+  /**
+   * Saves a new upload under the next base ID (101010), or, for an uploaded result, that base ID plus
+   * its function's code (101010-M). One process runs these steps without interruption, so two uploads
+   * can never get the same number.
+   */
+  create(input: NewFile, code?: ProcessorCode) {
+    const base = nextBaseId(metas.map((m) => m.id));
+    return localStorage.put(code ? `${base}-${code}` : base, input);
+  },
+
+  /** Saves a file under exactly this ID, replacing any file already there (a re-run result keeps its ID). */
+  put(id: string, input: NewFile) {
+    if (!parseFileId(id)) throw new Error(`Not a File ID: ${id}`);
     const { text, ...rest } = input;
-    if (replaceByName) {
-      metas.filter((m) => m.name === rest.name).forEach((m) => fs.rmSync(filePath(m.id), { force: true }));
-      metas = metas.filter((m) => m.name !== rest.name);
-    }
-    const meta: FileMeta = { ...rest, id: randomUUID(), uploadedAt: new Date().toISOString() };
-    fs.writeFileSync(filePath(meta.id), text);
-    metas.push(meta);
+    const meta: FileMeta = { ...rest, id, uploadedAt: new Date().toISOString() };
+    fs.writeFileSync(filePath(id), text);
+    metas = [...metas.filter((m) => m.id !== id), meta];
     persist();
     return meta;
+  },
+
+  /** Saves a sample under its fixed ID unless that ID is already taken. */
+  seed(id: string, input: NewFile) {
+    if (!metas.some((m) => m.id === id)) localStorage.put(id, input);
   },
 };
 
@@ -93,16 +112,16 @@ export async function reconcileMetadata(store: Store = storage) {
   return { updated, skipped };
 }
 
-/** First run only: load the synthetic CSVs so the demo has data. Delete server/data to reset. */
+/** First run only: load the synthetic CSVs as 100001–100005, in name order. Delete server/data to reset. */
 export async function seedSamples() {
   if (!useBlob && fs.existsSync(META)) return;
-  for (const name of fs.readdirSync(SAMPLES).filter((f) => f.endsWith('.csv')).sort()) {
+  const names = fs.readdirSync(SAMPLES).filter((f) => f.endsWith('.csv')).sort();
+  for (const [i, name] of names.entries()) {
     const text = fs.readFileSync(path.join(SAMPLES, name), 'utf8');
     const { headers, rows } = parseCsv(text);
     const problemRows = findProblems(headers, rows).total;
     const input = { name, text, rows: rows.length, columns: headers.length,
       status: problemRows > 0 ? 'Needs Review' as const : 'Ready' as const, problemRows };
-    if ('seed' in storage) await storage.seed(input);
-    else await storage.save(input);
+    await storage.seed(String(FIRST_FILE_ID + i), input);
   }
 }
