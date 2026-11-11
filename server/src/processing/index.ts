@@ -1,4 +1,4 @@
-import type { Problem, ProblemList, ProcessorId, Row } from '../../../shared/types';
+import { FILE_ID_COLUMN, RESULT_ID_COLUMN, type Problem, type ProblemList, type ProcessorId, type Row } from '../../../shared/types';
 import { getAdapter, type Normalized } from '../adapters';
 import { httpError } from '../lib/csv';
 
@@ -69,6 +69,8 @@ interface Processor {
 }
 
 const STATUS_COLUMNS = ['processing_status', 'validation_errors'];
+// Every result starts its generated columns with its own File ID; the input's file_id stays among the originals.
+const ID_COLUMNS = [RESULT_ID_COLUMN];
 
 // Exact historical suffixes remain readable; new exports only use the current columns.
 const LEGACY_COLUMNS: Record<ProcessorId, string[]> = {
@@ -80,11 +82,11 @@ const LEGACY_COLUMNS: Record<ProcessorId, string[]> = {
 // To add a processing function: add an entry here and to PROCESSORS in shared/types.ts.
 export const processors: Record<ProcessorId, Processor> = {
   validation: {
-    columns: ['composition_total_pct', ...STATUS_COLUMNS],
+    columns: [...ID_COLUMNS, 'composition_total_pct', ...STATUS_COLUMNS],
     run: (n) => ({ composition_total_pct: round(total(n), 2) }),
   },
   mass: {
-    columns: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', ...STATUS_COLUMNS],
+    columns: [...ID_COLUMNS, 'r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', ...STATUS_COLUMNS],
     run: (n, errors) => {
       if (errors.length) return { r32_mass_kg: '', r125_mass_kg: '', r134a_mass_kg: '' };
       const kg = (c: Component) => round((n.massKg! * n[c]!) / 100);
@@ -93,7 +95,7 @@ export const processors: Record<ProcessorId, Processor> = {
   },
   classification: {
     // Uses DEMO_CLASS_RULES; checked in order, first match wins.
-    columns: ['blend_class', 'dominant_component', ...STATUS_COLUMNS],
+    columns: [...ID_COLUMNS, 'blend_class', 'dominant_component', ...STATUS_COLUMNS],
     run: (n, errors) => {
       if (errors.length) return { blend_class: 'Needs review', dominant_component: '' };
       const dominant = COMPONENTS.reduce((a, b) => (n[b]! > n[a]! ? b : a));
@@ -106,10 +108,15 @@ export const processors: Record<ProcessorId, Processor> = {
   },
 };
 
-/** Which processor produced a CSV, judged by its last columns. undefined = an input file. */
+/**
+ * Which processor produced a CSV, judged by its last columns. undefined = an input file. Accepts the
+ * current columns, the same columns without result_id (exports made before File ID columns), and the
+ * older legacy columns.
+ */
 export function detectResult(headers: string[]): { processor: ProcessorId; generatedColumns: string[] } | undefined {
   for (const processor of Object.keys(processors) as ProcessorId[]) {
-    for (const generatedColumns of [processors[processor].columns, LEGACY_COLUMNS[processor]]) {
+    const current = processors[processor].columns;
+    for (const generatedColumns of [current, current.filter((c) => !ID_COLUMNS.includes(c)), LEGACY_COLUMNS[processor]]) {
       if (generatedColumns.every((c, i) => headers[headers.length - generatedColumns.length + i] === c))
         return { processor, generatedColumns: [...generatedColumns] };
     }
@@ -120,8 +127,24 @@ export function detectProcessor(headers: string[]): ProcessorId | undefined {
   return detectResult(headers)?.processor;
 }
 
-/** Runs a processor on every row; keeps all original columns and values and appends generated ones. */
-export function processRows(headers: string[], rows: Row[], id: ProcessorId) {
+/**
+ * Puts File IDs into a CSV's rows. An input gets file_id (added if missing). A result's existing
+ * file_id and result_id are overwritten; they are not added to results that never had them.
+ * Every upload is a new file, so IDs carried in from elsewhere are always replaced.
+ */
+export function stampFileIds(headers: string[], rows: Row[], fileId: string, isResult: boolean) {
+  const base = fileId.split('-')[0];
+  const out = isResult || headers.includes(FILE_ID_COLUMN) ? headers : [...headers, FILE_ID_COLUMN];
+  const stamped = rows.map((r) => ({
+    ...r,
+    ...(out.includes(FILE_ID_COLUMN) ? { [FILE_ID_COLUMN]: base } : {}),
+    ...(isResult && out.includes(RESULT_ID_COLUMN) ? { [RESULT_ID_COLUMN]: fileId } : {}),
+  }));
+  return { headers: out, rows: stamped };
+}
+
+/** Runs a processor on every row; keeps all original columns and values and appends generated ones, starting with result_id. */
+export function processRows(headers: string[], rows: Row[], id: ProcessorId, resultId = '') {
   const p = processors[id];
   const collisions = p.columns.filter((c) => headers.includes(c));
   if (collisions.length) throw httpError(400, `Cannot process this file: source columns conflict with generated columns: ${collisions.join(', ')}. Rename the source columns before processing.`);
@@ -129,6 +152,7 @@ export function processRows(headers: string[], rows: Row[], id: ProcessorId) {
   const out = rows.map((r, i) => {
     const { n, errors } = norm[i];
     const res = {
+      [RESULT_ID_COLUMN]: resultId,
       ...p.run(n, errors),
       processing_status: errors.length ? 'Invalid' : 'Valid',
       validation_errors: errors.join('; '),

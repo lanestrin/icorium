@@ -4,6 +4,7 @@ import { httpError } from './csv';
 
 type StoredFile = { meta: FileMeta; text: string };
 type NewFile = Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string };
+type NewUpload = Omit<NewFile, 'text'> & { text: string | ((id: string) => string) };
 /** How many times create() tries the next number when another server claims it first. */
 const CLAIM_ATTEMPTS = 20;
 
@@ -86,11 +87,12 @@ export function createBlobStorage(prefix: string) {
       return meta;
     },
     /** Saves a new upload under the next unclaimed base ID, or that ID plus a code for an uploaded result. */
-    async create(input: NewFile, code?: ProcessorCode) {
+    async create(input: NewUpload, code?: ProcessorCode) {
       for (let attempt = 0; attempt < CLAIM_ATTEMPTS; attempt++) {
         const baseId = nextBaseId(await names(claimsRoot));
         if (!(await createOnce(`${claimsRoot}${baseId}.json`, '{}'))) continue; // another server took it
-        return store.put(code ? `${baseId}-${code}` : baseId, input);
+        const id = code ? `${baseId}-${code}` : baseId;
+        return store.put(id, { ...input, text: typeof input.text === 'function' ? input.text(id) : input.text });
       }
       throw httpError(503, 'Could not reserve a File ID; please try again.');
     },

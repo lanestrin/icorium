@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1–10.3 merged, 11.1 awaiting review. See section 4.
+**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1–10.3 and 11.1 merged, 11.2 awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,10 +68,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 11.2** `feature/11.2-file-id-columns`, after 11.1 merges: put the File ID
-inside the data (`file_id` on inputs, `result_id` on results) and mark uploaded
-results as Imported. Start with an API test that an upload's stored CSV gains a
-`file_id` column. **Order:**
+**Next: 11.3** `feature/11.3-replace-requires-confirmation`, after 11.2 merges:
+the server refuses to overwrite an existing result (409) unless the request says
+`replace: true`. Start with an API test for a refused re-run. **Order:**
 10.1–10.3, then M11 (11.1–11.5), then 10.4–10.12; M11 changes how files are
 identified and stored, so the P2 refactors build on it.
 New work outside M10 and M11 needs a new request: add it as a new stable
@@ -439,12 +438,12 @@ inside a file (`A-001`).
   - Samples seed as `100001`–`100005` in name order. Document the reset in the README.
   - Update the `CLAUDE.md` "Result file names" rule to the File ID rules, the README and the Architecture page (storage keys, the Upload and Process flows); its content test must still pass.
 
-  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. `PROCESSORS` carries each code; `parseFileId`, `resultFileId` and `nextBaseId` in `shared/types.ts` are the shared rules. Both storage backends offer `create` (next base ID, or base plus code for an uploaded result), `put` (write at an exact ID; re-runs replace) and `seed` (fixed IDs, idempotent), and treat anything that is not a File ID as a 404 before touching storage. Blob stores files at `files/<id>.json` (direct reads) and claims numbers at `claims/<base>.json` with create-if-absent; old `records/` objects are ignored. Local storage refuses to start on pre-File-ID data with a message to delete `server/data` (never deleted automatically). `replaceByName` and the `'seed' in storage` check are gone. The uploaded-result ID (new base + code) is done here; marking it Imported is 11.2.
+  **Result:** merged in PR #31 (`fa493ff`); automated verification and CI passed (2026-11-11). `PROCESSORS` carries each code; `parseFileId`, `resultFileId` and `nextBaseId` in `shared/types.ts` are the shared rules. Both storage backends offer `create` (next base ID, or base plus code for an uploaded result), `put` (write at an exact ID; re-runs replace) and `seed` (fixed IDs, idempotent), and treat anything that is not a File ID as a 404 before touching storage. Blob stores files at `files/<id>.json` (direct reads) and claims numbers at `claims/<base>.json` with create-if-absent; old `records/` objects are ignored. Local storage refuses to start on pre-File-ID data with a message to delete `server/data` (never deleted automatically). `replaceByName` and the `'seed' in storage` check are gone. The uploaded-result ID (new base + code) is done here; marking it Imported is 11.2.
   **Depends on:** 10.1–10.3.
   **Done when:** every upload gets the next unused base ID, even under concurrent uploads; each result's ID is its input's ID plus the function code; a re-run replaces only that ID; two inputs with the same name keep separate results; no route or storage code looks files up by name.
   **Verification:** unit tests for the ID format, parser and next-number rule; storage tests for create-if-absent claims under concurrency on both backends; API tests for upload IDs, result IDs, replace by ID and the same-name case; `npm run verify`.
 
-- [ ] **11.2** `feature/11.2-file-id-columns` · **P1** — The ID travels with the data.
+- [x] **11.2** `feature/11.2-file-id-columns` · **P1** — The ID travels with the data.
   - On upload, append `file_id` (the new base ID, every row). If the CSV already has `file_id` or `result_id` columns (a re-upload), rewrite their values to the new IDs rather than adding duplicates.
   - Processing keeps `file_id` as an original column and adds `result_id` as the first generated column of every function, so results read `…, file_id, result_id, <function columns>, processing_status, validation_errors`.
   - Uploaded results get a new base ID plus their detected function's code and are marked Imported.
@@ -452,6 +451,7 @@ inside a file (`A-001`).
   - Partner adapters ignore the extra columns, so validation and processing results are unchanged.
   - Rename the "uploads and downloads unchanged" tests: a stored input now equals the upload plus `file_id`.
 
+  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. `stampFileIds` (processing) adds or rewrites `file_id` on inputs and rewrites `file_id`/`result_id` on uploaded results; results without ID columns (pre-11.2 exports) are stored exactly as uploaded. Every processor's generated columns start with `result_id`, which `processRows` fills in. `detectResult` also accepts results without `result_id`; the comparison leaves `result_id` out of its schema check and metrics, so older exports still compare with new results. Uploaded results get `imported: true`; samples are stored with their `file_id`. Storage `create` takes the text as a function of the new ID.
   **Depends on:** 11.1.
   **Done when:** every stored input and result carries its IDs on every row; a downloaded file re-uploaded gets new IDs in both its metadata and its columns; comparisons ignore the ID columns; all other values are unchanged.
   **Verification:** API tests for upload, process, download and re-upload of inputs and results, Imported marking, and comparison of results with different IDs; core tests for detection with `result_id`; `npm run verify`.
