@@ -213,7 +213,7 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
     <Modal
       title={file.name}
       subtitle={`File ID ${file.id} · ${file.status === 'Processed'
-        ? `${processorLabel(file.processor)} result · ${file.rows} rows · generated columns highlighted`
+        ? `${processorLabel(file.processor)} result · ${file.rows} rows · ${file.columns} columns · generated columns highlighted`
         : `${file.rows} rows · ${file.columns} columns`}${file.imported ? ` · ${importedLineage(file).short}` : ''}`}
       onClose={onClose}
       actions={

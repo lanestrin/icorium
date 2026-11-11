@@ -42,7 +42,7 @@ This is a demonstration with synthetic refrigerant-batch data, not a production 
 
 - **Left control column:** CSV upload/drop area; three processing functions; selected input filename; **Run Processing** button.
 
-- **Right file workspace:** one-line “CSV Files” heading/subtitle; **separate File ID and Filename columns**; one filter card (since 9.7) with search, upload-date range, processing function and status (**All / Ready / Needs Review / Processing / Processed / Error**) filters and **Clear filters**; **Active Files** / **Archived** tabs with counts (since 9.3) and **Sort by** beside them (since 9.7); scrollable file table with filename, rows, columns, upload date, processing function (since 9.7), status, **Preview** and **Download**.
+- **Right file workspace:** one-line “CSV Files” heading/subtitle; **separate File ID and Filename columns**; one filter card (since 9.7) with search, upload-date range, processing function and status (**All / Ready / Needs Review / Processing / Processed / Error**) filters and **Clear filters**; **Active Files** / **Archived** tabs with counts (since 9.3) and **Sort by** beside them (since 9.7); scrollable file table with File ID, filename, upload date (Archived On and Original Upload in the Archived tab), processing function (since 9.7), status, **Preview** and **Download**; row and column counts appear in **Preview**, not the table (since 9.9).
 
 - **Select files:** every row has a checkbox; a header checkbox selects all visible rows. **Run Processing** processes only the checked original inputs in turn with the chosen function; checked results are ignored by it (since 9.2, results are selectable so they can be archived). While rows are checked, a selection bar at the top of the table offers **Archive N files** (or **Restore N files** in the Archived tab) for the checked rows in view; archived rows also have a ⋯ menu with **Restore file**. Do **not** add compare buttons to each row.
 
@@ -114,9 +114,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 10.5** `chore/dead-and-partial-code` (M11 and 10.4 are done), then 10.6 to 10.12
+**Next: 9.9** `feature/9.9-compact-file-table` (added 2026-11-11), then 10.5 `chore/dead-and-partial-code`
 
-in order. Start with the `Invalid` highlight test in the preview. **Order:**
+and 10.6 to 10.12 in order. Start 9.9 with a component test that neither file tab has Rows or Columns headers. **Order:**
 
 10.1–10.3, then M11 (11.1–11.7, including 11.3a; 11.7 before 11.6), then 10.4–10.12; M11 changes how files are
 
@@ -397,6 +397,20 @@ user confirms before Mass or Classification calculates on a file with problems.
   **Done when:** every section renders; the diagram's components and flows are selectable by mouse and keyboard and name real files; every path, package, card version and quoted limit matches the code; the page is reachable from the other pages.
 
   **Verification:** content test reading the repository (paths, packages, versions, flows, quoted limits and deployment status); component tests for sections, cards, diagram selection and flows, storage and trade-offs, and navigation; `npm run verify`.
+
+- [x] **9.9** `feature/9.9-compact-file-table` · **P2** — Remove the **Rows** and **Columns** columns from the file table in both the **Active Files** and **Archived** tabs, at the person's request on 2026-11-11 (they supplied a compact mockup; it is illustrative, and the Uploaded date stays). Presentation only.
+
+  - Table columns, in order: selection checkbox, **File ID**, **File Name**, **Uploaded** (Active) or **Archived On** and **Original Upload** (Archived, unchanged), **Processing function**, **Status**, **Actions**. Rebalance widths so **File Name** gets the freed space; the table keeps scrolling inside its own region at phone width with no sideways page scroll.
+
+  - The **Preview** header shows, compactly in the existing subtitle and without new cards: filename (title), File ID, total rows, total columns and, for results, the processing function. Today an input shows rows and columns but a result shows only rows.
+
+  - Unchanged: upload, processing, File IDs, archive and restore, 2–5 file comparison, selection and bulk actions, filters and sorting, downloads, API responses and stored metadata (`rows` and `columns` stay in `FileMeta`).
+
+  **Depends on:** 11.5.
+
+  **Done when:** neither tab has Rows or Columns headers or cells; File ID stays its own column; File Name is wider; the preview of an input and of a result both show File ID, row count and column count, and a result also its function; every existing file operation still works.
+
+  **Verification:** component tests for both tabs' headers and cells, the empty-state colspan, and the preview header for an input and a result; existing table, selection, sort and archive tests updated where they relied on the removed columns; `npm run verify`.
 
 ### M10 — Code review fixes
 
