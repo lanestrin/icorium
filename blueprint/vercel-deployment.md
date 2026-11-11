@@ -49,7 +49,8 @@ storage resource, not another named service or a service binding.
   read directly by its ID. A new base number is claimed by creating
   `<namespace>/claims/<base>.json` with "fail if it exists"; a server that loses
   the race takes the next number, so concurrent uploads never share an ID. A
-  re-run result is written to its fixed ID (`101010-M`), last write wins.
+  confirmed re-run (`replace: true`) is written to its fixed ID (`101010-M`),
+  last write wins.
 - Objects saved before File IDs (under `<namespace>/records/`) are not read;
   that demo data is reset, not migrated.
 - Sample creation is idempotent across cold starts (samples take IDs

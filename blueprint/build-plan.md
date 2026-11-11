@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1–10.3 and 11.1 merged, 11.2 awaiting review. See section 4.
+**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1–10.3, 11.1 and 11.2 merged, 11.3 awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,9 +68,10 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 11.3** `feature/11.3-replace-requires-confirmation`, after 11.2 merges:
-the server refuses to overwrite an existing result (409) unless the request says
-`replace: true`. Start with an API test for a refused re-run. **Order:**
+**Next: 11.4** `feature/11.4-replace-confirmation-dialog`, after 11.3 merges:
+the **Replace existing result?** dialog, which sends `replace: true` only for
+the files it lists. Start with a component test that re-running a processed
+file opens the dialog and sends nothing. **Order:**
 10.1–10.3, then M11 (11.1–11.5), then 10.4–10.12; M11 changes how files are
 identified and stored, so the P2 refactors build on it.
 New work outside M10 and M11 needs a new request: add it as a new stable
@@ -451,13 +452,14 @@ inside a file (`A-001`).
   - Partner adapters ignore the extra columns, so validation and processing results are unchanged.
   - Rename the "uploads and downloads unchanged" tests: a stored input now equals the upload plus `file_id`.
 
-  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. `stampFileIds` (processing) adds or rewrites `file_id` on inputs and rewrites `file_id`/`result_id` on uploaded results; results without ID columns (pre-11.2 exports) are stored exactly as uploaded. Every processor's generated columns start with `result_id`, which `processRows` fills in. `detectResult` also accepts results without `result_id`; the comparison leaves `result_id` out of its schema check and metrics, so older exports still compare with new results. Uploaded results get `imported: true`; samples are stored with their `file_id`. Storage `create` takes the text as a function of the new ID.
+  **Result:** merged in PR #32 (`52edfb2`); automated verification and CI passed (2026-11-11). `stampFileIds` (processing) adds or rewrites `file_id` on inputs and rewrites `file_id`/`result_id` on uploaded results; results without ID columns (pre-11.2 exports) are stored exactly as uploaded. Every processor's generated columns start with `result_id`, which `processRows` fills in. `detectResult` also accepts results without `result_id`; the comparison leaves `result_id` out of its schema check and metrics, so older exports still compare with new results. Uploaded results get `imported: true`; samples are stored with their `file_id`. Storage `create` takes the text as a function of the new ID.
   **Depends on:** 11.1.
   **Done when:** every stored input and result carries its IDs on every row; a downloaded file re-uploaded gets new IDs in both its metadata and its columns; comparisons ignore the ID columns; all other values are unchanged.
   **Verification:** API tests for upload, process, download and re-upload of inputs and results, Imported marking, and comparison of results with different IDs; core tests for detection with `result_id`; `npm run verify`.
 
-- [ ] **11.3** `feature/11.3-replace-requires-confirmation` · **P1** — The server refuses to overwrite a result unless asked. `POST /api/process` returns 409 with the existing result's ID and name when the result exists and `replace` is not `true`; with `replace: true` it overwrites and keeps the ID, returning an archived result to Active Files.
+- [x] **11.3** `feature/11.3-replace-requires-confirmation` · **P1** — The server refuses to overwrite a result unless asked. `POST /api/process` returns 409 with the existing result's ID and name when the result exists and `replace` is not `true`; with `replace: true` it overwrites and keeps the ID, returning an archived result to Active Files.
 
+  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. `POST /api/process` takes an optional `replace` (default `false`). When the result ID already exists and `replace` is not `true`, it answers 409 with a `ReplaceConflict` (`shared/types.ts`): a message naming the input and the result ID, and `existing` with the result's `id`, `name` and `archived`, so 11.4 can say when it is archived. A refusal processes nothing and writes nothing. A confirmed re-run saves new metadata under the same ID, so an archived result returns to Active Files. The existence check and the write are not one atomic step: two first runs of the same result at once both write it, with the same content. API tests that use the shared samples confirm their re-runs; the client is unchanged, so until 11.4 a re-run in the app shows the 409 message as that file's error.
   **Depends on:** 11.1.
   **Done when:** no request can overwrite an existing result without `replace: true`; the 409 names the result; a first run needs no flag.
   **Verification:** API tests for first run, refused re-run, confirmed re-run (same ID, new content) and replacing an archived result; `npm run verify`.

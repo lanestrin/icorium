@@ -60,6 +60,12 @@ export interface FileMeta {
   imported?: boolean; // an uploaded result: its original input is not in this workspace
 }
 
+/** POST /api/process answers 409 with this when the result exists and the request did not send replace: true. */
+export interface ReplaceConflict {
+  message: string;
+  existing: Pick<FileMeta, 'id' | 'name' | 'archived'>;
+}
+
 /** Both clean and invalid input files can be processed; result files cannot. */
 export const isInputFile = (file: FileMeta) => file.status === 'Ready' || file.status === 'Needs Review';
 
