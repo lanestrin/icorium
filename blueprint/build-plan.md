@@ -726,7 +726,7 @@ The filename `data.csv` is permitted for every row above. A partner may name a f
 
   **Verification:** component tests for a single re-run, a mixed batch, a combined warning, Cancel, Run & Replace, a 409 from a stale list, keyboard use (focus, Escape) and double clicks; `npm run verify`.
 
-- [ ] **11.5** `feature/11.5-show-file-ids` · **P1** — Show **File ID and Filename as separate columns** in Active and Archived file tables. Search by either ID or filename; preview, comparison chips and processing selection show both independently. An **Imported** marker explains imported result files and missing original linkage. Sorting by File ID groups originals with suffixed results without relying on filename. Duplicate filenames must remain distinguishable by ID.
+- [x] **11.5** `feature/11.5-show-file-ids` · **P1** — Show **File ID and Filename as separate columns** in Active and Archived file tables. Search by either ID or filename; preview, comparison chips and processing selection show both independently. An **Imported** marker explains imported result files and missing original linkage. Sorting by File ID groups originals with suffixed results without relying on filename. Duplicate filenames must remain distinguishable by ID.
 
   **Depends on:** 11.1 and 11.2.
 

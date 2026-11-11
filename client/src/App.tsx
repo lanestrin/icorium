@@ -96,10 +96,12 @@ export default function App() {
     setSelectedIds((s) => { const n = new Set(s); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; });
   const visible = useMemo(
     () => {
+      const query = search.toLowerCase();
       const shown = files.filter((f) => {
         const day = new Date(f.uploadedAt).toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
         return (
-          f.name.toLowerCase().includes(search.toLowerCase()) &&
+          // Search finds files by name or File ID: "101010" finds the input and its results.
+          (f.name.toLowerCase().includes(query) || f.id.toLowerCase().includes(query)) &&
           // Each tab shows only its own files; the status filter applies within the tab.
           !!f.archived === viewArchived &&
           (status === 'All' || displayStatus(f, processingId, failedIds) === status) &&
@@ -244,7 +246,7 @@ export default function App() {
           canRun={selectedInputs.length > 0 && !processingId && !archiving}
           running={!!processingId}
           uploading={uploading}
-          selectedNames={selectedInputs.map((f) => f.name)}
+          selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
         />
 
         <main className="min-w-0 flex-1">
@@ -264,7 +266,7 @@ export default function App() {
           <div role="search" aria-label="Filter files" className="mt-5 flex flex-wrap items-stretch gap-3 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm">
             <label className={`${FIELD} min-w-0 sm:min-w-64 sm:flex-1`}>
               <Search className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
-              <input aria-label="Search file name" className="w-full min-w-0 bg-transparent py-1.5 outline-none" placeholder="Search file name..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input aria-label="Search file ID or name" className="w-full min-w-0 bg-transparent py-1.5 outline-none" placeholder="Search file ID or name..." value={search} onChange={(e) => setSearch(e.target.value)} />
             </label>
             <Divider />
             <div role="group" aria-labelledby="date-range-label" className={FIELD}>

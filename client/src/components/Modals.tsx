@@ -211,9 +211,9 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
   return (
     <Modal
       title={file.name}
-      subtitle={file.status === 'Processed'
+      subtitle={`File ID ${file.id} · ${file.status === 'Processed'
         ? `${processorLabel(file.processor)} result · ${file.rows} rows · generated columns highlighted`
-        : `${file.rows} rows · ${file.columns} columns`}
+        : `${file.rows} rows · ${file.columns} columns`}${file.imported ? ' · Imported: original input not linked' : ''}`}
       onClose={onClose}
       actions={
         <a href={api.downloadUrl(file.id)} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50">

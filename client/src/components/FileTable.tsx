@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Check, CircleAlert, Download, Eye, FileSpreadsheet, Layers, LoaderCircle, MoreHorizontal, RotateCcw, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { resultFileId, type FileMeta, type ProcessorId } from '../../../shared/types';
+import { parseFileId, PROCESSORS, resultFileId, type FileMeta, type ProcessorId } from '../../../shared/types';
 import { api } from '../api';
 
 export type Status = FileMeta['status'] | 'Processing' | 'Error';
@@ -65,7 +65,7 @@ export const PROCESSING_FUNCTIONS = ['Original', ...Object.values(FUNCTION_LABEL
 export const processingFunction = (f: FileMeta) =>
   f.status !== 'Processed' ? 'Original' : f.processor ? FUNCTION_LABEL[f.processor] : '—';
 
-export type SortKey = 'archived-desc' | 'uploaded-desc' | 'uploaded-asc' | 'name-asc' | 'name-desc';
+export type SortKey = 'archived-desc' | 'uploaded-desc' | 'uploaded-asc' | 'name-asc' | 'name-desc' | 'id-asc' | 'id-desc';
 /** Sort by choices. "Archived (newest)" is offered only in the Archived tab, where it is the default. */
 export const SORT_OPTIONS: { key: SortKey; label: string; archivedOnly?: boolean }[] = [
   { key: 'archived-desc', label: 'Archived (newest)', archivedOnly: true },
@@ -73,9 +73,33 @@ export const SORT_OPTIONS: { key: SortKey; label: string; archivedOnly?: boolean
   { key: 'uploaded-asc', label: 'Uploaded (oldest)' },
   { key: 'name-asc', label: 'Name (A–Z)' },
   { key: 'name-desc', label: 'Name (Z–A)' },
+  { key: 'id-asc', label: 'File ID (low–high)' },
+  { key: 'id-desc', label: 'File ID (high–low)' },
 ];
 
 const byName = (a: FileMeta, b: FileMeta) => a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' });
+
+/**
+ * Where a File ID sorts: its base number, then its place in that group (the original first, then
+ * results in PROCESSORS order: -V, -M, -C). Anything that is not a File ID sorts after every File ID.
+ */
+function idPosition(id: string): { base: number; place: number } {
+  const parsed = parseFileId(id);
+  if (!parsed) return { base: Infinity, place: 0 };
+  const place = parsed.code ? PROCESSORS.findIndex((p) => p.code === parsed.code) + 1 : 0;
+  return { base: Number(parsed.base), place };
+}
+
+/** By base number in the given direction; within one base the original and its results keep their fixed order. */
+const byId = (descending: boolean) => (a: FileMeta, b: FileMeta) => {
+  const x = idPosition(a.id);
+  const y = idPosition(b.id);
+  if (x.base !== y.base) {
+    if (x.base === Infinity || y.base === Infinity) return x.base === Infinity ? 1 : -1;
+    return descending ? y.base - x.base : x.base - y.base;
+  }
+  return x.place - y.place;
+};
 /** A sorted copy. Ties keep their existing order. Files archived before the date was kept sort last. */
 export function sortFiles(files: FileMeta[], key: SortKey): FileMeta[] {
   const compare: Record<SortKey, (a: FileMeta, b: FileMeta) => number> = {
@@ -84,9 +108,14 @@ export function sortFiles(files: FileMeta[], key: SortKey): FileMeta[] {
     'uploaded-asc': (a, b) => a.uploadedAt.localeCompare(b.uploadedAt),
     'name-asc': byName,
     'name-desc': (a, b) => byName(b, a),
+    'id-asc': byId(false),
+    'id-desc': byId(true),
   };
   return [...files].sort(compare[key]);
 }
+
+/** Why an imported result has no original: shown on the Imported marker and in the preview. */
+export const IMPORTED_NOTE = 'Uploaded result file. Its original input is not linked in this workspace.';
 
 export const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -136,6 +165,7 @@ function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onP
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const label = `Actions for ${file.id} ${file.name}`;
   const items = () => [...(box.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
 
   useEffect(() => {
@@ -162,7 +192,7 @@ function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onP
     <div ref={box} className="relative inline-block" onClick={(e) => e.stopPropagation()} onKeyDown={onKeyDown}>
       <button
         ref={trigger}
-        aria-label={`Actions for ${file.name}`}
+        aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -171,7 +201,7 @@ function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onP
         <MoreHorizontal className="h-4 w-4" />
       </button>
       {open && (
-        <div role="menu" aria-label={`Actions for ${file.name}`} className="absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+        <div role="menu" aria-label={label} className="absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
           <button role="menuitem" tabIndex={-1} className={ITEM} onClick={() => choose(onPreview)}>
             <Eye className="h-4 w-4" /> Preview file
           </button>
@@ -186,6 +216,9 @@ function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onP
     </div>
   );
 }
+
+/** The table columns a sort can be on: each SortKey starts with one of these. */
+type SortColumn = 'id' | 'name' | 'uploaded' | 'archived';
 
 const CHECKBOX = 'h-[18px] w-[18px] cursor-pointer rounded accent-blue-600 disabled:cursor-not-allowed disabled:opacity-40';
 
@@ -211,15 +244,15 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
   const ids = files.map((f) => f.id);
   const checkedCount = ids.filter((id) => selectedIds.has(id)).length;
   const allChecked = ids.length > 0 && checkedCount === ids.length;
-  const columns = archived ? 9 : 8;
+  const columns = archived ? 10 : 9;
   // aria-sort and an arrow on whichever column the list is sorted by.
-  const sortedBy = (column: 'name' | 'uploaded' | 'archived') => {
+  const sortedBy = (column: SortColumn) => {
     if (!sort.startsWith(column)) return {};
     const descending = sort.endsWith('desc');
     const Arrow = descending ? ArrowDown : ArrowUp;
     return { 'aria-sort': descending ? 'descending' as const : 'ascending' as const, arrow: <Arrow className="h-3.5 w-3.5" aria-hidden /> };
   };
-  const header = (label: string, column: 'name' | 'uploaded' | 'archived', className: string) => {
+  const header = (label: string, column: SortColumn, className: string) => {
     const { arrow, ...aria } = sortedBy(column);
     return <th className={className} {...aria}><span className="inline-flex items-center gap-1">{label}{arrow}</span></th>;
   };
@@ -235,7 +268,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
         tabIndex={0}
         className="overflow-auto rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:max-h-[calc(100vh-17rem)]"
       >
-        <table className={`w-full text-sm ${archived ? 'min-w-[1220px]' : 'min-w-[1060px]'}`}>
+        <table className={`w-full text-sm ${archived ? 'min-w-[1340px]' : 'min-w-[1180px]'}`}>
           <thead>
             <tr className="text-left text-slate-700 [&>th]:sticky [&>th]:top-0 [&>th]:z-[1] [&>th]:bg-slate-50 [&>th]:py-3 [&>th]:font-semibold">
               <th className="w-14 rounded-l-xl pl-6">
@@ -249,7 +282,8 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   onChange={() => onToggleAll(ids, !allChecked)}
                 />
               </th>
-              {header('File Name', 'name', 'pl-1')}
+              {header('File ID', 'id', 'pl-1 pr-4')}
+              {header('File Name', 'name', '')}
               <th className="px-3 text-center">Rows</th>
               <th className="px-3 text-center">Columns</th>
               {archived ? (
@@ -280,14 +314,22 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                     <input
                       type="checkbox"
                       className={CHECKBOX}
-                      aria-label={`Select ${f.name}`}
+                      aria-label={`Select ${f.id} ${f.name}`}
                       checked={checked}
                       disabled={!selectable}
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => onToggle(f.id)}
                     />
                   </td>
-                  <td className="py-2.5 pl-1 pr-4 font-semibold">
+                  <td className="whitespace-nowrap py-2.5 pl-1 pr-4 tabular-nums">
+                    <span className="flex items-center gap-2">
+                      {f.id}
+                      {f.imported && (
+                        <span title={IMPORTED_NOTE} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">Imported</span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="py-2.5 pr-4 font-semibold">
                     <span className="flex items-center gap-3">
                       <FileSpreadsheet className="h-5 w-5 shrink-0 text-green-600" strokeWidth={1.5} aria-hidden />
                       {f.name}
@@ -320,7 +362,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                           href={api.downloadUrl(f.id)}
                           onClick={(e) => e.stopPropagation()}
                           title="Download CSV"
-                          aria-label={`Download ${f.name}`}
+                          aria-label={`Download ${f.id} ${f.name}`}
                           className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50"
                         >
                           <Download className="h-4 w-4" />
