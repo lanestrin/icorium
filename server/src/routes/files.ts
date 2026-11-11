@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { COMPARE_MAX, COMPARE_MIN, GENERATOR_PARTNERS, type FileMeta } from '../../../shared/types';
+import { codeOf, COMPARE_MAX, COMPARE_MIN, GENERATOR_PARTNERS, resultFileId, type FileMeta } from '../../../shared/types';
 import { getAdapter } from '../adapters';
 import { detectResult, findProblems, processRows } from '../processing';
 import { compareResults } from '../lib/compare';
@@ -57,10 +57,11 @@ export async function fileRoutes(app: FastifyInstance) {
     const { headers, rows } = parseCsv(text);
     getAdapter(headers);
     const base = { name: file.filename, text, rows: rows.length, columns: headers.length, problemRows: findProblems(headers, rows).total };
-    // A previously exported result is registered as a result, so it can be compared in a later session.
+    // Every upload gets a new base File ID. A previously exported result is registered as a result,
+    // with that new base ID plus its function's code (e.g. 101012-M), so it can be compared later.
     const result = detectResult(headers);
-    if (result) return storage.save({ ...base, status: 'Processed', ...result });
-    return storage.save({ ...base, status: base.problemRows > 0 ? 'Needs Review' : 'Ready' });
+    if (result) return storage.create({ ...base, status: 'Processed', ...result }, codeOf(result.processor));
+    return storage.create({ ...base, status: base.problemRows > 0 ? 'Needs Review' : 'Ready' });
   });
 
   app.get<IdParams>('/files/:id/rows', async (req) => {
@@ -102,7 +103,10 @@ export async function fileRoutes(app: FastifyInstance) {
     const { headers, rows } = parseCsv(await storage.read(fileId));
     const out = processRows(headers, rows, processor);
     const base = meta.name.replace(/\.csv$/i, '');
-    return storage.save(
+    // The result's File ID is the input's ID plus the function's code. Running the same function on the
+    // same input again replaces that result and keeps its ID; the name is only a label.
+    return storage.put(
+      resultFileId(meta.id, processor),
       {
         name: `result_${base}_${processor}.csv`,
         text: toCsv(out.headers, out.rows),
@@ -114,7 +118,6 @@ export async function fileRoutes(app: FastifyInstance) {
         generatedColumns: out.generated,
         problemRows: out.problemRows,
       },
-      true,
     );
   });
 

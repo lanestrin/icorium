@@ -171,14 +171,14 @@ export const NODES: ArchNode[] = [
   { id: 'generator', title: 'CSV generator', icon: Wand2, summary: 'Synthetic partner files, nothing saved',
     detail: 'Makes 1–10 synthetic CSVs in a partner’s own format, with an exact number of rows that fail validation. It saves nothing: the browser downloads the files or uploads them through the normal upload.',
     files: ['server/src/lib/generate.ts', 'client/src/components/GeneratorPage.tsx'] },
-  { id: 'storage', title: 'Storage layer', icon: Layers, summary: 'list · get · read · patch · save',
-    detail: 'The only module that touches persistence. Routes call the same five operations whichever backend is active; the backend is chosen once at startup from the environment.',
+  { id: 'storage', title: 'Storage layer', icon: Layers, summary: 'Files keyed by File ID',
+    detail: 'The only module that touches persistence. Files are stored and found by File ID (101010, 101010-M), never by name. Routes call the same operations whichever backend is active: list, get, read, patch, create (claims the next ID) and put (writes a result at its ID); the backend is chosen once at startup from the environment.',
     files: ['server/src/lib/storage.ts'] },
   { id: 'local', title: 'Local filesystem', icon: HardDrive, summary: 'server/data: CSV files + meta.json',
     detail: 'Used when no Blob token is set. Each CSV is a file under server/data/files and all metadata is one meta.json. Deleting server/data resets the demo; the five samples load on first start.',
     files: ['server/src/lib/storage.ts'] },
   { id: 'blob', title: 'Vercel Blob (private)', icon: Cloud, summary: 'One private JSON object per file',
-    detail: 'Used when BLOB_READ_WRITE_TOKEN is set. Each file and its metadata are one private object; updates use ETag checks and return 409 on a conflicting change. On Vercel, startup fails rather than fall back to temporary disk.',
+    detail: 'Used when BLOB_READ_WRITE_TOKEN is set. Each file and its metadata are one private object named by its File ID; a new ID is claimed with a create-if-absent write, so two servers never hand out the same one. Updates use ETag checks and return 409 on a conflicting change. On Vercel, startup fails rather than fall back to temporary disk.',
     files: ['server/src/lib/blob-storage.ts'] },
   { id: 'shared', title: 'Shared contracts', icon: Braces, summary: 'Types used by client and server',
     detail: 'FileMeta, CompareResult, GeneratedFile, the processor list and the comparison and generator limits are defined once and imported by both sides, so request and response shapes cannot silently diverge.',
@@ -196,7 +196,7 @@ export const FLOWS: Flow[] = [
     { node: 'csv', text: 'Papa Parse reads headers and rows; malformed files are rejected.' },
     { node: 'adapters', text: 'The headers must match a partner adapter, or the upload is refused.' },
     { node: 'validation', text: 'Every row is checked; the invalid-row count sets Ready or Needs Review.' },
-    { node: 'storage', text: 'The CSV and its metadata are saved; the metadata goes back to the browser.' },
+    { node: 'storage', text: 'The CSV and its metadata are saved under the next File ID; the metadata goes back to the browser.' },
   ] },
   { id: 'process', label: 'Process', steps: [
     { node: 'browser', text: 'The person ticks inputs, picks a function and runs it (after a warning if rows are invalid).' },
@@ -208,7 +208,7 @@ export const FLOWS: Flow[] = [
     { node: 'validation', text: 'Each row is validated with the shared rules.' },
     { node: 'processing', text: 'The chosen function calculates valid rows only.' },
     { node: 'results', text: 'Original columns are kept and generated columns appended.' },
-    { node: 'storage', text: 'The result CSV is saved, replacing an earlier run; the browser then previews it via GET /api/files/:id/rows.' },
+    { node: 'storage', text: 'The result CSV is saved as the input’s ID plus the function’s code (101010-M), replacing an earlier run; the browser then previews it via GET /api/files/:id/rows.' },
   ] },
   { id: 'compare', label: 'Compare', steps: [
     { node: 'browser', text: 'The person ticks 2–5 results of one function and clicks Compare.' },
@@ -525,7 +525,7 @@ export function ArchitecturePage() {
               <ArrowDown className="my-2 h-5 w-5 text-slate-400" aria-hidden />
               <div className="w-full max-w-md rounded-xl border-2 border-blue-500 bg-blue-50 px-4 py-3 text-center">
                 <p className="font-semibold text-blue-800">storage</p>
-                <p className="font-mono text-xs text-blue-800">list · get · read · patch · save</p>
+                <p className="font-mono text-xs text-blue-800">list · get · read · patch · create · put</p>
               </div>
               <svg viewBox="0 0 300 40" className="h-10 w-full max-w-2xl" aria-hidden preserveAspectRatio="none">
                 <path d="M150 0 V14 M50 14 H250 M50 14 V40 M150 14 V40 M250 14 V40" stroke="#94a3b8" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
@@ -549,7 +549,7 @@ export function ArchitecturePage() {
               </div>
             </div>
             <p className="mt-4 text-sm text-slate-600">
-              The app is not tied to Vercel. Hosting elsewhere would mean adding one more backend with the same five operations in{' '}
+              The app is not tied to Vercel. Hosting elsewhere would mean adding one more backend with the same operations in{' '}
               <Path>server/src/lib</Path> and choosing it at startup; routes, validation and processing would not change.
             </p>
           </div>

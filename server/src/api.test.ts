@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import type { CompareResult, FileMeta, FileRows, GeneratedBatch, ProcessorId } from '../../shared/types';
+import { codeOf, type CompareResult, type FileMeta, type FileRows, type GeneratedBatch, type ProcessorId } from '../../shared/types';
 import { parseCsv } from './lib/csv';
 import { processors } from './processing';
 
@@ -31,6 +31,7 @@ describe('loading files', () => {
       'partner_a_baseline.csv', 'partner_a_followup.csv', 'partner_b_baseline.csv', 'partner_b_followup.csv', 'partner_c_baseline.csv',
     ]);
     for (const f of files) expect(f).toMatchObject({ status: 'Needs Review', rows: 25, columns: 6, problemRows: f.name === 'partner_b_followup.csv' ? 2 : 1 });
+    expect(files.map((f) => f.id)).toEqual(['100001', '100002', '100003', '100004', '100005']); // File IDs in name order
   });
 
   it('accepts an upload, previews its rows and downloads it unchanged', async () => {
@@ -153,7 +154,8 @@ describe('processing', () => {
   it('replaces the earlier result when the same function runs again', async () => {
     const first = await processSample('partner_a_baseline.csv', 'classification');
     const second = await processSample('partner_a_baseline.csv', 'classification');
-    expect(second.id).not.toBe(first.id);
+    expect(second.id).toBe(first.id); // the same result ID, replaced
+    expect(second.id).toBe(`${(await fileNamed('partner_a_baseline.csv')).id}-C`);
     expect((await listFiles()).filter((f) => f.name === 'result_partner_a_baseline_classification.csv')).toHaveLength(1);
   });
 
@@ -406,7 +408,8 @@ describe('input review status', () => {
     await storage.patch(result.id, { problemRows: undefined });
     const read = vi.spyOn(storage, 'read');
     const patch = vi.spyOn(storage, 'patch');
-    const save = vi.spyOn(storage, 'save');
+    const create = vi.spyOn(storage, 'create');
+    const put = vi.spyOn(storage, 'put');
     try {
       // Listing is a pure read: it shows what is stored and never reads CSVs or writes.
       const stale = await listFiles();
@@ -414,7 +417,8 @@ describe('input review status', () => {
       expect(stale.find((f) => f.id === missing.id)?.problemRows).toBeUndefined();
       expect(read).not.toHaveBeenCalled();
       expect(patch).not.toHaveBeenCalled();
-      expect(save).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+      expect(put).not.toHaveBeenCalled();
 
       const { updated, skipped } = await reconcileMetadata();
       expect(updated.sort()).toEqual([cleanMeta.name, invalid.name, missing.name, result.name].sort());
@@ -433,14 +437,14 @@ describe('input review status', () => {
       expect((await reconcileMetadata()).updated).toEqual([]); // nothing left to correct
       expect(read).not.toHaveBeenCalled();
       expect(patch).not.toHaveBeenCalled();
-    } finally { read.mockRestore(); patch.mockRestore(); save.mockRestore(); }
+    } finally { read.mockRestore(); patch.mockRestore(); create.mockRestore(); put.mockRestore(); }
     for (const [meta, text] of [[cleanMeta, clean], [invalid, clean.replace(',100,', ',,')], [missing, clean.replace(',100,', ',,')]] as const)
       expect((await app.inject(`/api/files/${meta.id}/download`)).body).toBe(text);
   });
 
   it('skips a stored file it cannot read instead of failing startup or the list', async () => {
     const { storage, reconcileMetadata } = await import('./lib/storage');
-    const broken = await storage.save({ name: 'unreadable_old_file.csv', text: 'batch_id,sample_date\nA-1,2026-09-01,extra\n', rows: 1, columns: 2, status: 'Ready' });
+    const broken = await storage.create({ name: 'unreadable_old_file.csv', text: 'batch_id,sample_date\nA-1,2026-09-01,extra\n', rows: 1, columns: 2, status: 'Ready' });
     expect((await reconcileMetadata()).skipped).toEqual([broken.name]);
     const listed = await app.inject('/api/files');
     expect(listed.statusCode).toBe(200);
@@ -480,8 +484,8 @@ describe('legacy result compatibility', () => {
     const { storage } = await import('./lib/storage');
     const saved = await Promise.all((['validation', 'mass', 'classification'] as const).map(async (id) => {
       const text = legacyCsv(id);
-      const meta = await storage.save({ name: `persisted_${id}.csv`, text, rows: 1, columns: originalHeaders.length + legacy[id].columns.length,
-        status: 'Processed', processor: id, generatedColumns: legacy[id].columns, problemRows: 0 });
+      const meta = await storage.create({ name: `persisted_${id}.csv`, text, rows: 1, columns: originalHeaders.length + legacy[id].columns.length,
+        status: 'Processed', processor: id, generatedColumns: legacy[id].columns, problemRows: 0 }, codeOf(id));
       return { meta, text };
     }));
     vi.resetModules();
@@ -507,6 +511,78 @@ describe('legacy result compatibility', () => {
       const other = files.find((f) => f.name === 'old_mass.csv')!;
       expect((await restarted.inject(`/api/compare?ids=${saved[1].meta.id},${other.id}`)).statusCode).toBe(200);
     } finally { await restarted.close(); }
+  });
+});
+
+describe('File IDs', () => {
+  const csv = sample('partner_a_baseline.csv');
+
+  it('gives every upload the next base ID, even for the same file', async () => {
+    const first = (await upload('ids_first.csv', csv)).json<FileMeta>();
+    const again = (await upload('ids_first.csv', csv)).json<FileMeta>();
+    expect(first.id).toMatch(/^\d{6}$/);
+    expect(Number(again.id)).toBe(Number(first.id) + 1);
+  });
+
+  it('names each result after its input ID and function code, and keeps the name as a label', async () => {
+    const input = (await upload('ids_input.csv', csv)).json<FileMeta>();
+    for (const processor of ['validation', 'mass', 'classification'] as const) {
+      const result = (await processFile(input.id, processor)).json<FileMeta>();
+      expect(result).toMatchObject({ id: `${input.id}-${codeOf(processor)}`, sourceId: input.id, name: `result_ids_input_${processor}.csv` });
+    }
+  });
+
+  it('keeps separate results for two inputs with the same name', async () => {
+    const a = (await upload('twin.csv', csv)).json<FileMeta>();
+    const b = (await upload('twin.csv', sample('partner_a_followup.csv'))).json<FileMeta>();
+    const ra = (await processFile(a.id, 'mass')).json<FileMeta>();
+    const rb = (await processFile(b.id, 'mass')).json<FileMeta>();
+    expect([ra.id, rb.id]).toEqual([`${a.id}-M`, `${b.id}-M`]);
+    const results = (await listFiles()).filter((f) => f.name === 'result_twin_mass.csv');
+    expect(results.map((f) => f.id).sort()).toEqual([ra.id, rb.id].sort()); // neither replaced the other
+    expect((await rowsOf(ra.id)).rows[7].r32_mass_kg).toBe(''); // a's row 8 has no mass
+    expect((await rowsOf(rb.id)).rows[7].r32_mass_kg).not.toBe('');
+  });
+
+  it('replaces a re-run result in place, keeping its ID and nothing else', async () => {
+    const input = (await upload('rerun_ids.csv', csv)).json<FileMeta>();
+    const first = (await processFile(input.id, 'validation')).json<FileMeta>();
+    const second = (await processFile(input.id, 'validation')).json<FileMeta>();
+    expect(second.id).toBe(first.id);
+    expect((await listFiles()).filter((f) => f.id === first.id)).toEqual([second]);
+  });
+
+  it('gives an uploaded result a new base ID plus its function code', async () => {
+    const input = (await upload('export_source.csv', csv)).json<FileMeta>();
+    const result = (await processFile(input.id, 'mass')).json<FileMeta>();
+    const text = (await app.inject(`/api/files/${result.id}/download`)).body;
+    const imported = (await upload('my_copy.csv', text)).json<FileMeta>();
+    expect(imported.id).toMatch(/^\d{6}-M$/);
+    expect(Number(imported.id.slice(0, 6))).toBeGreaterThan(Number(input.id));
+    expect(imported).toMatchObject({ status: 'Processed', processor: 'mass' });
+  });
+
+  it.each(['abc', '..%2Fmeta', '100000', '10101', '101010-m', '101010-X', '1010100'])('treats %s as an unknown file', async (id) => {
+    expect((await app.inject(`/api/files/${id}/rows`)).statusCode).toBe(404);
+    expect((await app.inject(`/api/files/${id}/download`)).statusCode).toBe(404);
+    expect((await processFile(id, 'mass')).statusCode).toBe(404);
+    expect((await app.inject({ method: 'POST', url: '/api/files/archive', payload: { ids: [id], archived: true } })).statusCode).toBe(404);
+  });
+
+  it('refuses to start on data saved before File IDs, without deleting it', async () => {
+    const old = fs.mkdtempSync(path.join(os.tmpdir(), 'reclaim-old-'));
+    const meta = path.join(old, 'meta.json');
+    fs.writeFileSync(meta, JSON.stringify([{ id: '0b6c5a8e-3c1f-4e7a-9f2d-6d1a2b3c4d5e', name: 'old.csv', rows: 1, columns: 6, uploadedAt: '', status: 'Ready' }]));
+    vi.stubEnv('RECLAIM_DATA_DIR', old);
+    vi.resetModules();
+    try {
+      await expect(import('./lib/storage')).rejects.toThrow(/created before File IDs\. Stop the server, delete that folder/);
+      expect(fs.existsSync(meta)).toBe(true);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+      fs.rmSync(old, { recursive: true, force: true });
+    }
   });
 });
 

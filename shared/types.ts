@@ -1,10 +1,44 @@
+// code: the fixed letter a result's File ID ends with (101010-V). Never change or reuse a code.
 export const PROCESSORS = [
-  { id: 'validation', label: 'Composition Validation', short: 'Validation', description: 'Check mixture percentages (≈100%)' },
-  { id: 'mass', label: 'Component Mass Calculation', short: 'Mass', description: 'Calculate mass of each refrigerant (kg)' },
-  { id: 'classification', label: 'Batch Classification', short: 'Classification', description: 'Categorize batches by composition' },
+  { id: 'validation', code: 'V', label: 'Composition Validation', short: 'Validation', description: 'Check mixture percentages (≈100%)' },
+  { id: 'mass', code: 'M', label: 'Component Mass Calculation', short: 'Mass', description: 'Calculate mass of each refrigerant (kg)' },
+  { id: 'classification', code: 'C', label: 'Batch Classification', short: 'Classification', description: 'Categorize batches by composition' },
 ] as const;
 
 export type ProcessorId = (typeof PROCESSORS)[number]['id'];
+export type ProcessorCode = (typeof PROCESSORS)[number]['code'];
+
+/*
+ * File IDs. Every upload gets a new six-digit base ID, counting up from 100001 and never reused.
+ * A result's ID is its input's base ID, a dash and its function's code: 101010-V, 101010-M, 101010-C.
+ * IDs are always uppercase; anything else is not a File ID.
+ */
+export const FIRST_FILE_ID = 100001;
+export const LAST_FILE_ID = 999999;
+const FILE_ID = new RegExp(`^(\\d{6})(?:-([${PROCESSORS.map((p) => p.code).join('')}]))?$`);
+
+/** The parts of a File ID, or undefined when the text is not one. */
+export function parseFileId(id: string): { base: string; code?: ProcessorCode } | undefined {
+  const m = FILE_ID.exec(id);
+  if (!m || Number(m[1]) < FIRST_FILE_ID) return undefined;
+  return { base: m[1], code: m[2] as ProcessorCode | undefined };
+}
+
+export const codeOf = (processor: ProcessorId): ProcessorCode => PROCESSORS.find((p) => p.id === processor)!.code;
+
+/** The ID of the result a function makes from an input: 101010 + mass = 101010-M. */
+export const resultFileId = (inputId: string, processor: ProcessorId) => `${inputId}-${codeOf(processor)}`;
+
+/** The base number after the highest one in use (inputs, results and claims alike), starting at 100001. */
+export function nextBaseId(ids: Iterable<string>): string {
+  let highest = FIRST_FILE_ID - 1;
+  for (const id of ids) {
+    const parsed = parseFileId(id);
+    if (parsed) highest = Math.max(highest, Number(parsed.base));
+  }
+  if (highest >= LAST_FILE_ID) throw new Error('No File IDs left: every six-digit ID is in use.');
+  return String(highest + 1);
+}
 export type FileStatus = 'Ready' | 'Needs Review' | 'Processed';
 
 export interface FileMeta {

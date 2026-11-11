@@ -39,7 +39,8 @@ describe('durable Blob storage', () => {
   it('shares files and metadata across fresh instances and paginated listings', async () => {
     const writer = createBlobStorage('test/shared');
     const saved: FileMeta[] = [];
-    for (let i = 0; i < 5; i++) saved.push(await writer.save(input(`${i}.csv`)));
+    for (let i = 0; i < 5; i++) saved.push(await writer.create(input(`${i}.csv`)));
+    expect(saved.map((m) => m.id)).toEqual(['100001', '100002', '100003', '100004', '100005']);
     const reader = createBlobStorage('test/shared');
     expect((await reader.list()).map((m) => m.id).sort()).toEqual(saved.map((m) => m.id).sort());
     expect(await reader.read(saved[0].id)).toBe(input('0.csv').text);
@@ -50,36 +51,57 @@ describe('durable Blob storage', () => {
     expect(await createBlobStorage('test/other').list()).toEqual([]);
   });
 
-  it('atomically replaces a named result with a fresh ID without changing its input', async () => {
+  it('replaces a result in place, keeping its File ID, without changing its input', async () => {
     const storage = createBlobStorage('test/replace');
-    const source = await storage.save(input('source.csv'));
-    const first = await storage.save({ ...input('result_source_mass.csv'), status: 'Processed' }, true);
-    const second = await createBlobStorage('test/replace').save({ ...input(first.name), text: 'new result', status: 'Processed' }, true);
-    expect(second.id).not.toBe(first.id);
-    expect((await storage.list()).filter((f) => f.name === first.name)).toEqual([second]);
-    await expect(storage.get(first.id)).rejects.toMatchObject({ statusCode: 404 });
+    const source = await storage.create(input('source.csv'));
+    const first = await storage.put(`${source.id}-M`, { ...input('result_source_mass.csv'), status: 'Processed' });
+    const second = await createBlobStorage('test/replace').put(`${source.id}-M`, { ...input(first.name), text: 'new result', status: 'Processed' });
+    expect(second.id).toBe(first.id);
+    expect((await storage.list()).filter((f) => f.id === first.id)).toEqual([second]);
     expect(await storage.read(second.id)).toBe('new result');
     expect(await storage.read(source.id)).toBe(input('source.csv').text);
+  });
+
+  it('never gives the same File ID to uploads on two servers at once', async () => {
+    const [a, b] = [createBlobStorage('test/claims'), createBlobStorage('test/claims')];
+    const made = await Promise.all([a, b, a, b, a, b].map((s, i) => s.create(input(`${i}.csv`))));
+    expect(made.map((m) => m.id).sort()).toEqual(['100001', '100002', '100003', '100004', '100005', '100006']);
+    expect(await a.list()).toHaveLength(6);
+    const imported = await b.create({ ...input('copy.csv'), status: 'Processed' }, 'M');
+    expect(imported.id).toBe('100007-M'); // an uploaded result claims its own new base number
+    expect((await a.create(input('next.csv'))).id).toBe('100008');
+  });
+
+  it('looks up a file directly by its ID and treats anything else as missing', async () => {
+    const storage = createBlobStorage('test/lookup');
+    const file = await storage.create(input('one.csv'));
+    vi.mocked(get).mockClear();
+    expect(await storage.get(file.id)).toEqual(file);
+    expect(vi.mocked(get)).toHaveBeenCalledTimes(1); // one read, no listing
+    for (const id of ['../claims/100001', 'abc', '100001-x'])
+      await expect(storage.get(id)).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('seeds samples idempotently even when two instances start together', async () => {
     const a = createBlobStorage('test/seed');
     const b = createBlobStorage('test/seed');
-    await Promise.all([a.seed(input('sample.csv')), b.seed(input('sample.csv'))]);
+    await Promise.all([a.seed('100001', input('sample.csv')), b.seed('100001', input('sample.csv'))]);
     const original = await a.list();
     expect(original).toHaveLength(1);
-    await b.seed({ ...input('sample.csv'), text: 'must not replace' });
+    expect(original[0].id).toBe('100001');
+    await b.seed('100001', { ...input('sample.csv'), text: 'must not replace' });
     expect(await b.list()).toEqual(original);
     expect(await b.read(original[0].id)).toBe(input('sample.csv').text);
+    expect((await a.create(input('upload.csv'))).id).toBe('100002'); // a seeded number is never reused
   });
 
   it('rejects a metadata update when another instance changes the object', async () => {
     const storage = createBlobStorage('test/conflict');
-    const file = await storage.save(input('conflict.csv'));
+    const file = await storage.create(input('conflict.csv'));
     const originalGet = vi.mocked(get).getMockImplementation()!;
     vi.mocked(get).mockImplementationOnce(async (...args) => {
       const result = await originalGet(...args);
-      const stored = [...blobs.files.values()][0];
+      const stored = [...blobs.files].find(([pathname]) => pathname.endsWith(`/files/${file.id}.json`))![1];
       stored.etag = 'changed-by-other-instance';
       return result;
     });
@@ -89,7 +111,7 @@ describe('durable Blob storage', () => {
 
   it('propagates service failures rather than silently falling back to local disk', async () => {
     vi.mocked(put).mockRejectedValueOnce(new Error('Store unavailable'));
-    await expect(createBlobStorage('test/failure').save(input('fail.csv'))).rejects.toThrow('Store unavailable');
+    await expect(createBlobStorage('test/failure').create(input('fail.csv'))).rejects.toThrow('Store unavailable');
   });
 
   it('serves a processed result from a fresh API instance using shared durable storage', async () => {
@@ -121,7 +143,7 @@ describe('durable Blob storage', () => {
 
   it('reconciles stale metadata when two servers start together, without failing either', async () => {
     const csv = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct\nA-1,2026-09-01,,40,30,30\n';
-    const stale = await createBlobStorage('test/reconcile').save({ name: 'old.csv', text: csv, rows: 1, columns: 6, status: 'Ready' });
+    const stale = await createBlobStorage('test/reconcile').create({ name: 'old.csv', text: csv, rows: 1, columns: 6, status: 'Ready' });
     vi.stubEnv('VERCEL', '1');
     vi.stubEnv('RECLAIM_DATA_DIR', undefined);
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-only-token');

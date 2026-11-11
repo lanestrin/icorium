@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1 and 10.2 merged, 10.3 awaiting review. See section 4.
+**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1–10.3 merged, 11.1 awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,9 +68,10 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 11.1** `feature/11.1-file-ids`, after 10.3 merges: the M10 P1 fixes are
-then done, and the agreed order moves to M11. Start with unit tests for the File ID
-format and the next-number rule. **Order:**
+**Next: 11.2** `feature/11.2-file-id-columns`, after 11.1 merges: put the File ID
+inside the data (`file_id` on inputs, `result_id` on results) and mark uploaded
+results as Imported. Start with an API test that an upload's stored CSV gains a
+`file_id` column. **Order:**
 10.1–10.3, then M11 (11.1–11.5), then 10.4–10.12; M11 changes how files are
 identified and stored, so the P2 refactors build on it.
 New work outside M10 and M11 needs a new request: add it as a new stable
@@ -282,7 +283,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
   - The preview's first page fetch in `PreviewModal` is never cancelled, so a slow response can land after the preview closes or changes file.
   - **Undo** on the archive toast is silently ignored while a processing batch runs, because it shares the busy flag. Disable it with a reason, or queue it.
 
-  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. `refresh()` in `App.tsx` numbers each list request and applies only the latest answer or error, and the upload awaits its refresh. `PreviewModal` ignores first-page and "Show more" responses for a file that is no longer open. Undo on the archive toast is disabled during a processing batch with "Available when processing finishes". The five new component tests fail against the previous code.
+  **Result:** merged in PR #30 (`0085eb5`); automated verification and CI passed (2026-11-11). `refresh()` in `App.tsx` numbers each list request and applies only the latest answer or error, and the upload awaits its refresh. `PreviewModal` ignores first-page and "Show more" responses for a file that is no longer open. Undo on the archive toast is disabled during a processing batch with "Available when processing finishes". The five new component tests fail against the previous code.
   **Depends on:** none.
   **Done when:** a stale list or preview response never replaces newer data; Undo is never a silent no-op.
   **Verification:** component tests with deferred promises resolving out of order for the list and the preview, and for Undo during processing; `npm run verify`.
@@ -430,7 +431,7 @@ inside a file (`A-001`).
 - **Downloads keep the file's name.** The ID is inside the file. (The paused
   10.1 header fix still applies to those names.)
 
-- [ ] **11.1** `feature/11.1-file-ids` · **P1** — Assign and use File IDs.
+- [x] **11.1** `feature/11.1-file-ids` · **P1** — Assign and use File IDs.
   - Define each function's code once, on `PROCESSORS` in `shared/types.ts`, with the ID format (`^\d{6}$` base, `^\d{6}-[VMC]$` result) and a parser shared by client and server.
   - **Assigning a base ID:** next number after the highest base ID in use. Claim it with a create-if-absent storage write (local: in the same synchronous step; Blob: `put` with `allowOverwrite: false` on the ID's key) and take the next number on a conflict, so two uploads at once never share an ID.
   - **Storage is keyed by File ID** (local files and Blob objects named by ID). Result IDs come from the input's ID and the function's code; re-running replaces by result ID, not by name. This removes `replaceByName` and fixes a current bug: two different inputs with the same name overwrite each other's results.
@@ -438,6 +439,7 @@ inside a file (`A-001`).
   - Samples seed as `100001`–`100005` in name order. Document the reset in the README.
   - Update the `CLAUDE.md` "Result file names" rule to the File ID rules, the README and the Architecture page (storage keys, the Upload and Process flows); its content test must still pass.
 
+  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. `PROCESSORS` carries each code; `parseFileId`, `resultFileId` and `nextBaseId` in `shared/types.ts` are the shared rules. Both storage backends offer `create` (next base ID, or base plus code for an uploaded result), `put` (write at an exact ID; re-runs replace) and `seed` (fixed IDs, idempotent), and treat anything that is not a File ID as a 404 before touching storage. Blob stores files at `files/<id>.json` (direct reads) and claims numbers at `claims/<base>.json` with create-if-absent; old `records/` objects are ignored. Local storage refuses to start on pre-File-ID data with a message to delete `server/data` (never deleted automatically). `replaceByName` and the `'seed' in storage` check are gone. The uploaded-result ID (new base + code) is done here; marking it Imported is 11.2.
   **Depends on:** 10.1–10.3.
   **Done when:** every upload gets the next unused base ID, even under concurrent uploads; each result's ID is its input's ID plus the function code; a re-run replaces only that ID; two inputs with the same name keep separate results; no route or storage code looks files up by name.
   **Verification:** unit tests for the ID format, parser and next-number rule; storage tests for create-if-absent claims under concurrency on both backends; API tests for upload IDs, result IDs, replace by ID and the same-name case; `npm run verify`.

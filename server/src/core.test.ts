@@ -4,7 +4,7 @@ import { getAdapter } from './adapters';
 import { detectProcessor, detectResult, findProblems, issues, processors, processRows } from './processing';
 import { compareResults, matchRows } from './lib/compare';
 import { generateCsv, generatedName, generateFiles } from './lib/generate';
-import type { FileMeta, GeneratedError, Row } from '../../shared/types';
+import { nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../../shared/types';
 
 const A_HEADERS = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
 const A_CSV = `${A_HEADERS}
@@ -378,5 +378,30 @@ describe('CSV generator', () => {
     [10, -1, 'Rows with errors must be a whole number from 0 to the number of rows.'],
   ])('rejects %s rows with %s errors', (rows, errorRows, message) => {
     expect(() => generateCsv('A', rows, errorRows, 1)).toThrow(message);
+  });
+});
+
+describe('File IDs', () => {
+  it('reads base IDs and result IDs, and nothing else', () => {
+    expect(parseFileId('101010')).toEqual({ base: '101010', code: undefined });
+    expect(parseFileId('101010-V')).toEqual({ base: '101010', code: 'V' });
+    expect(parseFileId('999999-C')).toEqual({ base: '999999', code: 'C' });
+    for (const bad of ['101010-v', '101010-X', '101010-VM', '10101', '1010100', '100000', '000001', ' 101010', '101010 ', 'abc', '../101010', ''])
+      expect(parseFileId(bad), bad).toBeUndefined();
+  });
+
+  it('gives each function its own fixed code', () => {
+    expect(PROCESSORS.map((p) => [p.id, p.code])).toEqual([['validation', 'V'], ['mass', 'M'], ['classification', 'C']]);
+    expect(resultFileId('101010', 'validation')).toBe('101010-V');
+    expect(resultFileId('101010', 'mass')).toBe('101010-M');
+    expect(resultFileId('101010', 'classification')).toBe('101010-C');
+  });
+
+  it('hands out the number after the highest one in use, starting at 100001', () => {
+    expect(nextBaseId([])).toBe('100001');
+    expect(nextBaseId(['100001', '100002-V'])).toBe('100003');
+    expect(nextBaseId(['100001', '100007-M', '100003'])).toBe('100008'); // results count too
+    expect(nextBaseId(['not-an-id', '42', '100005'])).toBe('100006'); // other text is ignored
+    expect(() => nextBaseId(['999999'])).toThrow('No File IDs left');
   });
 });
