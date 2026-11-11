@@ -226,7 +226,7 @@ describe('comparing results', () => {
     const b = await processSample('partner_a_followup.csv', 'validation');
     const res = (await compare(a.id, b.id)).json<CompareResult>();
     expect(res.rowMatch).toBe('batch_id');
-    expect(res.rows[0]).toEqual({ key: 'A-001', rowNumbers: [1, 1] });
+    expect(res.rows[0]).toEqual({ key: 'id:1:A-001', label: 'A-001', rowNumbers: [1, 1] });
     expect(res.rows).toHaveLength(25);
   });
 
@@ -240,7 +240,7 @@ describe('comparing results', () => {
     expect(body.rowMatch).toBe('position');
     expect(body.files.map((f) => f.source)).toEqual(['Partner A', 'Partner A', 'Partner B', 'Partner B', 'Partner C']);
     expect(body.files.map((f) => f.problems.total)).toEqual([1, 1, 1, 2, 1]);
-    expect(body.rows[0]).toEqual({ key: '#1', rowNumbers: [1, 1, 1, 1, 1] });
+    expect(body.rows[0]).toEqual({ key: '#1', label: '#1', rowNumbers: [1, 1, 1, 1, 1] });
     const total = body.columns.find((c) => c.name === 'composition_total_pct')!;
     expect(total.summary).toHaveLength(5);
     expect(total.values[0]).toHaveLength(5);

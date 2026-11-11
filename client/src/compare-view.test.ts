@@ -63,16 +63,22 @@ describe('comparison labels and numbers', () => {
 
 describe('top differences and the row chart axis', () => {
   const rows: MatchedRow[] = [
-    { key: '#1', rowNumbers: [1, 1, 1] },
-    { key: '#2', rowNumbers: [2, 2, 2] },
-    { key: '#3', rowNumbers: [3, 3, null] },
-    { key: '#4', rowNumbers: [4, 4, 4] },
-    { key: '#5', rowNumbers: [5, 5, 5] },
+    { key: '#1', label: '#1', rowNumbers: [1, 1, 1] },
+    { key: '#2', label: '#2', rowNumbers: [2, 2, 2] },
+    { key: '#3', label: '#3', rowNumbers: [3, 3, null] },
+    { key: '#4', label: '#4', rowNumbers: [4, 4, 4] },
+    { key: '#5', label: '#5', rowNumbers: [5, 5, 5] },
   ];
   const total: CompareColumn = {
     name: 'composition_total_pct', kind: 'numeric', unit: '%', measure: 'mean', summary: [], rowsDiffering: 0, rowsCompared: 5,
     values: [[100, 100, 100], [100, 99, 101.5], [100, 100, null], [100, 97, 100], [100, null, 100]],
   };
+
+  it('describes each row by its label, not its key', () => {
+    const labelled = rows.map((r, i) => ({ ...r, key: `id:${i === 2 ? 2 : 1}:B-1`, label: i === 2 ? 'B-1 (2)' : r.label }));
+    const found = topDifferences({ rows: labelled }, total, 0, 5).find((d) => d.text === 'Not in file');
+    expect(found).toMatchObject({ key: 'id:2:B-1', label: 'B-1 (2)' });
+  });
 
   it('compares each cell with the reference file', () => {
     expect(differsFromRef(total, 1, 1, 0)).toBe(true);
@@ -82,14 +88,14 @@ describe('top differences and the row chart axis', () => {
   });
   it('ranks rows by their largest gap from the reference, then rows with missing values', () => {
     expect(topDifferences({ rows }, total, 0)).toEqual([
-      { key: '#4', text: 'Composition total 97.00% (Δ -3.00 pp)', files: [1] },
-      { key: '#2', text: 'Composition total 101.50% (Δ +1.50 pp)', files: [1, 2] },
-      { key: '#3', text: 'Not in file', files: [2] },
+      { key: '#4', label: '#4', text: 'Composition total 97.00% (Δ -3.00 pp)', files: [1] },
+      { key: '#2', label: '#2', text: 'Composition total 101.50% (Δ +1.50 pp)', files: [1, 2] },
+      { key: '#3', label: '#3', text: 'Not in file', files: [2] },
     ]);
     expect(topDifferences({ rows }, total, 0, 5).map((d) => [d.key, d.text])).toContainEqual(['#5', 'No value']);
   });
   it('follows the chosen reference', () => {
-    expect(topDifferences({ rows }, total, 2)[0]).toEqual({ key: '#4', text: 'Composition total 97.00% (Δ -3.00 pp)', files: [1] });
+    expect(topDifferences({ rows }, total, 2)[0]).toEqual({ key: '#4', label: '#4', text: 'Composition total 97.00% (Δ -3.00 pp)', files: [1] });
     expect(topDifferences({ rows }, total, 2).map((d) => d.key)).toContain('#3');
     expect(topDifferences({ rows }, total, 2).find((d) => d.key === '#3')?.text).toBe('Not in the reference file');
   });
@@ -99,8 +105,8 @@ describe('top differences and the row chart axis', () => {
       values: [['Valid', 'Invalid'], ['Valid', 'Valid'], ['Invalid', '']],
     };
     expect(topDifferences({ rows: rows.slice(0, 3).map((r) => ({ ...r, rowNumbers: r.rowNumbers.slice(0, 2) })) }, status, 0)).toEqual([
-      { key: '#1', text: 'Invalid (reference: Valid)', files: [1] },
-      { key: '#3', text: '— (reference: Invalid)', files: [1] },
+      { key: '#1', label: '#1', text: 'Invalid (reference: Valid)', files: [1] },
+      { key: '#3', label: '#3', text: '— (reference: Invalid)', files: [1] },
     ]);
   });
   it('returns nothing when no row differs', () => {

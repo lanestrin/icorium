@@ -3,7 +3,7 @@ import { parseCsv, toCsv } from './lib/csv';
 import { getAdapter } from './adapters';
 import { detectProcessor, detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from './processing';
 import { compareResults, matchRows } from './lib/compare';
-import { generateCsv, generatedName, generateFiles } from './lib/generate';
+import { GENERATE_MAX_ATTEMPTS, generateCsv, generatedName, generateFiles } from './lib/generate';
 import { nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../../shared/types';
 
 const A_HEADERS = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
@@ -181,8 +181,22 @@ describe('compare', () => {
     const B = file('mass', ['x'], [{ x: '1' }], 'b');
     const out = compareResults([A, B]);
     expect(out.rowMatch).toBe('position');
-    expect(out.rows).toEqual([{ key: '#1', rowNumbers: [1, 1] }, { key: '#2', rowNumbers: [2, null] }]);
+    expect(out.rows).toEqual([{ key: '#1', label: '#1', rowNumbers: [1, 1] }, { key: '#2', label: '#2', rowNumbers: [2, null] }]);
     expect(out.columns[0]).toMatchObject({ values: [[1, 1], [2, null]], rowsDiffering: 1 });
+  });
+  it('counts numeric rows as differing only when their values differ as numbers', () => {
+    const rows = (xs: string[]) => xs.map((x) => ({ x }));
+    const differing = (a: string[], b: string[]) => compareResults([file('mass', ['x'], rows(a), 'a'), file('mass', ['x'], rows(b), 'b')]).columns[0].rowsDiffering;
+    expect(differing(['100'], ['100.0'])).toBe(0); // same number, different text
+    expect(differing(['1e2'], ['100'])).toBe(0);
+    expect(differing([''], [''])).toBe(0); // no value in either file
+    expect(differing([''], ['100'])).toBe(1);
+    expect(differing(['100'], ['100.5'])).toBe(1);
+    expect(differing(['100', '1'], ['100'])).toBe(1); // the second row is missing from b
+  });
+  it('still compares category columns as text', () => {
+    const out = compareResults([file('mass', ['s'], [{ s: 'Valid' }], 'a'), file('mass', ['s'], [{ s: 'valid' }], 'b')]);
+    expect(out.columns[0]).toMatchObject({ kind: 'category', rowsDiffering: 1 });
   });
 });
 
@@ -197,10 +211,10 @@ describe('matching rows by batch ID', () => {
     const out = matchRows([file(['A-1', 'A-2', 'A-3']), file(['A-3', 'A-1', 'A-2']), file(['A-2', 'A-9'])]);
     expect(out.rowMatch).toBe('batch_id');
     expect(out.rows).toEqual([
-      { key: 'A-1', rowNumbers: [1, 2, null] },
-      { key: 'A-2', rowNumbers: [2, 3, 1] },
-      { key: 'A-3', rowNumbers: [3, 1, null] },
-      { key: 'A-9', rowNumbers: [null, null, 2] },
+      { key: 'id:1:A-1', label: 'A-1', rowNumbers: [1, 2, null] },
+      { key: 'id:1:A-2', label: 'A-2', rowNumbers: [2, 3, 1] },
+      { key: 'id:1:A-3', label: 'A-3', rowNumbers: [3, 1, null] },
+      { key: 'id:1:A-9', label: 'A-9', rowNumbers: [null, null, 2] },
     ]);
   });
   it('falls back to position when any pair of files shares no ID', () => {
@@ -209,11 +223,21 @@ describe('matching rows by batch ID', () => {
   it('matches repeated IDs occurrence by occurrence and never matches blank IDs', () => {
     const out = matchRows([file(['B-1', 'B-1', '']), file(['B-1', '', 'B-1'])]);
     expect(out.rows).toEqual([
-      { key: 'B-1', rowNumbers: [1, 1] },
-      { key: 'B-1 (2)', rowNumbers: [2, 3] },
-      { key: '(blank ID) file 1 row 3', rowNumbers: [3, null] },
-      { key: '(blank ID) file 2 row 2', rowNumbers: [null, 2] },
+      { key: 'id:1:B-1', label: 'B-1', rowNumbers: [1, 1] },
+      { key: 'id:2:B-1', label: 'B-1 (2)', rowNumbers: [2, 3] },
+      { key: 'blank:1:3', label: '(blank ID) file 1 row 3', rowNumbers: [3, null] },
+      { key: 'blank:2:2', label: '(blank ID) file 2 row 2', rowNumbers: [null, 2] },
     ]);
+  });
+  it('never merges a real batch ID with the label of a repeated one', () => {
+    // "B-1 (2)" is a real batch ID here, and also the label of the second "B-1".
+    const out = matchRows([file(['B-1', 'B-1', 'B-1 (2)']), file(['B-1 (2)', 'B-1', 'B-1'])]);
+    expect(out.rows).toEqual([
+      { key: 'id:1:B-1', label: 'B-1', rowNumbers: [1, 2] },
+      { key: 'id:2:B-1', label: 'B-1 (2)', rowNumbers: [2, 3] },
+      { key: 'id:1:B-1 (2)', label: 'B-1 (2)', rowNumbers: [3, 1] },
+    ]);
+    expect(new Set(out.rows.map((r) => r.key)).size).toBe(3);
   });
   it('compares the matched rows, so reordered files do not differ', () => {
     const out = compareResults([file(['A-1', 'A-2'], ['100', '98']), file(['A-2', 'A-1'], ['98', '100'])]);
@@ -363,6 +387,15 @@ describe('CSV generator', () => {
 
   it('repeats a batch for the same seed, and makes different batches without one', () => {
     expect(generateFiles('B', 5, 1, 3, 2)).toEqual(generateFiles('B', 5, 1, 3, 2));
+  });
+  it('stops with a clear error, after a fixed number of tries, when it cannot make distinct files', () => {
+    let calls = 0;
+    const same = (...args: Parameters<typeof generateCsv>) => { calls++; return { ...generateCsv(...args), text: 'always the same' }; };
+    expect(GENERATE_MAX_ATTEMPTS).toBe(100);
+    expect(() => generateFiles('A', 3, 0, 2, 1, new Date(), same)).toThrow('Could not make 2 different files with these settings. Try more rows or fewer files.');
+    expect(calls).toBe(GENERATE_MAX_ATTEMPTS);
+    const error = (() => { try { generateFiles('A', 3, 0, 2, 1, new Date(), same); } catch (e) { return e; } })();
+    expect(error).toMatchObject({ statusCode: 400 });
     expect(generateFiles('B', 5, 1, 3)[0].text).not.toBe(generateFiles('B', 5, 1, 3)[0].text);
   });
 
