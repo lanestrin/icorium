@@ -42,6 +42,12 @@ describe('sorting files', () => {
     expect(ids('archived-desc')).toEqual(['a2', 'A10', 'b', 'c']); // never-archived files last, in their order
     expect(files.map((f) => f.id)).toEqual(['b', 'A10', 'a2', 'c']); // the input is not changed
   });
+
+  it('orders by File ID, keeping each original first and its results in V, M, C order', () => {
+    const byId = (key: 'id-asc' | 'id-desc') => sortFiles(['101011', '101010-C', 'not-an-id', '101010', '101010-V', '101010-M'].map((id) => at(id, '2026-11-01')), key).map((f) => f.id);
+    expect(byId('id-asc')).toEqual(['101010', '101010-V', '101010-M', '101010-C', '101011', 'not-an-id']);
+    expect(byId('id-desc')).toEqual(['101011', '101010', '101010-V', '101010-M', '101010-C', 'not-an-id']);
+  });
 });
 
 describe('data quality warning', () => {

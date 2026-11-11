@@ -10,13 +10,15 @@ interface Props {
   canRun: boolean;
   running: boolean;
   uploading: boolean;
-  selectedNames: string[];
+  selected: { id: string; name: string }[]; // the checked inputs, File ID and filename shown separately
 }
 
 export function Sidebar(p: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
   const pick = (list: FileList | null) => list?.length && p.onUpload([...list]);
+  const count = p.selected.length;
+  const describe = (f: { id: string; name: string }) => `${f.id} · ${f.name}`;
 
   return (
     <aside className="w-full shrink-0 space-y-8 lg:w-[22rem]">
@@ -61,14 +63,14 @@ export function Sidebar(p: Props) {
       </section>
 
       <div>
-        <p className="mb-2 truncate text-sm text-slate-500" title={p.selectedNames.join(', ')}>
-          {p.selectedNames.length === 0 && 'Check one or more input files in the list'}
-          {p.selectedNames.length === 1 && <>Input: <span className="font-medium text-slate-700">{p.selectedNames[0]}</span></>}
-          {p.selectedNames.length > 1 && <>Input: <span className="font-medium text-slate-700">{p.selectedNames.length} files selected</span></>}
+        <p className="mb-2 truncate text-sm text-slate-500" title={p.selected.map(describe).join(', ')}>
+          {count === 0 && 'Check one or more input files in the list'}
+          {count === 1 && <>Input: <span className="font-medium tabular-nums text-slate-700">{p.selected[0].id}</span> · <span className="font-medium text-slate-700">{p.selected[0].name}</span></>}
+          {count > 1 && <>Input: <span className="font-medium text-slate-700">{count} files selected</span></>}
         </p>
-        {p.selectedNames.length > 1 && (
+        {count > 1 && (
           <ul aria-label="Selected input files" className="mb-3 max-h-28 space-y-1 overflow-auto text-xs text-slate-600">
-            {p.selectedNames.map((name, i) => <li key={`${i}-${name}`} className="break-all">{name}</li>)}
+            {p.selected.map((f) => <li key={f.id} className="break-all">{describe(f)}</li>)}
           </ul>
         )}
         <button
@@ -77,7 +79,7 @@ export function Sidebar(p: Props) {
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3.5 font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {p.running ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
-          {p.running ? 'Processing…' : `Run Processing${p.selectedNames.length > 1 ? ` (${p.selectedNames.length})` : ''}`}
+          {p.running ? 'Processing…' : `Run Processing${count > 1 ? ` (${count})` : ''}`}
         </button>
       </div>
     </aside>

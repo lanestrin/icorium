@@ -144,6 +144,7 @@ export function CompareWorkspace({ result, onClose }: { result: CompareResult; o
             <li key={f.id} title={f.name} className="flex min-w-0 items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm">
               <Dot k={k} />
               <span className="truncate">{labels[k]}</span>
+              <span className="shrink-0 tabular-nums text-slate-500">{f.id}</span>
               {f.problems.total
                 ? <TriangleAlert className="h-4 w-4 shrink-0 text-red-500" aria-label={`${f.problems.total} flagged`} />
                 : <CircleCheck className="h-4 w-4 shrink-0 text-green-600" aria-label="0 flagged" />}
@@ -157,7 +158,7 @@ export function CompareWorkspace({ result, onClose }: { result: CompareResult; o
         <label className="flex items-center gap-3">
           <span className="font-semibold">Reference file</span>
           <select value={ref} onChange={(e) => setRef(Number(e.target.value))} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm">
-            {files.map((f, k) => <option key={f.id} value={k}>{labels[k]}</option>)}
+            {files.map((f, k) => <option key={f.id} value={k}>{`${labels[k]} · ${f.id}`}</option>)}
           </select>
         </label>
         <div role="group" aria-label="Metric" className="flex flex-wrap items-center gap-2">
