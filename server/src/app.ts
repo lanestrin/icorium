@@ -2,7 +2,7 @@ import Fastify, { type FastifyServerOptions } from 'fastify';
 import multipart from '@fastify/multipart';
 import { ZodError } from 'zod';
 import { fileRoutes } from './routes/files';
-import { seedSamples } from './lib/storage';
+import { reconcileMetadata, seedSamples } from './lib/storage';
 
 /** Builds the API without starting it, so tests can call it with app.inject(). */
 export async function buildApp(logger: FastifyServerOptions['logger'] = { level: 'warn' }) {
@@ -17,6 +17,9 @@ export async function buildApp(logger: FastifyServerOptions['logger'] = { level:
   });
 
   await seedSamples();
+  // Older metadata is corrected once here, so GET /api/files is a pure read.
+  const { skipped } = await reconcileMetadata();
+  if (skipped.length) app.log.warn(`Could not read ${skipped.length} stored file(s) to update their metadata: ${skipped.join(', ')}`);
   await app.register(fileRoutes, { prefix: '/api' });
   return app;
 }

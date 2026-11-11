@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1 awaiting review. See section 4.
+**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1 merged, 10.2 awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,9 +68,10 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 10.2** `fix/read-only-file-list`, after 10.1 merges: `GET /api/files`
-writes metadata while listing, which can fail with a 409 on Vercel Blob. It has
-no dependencies. Start with an API test that a list makes no writes. **Order:**
+**Next: 10.3** `fix/client-request-races`, after 10.2 merges: an older file list
+or preview response can overwrite newer data, and Undo is ignored during
+processing. It has no dependencies. Start with a component test that resolves two
+list requests out of order. **Order:**
 10.1–10.3, then M11 (11.1–11.5), then 10.4–10.12; M11 changes how files are
 identified and stored, so the P2 refactors build on it.
 New work outside M10 and M11 needs a new request: add it as a new stable
@@ -265,13 +266,14 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
 - [x] **10.1** `fix/download-file-names` · **P1** — Downloading a file whose name has characters outside Latin-1 returns **500 `ERR_INVALID_CHAR`**: `/api/files/:id/download` puts the raw name in `Content-Disposition` (`server/src/routes/files.ts`). Confirmed by uploading `報告.csv` (200) and downloading it (500). Send an ASCII fallback `filename="…"` plus an RFC 5987 `filename*=UTF-8''…` so any upload name downloads.
 
-  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. An `attachment()` helper in `server/src/routes/files.ts` writes `filename="<ASCII fallback>"` (accents dropped, other characters, quotes and backslashes replaced with `_`) and `filename*=UTF-8''<percent-encoded name>`, also encoding `! ' ( ) *`.
+  **Result:** merged in PR #28 (`b36e76a`); automated verification and CI passed (2026-11-11). An `attachment()` helper in `server/src/routes/files.ts` writes `filename="<ASCII fallback>"` (accents dropped, other characters, quotes and backslashes replaced with `_`) and `filename*=UTF-8''<percent-encoded name>`, also encoding `! ' ( ) *`.
   **Depends on:** none.
   **Done when:** files named with CJK, accented and quoted characters all download with status 200 and their original name in `filename*`; existing download tests still pass.
   **Verification:** API tests for those names; `npm run verify`.
 
-- [ ] **10.2** `fix/read-only-file-list` · **P1** — `GET /api/files` writes: it backfills missing problem counts and reconciles old statuses with `storage.patch` while listing (`server/src/routes/files.ts`). A read with side effects is an anti-pattern, and on Vercel Blob two tabs loading together can make one list request fail with a 409 from the ETag check. Move the reconciliation to a one-off step at startup (beside sample seeding), and make the list purely a read.
+- [x] **10.2** `fix/read-only-file-list` · **P1** — `GET /api/files` writes: it backfills missing problem counts and reconciles old statuses with `storage.patch` while listing (`server/src/routes/files.ts`). A read with side effects is an anti-pattern, and on Vercel Blob two tabs loading together can make one list request fail with a 409 from the ETag check. Move the reconciliation to a one-off step at startup (beside sample seeding), and make the list purely a read.
 
+  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. `GET /api/files` now returns `storage.list()` only. `reconcileMetadata()` in `server/src/lib/storage.ts` runs once in `buildApp` after seeding: it fills in missing counts (reading only those files), sets input statuses, treats a 409 as another server having done it, and skips (and the app logs) a file whose CSV cannot be read, so startup never fails on one bad file.
   **Depends on:** none.
   **Done when:** listing never writes; files saved before counts or the Needs Review status existed are still corrected, once, at startup; concurrent list requests cannot fail.
   **Verification:** API tests for startup reconciliation and that a list makes no writes (the existing "reconciles old statuses" and restart tests move to the startup step); a Blob storage test with two concurrent lists; `npm run verify`.

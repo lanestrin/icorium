@@ -45,19 +45,8 @@ function attachment(name: string) {
 }
 
 export async function fileRoutes(app: FastifyInstance) {
-  // Backfill missing counts and reconcile historical input statuses without rewriting CSVs.
-  app.get('/files', async () =>
-    Promise.all((await storage.list()).map(async (m) => {
-      let problemRows = m.problemRows;
-      if (problemRows === undefined) {
-        const { headers, rows } = parseCsv(await storage.read(m.id));
-        problemRows = findProblems(headers, rows).total;
-      }
-      const status = m.status === 'Processed' ? 'Processed' : problemRows > 0 ? 'Needs Review' : 'Ready';
-      if (m.problemRows === problemRows && m.status === status) return m;
-      return storage.patch(m.id, { problemRows, status });
-    })),
-  );
+  // A pure read: metadata from older versions is corrected once at startup (reconcileMetadata).
+  app.get('/files', async () => storage.list());
 
   // Upload: parse + schema check always run here, regardless of processing function.
   app.post('/files', async (req) => {
