@@ -828,6 +828,77 @@ describe('file IDs', () => {
   });
 });
 
+describe('file identity regression', () => {
+  // Two inputs and their results share filenames; only the File IDs tell them apart.
+  const inputA: FileMeta = { ...base, id: '101010', name: 'data.csv', status: 'Ready', problemRows: 0 };
+  const inputB: FileMeta = { ...inputA, id: '101011' };
+  const resultA: FileMeta = { ...base, id: '101010-V', name: 'result_data_validation.csv', status: 'Processed', processor: 'validation', sourceId: '101010', problemRows: 0 };
+  const resultB: FileMeta = { ...resultA, id: '101011-V', sourceId: '101011' };
+  const dialog = () => screen.getByRole('dialog', { name: 'Replace existing result?' });
+  const bar = () => screen.getByRole('toolbar', { name: 'Selected files' });
+
+  async function open() {
+    vi.mocked(api.list).mockResolvedValue([inputA, inputB, resultA, resultB]);
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('checkbox', { name: 'Select 101010 data.csv' });
+    return user;
+  }
+  async function rerunA(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('checkbox', { name: 'Select 101010 data.csv' }));
+    await user.click(screen.getByRole('button', { name: 'Run Processing' }));
+  }
+
+  it('asks only about the chosen input\'s result, and Cancel sends nothing', async () => {
+    const user = await open();
+    await rerunA(user);
+    expect(dialog()).toHaveTextContent('file 101010');
+    expect(dialog()).toHaveTextContent('101010-V');
+    expect(dialog()).not.toHaveTextContent('101011');
+    await user.click(within(dialog()).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Replace existing result?' })).not.toBeInTheDocument();
+    expect(api.process).not.toHaveBeenCalled();
+  });
+
+  it('Run & Replace replaces only that result, by its input\'s File ID', async () => {
+    vi.mocked(api.process).mockResolvedValue(resultA);
+    const user = await open();
+    await rerunA(user);
+    await user.click(within(dialog()).getByRole('button', { name: 'Run & Replace' }));
+    await waitFor(() => expect(api.process).toHaveBeenCalledTimes(1));
+    expect(api.process).toHaveBeenCalledWith('101010', 'validation', true);
+  });
+
+  it('archives one of two same-named results by its File ID', async () => {
+    vi.mocked(api.archive).mockResolvedValueOnce([{ ...resultB, archived: true }]);
+    const user = await open();
+    await user.click(screen.getByRole('checkbox', { name: 'Select 101011-V result_data_validation.csv' }));
+    await user.click(within(bar()).getByRole('button', { name: 'Archive 1 file' }));
+    await waitFor(() => expect(api.archive).toHaveBeenCalledTimes(1));
+    expect(api.archive).toHaveBeenCalledWith(['101011-V'], true);
+  });
+
+  it('compares two same-named results by their File IDs and shows both IDs', async () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+    try {
+      vi.mocked(api.compare).mockResolvedValue({
+        processor: 'validation',
+        rowMatch: 'batch_id',
+        files: [resultA, resultB].map((f) => ({ id: f.id, name: f.name, source: 'Partner A', rows: 1, problems: { total: 0, items: [] } })),
+        rows: [{ key: 'A-001', rowNumbers: [1, 1] }],
+        columns: [{ name: 'composition_total_pct', kind: 'numeric', unit: '%', measure: 'mean', summary: [100, 100], values: [[100, 100]], rowsDiffering: 0, rowsCompared: 1 }],
+      });
+      const user = await open();
+      await user.click(screen.getByRole('checkbox', { name: 'Select 101010-V result_data_validation.csv' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Select 101011-V result_data_validation.csv' }));
+      await user.click(within(bar()).getByRole('button', { name: 'Compare 2 files' }));
+      expect(api.compare).toHaveBeenCalledWith(['101010-V', '101011-V']);
+      const chips = within(within(await screen.findByRole('dialog', { name: 'Compare Files' })).getByRole('list', { name: 'Compared files' })).getAllByRole('listitem');
+      expect(chips.map((c) => within(c).getByText(/^1010\d\d-V$/).textContent)).toEqual(['101010-V', '101011-V']);
+    } finally { vi.unstubAllGlobals(); }
+  });
+});
+
 describe('preview', () => {
   const page = (offset: number, count: number) => ({
     headers: ['batch_id'], rows: Array.from({ length: count }, (_, i) => ({ batch_id: `A-${offset + i + 1}` })),
