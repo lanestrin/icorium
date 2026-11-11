@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CompareResult, FileMeta } from '../../shared/types';
+import type { CompareResult, FileMeta, FileRows } from '../../shared/types';
 import App from './App';
+import { PreviewModal } from './components/Modals';
 import { api } from './api';
 
 vi.mock('./api', () => ({ api: {
@@ -808,5 +809,90 @@ describe('comparing results', () => {
     expect(check(valB.name)).toBeChecked();
     expect(check('a.csv')).not.toBeChecked();
     expect(compareButton()).toBeEnabled();
+  });
+});
+
+describe('request ordering', () => {
+  /** A promise the test resolves or rejects when it chooses, to control the order responses arrive. */
+  const deferred = <T,>() => {
+    let resolve!: (v: T) => void;
+    let reject!: (e: Error) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+  const page = (batchId: string): FileRows =>
+    ({ headers: ['batch_id'], rows: [{ batch_id: batchId }], offset: 0, totalRows: 1, generatedColumns: [], problems: { total: 0, items: [] } });
+
+  it('keeps the newest file list when an older list request answers last', async () => {
+    const first = deferred<FileMeta[]>();
+    const second = deferred<FileMeta[]>();
+    vi.mocked(api.list).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    vi.mocked(api.upload).mockResolvedValue(clean);
+    const added: FileMeta = { ...clean, id: 'added', name: 'added.csv' };
+    const user = userEvent.setup();
+    render(<App />);
+    await user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, [new File(['a'], 'added.csv')]);
+    await act(async () => second.resolve([clean, added])); // the upload's refresh answers first
+    expect(await screen.findByRole('checkbox', { name: 'Select added.csv' })).toBeInTheDocument();
+    await act(async () => first.resolve([clean])); // the initial load answers last, with older data
+    expect(screen.getByRole('checkbox', { name: 'Select added.csv' })).toBeInTheDocument();
+    await act(async () => {});
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('ignores a failure from an older list request', async () => {
+    const first = deferred<FileMeta[]>();
+    vi.mocked(api.list).mockReturnValueOnce(first.promise).mockResolvedValueOnce([clean]);
+    vi.mocked(api.upload).mockResolvedValue(clean);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, [new File(['a'], 'clean.csv')]);
+    expect(await screen.findByRole('checkbox', { name: 'Select clean.csv' })).toBeInTheDocument();
+    await act(async () => first.reject(new Error('Network error')));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows the preview of the file now open, even when an earlier file answers last', async () => {
+    const forClean = deferred<FileRows>();
+    const forInvalid = deferred<FileRows>();
+    vi.mocked(api.rows).mockReturnValueOnce(forClean.promise).mockReturnValueOnce(forInvalid.promise);
+    const { rerender } = render(<PreviewModal file={clean} onClose={() => {}} />);
+    rerender(<PreviewModal file={invalid} onClose={() => {}} />);
+    await act(async () => forInvalid.resolve(page('row-of-invalid')));
+    expect(await screen.findByText('row-of-invalid')).toBeInTheDocument();
+    await act(async () => forClean.resolve(page('row-of-clean')));
+    expect(screen.queryByText('row-of-clean')).not.toBeInTheDocument();
+    expect(screen.getByText('row-of-invalid')).toBeInTheDocument();
+  });
+
+  it('does not show an error from a file that is no longer open', async () => {
+    const forClean = deferred<FileRows>();
+    vi.mocked(api.rows).mockReturnValueOnce(forClean.promise).mockResolvedValueOnce(page('row-of-invalid'));
+    const { rerender } = render(<PreviewModal file={clean} onClose={() => {}} />);
+    rerender(<PreviewModal file={invalid} onClose={() => {}} />);
+    expect(await screen.findByText('row-of-invalid')).toBeInTheDocument();
+    await act(async () => forClean.reject(new Error('File not found')));
+    expect(screen.queryByText('File not found')).not.toBeInTheDocument();
+  });
+
+  it('explains that Undo waits while a batch is processing, then allows it', async () => {
+    const user = await setup();
+    await user.click(check('result.csv'));
+    vi.mocked(api.archive).mockResolvedValue([{ ...result, archived: true }]);
+    await user.click(within(screen.getByRole('toolbar', { name: 'Selected files' })).getByRole('button', { name: /^Archive/ }));
+    const toast = await screen.findByRole('status');
+    const undo = () => within(toast).getByRole('button', { name: 'Undo' });
+    expect(undo()).toBeEnabled();
+
+    let finish!: (m: FileMeta) => void;
+    vi.mocked(api.process).mockImplementationOnce(() => new Promise((done) => { finish = done; }));
+    await user.click(check('clean.csv'));
+    await user.click(screen.getByRole('button', { name: /^Run Processing/ }));
+    expect(undo()).toBeDisabled();
+    expect(undo()).toHaveAccessibleDescription('Available when processing finishes');
+
+    await act(async () => finish(result));
+    expect(undo()).toBeEnabled();
+    expect(within(toast).queryByText('Available when processing finishes')).not.toBeInTheDocument();
   });
 });

@@ -115,21 +115,32 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
   const [data, setData] = useState<FileRows>();
   const [error, setError] = useState<string>();
   const [loadingMore, setLoadingMore] = useState(false);
-  useEffect(() => { api.rows(file.id, 0, PAGE).then(setData).catch((e) => setError(e.message)); }, [file.id]);
+  // The file currently shown. A response for any other file (or after closing) is ignored.
+  const shown = useRef(file.id);
+  useEffect(() => {
+    shown.current = file.id;
+    setData(undefined);
+    setError(undefined);
+    api.rows(file.id, 0, PAGE)
+      .then((d) => { if (shown.current === file.id) setData(d); })
+      .catch((e) => { if (shown.current === file.id) setError(e instanceof Error ? e.message : String(e)); });
+    return () => { shown.current = ''; };
+  }, [file.id]);
   const gen = new Set(data?.generatedColumns);
   const remaining = data ? data.totalRows - data.rows.length : 0;
   const flagged = new Map(data?.problems.items.map((p) => [p.row, p.message])); // row number -> problem
 
   async function showMore() {
     if (!data) return;
+    const id = file.id;
     setLoadingMore(true);
     try {
-      const next = await api.rows(file.id, data.rows.length, PAGE);
-      setData({ ...next, rows: [...data.rows, ...next.rows] });
+      const next = await api.rows(id, data.rows.length, PAGE);
+      if (shown.current === id) setData({ ...next, rows: [...data.rows, ...next.rows] });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (shown.current === id) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoadingMore(false);
+      if (shown.current === id) setLoadingMore(false);
     }
   }
 

@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1 merged, 10.2 awaiting review. See section 4.
+**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; 10.1 and 10.2 merged, 10.3 awaiting review. See section 4.
 
 ## 1. What “done” means
 
@@ -68,10 +68,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 10.3** `fix/client-request-races`, after 10.2 merges: an older file list
-or preview response can overwrite newer data, and Undo is ignored during
-processing. It has no dependencies. Start with a component test that resolves two
-list requests out of order. **Order:**
+**Next: 11.1** `feature/11.1-file-ids`, after 10.3 merges: the M10 P1 fixes are
+then done, and the agreed order moves to M11. Start with unit tests for the File ID
+format and the next-number rule. **Order:**
 10.1–10.3, then M11 (11.1–11.5), then 10.4–10.12; M11 changes how files are
 identified and stored, so the P2 refactors build on it.
 New work outside M10 and M11 needs a new request: add it as a new stable
@@ -273,16 +272,17 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
 - [x] **10.2** `fix/read-only-file-list` · **P1** — `GET /api/files` writes: it backfills missing problem counts and reconciles old statuses with `storage.patch` while listing (`server/src/routes/files.ts`). A read with side effects is an anti-pattern, and on Vercel Blob two tabs loading together can make one list request fail with a 409 from the ETag check. Move the reconciliation to a one-off step at startup (beside sample seeding), and make the list purely a read.
 
-  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. `GET /api/files` now returns `storage.list()` only. `reconcileMetadata()` in `server/src/lib/storage.ts` runs once in `buildApp` after seeding: it fills in missing counts (reading only those files), sets input statuses, treats a 409 as another server having done it, and skips (and the app logs) a file whose CSV cannot be read, so startup never fails on one bad file.
+  **Result:** merged in PR #29 (`e98f906`); automated verification and CI passed (2026-11-11). `GET /api/files` now returns `storage.list()` only. `reconcileMetadata()` in `server/src/lib/storage.ts` runs once in `buildApp` after seeding: it fills in missing counts (reading only those files), sets input statuses, treats a 409 as another server having done it, and skips (and the app logs) a file whose CSV cannot be read, so startup never fails on one bad file.
   **Depends on:** none.
   **Done when:** listing never writes; files saved before counts or the Needs Review status existed are still corrected, once, at startup; concurrent list requests cannot fail.
   **Verification:** API tests for startup reconciliation and that a list makes no writes (the existing "reconciles old statuses" and restart tests move to the startup step); a Blob storage test with two concurrent lists; `npm run verify`.
 
-- [ ] **10.3** `fix/client-request-races` · **P1** — Client requests that can apply out of order or silently do nothing:
+- [x] **10.3** `fix/client-request-races` · **P1** — Client requests that can apply out of order or silently do nothing:
   - `refresh()` in `client/src/App.tsx` has no ordering guard, and the upload's refresh is not awaited, so an older file list can overwrite a newer one (for example an upload finishing during a processing batch). Ignore responses from superseded requests.
   - The preview's first page fetch in `PreviewModal` is never cancelled, so a slow response can land after the preview closes or changes file.
   - **Undo** on the archive toast is silently ignored while a processing batch runs, because it shares the busy flag. Disable it with a reason, or queue it.
 
+  **Result:** implemented; automated verification passed (2026-11-11), awaiting review and PR. `refresh()` in `App.tsx` numbers each list request and applies only the latest answer or error, and the upload awaits its refresh. `PreviewModal` ignores first-page and "Show more" responses for a file that is no longer open. Undo on the archive toast is disabled during a processing batch with "Available when processing finishes". The five new component tests fail against the previous code.
   **Depends on:** none.
   **Done when:** a stale list or preview response never replaces newer data; Undo is never a silent no-op.
   **Verification:** component tests with deferred promises resolving out of order for the list and the preview, and for Undo during processing; `npm run verify`.

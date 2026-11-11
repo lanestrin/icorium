@@ -68,7 +68,15 @@ export default function App() {
   const [comparison, setComparison] = useState<CompareResult>();
   const [comparing, setComparing] = useState(false);
 
-  const refresh = () => api.list().then(setFiles).catch((e) => setError(msg(e)));
+  // Reloads the file list. Each request is numbered and only the latest one's answer is used,
+  // so a slow older response (e.g. from an upload during a processing batch) never overwrites newer data.
+  const listRequest = useRef(0);
+  const refresh = () => {
+    const request = ++listRequest.current;
+    return api.list()
+      .then((list) => { if (request === listRequest.current) setFiles(list); })
+      .catch((e) => { if (request === listRequest.current) setError(msg(e)); });
+  };
   useEffect(() => { refresh(); }, []);
   useEffect(() => {
     if (!toast) return;
@@ -138,7 +146,7 @@ export default function App() {
     }
     setUploading(false);
     if (errors.length) setError(`Upload failed\n${errors.join('\n')}`);
-    refresh();
+    await refresh();
   }
 
   /** Run Processing: asks first when Mass or Classification would skip invalid rows. */
@@ -364,13 +372,18 @@ export default function App() {
             <p className="text-sm text-slate-600">{toast.detail}</p>
           </div>
           {toast.undo && (
-            <button
-              onClick={() => { const { ids, archive } = toast.undo!; setArchived(ids, archive, false); }}
-              disabled={archiving}
-              className="rounded-xl border border-blue-200 bg-white px-4 py-1.5 font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-50"
-            >
-              Undo
-            </button>
+            <div className="flex flex-col items-end gap-1">
+              <button
+                onClick={() => { const { ids, archive } = toast.undo!; setArchived(ids, archive, false); }}
+                // Archiving waits for a processing batch to finish, so Undo says so instead of doing nothing.
+                disabled={archiving || !!processingId}
+                aria-describedby={processingId ? 'undo-wait' : undefined}
+                className="rounded-xl border border-blue-200 bg-white px-4 py-1.5 font-medium text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Undo
+              </button>
+              {processingId && <span id="undo-wait" className="text-xs text-slate-500">Available when processing finishes</span>}
+            </div>
           )}
           <button onClick={() => setToast(undefined)} aria-label="Dismiss notification" className="text-slate-500 hover:text-slate-800"><X className="h-5 w-5" /></button>
         </div>
