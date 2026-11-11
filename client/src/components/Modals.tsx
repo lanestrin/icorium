@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Download, TriangleAlert, X } from 'lucide-react';
 import { PROCESSORS, type FileMeta, type FileRows, type ProblemList, type ProcessorId } from '../../../shared/types';
 import { api } from '../api';
-import type { QualityWarning, Replacement } from './FileTable';
+import { importedLineage, type QualityWarning, type Replacement } from './FileTable';
 
 /** "1 row", "3 rows", or with a qualifier "1 valid row". */
 const rowsWord = (n: number, kind?: string) => `${n.toLocaleString()} ${kind ? `${kind} ` : ''}${n === 1 ? 'row' : 'rows'}`;
@@ -213,7 +213,7 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
       title={file.name}
       subtitle={`File ID ${file.id} · ${file.status === 'Processed'
         ? `${processorLabel(file.processor)} result · ${file.rows} rows · generated columns highlighted`
-        : `${file.rows} rows · ${file.columns} columns`}${file.imported ? ' · Imported: original input not linked' : ''}`}
+        : `${file.rows} rows · ${file.columns} columns`}${file.imported ? ` · ${importedLineage(file).short}` : ''}`}
       onClose={onClose}
       actions={
         <a href={api.downloadUrl(file.id)} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50">

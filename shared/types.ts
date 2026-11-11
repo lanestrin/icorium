@@ -57,7 +57,8 @@ export interface FileMeta {
   problemRows?: number; // rows with missing, invalid or duplicate values
   archived?: boolean; // hidden from the main list and the compare pickers until restored
   archivedAt?: string; // ISO; when it was last archived, cleared on restore
-  imported?: boolean; // an uploaded result: its original input is not in this workspace
+  imported?: boolean; // an uploaded result; linked to an original only when sourceId is set
+  importedFrom?: string; // provenance only: the source File ID an uploaded result named in its file_id column
 }
 
 /** POST /api/process answers 409 with this when the result exists and the request did not send replace: true. */

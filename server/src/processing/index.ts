@@ -1,4 +1,4 @@
-import { FILE_ID_COLUMN, RESULT_ID_COLUMN, type Problem, type ProblemList, type ProcessorId, type Row } from '../../../shared/types';
+import { FILE_ID_COLUMN, parseFileId, RESULT_ID_COLUMN, type Problem, type ProblemList, type ProcessorId, type Row } from '../../../shared/types';
 import { getAdapter, type Normalized } from '../adapters';
 import { httpError } from '../lib/csv';
 
@@ -130,10 +130,11 @@ export function detectProcessor(headers: string[]): ProcessorId | undefined {
 /**
  * Puts File IDs into a CSV's rows. An input gets file_id (added if missing). A result's existing
  * file_id and result_id are overwritten; they are not added to results that never had them.
- * Every upload is a new file, so IDs carried in from elsewhere are always replaced.
+ * Every upload is a new file, so IDs carried in from elsewhere are replaced, except that a result
+ * linked to its original keeps that original's base ID in file_id (sourceBase).
  */
-export function stampFileIds(headers: string[], rows: Row[], fileId: string, isResult: boolean) {
-  const base = fileId.split('-')[0];
+export function stampFileIds(headers: string[], rows: Row[], fileId: string, isResult: boolean, sourceBase?: string) {
+  const base = sourceBase ?? fileId.split('-')[0];
   const out = isResult || headers.includes(FILE_ID_COLUMN) ? headers : [...headers, FILE_ID_COLUMN];
   const stamped = rows.map((r) => ({
     ...r,
@@ -141,6 +142,30 @@ export function stampFileIds(headers: string[], rows: Row[], fileId: string, isR
     ...(isResult && out.includes(RESULT_ID_COLUMN) ? { [RESULT_ID_COLUMN]: fileId } : {}),
   }));
   return { headers: out, rows: stamped };
+}
+
+/**
+ * The source File ID an uploaded result names in its file_id column: the same File ID on every row.
+ * A missing column, no rows, mixed values or anything that is not a File ID name no source.
+ */
+export function embeddedSourceId(headers: string[], rows: Row[]): string | undefined {
+  if (!headers.includes(FILE_ID_COLUMN) || !rows.length) return undefined;
+  const value = rows[0][FILE_ID_COLUMN];
+  if (!rows.every((r) => r[FILE_ID_COLUMN] === value) || !parseFileId(value)) return undefined;
+  return value;
+}
+
+/**
+ * Whether an uploaded result's original columns hold exactly an input's data. The original columns
+ * are the result's columns minus its generated ones (and result_id). They must be the same set of
+ * names as the input's columns, in any order, with the same rows in the same order and the same
+ * text in every cell. Nothing is normalised, so an edited file never matches.
+ */
+export function matchesInput(resultHeaders: string[], resultRows: Row[], generatedColumns: string[], inputHeaders: string[], inputRows: Row[]): boolean {
+  const original = resultHeaders.filter((h) => !generatedColumns.includes(h) && h !== RESULT_ID_COLUMN);
+  if (original.length !== inputHeaders.length || !inputHeaders.every((h) => original.includes(h))) return false;
+  if (resultRows.length !== inputRows.length) return false;
+  return inputRows.every((input, i) => inputHeaders.every((h) => resultRows[i][h] === input[h]));
 }
 
 /** Runs a processor on every row; keeps all original columns and values and appends generated ones, starting with result_id. */

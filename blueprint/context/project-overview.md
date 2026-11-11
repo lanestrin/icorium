@@ -1,6 +1,6 @@
 # Reclaim Studio - Project Overview
 
-<!-- blueprint:source-hash 3e0d38fedf252158922fabe38d1d99a6748b95f2c5e50510f61fb459be460002 -->
+<!-- blueprint:source-hash 65e1f603bd65c3ef063be5e2f5d614a75bd8562f3cb2ebd69503cd0d7056712e -->
 
 > Upload partner refrigerant CSVs, run one of three processing functions on every row, export results that keep every original column, and compare 2 to 5 results in charts. Icorium interview exercise; all data fictional, classification rules demo-only.
 
@@ -59,22 +59,23 @@ export, two-file comparison, and tests.
 - **11.1** File IDs identify files.
 - **11.2** `file_id` / `result_id` columns carry IDs in the data.
 - **11.3** Server requires `replace: true` before overwriting a result (409 otherwise).
+- **11.3a** Atomic result create: simultaneous first runs conflict instead of overwriting.
+- **11.4** **Replace existing result?** confirmation dialog.
+- **11.5** File ID and Filename columns, search and sort by ID, IDs in preview, chips and processing panel, **Imported** marker.
 
 **Next (in order: M11, then M10)**
 
-1. **11.3a** Atomic result create (`fix/11.3a-atomic-result-create`) - a first result write is create-if-absent, so two simultaneous first runs return a conflict instead of overwriting; explicit replace unchanged. **Next item.**
-2. **11.4** Replace confirmation dialog - **Replace existing result?** with Cancel and red **Run & Replace**; one dialog lists every replaced result, says when one is archived, and merges with the Data Quality Warning; a 409 from a stale list shows the same dialog; `replace: true` sent once, only for listed files.
-3. **11.5** Show File IDs - separate **File ID** and **Filename** columns in both tabs; search by either (`101010` finds the input and its results); sort by File ID groups results with their original; IDs in preview, chips and processing panel; **Imported** marker.
-4. **11.6** File identity regression (`test/`) - same-name uploads, separate results, cancel and single replace, archive/restore, download, re-upload, 2-5 file compare, all keyed by full ID; imported lineage decided as an acceptance case. Depends on 11.3a, 11.4, 11.5.
-5. **10.4** Comparison and dialog edge cases (P2).
-6. **10.5** Remove or finish dead and partial code (P2).
-7. **10.6** Single source for names and limits (P2).
-8. **10.7** Partner adapters own `id` and number formats; drop `DIGITS` (P2).
-9. **10.8** Client structure: logic at the right level (P2).
-10. **10.9** Tighter storage interface (P2).
-11. **10.10** Cache parsed rows and problems per file (P2).
-12. **10.11** Faster Blob lookups - only if the Vercel deployment goes ahead (P2).
-13. **10.12** Configurable server settings (P2).
+1. **11.7** Link imported results (`feature/11.7-link-imported-results`) - an uploaded result is linked (`sourceId`, `file_id` = original base) only when its embedded source File ID names an original input in the workspace and its original columns and values match that input (generated columns excluded, column order ignored); otherwise it keeps the source ID as `importedFrom` provenance and stays unlinked. Always a new base ID + code, always Imported. **Next item.**
+2. **11.6** File identity regression (`test/`) - same-name uploads, separate results, cancel and single replace, archive/restore, download, re-upload, 2-5 file compare, all keyed by full ID; imported lineage follows 11.7; renaming not supported. Depends on 11.3a, 11.4, 11.5, 11.7.
+3. **10.4** Comparison and dialog edge cases (P2).
+4. **10.5** Remove or finish dead and partial code (P2).
+5. **10.6** Single source for names and limits (P2).
+6. **10.7** Partner adapters own `id` and number formats; drop `DIGITS` (P2).
+7. **10.8** Client structure: logic at the right level (P2).
+8. **10.9** Tighter storage interface (P2).
+9. **10.10** Cache parsed rows and problems per file (P2).
+10. **10.11** Faster Blob lookups - only if the Vercel deployment goes ahead (P2).
+11. **10.12** Configurable server settings (P2).
 
 ## Data model
 
@@ -93,7 +94,9 @@ No database. Each file is stored as CSV text plus metadata, through
 - `generatedColumns?` (string[]) - columns appended by the processor.
 - `problemRows?` (number) - rows failing Composition Validation.
 - `archived?` (boolean), `archivedAt?` (ISO string) - hidden from processing and comparison until restored.
-- `imported?` (boolean) - an uploaded result whose original is not in the workspace.
+- `imported?` (boolean) - an uploaded result (new base ID + code).
+- `importedFrom?` (string) - the source File ID embedded in an imported result, kept as provenance whether or not it links (11.7).
+- Linked import (11.7): `sourceId` is set only when that source names an original input in the workspace and the original columns and values match; otherwise unlinked.
 
 ### CSV contents
 
@@ -109,7 +112,9 @@ No database. Each file is stored as CSV text plus metadata, through
 > ID. Uploads overwrite existing `file_id` / `result_id` with new IDs. "Never
 > reused" holds only within one persistent workspace: a demo reset (delete
 > `server/data/`) restarts allocation. Older stored data is not migrated.
-> Imported-result lineage: see Open questions.
+> Imported-result lineage (decided 2026-11-11): linked only on a matching source
+> ID and matching original data, otherwise provenance kept, unlinked (11.7).
+> Renaming is not supported.
 
 ### Comparison (`GET /api/compare?ids=...`)
 
@@ -171,17 +176,8 @@ shadows. Works at phone width with no sideways scroll.
 
 > Resolve in the plans, then re-run /overview.
 
-- **Stale 11.3 status.** Build plan header **Status**, the 11.3 **Result** and
-  **What to build next** say 11.3 is awaiting review / "after 11.3 merges"; it is
-  merged (PR #33) and checked.
-- **Imported lineage reopened.** The identity contract and M11 call imported-result
-  lineage unresolved, while 11.2 shipped (and the earlier plan recorded as decided)
-  a new base ID + code, marked Imported, with no link to the original. Restore the
-  decision or record why it is reopened; 11.6 needs it.
-- **Rename has no feature.** The identity contract, 11.5 and 11.6 cover renaming
-  stored files, but no item adds rename. Drop it or add an item.
 - **Frozen UI scope vs shipped UI.** Section 2 lists separate File ID / Filename
-  columns (11.5, not built) and describes a comparison workspace with tabs, a
+  columns (built in 11.5) and describes a comparison workspace with tabs, a
   "filterable row matrix" and less repetition, unlike the shipped 9.5 dashboard,
   with no item for the change.
 - **Docs say IDs are never reused** (CLAUDE.md, README); the plan limits this to a

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from './lib/csv';
 import { getAdapter } from './adapters';
-import { detectProcessor, detectResult, findProblems, issues, processors, processRows, stampFileIds } from './processing';
+import { detectProcessor, detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from './processing';
 import { compareResults, matchRows } from './lib/compare';
 import { generateCsv, generatedName, generateFiles } from './lib/generate';
 import { nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../../shared/types';
@@ -432,5 +432,46 @@ describe('File ID columns', () => {
     expect(detectResult(out.headers)).toEqual({ processor: 'validation', generatedColumns: ['result_id', 'composition_total_pct', 'processing_status', 'validation_errors'] });
     expect(detectResult([...input, 'composition_total_pct', 'processing_status', 'validation_errors'])?.processor).toBe('validation');
     expect(detectResult([...input, 'file_id'])).toBeUndefined(); // an input with its file_id is still an input
+  });
+});
+
+describe('linking an imported result to its original', () => {
+  const inputHeaders = ['batch_id', 'feed_mass_kg', 'file_id'];
+  const inputRows = [
+    { batch_id: 'A-1', feed_mass_kg: '10.0', file_id: '101010' },
+    { batch_id: 'A-2', feed_mass_kg: '12', file_id: '101010' },
+  ];
+  const generated = ['result_id', 'composition_total_pct', 'processing_status', 'validation_errors'];
+  const resultHeaders = [...inputHeaders, ...generated];
+  const resultRows = inputRows.map((r) => ({ ...r, result_id: '101010-V', composition_total_pct: '100', processing_status: 'Valid', validation_errors: '' }));
+  const matches = (headers: string[], rows: Row[]) => matchesInput(headers, rows, generated, inputHeaders, inputRows);
+
+  it('reads the source File ID only when every row names the same File ID', () => {
+    expect(embeddedSourceId(resultHeaders, resultRows)).toBe('101010');
+    expect(embeddedSourceId(resultHeaders, resultRows.map((r) => ({ ...r, file_id: '101010-V' })))).toBe('101010-V');
+    expect(embeddedSourceId(['batch_id'], [{ batch_id: 'A-1' }])).toBeUndefined(); // no file_id column
+    expect(embeddedSourceId(resultHeaders, [])).toBeUndefined();
+    expect(embeddedSourceId(resultHeaders, [resultRows[0], { ...resultRows[1], file_id: '101011' }])).toBeUndefined();
+    expect(embeddedSourceId(resultHeaders, resultRows.map((r) => ({ ...r, file_id: '' })))).toBeUndefined();
+    expect(embeddedSourceId(resultHeaders, resultRows.map((r) => ({ ...r, file_id: 'abc' })))).toBeUndefined();
+  });
+
+  it('matches identical original data, in any column order', () => {
+    expect(matches(resultHeaders, resultRows)).toBe(true);
+    expect(matches(['feed_mass_kg', 'file_id', 'batch_id', ...generated], resultRows)).toBe(true);
+  });
+
+  it('does not match a changed value, a row or column more or less, or rows in another order', () => {
+    expect(matches(resultHeaders, [{ ...resultRows[0], feed_mass_kg: '10' }, resultRows[1]])).toBe(false); // 10.0 vs 10
+    expect(matches(resultHeaders, resultRows.slice(0, 1))).toBe(false);
+    expect(matches(resultHeaders, [...resultRows, resultRows[1]])).toBe(false);
+    expect(matches(resultHeaders.filter((h) => h !== 'feed_mass_kg'), resultRows)).toBe(false);
+    expect(matches(['notes', ...resultHeaders], resultRows.map((r) => ({ ...r, notes: '' })))).toBe(false);
+    expect(matches(resultHeaders, [resultRows[1], resultRows[0]])).toBe(false);
+  });
+
+  it('keeps the original base ID in file_id for a linked result', () => {
+    expect(stampFileIds(resultHeaders, resultRows, '101012-V', true, '101010').rows[0]).toMatchObject({ file_id: '101010', result_id: '101012-V' });
+    expect(stampFileIds(resultHeaders, resultRows, '101012-V', true).rows[0]).toMatchObject({ file_id: '101012', result_id: '101012-V' });
   });
 });
