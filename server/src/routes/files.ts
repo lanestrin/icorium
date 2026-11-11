@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { codeOf, COMPARE_MAX, COMPARE_MIN, GENERATOR_PARTNERS, resultFileId, type FileMeta } from '../../../shared/types';
+import { codeOf, COMPARE_MAX, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_PARTNERS, RESULT_ID_COLUMN, resultFileId, type FileMeta } from '../../../shared/types';
 import { getAdapter } from '../adapters';
-import { detectResult, findProblems, processRows } from '../processing';
+import { detectResult, findProblems, processRows, stampFileIds } from '../processing';
 import { compareResults } from '../lib/compare';
 import { httpError, parseCsv, toCsv } from '../lib/csv';
 import { storage } from '../lib/storage';
@@ -56,11 +56,21 @@ export async function fileRoutes(app: FastifyInstance) {
     const text = (await file.toBuffer()).toString('utf8');
     const { headers, rows } = parseCsv(text);
     getAdapter(headers);
-    const base = { name: file.filename, text, rows: rows.length, columns: headers.length, problemRows: findProblems(headers, rows).total };
     // Every upload gets a new base File ID. A previously exported result is registered as a result,
-    // with that new base ID plus its function's code (e.g. 101012-M), so it can be compared later.
+    // with that new base ID plus its function's code (e.g. 101012-M), and marked Imported.
     const result = detectResult(headers);
-    if (result) return storage.create({ ...base, status: 'Processed', ...result }, codeOf(result.processor));
+    // The ID travels with the data: stored files carry it in their file_id / result_id columns,
+    // replacing any IDs the uploaded CSV brought with it.
+    // A result exported before File ID columns has none to stamp, so it is stored exactly as uploaded.
+    const hasIdColumns = headers.includes(FILE_ID_COLUMN) || headers.includes(RESULT_ID_COLUMN);
+    const textFor = (id: string) => {
+      if (result && !hasIdColumns) return text;
+      const stored = stampFileIds(headers, rows, id, !!result);
+      return toCsv(stored.headers, stored.rows);
+    };
+    const columns = result || headers.includes(FILE_ID_COLUMN) ? headers.length : headers.length + 1;
+    const base = { name: file.filename, text: textFor, rows: rows.length, columns, problemRows: findProblems(headers, rows).total };
+    if (result) return storage.create({ ...base, status: 'Processed', imported: true, ...result }, codeOf(result.processor));
     return storage.create({ ...base, status: base.problemRows > 0 ? 'Needs Review' : 'Ready' });
   });
 
@@ -101,12 +111,13 @@ export async function fileRoutes(app: FastifyInstance) {
     if (meta.status === 'Processed') throw httpError(400, 'Select an input file, not a result file');
     if (meta.archived) throw httpError(400, `Restore ${meta.name} before processing it`);
     const { headers, rows } = parseCsv(await storage.read(fileId));
-    const out = processRows(headers, rows, processor);
+    const id = resultFileId(meta.id, processor);
+    const out = processRows(headers, rows, processor, id);
     const base = meta.name.replace(/\.csv$/i, '');
     // The result's File ID is the input's ID plus the function's code. Running the same function on the
     // same input again replaces that result and keeps its ID; the name is only a label.
     return storage.put(
-      resultFileId(meta.id, processor),
+      id,
       {
         name: `result_${base}_${processor}.csv`,
         text: toCsv(out.headers, out.rows),

@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { FIRST_FILE_ID, nextBaseId, parseFileId, type FileMeta, type ProcessorCode } from '../../../shared/types';
-import { httpError, parseCsv } from './csv';
-import { findProblems } from '../processing';
+import { httpError, parseCsv, toCsv } from './csv';
+import { findProblems, stampFileIds } from '../processing';
 import { createBlobStorage } from './blob-storage';
 
 // Local-file storage. Swap this module to change persistence; nothing else touches the disk.
@@ -26,6 +26,8 @@ const filePath = (id: string) => path.join(FILES, `${id}.csv`);
 
 /** What saving a file needs; the ID and upload time are set by storage. */
 export type NewFile = Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string };
+/** For create(): the text may depend on the new File ID, which is written into the CSV's ID columns. */
+export type NewUpload = Omit<NewFile, 'text'> & { text: string | ((id: string) => string) };
 
 const localStorage = {
   list: () => [...metas].sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt)),
@@ -51,9 +53,10 @@ const localStorage = {
    * its function's code (101010-M). One process runs these steps without interruption, so two uploads
    * can never get the same number.
    */
-  create(input: NewFile, code?: ProcessorCode) {
+  create(input: NewUpload, code?: ProcessorCode) {
     const base = nextBaseId(metas.map((m) => m.id));
-    return localStorage.put(code ? `${base}-${code}` : base, input);
+    const id = code ? `${base}-${code}` : base;
+    return localStorage.put(id, { ...input, text: typeof input.text === 'function' ? input.text(id) : input.text });
   },
 
   /** Saves a file under exactly this ID, replacing any file already there (a re-run result keeps its ID). */
@@ -112,16 +115,20 @@ export async function reconcileMetadata(store: Store = storage) {
   return { updated, skipped };
 }
 
-/** First run only: load the synthetic CSVs as 100001–100005, in name order. Delete server/data to reset. */
+/**
+ * First run only: load the synthetic CSVs as 100001–100005, in name order, each stored with its
+ * file_id column (the files in sample-data are never changed). Delete server/data to reset.
+ */
 export async function seedSamples() {
   if (!useBlob && fs.existsSync(META)) return;
   const names = fs.readdirSync(SAMPLES).filter((f) => f.endsWith('.csv')).sort();
   for (const [i, name] of names.entries()) {
-    const text = fs.readFileSync(path.join(SAMPLES, name), 'utf8');
-    const { headers, rows } = parseCsv(text);
+    const id = String(FIRST_FILE_ID + i);
+    const { headers, rows } = parseCsv(fs.readFileSync(path.join(SAMPLES, name), 'utf8'));
     const problemRows = findProblems(headers, rows).total;
-    const input = { name, text, rows: rows.length, columns: headers.length,
+    const stored = stampFileIds(headers, rows, id, false);
+    const input = { name, text: toCsv(stored.headers, stored.rows), rows: rows.length, columns: stored.headers.length,
       status: problemRows > 0 ? 'Needs Review' as const : 'Ready' as const, problemRows };
-    await storage.seed(String(FIRST_FILE_ID + i), input);
+    await storage.seed(id, input);
   }
 }

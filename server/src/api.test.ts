@@ -30,24 +30,24 @@ describe('loading files', () => {
     expect(files.map((f) => f.name)).toEqual([
       'partner_a_baseline.csv', 'partner_a_followup.csv', 'partner_b_baseline.csv', 'partner_b_followup.csv', 'partner_c_baseline.csv',
     ]);
-    for (const f of files) expect(f).toMatchObject({ status: 'Needs Review', rows: 25, columns: 6, problemRows: f.name === 'partner_b_followup.csv' ? 2 : 1 });
+    for (const f of files) expect(f).toMatchObject({ status: 'Needs Review', rows: 25, columns: 7, problemRows: f.name === 'partner_b_followup.csv' ? 2 : 1 });
     expect(files.map((f) => f.id)).toEqual(['100001', '100002', '100003', '100004', '100005']); // File IDs in name order
   });
 
-  it('accepts an upload, previews its rows and downloads it unchanged', async () => {
+  it('accepts an upload, previews its rows and downloads it with only its file_id added', async () => {
     const text = sample('partner_c_baseline.csv');
     const res = await upload('uploaded_c.csv', text);
     expect(res.statusCode).toBe(200);
     const meta = res.json<FileMeta>();
-    expect(meta).toMatchObject({ name: 'uploaded_c.csv', status: 'Needs Review', rows: 25, columns: 6 });
+    expect(meta).toMatchObject({ name: 'uploaded_c.csv', status: 'Needs Review', rows: 25, columns: 7 });
 
     const preview = await rowsOf(meta.id);
-    expect(preview.headers).toEqual(['material_ref', 'collection_date', 'quantity_g', 'R32_fraction', 'R125_fraction', 'R134a_fraction']);
+    expect(preview.headers).toEqual(['material_ref', 'collection_date', 'quantity_g', 'R32_fraction', 'R125_fraction', 'R134a_fraction', 'file_id']);
     expect(preview.rows).toHaveLength(25);
 
     const download = await app.inject(`/api/files/${meta.id}/download`);
     expect(download.headers['content-disposition']).toBe(`attachment; filename="uploaded_c.csv"; filename*=UTF-8''uploaded_c.csv`);
-    expect(download.body).toBe(text);
+    expect(parseCsv(download.body)).toEqual(storedInput(text, meta.id)); // the upload plus its file_id
   });
 
   it.each(['報告.csv', 'café_ñ.csv', "it's (final) * draft!.csv", 'résumé "v2".csv'])('downloads %s under its own name', async (name) => {
@@ -55,7 +55,7 @@ describe('loading files', () => {
     const meta = (await upload(name, text)).json<FileMeta>();
     const download = await app.inject(`/api/files/${meta.id}/download`);
     expect(download.statusCode).toBe(200);
-    expect(download.body).toBe(text);
+    expect(parseCsv(download.body)).toEqual(storedInput(text, meta.id));
     const header = download.headers['content-disposition'] as string;
     // RFC 5987: the exact name, UTF-8 and percent-encoded, for browsers that read filename*.
     const encoded = header.match(/filename\*=UTF-8''([^;\s]+)/)![1];
@@ -310,6 +310,7 @@ describe('current result contract', () => {
     expect(invalid.map((row) => after.rows[row - 1].validation_errors)).toEqual(reasons);
     after.rows.forEach((r, i) => {
       before.headers.forEach((h) => expect(r[h]).toBe(before.rows[i][h]));
+      expect([r.file_id, r.result_id]).toEqual([source.id, result.id]); // the input's ID travels into the result
       if (r.processing_status === 'Valid') expect(r.validation_errors).toBe('');
       else {
         expect(r.validation_errors).toBe(after.problems.items.find((p) => p.row === i + 1)?.message);
@@ -320,9 +321,12 @@ describe('current result contract', () => {
     const download = (await app.inject(`/api/files/${result.id}/download`)).body;
     expect(parseCsv(download)).toEqual({ headers: after.headers, rows: after.rows });
     const imported = (await upload(`renamed_${name}_${id}.csv`, download)).json<FileMeta>();
-    expect(imported).toMatchObject({ status: 'Processed', processor: id, generatedColumns: result.generatedColumns });
+    expect(imported).toMatchObject({ status: 'Processed', processor: id, generatedColumns: result.generatedColumns, imported: true });
     expect((await rowsOf(imported.id)).generatedColumns).toEqual(after.generatedColumns);
-    expect((await app.inject(`/api/files/${imported.id}/download`)).body).toBe(download);
+    // The copy is a new file: its ID columns carry its new IDs; every other value is unchanged.
+    const copy = parseCsv((await app.inject(`/api/files/${imported.id}/download`)).body);
+    expect(copy.headers).toEqual(after.headers);
+    expect(copy.rows).toEqual(after.rows.map((r) => ({ ...r, file_id: imported.id.slice(0, 6), result_id: imported.id })));
     const compared = await compare(result.id, imported.id);
     expect(compared.statusCode).toBe(200);
     expect(compared.json<CompareResult>().columns.every((c) => c.rowsDiffering === 0)).toBe(true);
@@ -345,7 +349,7 @@ describe('current result contract', () => {
       expect(response.json().message).toContain('processing_status');
     }
     expect((await listFiles()).length).toBe(before);
-    expect((await app.inject(`/api/files/${input.id}/download`)).body).toBe(csv);
+    expect(parseCsv((await app.inject(`/api/files/${input.id}/download`)).body)).toEqual(storedInput(csv, input.id));
   });
 
   it('compares actual CSV schemas even if stored generated-column metadata is stale', async () => {
@@ -356,8 +360,9 @@ describe('current result contract', () => {
     await storage.patch(imported.id, { generatedColumns: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status'] });
     const response = await compare(imported.id, result.id);
     expect(response.statusCode).toBe(200);
-    expect(response.json().columns.map((c: { name: string }) => c.name)).toEqual(processors.mass.columns);
-    expect((await app.inject(`/api/files/${imported.id}/download`)).body).toBe(text);
+    // result_id is never compared: it always differs between files.
+    expect(response.json().columns.map((c: { name: string }) => c.name)).toEqual(processors.mass.columns.filter((c) => c !== 'result_id'));
+    expect(parseCsv((await app.inject(`/api/files/${imported.id}/download`)).body).rows[0].result_id).toBe(imported.id);
   });
 });
 
@@ -439,7 +444,7 @@ describe('input review status', () => {
       expect(patch).not.toHaveBeenCalled();
     } finally { read.mockRestore(); patch.mockRestore(); create.mockRestore(); put.mockRestore(); }
     for (const [meta, text] of [[cleanMeta, clean], [invalid, clean.replace(',100,', ',,')], [missing, clean.replace(',100,', ',,')]] as const)
-      expect((await app.inject(`/api/files/${meta.id}/download`)).body).toBe(text);
+      expect(parseCsv((await app.inject(`/api/files/${meta.id}/download`)).body)).toEqual(storedInput(text, meta.id));
   });
 
   it('skips a stored file it cannot read instead of failing startup or the list', async () => {
@@ -586,6 +591,57 @@ describe('File IDs', () => {
   });
 });
 
+describe('File ID columns', () => {
+  const csv = sample('partner_b_baseline.csv');
+  const download = async (id: string) => parseCsv((await app.inject(`/api/files/${id}/download`)).body);
+
+  it('stores every input with its file_id on every row, samples included', async () => {
+    const input = (await upload('carry_id.csv', csv)).json<FileMeta>();
+    const stored = await download(input.id);
+    expect(stored.headers.at(-1)).toBe('file_id');
+    expect(new Set(stored.rows.map((r) => r.file_id))).toEqual(new Set([input.id]));
+    const sampleRows = (await download('100001')).rows;
+    expect(sampleRows.every((r) => r.file_id === '100001')).toBe(true);
+    expect(input.problemRows).toBe(1); // the extra column changes nothing about validation
+  });
+
+  it('gives a re-uploaded input a new file_id instead of a second column', async () => {
+    const first = (await upload('travel.csv', csv)).json<FileMeta>();
+    const exported = (await app.inject(`/api/files/${first.id}/download`)).body;
+    const again = (await upload('travel_copy.csv', exported)).json<FileMeta>();
+    const stored = await download(again.id);
+    expect(stored.headers.filter((h) => h === 'file_id')).toHaveLength(1);
+    expect(stored.rows.every((r) => r.file_id === again.id)).toBe(true);
+    expect(again.columns).toBe(first.columns);
+    expect(again.imported).toBeUndefined(); // an input is never "Imported"
+  });
+
+  it('starts every result with result_id after the input columns, including file_id', async () => {
+    const input = (await upload('ids_in_result.csv', csv)).json<FileMeta>();
+    const result = (await processFile(input.id, 'validation')).json<FileMeta>();
+    const stored = await download(result.id);
+    expect(stored.headers.slice(-4)).toEqual(['result_id', 'composition_total_pct', 'processing_status', 'validation_errors']);
+    expect(stored.rows.every((r) => r.file_id === input.id && r.result_id === result.id)).toBe(true);
+    expect(result.imported).toBeUndefined();
+  });
+
+  it('keeps recognising, storing unchanged and comparing results exported before ID columns', async () => {
+    const input = (await upload('pre_ids.csv', csv)).json<FileMeta>();
+    const result = (await processFile(input.id, 'mass')).json<FileMeta>();
+    const current = await download(result.id);
+    // An export made before File ID columns: no file_id, no result_id.
+    const headers = current.headers.filter((h) => h !== 'file_id' && h !== 'result_id');
+    const oldText = [headers.join(','), ...current.rows.map((r) => headers.map((h) => r[h]).join(','))].join('\n');
+    const old = (await upload('old_export.csv', oldText)).json<FileMeta>();
+    expect(old).toMatchObject({ status: 'Processed', processor: 'mass', imported: true });
+    expect(old.id).toMatch(/^\d{6}-M$/);
+    expect((await app.inject(`/api/files/${old.id}/download`)).body).toBe(oldText);
+    const compared = await compare(result.id, old.id);
+    expect(compared.statusCode).toBe(200);
+    expect(compared.json<CompareResult>().columns.every((c) => c.rowsDiffering === 0)).toBe(true);
+  });
+});
+
 describe('archiving', () => {
   const archive = (ids: string[], archived: boolean) => app.inject({ method: 'POST', url: '/api/files/archive', payload: { ids, archived } });
 
@@ -670,7 +726,7 @@ describe('generating CSVs', () => {
   it.each([[0, 'Ready'], [3, 'Needs Review']] as const)('uploads a generated file with %s error rows as %s, like any partner CSV', async (errorRows, status) => {
     const [file] = (await generate({ partner: 'C', rows: 12, errorRows, seed: 9 })).json<GeneratedBatch>().files;
     const meta = (await upload(file.name, file.text)).json<FileMeta>();
-    expect(meta).toMatchObject({ name: file.name, rows: 12, columns: 6, problemRows: errorRows, status });
+    expect(meta).toMatchObject({ name: file.name, rows: 12, columns: 7, problemRows: errorRows, status });
   });
 
   it('makes several files with different data and names, each uploadable', async () => {
@@ -704,6 +760,11 @@ describe('generating CSVs', () => {
   });
 });
 
+/** What a stored input looks like: the uploaded CSV plus file_id (its File ID) on every row. */
+const storedInput = (text: string, id: string) => {
+  const { headers, rows } = parseCsv(text);
+  return { headers: [...headers, 'file_id'], rows: rows.map((r) => ({ ...r, file_id: id })) };
+};
 const listFiles = async () => (await app.inject('/api/files')).json<FileMeta[]>();
 const fileNamed = async (name: string) => {
   const f = (await listFiles()).find((x) => x.name === name);

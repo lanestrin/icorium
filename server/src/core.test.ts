@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from './lib/csv';
 import { getAdapter } from './adapters';
-import { detectProcessor, detectResult, findProblems, issues, processors, processRows } from './processing';
+import { detectProcessor, detectResult, findProblems, issues, processors, processRows, stampFileIds } from './processing';
 import { compareResults, matchRows } from './lib/compare';
 import { generateCsv, generatedName, generateFiles } from './lib/generate';
 import { nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../../shared/types';
@@ -101,7 +101,7 @@ describe('processing and export', () => {
   it('processes every row, keeps original values and appends only the chosen columns', () => {
     const out = processRows(headers, rows, 'mass');
     expect(out.rows).toHaveLength(rows.length);
-    expect(out.headers).toEqual([...headers, 'r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'processing_status', 'validation_errors']);
+    expect(out.headers).toEqual([...headers, 'result_id', 'r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'processing_status', 'validation_errors']);
     out.rows.forEach((r, i) => headers.forEach((h) => expect(r[h]).toBe(rows[i][h])));
     expect(out.rows[0]).toMatchObject({ r32_mass_kg: '50', processing_status: 'Valid', validation_errors: '' });
     expect(out.rows[1]).toMatchObject({ r32_mass_kg: '', processing_status: 'Invalid' });
@@ -403,5 +403,34 @@ describe('File IDs', () => {
     expect(nextBaseId(['100001', '100007-M', '100003'])).toBe('100008'); // results count too
     expect(nextBaseId(['not-an-id', '42', '100005'])).toBe('100006'); // other text is ignored
     expect(() => nextBaseId(['999999'])).toThrow('No File IDs left');
+  });
+});
+
+describe('File ID columns', () => {
+  const headers = ['batch_id', 'value'];
+  const rows = [{ batch_id: 'A-1', value: '1' }, { batch_id: 'A-2', value: '2' }];
+
+  it('adds file_id to an input, or rewrites one it already has', () => {
+    expect(stampFileIds(headers, rows, '101010', false)).toEqual({
+      headers: ['batch_id', 'value', 'file_id'],
+      rows: rows.map((r) => ({ ...r, file_id: '101010' })),
+    });
+    const carried = stampFileIds(['batch_id', 'file_id'], [{ batch_id: 'A-1', file_id: '100001' }], '101011', false);
+    expect(carried).toEqual({ headers: ['batch_id', 'file_id'], rows: [{ batch_id: 'A-1', file_id: '101011' }] });
+  });
+
+  it("rewrites a result's file_id and result_id, and adds neither to a result without them", () => {
+    const result = stampFileIds(['batch_id', 'file_id', 'result_id', 'x'], [{ batch_id: 'A', file_id: '100001', result_id: '100001-M', x: '1' }], '101012-M', true);
+    expect(result.rows).toEqual([{ batch_id: 'A', file_id: '101012', result_id: '101012-M', x: '1' }]);
+    expect(stampFileIds(headers, rows, '101013-V', true)).toEqual({ headers, rows });
+  });
+
+  it('writes the result ID on every row and recognises results with or without it', () => {
+    const input = ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'];
+    const out = processRows(input, [{ batch_id: 'A', sample_date: 'd', feed_mass_kg: '100', r32_pct: '40', r125_pct: '30', r134a_pct: '30' }], 'validation', '101010-V');
+    expect(out.rows[0].result_id).toBe('101010-V');
+    expect(detectResult(out.headers)).toEqual({ processor: 'validation', generatedColumns: ['result_id', 'composition_total_pct', 'processing_status', 'validation_errors'] });
+    expect(detectResult([...input, 'composition_total_pct', 'processing_status', 'validation_errors'])?.processor).toBe('validation');
+    expect(detectResult([...input, 'file_id'])).toBeUndefined(); // an input with its file_id is still an input
   });
 });

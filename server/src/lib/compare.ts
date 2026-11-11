@@ -1,4 +1,4 @@
-import { COMPARE_MAX, COMPARE_MIN, PROCESSORS, type CompareColumn, type CompareResult, type FileMeta, type MatchedRow, type Row, type RowMatch } from '../../../shared/types';
+import { COMPARE_MAX, COMPARE_MIN, PROCESSORS, RESULT_ID_COLUMN, type CompareColumn, type CompareResult, type FileMeta, type MatchedRow, type Row, type RowMatch } from '../../../shared/types';
 import { getAdapter } from '../adapters';
 import { httpError } from './csv';
 
@@ -61,9 +61,12 @@ export function compareResults(files: Loaded[]): Omit<CompareResult, 'files'> & 
   if (other)
     throw httpError(400, `These files can't be compared: ${first.meta.name} is a ${label(first.meta.processor)} result but ${other.meta.name} is a ${label(other.meta.processor)} result. Pick results from the same function.`);
 
-  const cols = first.meta.generatedColumns ?? [];
+  // Compare the function's own columns. result_id always differs between files, so it is left out,
+  // which also lets results exported before File ID columns compare with new ones.
+  const functionColumns = (f: Loaded) => (f.meta.generatedColumns ?? []).filter((c) => c !== RESULT_ID_COLUMN);
+  const cols = functionColumns(first);
   for (const f of files) {
-    const c = f.meta.generatedColumns ?? [];
+    const c = functionColumns(f);
     if (!cols.length || c.length !== cols.length || c.some((x, i) => x !== cols[i]))
       throw httpError(400, "These result schemas can't be compared. Regenerate the older result from its original input so all files use the same output columns.");
   }

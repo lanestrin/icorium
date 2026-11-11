@@ -14,6 +14,9 @@ export type ProcessorCode = (typeof PROCESSORS)[number]['code'];
  * IDs are always uppercase; anything else is not a File ID.
  */
 export const FIRST_FILE_ID = 100001;
+/** The File ID travels with the data: inputs carry it in file_id, results add their own in result_id. */
+export const FILE_ID_COLUMN = 'file_id';
+export const RESULT_ID_COLUMN = 'result_id';
 export const LAST_FILE_ID = 999999;
 const FILE_ID = new RegExp(`^(\\d{6})(?:-([${PROCESSORS.map((p) => p.code).join('')}]))?$`);
 
@@ -54,6 +57,7 @@ export interface FileMeta {
   problemRows?: number; // rows with missing, invalid or duplicate values
   archived?: boolean; // hidden from the main list and the compare pickers until restored
   archivedAt?: string; // ISO; when it was last archived, cleared on restore
+  imported?: boolean; // an uploaded result: its original input is not in this workspace
 }
 
 /** Both clean and invalid input files can be processed; result files cannot. */
