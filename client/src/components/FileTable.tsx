@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Check, CircleAlert, Download, Eye, FileSpreadsheet, Layers, LoaderCircle, MoreHorizontal, RotateCcw, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import type { FileMeta, ProcessorId } from '../../../shared/types';
+import { resultFileId, type FileMeta, type ProcessorId } from '../../../shared/types';
 import { api } from '../api';
 
 export type Status = FileMeta['status'] | 'Processing' | 'Error';
@@ -24,6 +24,20 @@ export function qualityWarning(batch: FileMeta[], processor: ProcessorId): Quali
     .filter((f) => (f.problemRows ?? 0) > 0)
     .map((f) => ({ id: f.id, name: f.name, invalid: f.problemRows!, valid: Math.max(0, f.rows - f.problemRows!) }));
   return affected.length ? { affected, cleanCount: batch.length - affected.length } : undefined;
+}
+
+/** A result that running a function would replace. */
+export interface Replacement { inputId: string; resultId: string; resultName: string; archived: boolean }
+
+/**
+ * The batch inputs that already have a result for this function, in batch order. A result is found by
+ * its File ID (the input's ID plus the function's code), never by name, and archived results count too.
+ */
+export function replacements(batch: FileMeta[], processor: ProcessorId, files: FileMeta[]): Replacement[] {
+  return batch.flatMap((input) => {
+    const result = files.find((f) => f.id === resultFileId(input.id, processor));
+    return result ? [{ inputId: input.id, resultId: result.id, resultName: result.name, archived: !!result.archived }] : [];
+  });
 }
 
 const BADGE: Record<Status, [string, LucideIcon]> = {

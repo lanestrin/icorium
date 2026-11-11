@@ -344,6 +344,122 @@ describe('data quality warning', () => {
   });
 });
 
+describe('replacing an existing result', () => {
+  const runButton = (n?: number) => screen.getByRole('button', { name: n ? `Run Processing (${n})` : 'Run Processing' });
+  const dialog = () => screen.getByRole('dialog', { name: 'Replace existing result?' });
+  const replaceButton = () => within(dialog()).getByRole('button', { name: 'Run & Replace' });
+  const cleanV: FileMeta = { ...base, id: 'clean-V', name: 'result_clean_validation.csv', status: 'Processed', processor: 'validation', sourceId: 'clean' };
+  const invalidM: FileMeta = { ...base, id: 'invalid-M', name: 'result_invalid_mass.csv', status: 'Processed', processor: 'mass', sourceId: 'invalid', archived: true };
+  const conflictError = (existing: FileMeta) => Object.assign(new Error(`Already run. Confirm to replace the existing result ${existing.id}.`),
+    { conflict: { message: `Already run. Confirm to replace the existing result ${existing.id}.`, existing: { id: existing.id, name: existing.name, archived: existing.archived } } });
+
+  async function rerun(files: FileMeta[], select: string[], fn: RegExp) {
+    vi.mocked(api.list).mockResolvedValue(files);
+    const user = await setup();
+    for (const name of select) await user.click(check(name));
+    await user.click(screen.getByRole('radio', { name: fn }));
+    await user.click(runButton(select.length > 1 ? select.length : undefined));
+    return user;
+  }
+
+  it('asks before a single re-run, naming the input and the result it replaces, and sends nothing', async () => {
+    await rerun([clean, invalid, cleanV], ['clean.csv'], /Composition Validation/);
+    expect(dialog()).toHaveTextContent('Composition Validation has already been run for file clean. Running it again will replace the existing result clean-V. This action cannot be undone.');
+    expect(within(dialog()).getByText('clean-V').tagName).toBe('STRONG');
+    expect(dialog()).not.toHaveTextContent('Archived');
+    expect(dialog()).toHaveFocus();
+    expect(screen.queryByRole('dialog', { name: 'Data Quality Warning' })).not.toBeInTheDocument();
+    expect(api.process).not.toHaveBeenCalled();
+  });
+
+  it('Run & Replace sends replace: true once, even on a double click', async () => {
+    vi.mocked(api.process).mockResolvedValue(cleanV);
+    const user = await rerun([clean, invalid, cleanV], ['clean.csv'], /Composition Validation/);
+    await user.dblClick(replaceButton());
+    await screen.findByRole('dialog', { name: /result_clean_validation/ });
+    expect(api.process).toHaveBeenCalledTimes(1);
+    expect(api.process).toHaveBeenCalledWith('clean', 'validation', true);
+  });
+
+  it('lists only the files with a result in a mixed batch and replaces only those', async () => {
+    const other: FileMeta = { ...clean, id: 'other', name: 'other.csv' };
+    vi.mocked(api.process).mockResolvedValue(cleanV);
+    const user = await rerun([clean, other, cleanV], ['clean.csv', 'other.csv'], /Composition Validation/);
+    expect(dialog()).toHaveTextContent('clean-V');
+    expect(dialog()).not.toHaveTextContent('other-V');
+    expect(dialog()).toHaveTextContent('1 other selected file will be processed normally.');
+    await user.click(replaceButton());
+    await waitFor(() => expect(api.process).toHaveBeenCalledTimes(2));
+    expect(api.process).toHaveBeenNthCalledWith(1, 'clean', 'validation', true);
+    expect(api.process).toHaveBeenNthCalledWith(2, 'other', 'validation');
+  });
+
+  it('lists every result for several re-runs and notes an archived one', async () => {
+    const cleanM: FileMeta = { ...cleanV, id: 'clean-M', name: 'result_clean_mass.csv', processor: 'mass' };
+    await rerun([clean, invalid, cleanM, invalidM], ['clean.csv', 'invalid.csv'], /Component Mass Calculation/);
+    expect(dialog()).toHaveTextContent('Component Mass Calculation has already been run for 2 selected files. Running it again will replace these existing results. This action cannot be undone.');
+    const items = within(within(dialog()).getByRole('list', { name: 'Results to replace' })).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual([
+      'clean-Mresult_clean_mass.csv',
+      'invalid-Mresult_invalid_mass.csvArchived: replacing it returns it to Active Files.',
+    ]);
+  });
+
+  it('shows the data quality warning inside the same dialog, so one confirmation runs everything', async () => {
+    vi.mocked(api.process).mockResolvedValue(invalidM);
+    const user = await rerun([clean, invalid, invalidM], ['invalid.csv'], /Component Mass Calculation/);
+    expect(dialog()).toHaveTextContent('Running it again will replace the existing result invalid-M.');
+    expect(dialog()).toHaveTextContent('Archived: replacing it returns it to Active Files.');
+    expect(within(dialog()).getByRole('list', { name: 'Files with invalid rows' })).toHaveTextContent('invalid.csv23 valid rows · 2 invalid rows');
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await user.click(replaceButton());
+    await waitFor(() => expect(api.process).toHaveBeenCalledWith('invalid', 'mass', true));
+    expect(screen.queryByRole('dialog', { name: 'Data Quality Warning' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['Cancel', (user: ReturnType<typeof userEvent.setup>) => user.click(within(dialog()).getByRole('button', { name: 'Cancel' }))],
+    ['Escape', (user: ReturnType<typeof userEvent.setup>) => user.keyboard('{Escape}')],
+    ['the close button', (user: ReturnType<typeof userEvent.setup>) => user.click(within(dialog()).getByRole('button', { name: 'Close' }))],
+  ])('%s sends nothing, keeps the selection and returns focus to Run Processing', async (_, cancel) => {
+    const user = await rerun([clean, invalid, cleanV], ['clean.csv'], /Composition Validation/);
+    await cancel(user);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.process).not.toHaveBeenCalled();
+    expect(check('clean.csv')).toBeChecked();
+    expect(runButton()).toHaveFocus();
+  });
+
+  it('keeps Tab inside the dialog', async () => {
+    const user = await rerun([clean, invalid, cleanV], ['clean.csv'], /Composition Validation/);
+    const buttons = within(dialog()).getAllByRole('button');
+    buttons[buttons.length - 1].focus();
+    await user.tab();
+    expect(buttons[0]).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(buttons[buttons.length - 1]).toHaveFocus();
+  });
+
+  it('asks about a result the stale list did not show, instead of reporting an error, then replaces it once', async () => {
+    const other: FileMeta = { ...clean, id: 'other', name: 'other.csv' };
+    const otherV: FileMeta = { ...cleanV, id: 'other-V', name: 'result_other_validation.csv', sourceId: 'other' };
+    vi.mocked(api.process)
+      .mockRejectedValueOnce(conflictError(cleanV)) // clean already has a result the list did not show
+      .mockResolvedValueOnce(otherV)
+      .mockResolvedValueOnce(cleanV);
+    const user = await rerun([clean, other], ['clean.csv', 'other.csv'], /Composition Validation/);
+    await screen.findByRole('dialog', { name: 'Replace existing result?' });
+    expect(dialog()).toHaveTextContent('Composition Validation has already been run for file clean. Running it again will replace the existing result clean-V.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Processed 1 file.');
+    expect(check('clean.csv')).toBeChecked();
+    expect(api.process).toHaveBeenNthCalledWith(1, 'clean', 'validation');
+    await user.dblClick(replaceButton());
+    await waitFor(() => expect(api.process).toHaveBeenCalledTimes(3));
+    expect(api.process).toHaveBeenNthCalledWith(3, 'clean', 'validation', true);
+  });
+});
+
 describe('archive and restore', () => {
   const archived = (f: FileMeta, archivedAt = '2026-11-08T10:00:00Z'): FileMeta => ({ ...f, archived: true, archivedAt });
   const tab = (name: RegExp) => screen.getByRole('tab', { name });

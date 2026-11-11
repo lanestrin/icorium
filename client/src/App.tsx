@@ -1,11 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Archive, ArrowDownUp, ArrowLeftRight, Calendar, Check, ChevronDown, CircleAlert, Filter, Layers, Network, RotateCcw, Search, Wand2, X, type LucideIcon } from 'lucide-react';
-import { isInputFile, type CompareResult, type FileMeta, type ProcessorId } from '../../shared/types';
+import { isInputFile, type CompareResult, type FileMeta, type ProcessorId, type ReplaceConflict } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
-import { displayStatus, FileTable, FileTabs, PROCESSING_FUNCTIONS, processingFunction, qualityWarning, SORT_OPTIONS, sortFiles, type SortKey, type QualityWarning, type Status, type Tab } from './components/FileTable';
+import { displayStatus, FileTable, FileTabs, PROCESSING_FUNCTIONS, processingFunction, qualityWarning, replacements, SORT_OPTIONS, sortFiles, type SortKey, type QualityWarning, type Replacement, type Status, type Tab } from './components/FileTable';
 import { compareBlocker, CompareWorkspace } from './components/CompareWorkspace';
-import { PreviewModal, QualityWarningModal } from './components/Modals';
+import { PreviewModal, QualityWarningModal, ReplaceResultModal } from './components/Modals';
 import { GeneratorPage } from './components/GeneratorPage';
 import { ArchitecturePage } from './components/ArchitecturePage';
 
@@ -45,7 +45,9 @@ export default function App() {
   const [processor, setProcessor] = useState<ProcessorId>('validation');
   const [processingId, setProcessingId] = useState<string>(); // batches run one file at a time
   const busy = useRef(false); // set synchronously, so a double click cannot start a second batch
-  const [pending, setPending] = useState<{ batch: FileMeta[]; processor: ProcessorId; warning: QualityWarning }>();
+  // A run waiting for confirmation: items lists results it would replace (Replace dialog); a warning
+  // alone is the Data Quality Warning.
+  const [pending, setPending] = useState<{ batch: FileMeta[]; processor: ProcessorId; warning?: QualityWarning; items?: Replacement[] }>();
   const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -149,24 +151,29 @@ export default function App() {
     await refresh();
   }
 
-  /** Run Processing: asks first when Mass or Classification would skip invalid rows. */
+  /**
+   * Run Processing: asks first when the run would replace existing results (one dialog, which also
+   * carries the Data Quality Warning when it applies), or when Mass or Classification would skip invalid rows.
+   */
   function requestRun() {
     const batch = selectedInputs;
     if (!batch.length || busy.current) return;
     const warning = qualityWarning(batch, processor);
+    const items = replacements(batch, processor, files);
+    if (items.length) return setPending({ batch, processor, warning, items });
     if (warning) return setPending({ batch, processor, warning });
     run(batch, processor);
   }
 
-  /** Process Valid Rows: runs exactly the files whose counts the warning showed. */
+  /** Process Valid Rows or Run & Replace: runs exactly the files the dialog showed, replacing only those it listed. */
   function confirmRun() {
     if (!pending) return;
     setPending(undefined);
-    run(pending.batch, pending.processor);
+    run(pending.batch, pending.processor, new Set(pending.items?.map((r) => r.inputId)));
   }
 
   /** Processes the given input files, one after another, with the given function. */
-  async function run(batch: FileMeta[], processor: ProcessorId) {
+  async function run(batch: FileMeta[], processor: ProcessorId, replaceIds = new Set<string>()) {
     if (!batch.length || busy.current) return;
     busy.current = true;
     setError(undefined);
@@ -175,25 +182,41 @@ export default function App() {
     const failed = new Set<string>();
     const errors: string[] = [];
     const made: FileMeta[] = [];
+    const conflicts: { input: FileMeta; conflict: ReplaceConflict }[] = [];
     for (const f of batch) {
       setProcessingId(f.id);
       try {
-        made.push(await api.process(f.id, processor));
+        made.push(await (replaceIds.has(f.id) ? api.process(f.id, processor, true) : api.process(f.id, processor)));
         await refresh();
       } catch (e) {
-        failed.add(f.id);
-        errors.push(`${f.name}: ${msg(e)}`);
+        // A result appeared since the list loaded: ask about it after the batch instead of failing.
+        const conflict = (e as { conflict?: ReplaceConflict }).conflict;
+        if (conflict) conflicts.push({ input: f, conflict });
+        else {
+          failed.add(f.id);
+          errors.push(`${f.name}: ${msg(e)}`);
+        }
       }
     }
     busy.current = false; // per-file errors are caught above, so this always runs
     setProcessingId(undefined);
     setFailedIds(failed);
-    // Failed files stay checked so they can be retried. After a clean batch, the new results are
-    // checked instead, so they can be compared straight away.
-    const comparable = !failed.size && made.length >= 2;
-    setSelectedIds(comparable ? new Set(made.map((m) => m.id)) : failed);
+    // Failed and conflicting files stay checked so they can be retried. After a clean batch, the new
+    // results are checked instead, so they can be compared straight away.
+    const comparable = !failed.size && !conflicts.length && made.length >= 2;
+    setSelectedIds(comparable ? new Set(made.map((m) => m.id)) : new Set([...failed, ...conflicts.map((c) => c.input.id)]));
     if (errors.length) setError(`Processing failed\n${errors.join('\n')}`);
 
+    if (conflicts.length) {
+      await refresh(); // show the result that appeared
+      if (made.length) setNotice(`Processed ${plural(made.length)}.`);
+      // The data quality warning, if any, was already confirmed for this batch.
+      return setPending({
+        batch: conflicts.map((c) => c.input),
+        processor,
+        items: conflicts.map(({ input, conflict: { existing } }) => ({ inputId: input.id, resultId: existing.id, resultName: existing.name, archived: !!existing.archived })),
+      });
+    }
     if (made.length === 1) return setPreview(made[0]); // single file: show the result right away
     if (made.length > 1) setNotice(`Processed ${made.length} files.${comparable ? ' Their results are selected, so you can compare them.' : ' Results are in the list.'}`);
   }
@@ -391,7 +414,12 @@ export default function App() {
 
 
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}
-      {pending && <QualityWarningModal warning={pending.warning} processor={pending.processor} onCancel={() => setPending(undefined)} onConfirm={confirmRun} />}
+      {pending?.items ? (
+        <ReplaceResultModal items={pending.items} otherCount={pending.batch.length - pending.items.length} warning={pending.warning}
+          processor={pending.processor} onCancel={() => setPending(undefined)} onConfirm={confirmRun} />
+      ) : pending?.warning && (
+        <QualityWarningModal warning={pending.warning} processor={pending.processor} onCancel={() => setPending(undefined)} onConfirm={confirmRun} />
+      )}
       {comparison && <CompareWorkspace result={comparison} onClose={() => setComparison(undefined)} />}
     </div>
   );

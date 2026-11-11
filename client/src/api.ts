@@ -1,8 +1,13 @@
-import type { CompareResult, FileMeta, FileRows, GeneratedBatch, GeneratorPartner, ProcessorId } from '../../shared/types';
+import type { CompareResult, FileMeta, FileRows, GeneratedBatch, GeneratorPartner, ProcessorId, ReplaceConflict } from '../../shared/types';
 
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.message ?? res.statusText);
+  if (!res.ok) {
+    const error = new Error(body.message ?? res.statusText);
+    // A refused re-run carries the existing result, so the app can ask before replacing it.
+    if (res.status === 409 && body.existing) Object.assign(error, { conflict: body as ReplaceConflict });
+    throw error;
+  }
   return body as T;
 }
 
@@ -15,11 +20,12 @@ export const api = {
     fd.append('file', file);
     return fetch('/api/files', { method: 'POST', body: fd }).then(json<FileMeta>);
   },
-  process: (fileId: string, processor: ProcessorId) =>
+  /** replace: true only after the person confirmed replacing this input's existing result. */
+  process: (fileId: string, processor: ProcessorId, replace?: boolean) =>
     fetch('/api/process', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ fileId, processor }),
+      body: JSON.stringify(replace ? { fileId, processor, replace: true } : { fileId, processor }),
     }).then(json<FileMeta>),
   archive: (ids: string[], archived: boolean) =>
     fetch('/api/files/archive', {
