@@ -105,6 +105,15 @@ export function createBlobStorage(prefix: string) {
       });
       return meta;
     },
+    /**
+     * Saves a file under exactly this ID only if no object has it yet ("fail if it exists"), so a
+     * request on another server can never overwrite it. Returns undefined, changing nothing, when it exists.
+     */
+    async createAt(id: string, input: NewFile) {
+      const { text, ...fields } = input;
+      const meta: FileMeta = { ...fields, id, uploadedAt: new Date().toISOString() };
+      return (await createOnce(pathOf(id), JSON.stringify({ meta, text }))) ? meta : undefined;
+    },
     /** Saves a sample under its fixed ID once; another server starting at the same time never overwrites it. */
     async seed(id: string, input: NewFile) {
       const parsed = parseFileId(id);

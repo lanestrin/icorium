@@ -62,6 +62,34 @@ describe('durable Blob storage', () => {
     expect(await storage.read(source.id)).toBe(input('source.csv').text);
   });
 
+  it('creates a result at an exact ID only once, leaving an existing one unchanged', async () => {
+    const storage = createBlobStorage('test/create-at');
+    const source = await storage.create(input('source.csv'));
+    const id = `${source.id}-M`;
+    const first = await storage.createAt(id, { ...input('result_source_mass.csv'), status: 'Processed' });
+    expect(first).toMatchObject({ id, status: 'Processed' });
+    const before = blobs.files.get(`test/create-at/files/${id}.json`);
+    expect(await storage.createAt(id, { ...input('other.csv'), text: 'overwritten', status: 'Processed' })).toBeUndefined();
+    expect(blobs.files.get(`test/create-at/files/${id}.json`)).toEqual(before); // same bytes, same ETag
+    expect(await storage.get(id)).toEqual(first);
+  });
+
+  it('lets only one of two servers create the same result at once', async () => {
+    const [a, b] = [createBlobStorage('test/create-race'), createBlobStorage('test/create-race')];
+    const source = await a.create(input('source.csv'));
+    const id = `${source.id}-V`;
+    const made = await Promise.all([a, b].map((s, i) => s.createAt(id, { ...input(`${i}.csv`), text: `run ${i}`, status: 'Processed' })));
+    const winner = made.findIndex((m) => m);
+    expect(made.filter((m) => m)).toHaveLength(1);
+    expect(await a.read(id)).toBe(`run ${winner}`);
+  });
+
+  it('reports a failed result create as an error, not as already existing', async () => {
+    const storage = createBlobStorage('test/create-fail');
+    vi.mocked(put).mockRejectedValueOnce(new Error('Store unavailable'));
+    await expect(storage.createAt('100001-V', { ...input('r.csv'), status: 'Processed' })).rejects.toThrow('Store unavailable');
+  });
+
   it('never gives the same File ID to uploads on two servers at once', async () => {
     const [a, b] = [createBlobStorage('test/claims'), createBlobStorage('test/claims')];
     const made = await Promise.all([a, b, a, b, a, b].map((s, i) => s.create(input(`${i}.csv`))));

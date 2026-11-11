@@ -90,7 +90,7 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 - Both rows of a duplicate batch ID are marked Invalid; neither is picked as the correct one.
 - Comparison matches rows by batch ID only when every pair of compared files shares IDs (a partner's baseline and follow-up); files from different partners share none, so their rows are matched by position, up to the longest file. The comparison states which was used. A repeated ID is matched occurrence by occurrence, and a blank ID never matches.
 - Only results from the same function and the current column layout can be compared. Regenerate an older result before comparing it with a new one.
-- A confirmed re-run of a function on the same input replaces the earlier result under the same File ID; there is no version history. Two first runs of the same result at the same moment both write it (the content is the same). File IDs end at `999999`.
+- A confirmed re-run of a function on the same input replaces the earlier result under the same File ID; there is no version history. A result is first saved with a create-if-absent write, so of two first runs of the same result at the same moment one is saved and the other is refused with 409, like any unconfirmed re-run. Two *confirmed* replacements at the same moment both write and the last one is kept (both are made from the same input, so only the save time differs). File IDs end at `999999`.
 - Processing is synchronous and handles one file at a time, which suits interview-sized files. Preview lists the first 100 problem rows in detail.
 - Classification thresholds are demo-only, and no purity or recovery is inferred from feed composition.
 - Automated tests cover behavior in jsdom; they do not check real-browser layout or visuals.

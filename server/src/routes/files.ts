@@ -128,33 +128,32 @@ export async function fileRoutes(app: FastifyInstance) {
     // same input again replaces that result and keeps its ID, but only when the request confirms it,
     // so another tab or a stale file list can never overwrite a result silently.
     const id = resultFileId(meta.id, processor);
+    const conflict = (existing: FileMeta): ReplaceConflict => ({
+      message: `${PROCESSORS.find((p) => p.id === processor)!.label} has already been run for file ${meta.id}. Confirm to replace the existing result ${id}.`,
+      existing: { id: existing.id, name: existing.name, archived: existing.archived },
+    });
     const existing = await findFile(id);
-    if (existing && !replace) {
-      const label = PROCESSORS.find((p) => p.id === processor)!.label;
-      const conflict: ReplaceConflict = {
-        message: `${label} has already been run for file ${meta.id}. Confirm to replace the existing result ${id}.`,
-        existing: { id: existing.id, name: existing.name, archived: existing.archived },
-      };
-      return reply.code(409).send(conflict);
-    }
+    if (existing && !replace) return reply.code(409).send(conflict(existing));
     const { headers, rows } = parseCsv(await storage.read(fileId));
     const out = processRows(headers, rows, processor, id);
     const base = meta.name.replace(/\.csv$/i, '');
-    // A replaced result is saved as new metadata, so an archived one returns to Active Files.
-    return storage.put(
-      id,
-      {
-        name: `result_${base}_${processor}.csv`,
-        text: toCsv(out.headers, out.rows),
-        rows: out.rows.length,
-        columns: out.headers.length,
-        status: 'Processed',
-        processor,
-        sourceId: meta.id,
-        generatedColumns: out.generated,
-        problemRows: out.problemRows,
-      },
-    );
+    const result = {
+      name: `result_${base}_${processor}.csv`,
+      text: toCsv(out.headers, out.rows),
+      rows: out.rows.length,
+      columns: out.headers.length,
+      status: 'Processed' as const,
+      processor,
+      sourceId: meta.id,
+      generatedColumns: out.generated,
+      problemRows: out.problemRows,
+    };
+    // A confirmed re-run overwrites, saving new metadata, so an archived result returns to Active Files.
+    if (replace) return storage.put(id, result);
+    // Otherwise only create: if another request saved this result since the check above, refuse
+    // like a normal re-run rather than overwrite it.
+    const created = await storage.createAt(id, result);
+    return created ?? reply.code(409).send(conflict(await storage.get(id)));
   });
 
   // Generates 1–10 synthetic partner CSVs with different data. Nothing is saved: the page downloads them or uploads them like any CSV.

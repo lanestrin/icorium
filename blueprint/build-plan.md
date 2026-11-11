@@ -700,7 +700,7 @@ The filename `data.csv` is permitted for every row above. A partner may name a f
 
   **Verification:** API tests for first run, refused re-run, confirmed re-run (same ID, new content) and replacing an archived result; `npm run verify`.
 
-- [ ] **11.3a** `fix/11.3a-atomic-result-create` · **P1** — Close the documented race between “result does not exist” and creation. Make a new result write create-if-absent; if another run creates the same result first, return a replacement conflict instead of overwriting it. Preserve explicit replacement behavior. For a confirmed replacement, use available storage version/concurrency protection or document the overwrite semantics and prevent duplicate client submissions.
+- [x] **11.3a** `fix/11.3a-atomic-result-create` · **P1** — Close the documented race between “result does not exist” and creation. Make a new result write create-if-absent; if another run creates the same result first, return a replacement conflict instead of overwriting it. Preserve explicit replacement behavior. For a confirmed replacement, use available storage version/concurrency protection or document the overwrite semantics and prevent duplicate client submissions.
 
   **Depends on:** 11.3 implementation.
 
