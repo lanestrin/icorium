@@ -46,12 +46,12 @@ New review requests record requested execution and completed receipts record
 actual execution. Manual uses `fresh session`; automatic uses `fresh subagent`;
 an explicit automatic fallback records actual manual with `fresh session`.
 
-`git.landing` controls only how `/complete` offers to land finished regular
-work. Its default, `local-merge`, keeps the local squash-merge flow. Set it to
-`pull-request` when completed branches should be pushed and opened as pull
-requests for provider review and squash merge. Configuration never supplies the
-required push, pull-request, or merge approvals. Continuous Mode remains
-local-only and ignores this setting.
+This project uses `git.landing: "pull-request"`. Complete prepares the archive,
+final verification evidence and publication drafts, then stops. Only separately
+authorized Approve makes the work commit, pushes and creates or updates the PR;
+the person performs the squash merge. A different regular landing setting is a
+project-rule conflict to resolve, not permission to merge locally. Continuous
+Mode retains its own explicitly authorized local-only lifecycle.
 
 New projects default to one review packet after all small implementation steps
 (`workflow.stepReview: "feature"`) with step checkpoint commits disabled. This
@@ -105,11 +105,20 @@ the default branch is protected or several isolated checkouts are active. This
 model intentionally does not add per-item state folders or automatic agent
 coordination.
 
-Learn the feature loop: `/feature` -> `/implement` -> `/check` -> `/audit current` ->
-`/complete`. Approve the Feature spec before Implement. Check proves behavior;
-Audit reviews code and records findings. Showing both in this path does not
-change configured gates or make Audit mandatory. `/check guide` only generates
-manual instructions and never performs verification or records acceptance.
+The regular loop is `/feature` (or `/fix`, `/rollback`) -> `/implement` ->
+`/complete` -> `/approve`. Approve the spec before Implement. Check proves
+behavior and Audit reviews code; run them when explicitly requested or selected
+by configured gates. Required independent review and previously initiated gates
+remain enforced. `/check guide` only generates instructions and never records
+verification or acceptance.
+
+Run Verify after the finished tracked edits. Reuse an evidenced pass for the
+exact unchanged candidate instead of rerunning it at each handoff. Spec and
+archival edits invalidate reuse. Complete records final candidate identity and
+passing evidence in the ignored `blueprint/context/landing-review.md`, which
+Approve validates before publication. Failure, missing evidence, changed relevant
+runtime/dependency inputs or uncertain identity requires another run. See
+AGENTS.md and Complete Step 2 for the candidate and evidence requirements.
 
 Core skills:
 
@@ -119,7 +128,8 @@ Core skills:
 - `implement` - build the current spec one small, reviewed step at a time
 - `check` - prove the current spec against the running app, or use `check guide`
   for a read-only manual review guide: where to go, what to click, what to expect
-- `complete` - run the final safety pass, log features, fixes, or rollbacks under `blueprint/history/`, then request approval for the configured local merge or pull-request landing
+- `complete` - check final gates, archive work under `blueprint/history/`, and prepare commit/PR drafts without publishing
+- `approve` - publish that reviewed work only after the person explicitly authorizes its commit, push and PR
 
 ### Understand and review
 

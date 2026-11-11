@@ -33,8 +33,9 @@ planning context, coding standards and the active spec only when needed.
 ## Completion and approval skills
 
 - `/complete`: the Blueprint completion step (safety pass, history logging
-  under `blueprint/history/`, commit and PR drafts). `git.landing` is
-  `pull-request` in `blueprint/config.json`, so it never merges locally.
+  under `blueprint/history/`, commit and PR drafts). It never stages, commits,
+  pushes, publishes or merges. Final tracked archival edits require Verify;
+  unchanged prepared candidates reuse their recorded passing evidence.
   See `.claude/skills/complete/SKILL.md`.
 - `/approve`: only the person invokes it after reviewing the drafts. It
   authorizes one commit, push and PR creation/update. See

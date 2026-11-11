@@ -21,12 +21,11 @@ activity contract. A missing or failing helper is a warning, not a blocker.
 
 Where this sits in the workflow:
 
-    /fix  ->  /implement  ->  /complete  ->  back to your features
-    (spec     (build it,      (log to blueprint/history/fixes/
-     the fix)  reviewed)       + merge)
+    /fix -> /implement -> /complete -> /approve
+    (spec)  (build)       (log + drafts) (publish)
 
 A fix is a bug or small change that isn't a planned build-plan feature. It runs
-through the same loop as a feature (build with review gates, iterate, then merge);
+through the same loop as a feature (build, conditional gates, drafts, approval);
 it just starts here instead of `/feature`, and is logged separately.
 
 ## Input

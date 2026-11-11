@@ -232,7 +232,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.1** `feature/8.1-shared-row-validation` — Use the same Composition Validation rules for all three functions, including missing and duplicate batch IDs. End every result with `processing_status` (`Valid` / `Invalid`) and `validation_errors` (empty when valid), replacing `validation_status`, `validation_message` and `mass_status`. Validation retains `composition_total_pct`; invalid mass rows have empty calculated values and invalid classification rows use `Needs review`. Update result detection and comparison so newly exported or renamed/re-uploaded results work in this same PR.
 
-  **Result:** merged in PR #3 (`7a8ac14`); automated verification passed. See [feature scope and results](features/8.1-shared-row-validation.md).
+  **Result:** merged in PR #3 (`7a8ac14`); automated verification passed. See [feature scope and results](history/features/8.1-shared-row-validation.md).
 
   **Depends on:** existing processing, export and comparison baseline.
 
@@ -256,7 +256,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.2** `feature/8.2-needs-review-status` — Show invalid input files as **Needs Review** with an **N invalid** tag and add that status to the filter. Results remain **Processed** with the invalid-row tag. Keep processing/error feedback and file eligibility consistent with the new input status.
 
-  **Result:** merged in PR #4 (`6f08728`); automated verification passed (96 server tests, 13 client unit/component tests and client build on 2026-11-06). Person confirmed filters work and removed remaining manual UI acceptance gates. See [scope and verification status](features/8.2-needs-review-status.md).
+  **Result:** merged in PR #4 (`6f08728`); automated verification passed (96 server tests, 13 client unit/component tests and client build on 2026-11-06). Person confirmed filters work and removed remaining manual UI acceptance gates. See [scope and verification status](history/features/8.2-needs-review-status.md).
 
   **Depends on:** 8.1.
 
@@ -278,7 +278,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.3** `feature/8.3-data-quality-warning` — Before Mass or Classification runs on selected inputs with invalid rows, show a **Data Quality Warning** dialog with valid/error row counts per file. Explain: "Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values." Provide **Cancel** and **Process Valid Rows**. Validation runs without this warning.
 
-  **Result:** merged in PR #13 (`9425c11`); automated verification passed (2026-11-09). See [feature scope and results](features/8.3-data-quality-warning.md).
+  **Result:** merged in PR #13 (`9425c11`); automated verification passed (2026-11-09). See [feature scope and results](history/features/8.3-data-quality-warning.md).
 
   **Depends on:** 8.1 and 8.2.
 
@@ -300,7 +300,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.4** `feature/8.4-partial-processing-demo` — Update README examples and the interview walkthrough for the new columns, Needs Review status and confirmation dialog; verify all three functions against all five samples and the saved-result round trip.
 
-  **Result:** merged in PR #14 (`0b87809`); automated verification passed (2026-11-09). The API contract test pins every sample's invalid rows and reasons for all three functions. See [feature scope and results](features/8.4-partial-processing-demo.md).
+  **Result:** merged in PR #14 (`0b87809`); automated verification passed (2026-11-09). The API contract test pins every sample's invalid rows and reasons for all three functions. See [feature scope and results](history/features/8.4-partial-processing-demo.md).
 
   **Depends on:** 8.1–8.3.
 
@@ -746,7 +746,7 @@ The filename `data.csv` is permitted for every row above. A partner may name a f
 
 - [x] **7.1** `feature/7.1-interview-readiness` — Review final interview documentation and automated verification after partial processing and any explicitly requested UI changes. This is an integration review, not a redesign.
 
-  **Result:** merged in PR #15 (`d28064b`); automated verification passed (2026-11-09). Added client component coverage for upload, preview paging, compare footer and comparison. Aligned README, plan layout and stack doc with the code. See [feature scope and results](features/7.1-interview-readiness.md).
+  **Result:** merged in PR #15 (`d28064b`); automated verification passed (2026-11-09). Added client component coverage for upload, preview paging, compare footer and comparison. Aligned README, plan layout and stack doc with the code. See [feature scope and results](history/features/7.1-interview-readiness.md).
 
   **Depends on:** 8.1–8.4 and any subsequently approved UI feature affecting the demo.
 

@@ -21,9 +21,8 @@ activity contract. A missing or failing helper is a warning, not a blocker.
 
 Where this sits in the workflow:
 
-    completed feature + git history  ->  [rollback]  ->  /implement  ->  /check  ->  /complete
-    (archive + squashed commit)           (risk review     (reverse       (prove)     (log + merge)
-                                           + spec)          product diff)
+    completed feature + git history -> [rollback] -> /implement -> /complete -> /approve
+    (archive + squashed commit)        (risk review) (reverse)     (log + drafts) (publish)
 
 This skill plans a rollback. It does not change product code, create a branch,
 commit, merge, or push. It identifies the completed feature and its exact git
@@ -189,7 +188,8 @@ spec, then run `/implement` to create the rollback branch and apply it.
 - Never use `git reset --hard`, force-push, history rewriting, or broad file
   restoration.
 - Never infer permission to cascade into later features or destroy stored data.
-- A rollback still uses `/implement`, `/check`, and `/complete` review gates.
+- A rollback uses `/implement`, configured or explicitly requested Check/Audit
+  gates, `/complete` drafts and separately authorized `/approve` publication.
 
 ## Formatting
 

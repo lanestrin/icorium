@@ -31,10 +31,11 @@ The loop we use for every feature. The spec for the feature being built lives in
 @blueprint/context/current-feature.md.
 
 Run `/feature` (or `/fix` for a bug or change that isn't a planned feature) to
-write the spec and approve it before `/implement` builds it on a branch. Use
-`/check` to prove behavior, `/audit` to review code and record findings, and
-`/complete` to log the work and merge with approval. This teaching path does not
-change the configured gates; Audit is not mandatory for every feature.
+write the spec and approve it before `/implement` builds it on a branch.
+Use `/check` to prove behavior and `/audit` to review code when explicitly
+requested or selected by configured gates. `/complete` logs the work and prepares
+publication drafts; separately authorized `/approve` commits, pushes and opens
+the PR. The person performs the merge. Required or pending reviews remain gates.
 `/check guide` only explains how the user can test the work and never runs checks
 or records acceptance. The numbered loop below is what those skills follow.
 
@@ -50,13 +51,9 @@ rather than mixing app source or unrelated work into the baseline. When setup
 work is on a dedicated branch, the same approval can finalize the local baseline
 and fast-forward it into the unchanged default branch. It never pushes.
 
-The skills are the structured path, not a requirement. You can also just describe
-a feature, fix, or change in chat at any time and we'll build it the same way; the
-rules below still apply (small steps, a reviewable diff, the conventions in
-`coding-standards.md`). Project instructions tell the agent to read these files
-when the work needs them instead of carrying them through every unrelated turn.
-Use the skills when you want the repeatable loop and the logging; prompt directly
-when you just want something done.
+Natural-language requests use the same project review and approval gates as
+skill invocations. Describing a change in chat does not bypass spec approval,
+verification or publication review. Load only the context needed for the work.
 
 1. **Spec** - Optionally run `/brief` first for a read-only preview of the next
    feature (scope, dependencies, size); it writes nothing. Then run `/feature`
@@ -134,13 +131,19 @@ enable checkpoint prompts by itself. The previous workflow uses
    `blueprint/build-plan.md`, and
    resets `blueprint/context/current-feature.md` and
    `blueprint/context/review.md` to their stubs.
-11. **Feature commit** - `/complete` stages everything on the branch (step work
-   plus the logging changes) into one conventional feature commit.
-12. **Land** - `/complete` follows `git.landing`. The default local path asks to
-    squash-merge the branch and later asks separately before pushing the default
-    branch. The `pull-request` path asks once before pushing the work branch and
-    opening a pull request, then leaves provider review and squash merge to the
-    user. Neither path infers approval from configuration.
+11. **Final verification + drafts** - Complete finishes tracked archival edits,
+    then runs Verify because those edits invalidate earlier results. It records
+    the final tested candidate and passing evidence in `landing-review.md`, and
+    writes the full commit and PR drafts to ignored `landing-*` files. It stops
+    without staging, committing or publishing. An unchanged prepared candidate
+    can reuse its evidenced pass; failure, missing evidence, changed relevant
+    inputs or uncertain identity requires a fresh run.
+12. **Publish** - Only the person's explicit `/approve` invocation, or equivalent
+    explicit authorization under commit rules, permits the reviewed commit,
+    branch push and PR creation/update. Approve validates the exact content,
+    drafts and complete tested-candidate identity and reuses unchanged passing
+    evidence. The person performs the squash merge after CI. Continuous Mode
+    retains its own separate explicit local lifecycle.
 13. **Release prep (optional)** - run `/release render` or `/release vercel`
     after a completed feature or milestone when you want local provider config,
     env var review, build/start checks, and a smoke-test path. `/release` must

@@ -1,6 +1,6 @@
 # Reclaim Studio - Project Overview
 
-<!-- blueprint:source-hash 9464bcbd710024816a748c5766fc25735345d608900c03aa152e6590e364c81d -->
+<!-- blueprint:source-hash 3e0d38fedf252158922fabe38d1d99a6748b95f2c5e50510f61fb459be460002 -->
 
 > Upload partner refrigerant CSVs, run one of three processing functions on every row, export results that keep every original column, and compare 2 to 5 results in charts. Icorium interview exercise; all data fictional, classification rules demo-only.
 
@@ -186,9 +186,6 @@ shadows. Works at phone width with no sideways scroll.
   with no item for the change.
 - **Docs say IDs are never reused** (CLAUDE.md, README); the plan limits this to a
   persistent workspace.
-- **Who publishes.** **Rules for features** says `/approve` commits, pushes and
-  publishes the PR; Blueprint `/complete` with `pull-request` landing also offers
-  push and PR, and PRs are opened manually.
 - **Plan formatting.** Escaped table pipes (`\|`), escaped `\<`, blank lines that
   split wrapped paragraphs, and `**---**` render incorrectly; the repo layout block
   omits the generator and architecture pages.
