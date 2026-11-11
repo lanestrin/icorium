@@ -1,6 +1,6 @@
 # Reclaim Studio - Project Overview
 
-<!-- blueprint:source-hash 7650e8e4fcce1698d9fffb7427a8b60a81a86d62a90cba867447412f0479cb8c -->
+<!-- blueprint:source-hash f7495085b09c59f172422f0eb09c65c98122c938148548885a2e1f50725b8443 -->
 
 > Upload partner refrigerant CSVs, run one of three processing functions on every row, export results that keep every original column, and compare 2 to 5 results in charts. Icorium interview exercise; all data fictional, classification rules demo-only.
 
@@ -62,20 +62,21 @@ export, two-file comparison, and tests.
 - **11.3a** Atomic result create: simultaneous first runs conflict instead of overwriting.
 - **11.4** **Replace existing result?** confirmation dialog.
 - **11.5** File ID and Filename columns, search and sort by ID, IDs in preview, chips and processing panel, **Imported** marker.
+- **11.7** Imported results linked only on a matching source File ID and matching original data; otherwise `importedFrom` provenance, unlinked.
+- **11.6** File identity regression tests (API, Blob storage, component), all keyed by full ID.
+- **10.4** Collision-proof comparison row keys with display labels, numeric "rows differing", generator attempt cap, focus trap skips disabled fields.
 
-**Next (in order: M11, then M10)**
+**Next (in order)**
 
-1. **11.7** Link imported results (`feature/11.7-link-imported-results`) - an uploaded result is linked (`sourceId`, `file_id` = original base) only when its embedded source File ID names an original input in the workspace and its original columns and values match that input (generated columns excluded, column order ignored); otherwise it keeps the source ID as `importedFrom` provenance and stays unlinked. Always a new base ID + code, always Imported. **Next item.**
-2. **11.6** File identity regression (`test/`) - same-name uploads, separate results, cancel and single replace, archive/restore, download, re-upload, 2-5 file compare, all keyed by full ID; imported lineage follows 11.7; renaming not supported. Depends on 11.3a, 11.4, 11.5, 11.7.
-3. **10.4** Comparison and dialog edge cases (P2).
-4. **10.5** Remove or finish dead and partial code (P2).
-5. **10.6** Single source for names and limits (P2).
-6. **10.7** Partner adapters own `id` and number formats; drop `DIGITS` (P2).
-7. **10.8** Client structure: logic at the right level (P2).
-8. **10.9** Tighter storage interface (P2).
-9. **10.10** Cache parsed rows and problems per file (P2).
-10. **10.11** Faster Blob lookups - only if the Vercel deployment goes ahead (P2).
-11. **10.12** Configurable server settings (P2).
+1. **9.9** Compact file table (`feature/9.9-compact-file-table`) - remove **Rows** and **Columns** from both tabs, give File Name the space; Preview header shows File ID, rows, columns and (results) the function. Presentation only. **Next item.**
+2. **10.5** Remove or finish dead and partial code (P2).
+3. **10.6** Single source for names and limits (P2).
+4. **10.7** Partner adapters own `id` and number formats; drop `DIGITS` (P2).
+5. **10.8** Client structure: logic at the right level (P2).
+6. **10.9** Tighter storage interface (P2).
+7. **10.10** Cache parsed rows and problems per file (P2).
+8. **10.11** Faster Blob lookups - only if the Vercel deployment goes ahead (P2).
+9. **10.12** Configurable server settings (P2).
 
 ## Data model
 

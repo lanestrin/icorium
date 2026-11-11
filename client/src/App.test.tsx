@@ -921,6 +921,50 @@ describe('file identity regression', () => {
   });
 });
 
+describe('compact file table', () => {
+  const headers = () => screen.getAllByRole('columnheader').map((h) => h.textContent);
+  const subtitle = (dialog: HTMLElement) => within(dialog).getByText(/^File ID /).textContent;
+
+  it('shows no Rows or Columns in either tab, keeping File ID and the dates', async () => {
+    const archivedFile: FileMeta = { ...clean, id: 'old', name: 'old.csv', archived: true, archivedAt: '2026-11-08T10:00:00Z' };
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, archivedFile]);
+    const user = await setup();
+    expect(screen.getAllByRole('columnheader')[0]).toContainElement(screen.getByRole('checkbox', { name: 'Select all files' }));
+    expect(headers().slice(1)).toEqual(['File ID', 'File Name', 'Uploaded', 'Processing function', 'Status', 'Actions']);
+    // 25 rows and 7 columns are no longer shown as cells of their own.
+    expect(within(row('clean.csv')).getAllByRole('cell').map((c) => c.textContent)).not.toContain('25');
+    expect(within(row('clean.csv')).getAllByRole('cell').map((c) => c.textContent)).not.toContain('7');
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    expect(headers().slice(1)).toEqual(['File ID', 'File Name', 'Archived On', 'Original Upload', 'Processing function', 'Status', 'Actions']);
+    expect(within(row('old.csv')).getAllByRole('cell')).toHaveLength(8);
+  });
+
+  it('spans the empty-state message across the remaining columns', async () => {
+    const user = await setup();
+    await user.type(screen.getByRole('textbox', { name: 'Search file ID or name' }), 'nothing matches');
+    expect(screen.getByText('No CSV files match your filters.')).toHaveAttribute('colspan', '7');
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByText(/^No archived files/)).toHaveAttribute('colspan', '8');
+  });
+
+  it('keeps the row and column counts in the preview header, for inputs and results', async () => {
+    const imported: FileMeta = { ...result, id: '101012-M', name: 'copy.csv', imported: true };
+    vi.mocked(api.list).mockResolvedValue([clean, result, imported]);
+    const user = await setup();
+    const preview = async (name: string) => {
+      await user.click(within(row(name)).getByRole('button', { name: 'Preview' }));
+      const dialog = await screen.findByRole('dialog');
+      const text = subtitle(dialog);
+      await user.click(within(dialog).getByRole('button', { name: /Close/ }));
+      return text;
+    };
+    expect(await preview('clean.csv')).toBe('File ID clean · 25 rows · 7 columns');
+    expect(await preview('result.csv')).toBe('File ID result · Component Mass Calculation result · 25 rows · 7 columns · generated columns highlighted');
+    expect(await preview('copy.csv')).toBe('File ID 101012-M · Component Mass Calculation result · 25 rows · 7 columns · generated columns highlighted · Imported: original input not linked');
+  });
+});
+
 describe('preview', () => {
   const page = (offset: number, count: number) => ({
     headers: ['batch_id'], rows: Array.from({ length: count }, (_, i) => ({ batch_id: `A-${offset + i + 1}` })),

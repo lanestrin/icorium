@@ -254,7 +254,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
   const ids = files.map((f) => f.id);
   const checkedCount = ids.filter((id) => selectedIds.has(id)).length;
   const allChecked = ids.length > 0 && checkedCount === ids.length;
-  const columns = archived ? 10 : 9;
+  const columns = archived ? 8 : 7; // for the empty-state row
   // aria-sort and an arrow on whichever column the list is sorted by.
   const sortedBy = (column: SortColumn) => {
     if (!sort.startsWith(column)) return {};
@@ -278,7 +278,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
         tabIndex={0}
         className="overflow-auto rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:max-h-[calc(100vh-17rem)]"
       >
-        <table className={`w-full text-sm ${archived ? 'min-w-[1340px]' : 'min-w-[1180px]'}`}>
+        <table className={`w-full text-sm ${archived ? 'min-w-[1160px]' : 'min-w-[1000px]'}`}>
           <thead>
             <tr className="text-left text-slate-700 [&>th]:sticky [&>th]:top-0 [&>th]:z-[1] [&>th]:bg-slate-50 [&>th]:py-3 [&>th]:font-semibold">
               <th className="w-14 rounded-l-xl pl-6">
@@ -294,8 +294,6 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
               </th>
               {header('File ID', 'id', 'pl-1 pr-4')}
               {header('File Name', 'name', '')}
-              <th className="px-3 text-center">Rows</th>
-              <th className="px-3 text-center">Columns</th>
               {archived ? (
                 <>
                   {header('Archived On', 'archived', 'pl-4 pr-3')}
@@ -345,8 +343,6 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                       {f.name}
                     </span>
                   </td>
-                  <td className="px-3 text-center">{f.rows}</td>
-                  <td className="px-3 text-center">{f.columns}</td>
                   {archived && <td className="whitespace-nowrap pl-4 pr-3">{f.archivedAt ? fmtDate(f.archivedAt) : '—'}</td>}
                   <td className={`whitespace-nowrap pr-3 ${archived ? '' : 'pl-4'}`}>{fmtDate(f.uploadedAt)}</td>
                   <td className="whitespace-nowrap pr-3 text-slate-500">{processingFunction(f)}</td>
