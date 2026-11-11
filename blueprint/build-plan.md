@@ -3,7 +3,7 @@
 **Project:** Icorium full-stack coding exercise  
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 **Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
-**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review; none started. See section 4.
+**Status:** All planned features merged. M10 lists the fixes from the 2026-11-10 code review and M11 the File ID scheme; none started. See section 4.
 
 ## 1. What “done” means
 
@@ -71,7 +71,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 **Next: 10.1** `fix/download-file-names`: downloading a file whose name has
 non-Latin characters fails with a 500 (confirmed). It is the first M10 item and
 has no dependencies. Start by adding an API test that uploads `報告.csv` and
-downloads it. New work outside M10 needs a new request: add it as a new stable
+downloads it. **Order:** 10.1–10.3, then M11 (11.1–11.5), then 10.4–10.12; M11
+changes how files are identified and stored, so the P2 refactors build on it.
+New work outside M10 and M11 needs a new request: add it as a new stable
 ID with its scope before building, or use a `fix/` branch for a bug.
 
 **Selection rule:** take the first unchecked item below whose dependencies are
@@ -282,7 +284,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
   **Done when:** a stale list or preview response never replaces newer data; Undo is never a silent no-op.
   **Verification:** component tests with deferred promises resolving out of order for the list and the preview, and for Undo during processing; `npm run verify`.
 
-- [ ] **10.4** `fix/comparison-and-dialog-edge-cases` · **P2** — Small correctness gaps:
+- [ ] **10.4** `fix/comparison-and-dialog-edge-cases` · **P2** (after M11) — Small correctness gaps:
   - Comparison row keys are built as `B-010 (2)` and `(blank ID) file 1 row 3` (`server/src/lib/compare.ts`), which can collide with a real batch ID of the same text. Keep the display label but key rows on something that cannot collide.
   - "Rows differing" compares cell text, so `100` and `100.0` count as different. Compare numeric columns by value.
   - The generator's retry loop for distinct files (`generateFiles` in `server/src/lib/generate.ts`) has no attempt cap. Stop with a clear error after a fixed number of attempts.
@@ -336,7 +338,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
   - The module creates folders, reads `meta.json` and may throw on Vercel when imported; move this into an explicit initialisation called from `buildApp`, so tests no longer need environment variables set before importing.
   - Update the Architecture page's storage text if it changes.
 
-  **Depends on:** 10.2 (startup reconciliation lives here).
+  **Depends on:** 10.2 (startup reconciliation lives here) and 11.1 (storage is keyed by File ID).
   **Done when:** both backends satisfy one interface with no implementation checks outside storage; an interrupted metadata write cannot corrupt `meta.json`; importing the module has no side effects.
   **Verification:** storage unit tests run against both backends; an atomic-write test; existing API and Blob tests; `npm run verify`.
 
@@ -353,7 +355,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
   - Keep a small id → object index so a lookup needs no full scan.
   - Update `blueprint/vercel-deployment.md` and the Architecture page.
 
-  **Depends on:** 10.9.
+  **Depends on:** 10.9 and 11.1. With storage keyed by File ID, a lookup by id becomes a direct read, which replaces the planned id → object index.
   **Done when:** getting, reading or patching one file transfers only that file's objects; listing transfers metadata only; ETag conflict handling still returns 409.
   **Verification:** Blob storage unit tests counting SDK calls per operation; existing Blob tests; `npm run verify`.
 
@@ -366,6 +368,111 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
   **Depends on:** none.
   **Done when:** each setting can be changed without editing code; defaults are unchanged.
   **Verification:** API tests for a custom upload limit and the default; the Architecture content test updated to read the default; `npm run verify`.
+
+### M11 — File IDs
+
+Agreed with the person on 2026-11-11, before any code. Files are identified by a
+**File ID**, not by their names. Names become labels only: nothing links,
+replaces or compares by name. The ID travels with the data as a column inside
+the CSV. "File ID" is the term in the UI; "batch ID" keeps meaning the row IDs
+inside a file (`A-001`).
+
+**The rules**
+- Every upload gets a new **base ID**: six digits counting up from `100001`
+  (`101010`, `101011`, …), never changed and never reused, even after archiving.
+- Processing adds the function's code to the selected original's ID: `-V`
+  Validation, `-M` Mass, `-C` Classification (`101010-V`). Codes are fixed; a
+  future function gets a new letter. Results cannot be processed again, so an ID
+  never has more than one suffix.
+- If that result ID already exists, the person is asked first. **Cancel** keeps
+  the existing result; **Run & Replace** overwrites it and keeps the same ID.
+- Re-uploading the same original CSV gives it a new base ID (`101011`), and its
+  results are separate (`101011-V`).
+
+**Workflow**
+
+| Action | File ID | Behaviour |
+| --- | --- | --- |
+| Upload original CSV | `101010` | Assign a new base ID |
+| Run Validation | `101010-V` | Create result |
+| Run Mass Calculation | `101010-M` | Create result |
+| Run Classification | `101010-C` | Create result |
+| Run Validation again | `101010-V` | Ask for confirmation |
+| Confirm the re-run | `101010-V` | Overwrite the existing result |
+| Re-upload the original CSV | `101011` | Assign a new base ID |
+| Run Validation on the new upload | `101011-V` | Create a separate result |
+
+**Decisions for the remaining cases** (defaults proposed and accepted on 2026-11-11)
+- **ID columns in the data.** A stored input gets a `file_id` column with its
+  base ID on every row. A result keeps every original column, including that
+  `file_id` (its link to the original), and adds `result_id` (e.g. `101010-V`)
+  as its first generated column. Sample CSVs on disk are never changed; only
+  stored copies get the column.
+- **The server enforces the confirmation.** `POST /api/process` refuses with a
+  409 when the result ID exists unless the request sets `replace: true`, so
+  another tab or a stale list can never overwrite silently.
+- **Several files at once.** One dialog lists every result that would be
+  replaced. When the Data Quality Warning also applies, both appear in that one
+  dialog, so Run never needs two confirmations. Cancel runs nothing; Run &
+  Replace runs them all.
+- **A downloaded result uploaded again** gets a new base ID plus its function
+  code (e.g. `101012-M`), is marked **Imported** (there is no input `101012`),
+  and its `file_id`/`result_id` values are rewritten to the new IDs. Every upload
+  is a new file.
+- **Replacing an archived result** keeps the ID and returns it to Active Files;
+  the confirmation says it is archived.
+- **Existing stored files** are not migrated: reset the demo data (delete
+  `server/data/`, or use a new Blob prefix). Older exports uploaded later get IDs
+  like any upload.
+- **Downloads keep the file's name.** The ID is inside the file. (The paused
+  10.1 header fix still applies to those names.)
+
+- [ ] **11.1** `feature/11.1-file-ids` · **P1** — Assign and use File IDs.
+  - Define each function's code once, on `PROCESSORS` in `shared/types.ts`, with the ID format (`^\d{6}$` base, `^\d{6}-[VMC]$` result) and a parser shared by client and server.
+  - **Assigning a base ID:** next number after the highest base ID in use. Claim it with a create-if-absent storage write (local: in the same synchronous step; Blob: `put` with `allowOverwrite: false` on the ID's key) and take the next number on a conflict, so two uploads at once never share an ID.
+  - **Storage is keyed by File ID** (local files and Blob objects named by ID). Result IDs come from the input's ID and the function's code; re-running replaces by result ID, not by name. This removes `replaceByName` and fixes a current bug: two different inputs with the same name overwrite each other's results.
+  - Routes accept and validate File IDs. Results keep the display name `result_<input>_<function id>.csv`, as a label only.
+  - Samples seed as `100001`–`100005` in name order. Document the reset in the README.
+  - Update the `CLAUDE.md` "Result file names" rule to the File ID rules, the README and the Architecture page (storage keys, the Upload and Process flows); its content test must still pass.
+
+  **Depends on:** 10.1–10.3.
+  **Done when:** every upload gets the next unused base ID, even under concurrent uploads; each result's ID is its input's ID plus the function code; a re-run replaces only that ID; two inputs with the same name keep separate results; no route or storage code looks files up by name.
+  **Verification:** unit tests for the ID format, parser and next-number rule; storage tests for create-if-absent claims under concurrency on both backends; API tests for upload IDs, result IDs, replace by ID and the same-name case; `npm run verify`.
+
+- [ ] **11.2** `feature/11.2-file-id-columns` · **P1** — The ID travels with the data.
+  - On upload, append `file_id` (the new base ID, every row). If the CSV already has `file_id` or `result_id` columns (a re-upload), rewrite their values to the new IDs rather than adding duplicates.
+  - Processing keeps `file_id` as an original column and adds `result_id` as the first generated column of every function, so results read `…, file_id, result_id, <function columns>, processing_status, validation_errors`.
+  - Uploaded results get a new base ID plus their detected function's code and are marked Imported.
+  - Update result detection, the comparison's schema check (so files are compared on function columns only), and leave `file_id`/`result_id` out of comparison metrics.
+  - Partner adapters ignore the extra columns, so validation and processing results are unchanged.
+  - Rename the "uploads and downloads unchanged" tests: a stored input now equals the upload plus `file_id`.
+
+  **Depends on:** 11.1.
+  **Done when:** every stored input and result carries its IDs on every row; a downloaded file re-uploaded gets new IDs in both its metadata and its columns; comparisons ignore the ID columns; all other values are unchanged.
+  **Verification:** API tests for upload, process, download and re-upload of inputs and results, Imported marking, and comparison of results with different IDs; core tests for detection with `result_id`; `npm run verify`.
+
+- [ ] **11.3** `feature/11.3-replace-requires-confirmation` · **P1** — The server refuses to overwrite a result unless asked. `POST /api/process` returns 409 with the existing result's ID and name when the result exists and `replace` is not `true`; with `replace: true` it overwrites and keeps the ID, returning an archived result to Active Files.
+
+  **Depends on:** 11.1.
+  **Done when:** no request can overwrite an existing result without `replace: true`; the 409 names the result; a first run needs no flag.
+  **Verification:** API tests for first run, refused re-run, confirmed re-run (same ID, new content) and replacing an archived result; `npm run verify`.
+
+- [ ] **11.4** `feature/11.4-replace-confirmation-dialog` · **P1** — The confirmation in the UI, following the person's mockup: title **Replace existing result?**, "Composition Validation has already been run for file **101010**. Running it again will replace the existing result **101010-V**. This action cannot be undone.", **Cancel** and a red **Run & Replace**.
+  - For several files, one dialog lists every result that would be replaced; files without an existing result are processed normally.
+  - When the Data Quality Warning also applies, both appear in that one dialog.
+  - It says when a result being replaced is archived.
+  - The client asks before running, using the file list; if the server still answers 409 (the list was stale), show the same dialog for that file.
+  - Cancel sends nothing; Run & Replace sends `replace: true` for exactly the listed files, once, even on a double click.
+
+  **Depends on:** 11.3.
+  **Done when:** no re-run starts without confirmation; Cancel changes nothing; one dialog covers replacements and data quality together.
+  **Verification:** component tests for a single re-run, a mixed batch, a combined warning, Cancel, Run & Replace, a 409 from a stale list, keyboard use (focus, Escape) and double clicks; `npm run verify`.
+
+- [ ] **11.5** `feature/11.5-show-file-ids` · **P1** — Show File IDs in the UI: a **File ID** column in the file table (both tabs) and search by File ID; the ID in the preview title, the comparison chips and the processing panel; an **Imported** marker for results whose original is not in the workspace. Results list beside their original when sorted by File ID (a new sort option).
+
+  **Depends on:** 11.1 and 11.2.
+  **Done when:** every file shows its ID wherever it is named; searching `101010` finds the input and its results.
+  **Verification:** component tests for the column, search, sort, preview, comparison chips and Imported marker; `npm run verify`.
 
 ### M7 — Final interview readiness
 
