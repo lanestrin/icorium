@@ -119,6 +119,37 @@ describe('durable Blob storage', () => {
     } finally { await first.close(); await second?.close(); }
   });
 
+  it('reconciles stale metadata when two servers start together, without failing either', async () => {
+    const csv = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct\nA-1,2026-09-01,,40,30,30\n';
+    const stale = await createBlobStorage('test/reconcile').save({ name: 'old.csv', text: csv, rows: 1, columns: 6, status: 'Ready' });
+    vi.stubEnv('VERCEL', '1');
+    vi.stubEnv('RECLAIM_DATA_DIR', undefined);
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-only-token');
+    vi.resetModules();
+    const { reconcileMetadata } = await import('./lib/storage');
+    const [a, b] = [createBlobStorage('test/reconcile'), createBlobStorage('test/reconcile')];
+    await expect(Promise.all([reconcileMetadata(a), reconcileMetadata(b)])).resolves.toHaveLength(2);
+    expect(await a.get(stale.id)).toMatchObject({ status: 'Needs Review', problemRows: 1 });
+    // Listing on either server is a read and never conflicts.
+    await expect(Promise.all([a.list(), b.list(), a.list()])).resolves.toHaveLength(3);
+  });
+
+  it('treats a 409 during reconciliation as already done, but surfaces other failures', async () => {
+    vi.stubEnv('VERCEL', '1');
+    vi.stubEnv('RECLAIM_DATA_DIR', undefined);
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-only-token');
+    vi.resetModules();
+    const { reconcileMetadata } = await import('./lib/storage');
+    const meta = { id: 'x', name: 'x.csv', rows: 1, columns: 6, uploadedAt: '', status: 'Ready', problemRows: 3 } as FileMeta;
+    const store = (statusCode: number) => ({
+      list: async () => [meta],
+      read: async () => '',
+      patch: async () => { throw Object.assign(new Error('conflict'), { statusCode }); },
+    });
+    await expect(reconcileMetadata(store(409))).resolves.toEqual({ updated: [], skipped: [] });
+    await expect(reconcileMetadata(store(500))).rejects.toThrow('conflict');
+  });
+
   it('refuses a Vercel startup without durable storage configuration', async () => {
     vi.stubEnv('VERCEL', '1');
     vi.stubEnv('RECLAIM_DATA_DIR', undefined);

@@ -193,10 +193,12 @@ describe('problem rows', () => {
     expect(files[1].problems.items).toEqual([expect.objectContaining({ row: 18, message: expect.stringContaining('composition totals') })]);
   });
 
-  it('fills in the count for files saved before it existed', async () => {
-    const { storage } = await import('./lib/storage');
+  it('fills in the count for files saved before it existed, at startup rather than when listing', async () => {
+    const { storage, reconcileMetadata } = await import('./lib/storage');
     const id = (await fileNamed('partner_b_followup.csv')).id;
     await storage.patch(id, { problemRows: undefined });
+    expect((await fileNamed('partner_b_followup.csv')).problemRows).toBeUndefined(); // listing leaves it alone
+    await reconcileMetadata();
     expect((await fileNamed('partner_b_followup.csv')).problemRows).toBe(2);
   });
 });
@@ -392,8 +394,8 @@ describe('input review status', () => {
     expect((await app.inject(`/api/files/${result.id}/download`)).body).toBe(text);
   });
 
-  it('reconciles old statuses and missing counts without rereading or rewriting known files', async () => {
-    const { storage } = await import('./lib/storage');
+  it('lists without writing, and reconciles old statuses and missing counts once at startup', async () => {
+    const { storage, reconcileMetadata } = await import('./lib/storage');
     const cleanMeta = (await upload('old_clean_status.csv', clean)).json<FileMeta>();
     const invalid = (await upload('old_invalid_status.csv', clean.replace(',100,', ',,'))).json<FileMeta>();
     const missing = (await upload('missing_count_status.csv', clean.replace(',100,', ',,'))).json<FileMeta>();
@@ -404,7 +406,19 @@ describe('input review status', () => {
     await storage.patch(result.id, { problemRows: undefined });
     const read = vi.spyOn(storage, 'read');
     const patch = vi.spyOn(storage, 'patch');
+    const save = vi.spyOn(storage, 'save');
     try {
+      // Listing is a pure read: it shows what is stored and never reads CSVs or writes.
+      const stale = await listFiles();
+      expect(stale.find((f) => f.id === cleanMeta.id)?.status).toBe('Needs Review');
+      expect(stale.find((f) => f.id === missing.id)?.problemRows).toBeUndefined();
+      expect(read).not.toHaveBeenCalled();
+      expect(patch).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+
+      const { updated, skipped } = await reconcileMetadata();
+      expect(updated.sort()).toEqual([cleanMeta.name, invalid.name, missing.name, result.name].sort());
+      expect(skipped).toEqual([]);
       const files = await listFiles();
       expect(files.find((f) => f.id === cleanMeta.id)).toEqual(cleanMeta);
       expect(files.find((f) => f.id === invalid.id)).toEqual(invalid);
@@ -416,12 +430,21 @@ describe('input review status', () => {
       expect(files.find((f) => f.id === result.id)).toMatchObject({ status: 'Processed', problemRows: 1 });
       expect(read.mock.calls.map(([id]) => id).sort()).toEqual([missing.id, result.id].sort());
       read.mockClear(); patch.mockClear();
-      await listFiles();
+      expect((await reconcileMetadata()).updated).toEqual([]); // nothing left to correct
       expect(read).not.toHaveBeenCalled();
       expect(patch).not.toHaveBeenCalled();
-    } finally { read.mockRestore(); patch.mockRestore(); }
+    } finally { read.mockRestore(); patch.mockRestore(); save.mockRestore(); }
     for (const [meta, text] of [[cleanMeta, clean], [invalid, clean.replace(',100,', ',,')], [missing, clean.replace(',100,', ',,')]] as const)
       expect((await app.inject(`/api/files/${meta.id}/download`)).body).toBe(text);
+  });
+
+  it('skips a stored file it cannot read instead of failing startup or the list', async () => {
+    const { storage, reconcileMetadata } = await import('./lib/storage');
+    const broken = await storage.save({ name: 'unreadable_old_file.csv', text: 'batch_id,sample_date\nA-1,2026-09-01,extra\n', rows: 1, columns: 2, status: 'Ready' });
+    expect((await reconcileMetadata()).skipped).toEqual([broken.name]);
+    const listed = await app.inject('/api/files');
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json<FileMeta[]>().find((f) => f.id === broken.id)).toEqual(broken);
   });
 });
 

@@ -58,6 +58,41 @@ export const storage = useBlob
   ? createBlobStorage(process.env.RECLAIM_BLOB_PREFIX ?? `icorium/${process.env.VERCEL_ENV ?? 'development'}`)
   : localStorage;
 
+type Store = Pick<typeof storage, 'list' | 'read' | 'patch'>;
+
+/**
+ * Startup step: brings metadata saved by older versions up to date, so listing files never has to
+ * write. Fills in missing problem-row counts (reading only those files) and sets inputs to Ready or
+ * Needs Review from their count. Results stay Processed. Safe when several servers start together:
+ * a 409 means another server updated that file first. A file whose CSV cannot be read is skipped
+ * and reported rather than stopping startup.
+ */
+export async function reconcileMetadata(store: Store = storage) {
+  const updated: string[] = [];
+  const skipped: string[] = [];
+  for (const m of await store.list()) {
+    let problemRows = m.problemRows;
+    if (problemRows === undefined) {
+      try {
+        const { headers, rows } = parseCsv(await store.read(m.id));
+        problemRows = findProblems(headers, rows).total;
+      } catch {
+        skipped.push(m.name);
+        continue;
+      }
+    }
+    const status = m.status === 'Processed' ? 'Processed' : problemRows > 0 ? 'Needs Review' : 'Ready';
+    if (m.problemRows === problemRows && m.status === status) continue;
+    try {
+      await store.patch(m.id, { problemRows, status });
+      updated.push(m.name);
+    } catch (error) {
+      if ((error as { statusCode?: number }).statusCode !== 409) throw error;
+    }
+  }
+  return { updated, skipped };
+}
+
 /** First run only: load the synthetic CSVs so the demo has data. Delete server/data to reset. */
 export async function seedSamples() {
   if (!useBlob && fs.existsSync(META)) return;
