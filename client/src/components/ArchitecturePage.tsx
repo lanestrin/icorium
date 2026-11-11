@@ -163,7 +163,7 @@ export const NODES: ArchNode[] = [
     detail: 'Three independent functions run on every row: composition validation, component mass calculation and demo-only blend classification. Each declares the columns it adds.',
     files: ['server/src/processing/index.ts'] },
   { id: 'results', title: 'Result generation', icon: FileOutput, summary: 'Original columns + generated columns',
-    detail: 'Every original column and value is kept, including the input’s file_id, and the function’s columns are appended, starting with result_id and ending with processing_status and validation_errors. Re-running a function on the same input replaces its earlier result.',
+    detail: 'Every original column and value is kept, including the input’s file_id, and the function’s columns are appended, starting with result_id and ending with processing_status and validation_errors. Re-running a function on the same input replaces its earlier result only when the request sends replace: true; otherwise the server answers 409 and names the existing result.',
     files: ['server/src/processing/index.ts', 'server/src/lib/csv.ts'] },
   { id: 'compare', title: 'Comparison', icon: GitCompare, summary: '2–5 results, rows matched by batch ID or position',
     detail: 'Compares 2–5 results of one function column by column. Rows are matched by batch ID when every pair of files shares IDs, otherwise by position, and the response says which. The dashboard draws it with Recharts.',

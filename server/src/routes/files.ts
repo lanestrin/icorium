@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { codeOf, COMPARE_MAX, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_PARTNERS, RESULT_ID_COLUMN, resultFileId, type FileMeta } from '../../../shared/types';
+import { codeOf, COMPARE_MAX, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, resultFileId, type FileMeta, type ReplaceConflict } from '../../../shared/types';
 import { getAdapter } from '../adapters';
 import { detectResult, findProblems, processRows, stampFileIds } from '../processing';
 import { compareResults } from '../lib/compare';
@@ -8,7 +8,11 @@ import { httpError, parseCsv, toCsv } from '../lib/csv';
 import { storage } from '../lib/storage';
 import { GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, generateFiles } from '../lib/generate';
 
-const processBody = z.object({ fileId: z.string().min(1), processor: z.enum(['validation', 'mass', 'classification']) });
+const processBody = z.object({
+  fileId: z.string().min(1),
+  processor: z.enum(['validation', 'mass', 'classification']),
+  replace: z.boolean().default(false), // must be true to overwrite an existing result
+});
 const archiveBody = z.object({ ids: z.array(z.string().min(1)).min(1), archived: z.boolean() });
 // ?ids=a,b,c — 2 to 5 different results.
 const compareQuery = z.object({
@@ -42,6 +46,16 @@ function attachment(name: string) {
   // encodeURIComponent leaves ! ' ( ) * as they are; RFC 5987 needs ' ( ) * encoded, and ! is encoded too for safety.
   const exact = encodeURIComponent(name).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
   return `attachment; filename="${fallback}"; filename*=UTF-8''${exact}`;
+}
+
+/** The file with this ID, or undefined when there is none. */
+async function findFile(id: string) {
+  try {
+    return await storage.get(id);
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === 404) return undefined;
+    throw error;
+  }
 }
 
 export async function fileRoutes(app: FastifyInstance) {
@@ -105,17 +119,28 @@ export async function fileRoutes(app: FastifyInstance) {
     return updated;
   });
 
-  app.post('/process', async (req) => {
-    const { fileId, processor } = processBody.parse(req.body);
+  app.post('/process', async (req, reply) => {
+    const { fileId, processor, replace } = processBody.parse(req.body);
     const meta = await storage.get(fileId);
     if (meta.status === 'Processed') throw httpError(400, 'Select an input file, not a result file');
     if (meta.archived) throw httpError(400, `Restore ${meta.name} before processing it`);
-    const { headers, rows } = parseCsv(await storage.read(fileId));
+    // The result's File ID is the input's ID plus the function's code. Running the same function on the
+    // same input again replaces that result and keeps its ID, but only when the request confirms it,
+    // so another tab or a stale file list can never overwrite a result silently.
     const id = resultFileId(meta.id, processor);
+    const existing = await findFile(id);
+    if (existing && !replace) {
+      const label = PROCESSORS.find((p) => p.id === processor)!.label;
+      const conflict: ReplaceConflict = {
+        message: `${label} has already been run for file ${meta.id}. Confirm to replace the existing result ${id}.`,
+        existing: { id: existing.id, name: existing.name, archived: existing.archived },
+      };
+      return reply.code(409).send(conflict);
+    }
+    const { headers, rows } = parseCsv(await storage.read(fileId));
     const out = processRows(headers, rows, processor, id);
     const base = meta.name.replace(/\.csv$/i, '');
-    // The result's File ID is the input's ID plus the function's code. Running the same function on the
-    // same input again replaces that result and keeps its ID; the name is only a label.
+    // A replaced result is saved as new metadata, so an archived one returns to Active Files.
     return storage.put(
       id,
       {

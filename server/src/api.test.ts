@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { codeOf, type CompareResult, type FileMeta, type FileRows, type GeneratedBatch, type ProcessorId } from '../../shared/types';
+import { codeOf, type CompareResult, type FileMeta, type ReplaceConflict, type FileRows, type GeneratedBatch, type ProcessorId } from '../../shared/types';
 import { parseCsv } from './lib/csv';
 import { processors } from './processing';
 
@@ -383,7 +383,8 @@ describe('input review status', () => {
     const source = await fileNamed('partner_b_followup.csv');
     expect(source).toMatchObject({ status: 'Needs Review', problemRows: 2 });
     const before = (await app.inject(`/api/files/${source.id}/download`)).body;
-    const response = await processFile(source.id, processor);
+    // A shared sample other tests also process, so the re-run is confirmed.
+    const response = await processFile(source.id, processor, true);
     expect(response.statusCode).toBe(200);
     const result = response.json<FileMeta>();
     expect(result).toMatchObject({ status: 'Processed', problemRows: 2, processor });
@@ -549,10 +550,10 @@ describe('File IDs', () => {
     expect((await rowsOf(rb.id)).rows[7].r32_mass_kg).not.toBe('');
   });
 
-  it('replaces a re-run result in place, keeping its ID and nothing else', async () => {
+  it('replaces a confirmed re-run result in place, keeping its ID and nothing else', async () => {
     const input = (await upload('rerun_ids.csv', csv)).json<FileMeta>();
     const first = (await processFile(input.id, 'validation')).json<FileMeta>();
-    const second = (await processFile(input.id, 'validation')).json<FileMeta>();
+    const second = (await processFile(input.id, 'validation', true)).json<FileMeta>();
     expect(second.id).toBe(first.id);
     expect((await listFiles()).filter((f) => f.id === first.id)).toEqual([second]);
   });
@@ -588,6 +589,54 @@ describe('File IDs', () => {
       vi.resetModules();
       fs.rmSync(old, { recursive: true, force: true });
     }
+  });
+});
+
+describe('replacing a result', () => {
+  const csv = sample('partner_a_baseline.csv');
+  const download = async (id: string) => (await app.inject(`/api/files/${id}/download`)).body;
+
+  it('runs a first time without asking, even when replace is sent', async () => {
+    const input = (await upload('first_run.csv', csv)).json<FileMeta>();
+    expect((await processFile(input.id, 'mass')).statusCode).toBe(200);
+    expect((await processFile(input.id, 'validation', true)).statusCode).toBe(200);
+  });
+
+  it.each([undefined, false])('refuses a re-run that does not confirm (replace: %s) and changes nothing', async (replace) => {
+    const input = (await upload('refused.csv', csv)).json<FileMeta>();
+    const first = (await processFile(input.id, 'validation')).json<FileMeta>();
+    const text = await download(first.id);
+    const before = await listFiles();
+    const res = await processFile(input.id, 'validation', replace);
+    expect(res.statusCode).toBe(409);
+    expect(res.json<ReplaceConflict>()).toEqual({
+      message: `Composition Validation has already been run for file ${input.id}. Confirm to replace the existing result ${first.id}.`,
+      existing: { id: first.id, name: first.name },
+    });
+    expect(await listFiles()).toEqual(before);
+    expect(await download(first.id)).toBe(text);
+  });
+
+  it('only asks about the same function: other results of the input are separate', async () => {
+    const input = (await upload('other_function.csv', csv)).json<FileMeta>();
+    await processFile(input.id, 'validation');
+    expect((await processFile(input.id, 'mass')).statusCode).toBe(200);
+    expect((await processFile(input.id, 'mass')).statusCode).toBe(409);
+  });
+
+  it('overwrites a confirmed re-run under the same ID with new content', async () => {
+    const input = (await upload('confirmed.csv', csv)).json<FileMeta>();
+    const first = (await processFile(input.id, 'mass')).json<FileMeta>();
+    // Rewrite the stored result so the replacement is visibly new content.
+    const { storage } = await import('./lib/storage');
+    await storage.put(first.id, { ...first, text: (await download(first.id)).replace(/,Valid,/g, ',STALE,') });
+    expect(await download(first.id)).toContain(',STALE,');
+    const res = await processFile(input.id, 'mass', true);
+    expect(res.statusCode).toBe(200);
+    const second = res.json<FileMeta>();
+    expect(second).toMatchObject({ id: first.id, name: first.name, sourceId: input.id });
+    expect(await download(first.id)).not.toContain(',STALE,');
+    expect((await listFiles()).filter((f) => f.id === first.id)).toEqual([second]);
   });
 });
 
@@ -683,7 +732,10 @@ describe('archiving', () => {
     const input = (await upload('rerun.csv', sample('partner_a_baseline.csv'))).json<FileMeta>();
     const first = (await processFile(input.id, 'classification')).json<FileMeta>();
     await archive([first.id], true);
-    const second = (await processFile(input.id, 'classification')).json<FileMeta>();
+    const refused = await processFile(input.id, 'classification');
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json<ReplaceConflict>().existing).toEqual({ id: first.id, name: first.name, archived: true }); // the dialog can say it is archived
+    const second = (await processFile(input.id, 'classification', true)).json<FileMeta>();
     const results = (await listFiles()).filter((f) => f.name === 'result_rerun_classification.csv');
     expect(results).toEqual([second]);
     expect(second.archived).toBeUndefined();
@@ -772,8 +824,10 @@ const fileNamed = async (name: string) => {
   return f;
 };
 const rowsOf = async (id: string) => (await app.inject(`/api/files/${id}/rows`)).json<FileRows>();
-const processFile = (fileId: string, processor: string) => app.inject({ method: 'POST', url: '/api/process', payload: { fileId, processor } });
-const processSample = async (name: string, processor: ProcessorId) => (await processFile((await fileNamed(name)).id, processor)).json<FileMeta>();
+const processFile = (fileId: string, processor: string, replace?: boolean) =>
+  app.inject({ method: 'POST', url: '/api/process', payload: { fileId, processor, replace } });
+// Samples are shared by many tests, so re-runs of them are confirmed; 'replacing a result' covers the refusal.
+const processSample = async (name: string, processor: ProcessorId) => (await processFile((await fileNamed(name)).id, processor, true)).json<FileMeta>();
 const compare = (...ids: string[]) => app.inject(`/api/compare?ids=${ids.join(',')}`);
 
 /** Sends a real multipart upload, as the browser's file chooser does. */
