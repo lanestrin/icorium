@@ -51,6 +51,11 @@ describe('Architecture page content', () => {
   it('quotes limits and rules that match the code', () => {
     expect(read('server/src/app.ts')).toContain('DEFAULT_MAX_UPLOAD_MB = 10;'); // 10 MB uploads by default
     expect(read('server/src/app.ts')).toContain("DEFAULT_LOG_LEVEL = 'warn';"); // warnings and errors only by default
+    expect(read('server/src/app.ts')).toContain("value('MAX_UPLOAD_MB')"); // the upload limit can be changed
+    expect(read('server/src/app.ts')).toContain("value('LOG_LEVEL')"); // the log level can be changed
+    expect(read('server/src/lib/storage.ts')).toMatch(/interface Storage \{[\s\S]*createAt\(id: string/); // the storage operations named
+    expect(read('shared/types.ts')).toContain('export const ADAPTERS = ['); // partner formats live in the shared file
+    expect(read('server/src/routes/files.ts')).toContain('z.enum(PROCESSORS.map('); // allowed functions come from the shared list
     expect(read('server/src/processing/index.ts')).toContain('TOTAL_TOLERANCE_PCT = 0.5'); // ±0.5 points
     expect(read('shared/types.ts')).toMatch(/GENERATOR_MAX_ROWS = 5000;[\s\S]*GENERATOR_MAX_FILES = 10;/);
     expect(COMPARE_MAX).toBe(5);
