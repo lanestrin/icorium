@@ -248,7 +248,7 @@ const DECISIONS: { question: string; answer: string[] }[] = [
   ] },
   { question: 'Why a modular processing pipeline?', answer: [
     'Parsing, partner normalization, validation and the three functions are separate steps. Adapters absorb each partner’s column names and units, so processing only ever sees one normalized record.',
-    'A new partner format is one entry in the adapter list. A new calculation is one processor that declares its columns, plus its name in the shared processor list and the API’s allowed values.',
+    'A new partner format is one entry in the adapter list. A new calculation is one processor that declares its columns, plus its entry in the shared processor list, which the API’s allowed values come from.',
     'Validation is shared, so every function treats bad rows the same way and the rules are tested once.',
   ] },
   { question: 'Why synchronous processing?', answer: [

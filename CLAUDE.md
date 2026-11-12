@@ -68,7 +68,7 @@ Examples:
 
 ## Extending
 
-- New partner CSV format: add an entry to `ADAPTERS` in `server/src/adapters/index.ts`. To generate it, also add it to `GENERATOR_PARTNERS` in `shared/types.ts` and `DIGITS` in `server/src/lib/generate.ts`.
+- New partner CSV format: add one entry to `ADAPTERS` in `shared/types.ts` (its id, name, description, columns, unit factors and number formats). Uploads, processing and the CSV generator all read it; `server/src/adapters/index.ts` matches and normalizes rows.
 - New processing function: add it to `processors` in `server/src/processing/index.ts` and to `PROCESSORS` in `shared/types.ts` (its id, code and labels). The API's accepted functions and the file table's label follow from `PROCESSORS`. Add a test in `server/src/core.test.ts`.
 
 ## Commands

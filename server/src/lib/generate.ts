@@ -1,17 +1,9 @@
 import { randomInt } from 'node:crypto';
-import { ADAPTERS } from '../adapters';
 import { httpError, toCsv } from './csv';
-import type { GeneratedError, GeneratedFile, GeneratorPartner } from '../../../shared/types';
+import { ADAPTERS, type GeneratedError, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
 
 /** Tries allowed in one generateFiles call before it gives up on making distinct files. */
 export const GENERATE_MAX_ATTEMPTS = 100;
-
-/** How each partner writes its numbers, matching the sample files: A kg/% , B lb/%, C g/fractions. */
-const DIGITS: Record<GeneratorPartner, { mass: number; pct: number }> = {
-  A: { mass: 3, pct: 2 },
-  B: { mass: 3, pct: 2 },
-  C: { mass: 0, pct: 5 },
-};
 
 /** Small seeded random generator (mulberry32), so a seed always gives the same file. */
 function random(seed: number) {
@@ -40,12 +32,12 @@ const SINGLE_ERRORS: GeneratedError['kind'][] = ['mass missing', 'mass not a num
  * fail, so it is only planted when at least two error rows remain.
  */
 export function generateCsv(partner: GeneratorPartner, rows: number, errorRows: number, seed = randomInt(2 ** 31), name = generatedName(partner, 1, new Date())): GeneratedFile {
-  const adapter = ADAPTERS.find((a) => a.name === `Partner ${partner}`);
+  const adapter = ADAPTERS.find((a) => a.id === partner);
   if (!adapter) throw httpError(400, `Unknown partner ${partner}.`);
 
   const rand = random(seed);
   const between = (lo: number, hi: number) => lo + rand() * (hi - lo);
-  const digits = DIGITS[partner];
+  const { digits } = adapter;
   const fixed = (v: number, d: number) => v.toFixed(d);
   const [idCol, dateCol, massCol, r32Col, r125Col, r134aCol] = adapter.columns;
   const width = Math.max(3, String(rows).length);

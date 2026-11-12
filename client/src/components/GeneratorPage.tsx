@@ -1,16 +1,10 @@
 import { useId, useState, type FormEvent } from 'react';
 import { ArrowLeft, Check, Network, CircleAlert, Download, Eye, FilePlus2, LoaderCircle, Wand2, X } from 'lucide-react';
-import { GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
+import { ADAPTERS, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
 import { api } from '../api';
 
 const PREVIEW_ROWS = 10;
 const ERRORS_SHOWN = 20;
-
-const PARTNERS: Record<GeneratorPartner, string> = {
-  A: 'Kilograms and percentages',
-  B: 'Pounds and percentages',
-  C: 'Grams and fractions (0–1)',
-};
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** Generated values never contain commas or quotes, so a plain split is enough for the preview. */
@@ -116,12 +110,12 @@ export function GeneratorPage() {
           <fieldset>
             <legend className="mb-3 text-lg font-semibold">Partner</legend>
             <div className="space-y-2">
-              {GENERATOR_PARTNERS.map((p) => (
+              {ADAPTERS.map(({ id: p, name, description }) => (
                 <label key={p} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${partner === p ? 'border-blue-300 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}>
                   <input type="radio" name={`${ids}-partner`} checked={partner === p} onChange={() => setPartner(p)} className="mt-1 h-4 w-4 accent-blue-600" />
                   <span>
-                    <span className="block font-semibold">Partner {p}</span>
-                    <span className="block text-sm text-slate-500">{PARTNERS[p]}</span>
+                    <span className="block font-semibold">{name}</span>
+                    <span className="block text-sm text-slate-500">{description}</span>
                   </span>
                 </label>
               ))}
