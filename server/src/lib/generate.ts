@@ -6,7 +6,7 @@ import { ADAPTERS, type GeneratedError, type GeneratedFile, type GeneratorPartne
 const GENERATOR_FIRST_DAY = Date.UTC(2026, 8, 1);
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Ranges clean generated rows are drawn from: feed mass in kg, R-32 and R-125 in %. R-134a makes up the rest. */
-const GENERATOR_RANGES = { massKg: [110, 140], r32Pct: [33, 40], r125Pct: [26, 33] } as const;
+const GENERATOR_RANGES = { massKg: [110, 140], r32Pct: [33, 43], r125Pct: [26, 33] } as const;
 /** Tries allowed in one generateFiles call before it gives up on making distinct files. */
 export const GENERATE_MAX_ATTEMPTS = 100;
 
