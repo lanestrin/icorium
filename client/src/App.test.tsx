@@ -20,6 +20,16 @@ const statusFilter = () => screen.getByRole('combobox', { name: /Status/ });
 /** Row controls are labelled with the File ID, then the filename: "Select 101010 data.csv". */
 const withId = (prefix: string, name: string) => new RegExp(`^${prefix} \\S+ ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
 const check = (name: string) => screen.getByRole('checkbox', { name: withId('Select', name) });
+/** Opens a row's ⋯ Actions menu (rows are found by any text they contain) and returns the menu. */
+async function rowMenu(user: ReturnType<typeof userEvent.setup>, rowName: string | RegExp) {
+  const target = screen.getByRole('row', { name: typeof rowName === 'string' ? new RegExp(rowName) : rowName });
+  await user.click(within(target).getByRole('button', { name: /^Actions for / }));
+  return screen.getByRole('menu');
+}
+/** Opens a row's preview through its Actions menu. */
+async function previewRow(user: ReturnType<typeof userEvent.setup>, rowName: string | RegExp) {
+  await user.click(within(await rowMenu(user, rowName)).getByRole('menuitem', { name: 'Preview file' }));
+}
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -230,13 +240,13 @@ describe('input selection and status filtering', () => {
     check('invalid.csv').focus();
     await user.keyboard(' ');
     expect(check('invalid.csv')).toBeChecked();
-    const preview = within(row('invalid.csv')).getByRole('button', { name: 'Preview' });
-    await user.click(preview);
+    const trigger = within(row('invalid.csv')).getByRole('button', { name: /^Actions for / });
+    await previewRow(user, 'invalid.csv');
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(preview).toHaveFocus();
+    expect(trigger).toHaveFocus(); // back on the row's ⋯ button
   });
 
   it('processes mixed selections once and retains only failed inputs', async () => {
@@ -750,8 +760,12 @@ describe('file IDs', () => {
 
   it('tells files with the same name apart by ID, in the list and the processing panel', async () => {
     const user = await open();
-    expect(screen.getByRole('link', { name: 'Download 101010 data.csv' })).toHaveAttribute('href', '/api/files/101010/download');
-    expect(screen.getByRole('link', { name: 'Download 101011 data.csv' })).toHaveAttribute('href', '/api/files/101011/download');
+    for (const id of ['101010', '101011']) {
+      const menu = await rowMenu(user, new RegExp(`Select ${id} data`));
+      expect(menu).toHaveAccessibleName(`Actions for ${id} data.csv`);
+      expect(within(menu).getByRole('menuitem', { name: 'Download file' })).toHaveAttribute('href', `/api/files/${id}/download`);
+      await user.keyboard('{Escape}');
+    }
     await user.click(screen.getByRole('checkbox', { name: 'Select 101011 data.csv' }));
     expect(screen.getByRole('checkbox', { name: 'Select 101010 data.csv' })).not.toBeChecked();
     expect(screen.getByText((_, el) => el?.tagName === 'P' && el.textContent === 'Input: 101011 · data.csv')).toBeInTheDocument();
@@ -801,7 +815,7 @@ describe('file IDs', () => {
     expect(marker('101012-C')).toHaveAttribute('title', 'Uploaded result file. Its original input is not linked in this workspace.');
 
     const preview = async (id: string) => {
-      await user.click(within(screen.getByRole('row', { name: new RegExp(id) })).getByRole('button', { name: 'Preview' }));
+      await previewRow(user, new RegExp(id));
       const dialog = await screen.findByRole('dialog');
       const text = dialog.textContent;
       await user.click(within(dialog).getByRole('button', { name: /Close/ }));
@@ -816,12 +830,12 @@ describe('file IDs', () => {
 
   it('shows the File ID in the preview, and explains an imported result', async () => {
     const user = await open();
-    await user.click(within(screen.getByRole('row', { name: /101012-C/ })).getByRole('button', { name: 'Preview' }));
+    await previewRow(user, /101012-C/);
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('File ID 101012-C · ');
     expect(dialog).toHaveTextContent('Imported: original input not linked');
     await user.click(within(dialog).getByRole('button', { name: /Close/ }));
-    await user.click(within(screen.getByRole('row', { name: /101010-V/ })).getByRole('button', { name: 'Preview' }));
+    await previewRow(user, /101010-V/);
     const result = await screen.findByRole('dialog');
     expect(result).toHaveTextContent('File ID 101010-V · ');
     expect(result).not.toHaveTextContent('Imported');
@@ -921,6 +935,51 @@ describe('file identity regression', () => {
   });
 });
 
+describe('row actions menu', () => {
+  const archivedFile: FileMeta = { ...clean, id: 'old', name: 'old.csv', archived: true, archivedAt: '2026-11-08T10:00:00Z' };
+  const actionsCell = (name: string) => within(row(name)).getAllByRole('cell').at(-1)!;
+  const items = (menu: HTMLElement) => within(menu).getAllByRole('menuitem').map((i) => i.textContent?.trim());
+
+  it('gives each active row one ⋯ menu with Preview and Download, without selecting the row', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, archivedFile]);
+    const user = await setup();
+    expect(within(actionsCell('clean.csv')).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Actions for clean clean.csv']);
+    expect(within(row('clean.csv')).queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
+    expect(within(row('clean.csv')).queryByRole('link')).not.toBeInTheDocument();
+    const menu = await rowMenu(user, 'clean.csv');
+    expect(items(menu)).toEqual(['Preview file', 'Download file']);
+    expect(within(menu).getByRole('menuitem', { name: 'Download file' })).toHaveAttribute('href', '/api/files/clean/download');
+    expect(check('clean.csv')).not.toBeChecked(); // opening the menu is not a row click
+    await user.click(within(menu).getByRole('menuitem', { name: 'Preview file' }));
+    expect(await screen.findByRole('dialog', { name: 'clean.csv' })).toBeInTheDocument();
+    expect(check('clean.csv')).not.toBeChecked();
+  });
+
+  it('keeps Restore in the archived menu only', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, archivedFile]);
+    const user = await setup();
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    expect(items(await rowMenu(user, 'old.csv'))).toEqual(['Preview file', 'Download file', 'Restore file']);
+  });
+
+  it.each([['Active Files', 'clean.csv'], ['Archived', 'old.csv']])('works from the keyboard and returns focus to ⋯ after a preview (%s)', async (tab, name) => {
+    vi.mocked(api.list).mockResolvedValue([clean, archivedFile]);
+    const user = await setup();
+    await user.click(screen.getByRole('tab', { name: new RegExp(tab) }));
+    const trigger = within(row(name)).getByRole('button', { name: /^Actions for / });
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('menuitem', { name: 'Preview file' })).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Download file' })).toHaveFocus();
+    await user.keyboard('{ArrowUp}{Enter}');
+    expect(await screen.findByRole('dialog', { name })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+});
+
 describe('compact file table', () => {
   const headers = () => screen.getAllByRole('columnheader').map((h) => h.textContent);
   const subtitle = (dialog: HTMLElement) => within(dialog).getByText(/^File ID /).textContent;
@@ -953,7 +1012,7 @@ describe('compact file table', () => {
     vi.mocked(api.list).mockResolvedValue([clean, result, imported]);
     const user = await setup();
     const preview = async (name: string) => {
-      await user.click(within(row(name)).getByRole('button', { name: 'Preview' }));
+      await previewRow(user, name);
       const dialog = await screen.findByRole('dialog');
       const text = subtitle(dialog);
       await user.click(within(dialog).getByRole('button', { name: /Close/ }));
@@ -974,7 +1033,7 @@ describe('preview', () => {
   it('loads further pages on request and offers the download', async () => {
     const user = await setup();
     vi.mocked(api.rows).mockResolvedValueOnce(page(0, 100)).mockResolvedValueOnce(page(100, 50));
-    await user.click(within(row('clean.csv')).getByRole('button', { name: 'Preview' }));
+    await previewRow(user, 'clean.csv');
     const dialog = await screen.findByRole('dialog', { name: 'clean.csv' });
     expect(await within(dialog).findByText('Showing 100 of 150 rows')).toBeInTheDocument();
     expect(within(dialog).getByRole('link', { name: 'Download CSV' })).toHaveAttribute('href', '/api/files/clean/download');
@@ -988,7 +1047,7 @@ describe('preview', () => {
   it('shows the error when rows cannot be loaded', async () => {
     const user = await setup();
     vi.mocked(api.rows).mockRejectedValueOnce(new Error('File not found'));
-    await user.click(within(row('clean.csv')).getByRole('button', { name: 'Preview' }));
+    await previewRow(user, 'clean.csv');
     expect(await within(await screen.findByRole('dialog')).findByText('File not found')).toBeInTheDocument();
   });
 });

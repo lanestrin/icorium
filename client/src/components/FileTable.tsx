@@ -170,8 +170,8 @@ export function FileTabs({ tab, setTab, counts, extra }: { tab: Tab; setTab: (t:
   );
 }
 
-/** The ⋯ menu on an archived row. Arrow keys move between items; Escape or a click outside closes it. */
-function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onPreview: () => void; onRestore: () => void; disabled?: boolean }) {
+/** The ⋯ Actions menu on every row: Preview and Download, plus Restore in the Archived tab. Arrow keys move between items; Escape or a click outside closes it. */
+function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onPreview: () => void; onRestore?: () => void; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -187,7 +187,8 @@ function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onP
   }, [open]);
 
   const close = () => { setOpen(false); trigger.current?.focus(); };
-  const choose = (action: () => void) => { setOpen(false); action(); };
+  // Focus goes back to the trigger first, so a dialog the action opens returns focus there when it closes.
+  const choose = (action: () => void) => { setOpen(false); trigger.current?.focus(); action(); };
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') { e.preventDefault(); close(); return; }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -218,9 +219,11 @@ function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onP
           <a role="menuitem" tabIndex={-1} className={ITEM} href={api.downloadUrl(file.id)} onClick={() => setOpen(false)}>
             <Download className="h-4 w-4" /> Download file
           </a>
-          <button role="menuitem" tabIndex={-1} className={ITEM} disabled={disabled} onClick={() => choose(onRestore)}>
-            <RotateCcw className="h-4 w-4" /> Restore file
-          </button>
+          {onRestore && (
+            <button role="menuitem" tabIndex={-1} className={ITEM} disabled={disabled} onClick={() => choose(onRestore)}>
+              <RotateCcw className="h-4 w-4" /> Restore file
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -241,7 +244,7 @@ interface Props {
   onToggle: (id: string) => void;
   onToggleAll: (ids: string[], on: boolean) => void;
   onPreview: (f: FileMeta) => void;
-  archived?: boolean; // Archived tab: Archived On / Original Upload columns and a ⋯ menu per row
+  archived?: boolean; // Archived tab: Archived On / Original Upload columns and Restore in the row menu
   onRestore?: (f: FileMeta) => void;
   restoreDisabled?: boolean;
   selectionBar?: ReactNode; // shown at the top of the card while rows are selected
@@ -304,7 +307,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
               )}
               <th className="pr-3">Processing function</th>
               <th>Status</th>
-              <th className={`rounded-r-xl ${archived ? 'pr-4 text-center' : ''}`}>Actions</th>
+              <th className="rounded-r-xl pr-4 text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -352,29 +355,9 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                     </div>
                   </td>
                   <td>
-                    {archived && onRestore ? (
-                      <div className="pr-4 text-center">
-                        <RowMenu file={f} onPreview={() => onPreview(f)} onRestore={() => onRestore(f)} disabled={restoreDisabled} />
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 pr-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onPreview(f); }}
-                          className="flex items-center gap-2 rounded-full border border-slate-200 px-4 py-1.5 hover:bg-slate-50"
-                        >
-                          <Eye className="h-4 w-4" /> Preview
-                        </button>
-                        <a
-                          href={api.downloadUrl(f.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Download CSV"
-                          aria-label={`Download ${f.id} ${f.name}`}
-                          className="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50"
-                        >
-                          <Download className="h-4 w-4" />
-                        </a>
-                      </div>
-                    )}
+                    <div className="pr-4 text-center">
+                      <RowMenu file={f} onPreview={() => onPreview(f)} onRestore={archived && onRestore ? () => onRestore(f) : undefined} disabled={restoreDisabled} />
+                    </div>
                   </td>
                 </tr>
               );

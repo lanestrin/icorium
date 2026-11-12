@@ -1,6 +1,6 @@
 # Reclaim Studio - Project Overview
 
-<!-- blueprint:source-hash f7495085b09c59f172422f0eb09c65c98122c938148548885a2e1f50725b8443 -->
+<!-- blueprint:source-hash d567d204778cd27bf0e8e836eccadaaa8d81d5a0da5df6f9355474345bd8b7d4 -->
 
 > Upload partner refrigerant CSVs, run one of three processing functions on every row, export results that keep every original column, and compare 2 to 5 results in charts. Icorium interview exercise; all data fictional, classification rules demo-only.
 
@@ -64,11 +64,12 @@ export, two-file comparison, and tests.
 - **11.5** File ID and Filename columns, search and sort by ID, IDs in preview, chips and processing panel, **Imported** marker.
 - **11.7** Imported results linked only on a matching source File ID and matching original data; otherwise `importedFrom` provenance, unlinked.
 - **11.6** File identity regression tests (API, Blob storage, component), all keyed by full ID.
+- **9.9** Compact file table: no Rows or Columns columns; counts in the Preview header.
 - **10.4** Collision-proof comparison row keys with display labels, numeric "rows differing", generator attempt cap, focus trap skips disabled fields.
 
 **Next (in order)**
 
-1. **9.9** Compact file table (`feature/9.9-compact-file-table`) - remove **Rows** and **Columns** from both tabs, give File Name the space; Preview header shows File ID, rows, columns and (results) the function. Presentation only. **Next item.**
+1. **9.10** Row actions menu (`feature/9.10-row-actions-menu`) - Active Files rows use the Archived tab's ⋯ menu (Preview file, Download file) instead of Preview and download buttons. Presentation only. **Next item.**
 2. **10.5** Remove or finish dead and partial code (P2).
 3. **10.6** Single source for names and limits (P2).
 4. **10.7** Partner adapters own `id` and number formats; drop `DIGITS` (P2).

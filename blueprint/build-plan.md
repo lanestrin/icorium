@@ -42,7 +42,7 @@ This is a demonstration with synthetic refrigerant-batch data, not a production 
 
 - **Left control column:** CSV upload/drop area; three processing functions; selected input filename; **Run Processing** button.
 
-- **Right file workspace:** one-line “CSV Files” heading/subtitle; **separate File ID and Filename columns**; one filter card (since 9.7) with search, upload-date range, processing function and status (**All / Ready / Needs Review / Processing / Processed / Error**) filters and **Clear filters**; **Active Files** / **Archived** tabs with counts (since 9.3) and **Sort by** beside them (since 9.7); scrollable file table with File ID, filename, upload date (Archived On and Original Upload in the Archived tab), processing function (since 9.7), status, **Preview** and **Download**; row and column counts appear in **Preview**, not the table (since 9.9).
+- **Right file workspace:** one-line “CSV Files” heading/subtitle; **separate File ID and Filename columns**; one filter card (since 9.7) with search, upload-date range, processing function and status (**All / Ready / Needs Review / Processing / Processed / Error**) filters and **Clear filters**; **Active Files** / **Archived** tabs with counts (since 9.3) and **Sort by** beside them (since 9.7); scrollable file table with File ID, filename, upload date (Archived On and Original Upload in the Archived tab), processing function (since 9.7), status and a ⋯ **Actions** menu (since 9.10; **Preview file** and **Download file**, plus **Restore file** in Archived); row and column counts appear in **Preview**, not the table (since 9.9).
 
 - **Select files:** every row has a checkbox; a header checkbox selects all visible rows. **Run Processing** processes only the checked original inputs in turn with the chosen function; checked results are ignored by it (since 9.2, results are selectable so they can be archived). While rows are checked, a selection bar at the top of the table offers **Archive N files** (or **Restore N files** in the Archived tab) for the checked rows in view; archived rows also have a ⋯ menu with **Restore file**. Do **not** add compare buttons to each row.
 
@@ -114,9 +114,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 9.9** `feature/9.9-compact-file-table` (added 2026-11-11), then 10.5 `chore/dead-and-partial-code`
+**Next: 9.10** `feature/9.10-row-actions-menu` (added 2026-11-11), then 10.5 `chore/dead-and-partial-code`
 
-and 10.6 to 10.12 in order. Start 9.9 with a component test that neither file tab has Rows or Columns headers. **Order:**
+and 10.6 to 10.12 in order. Start 9.10 with a component test that an Active Files row has one Actions menu button and no Preview button. **Order:**
 
 10.1–10.3, then M11 (11.1–11.7, including 11.3a; 11.7 before 11.6), then 10.4–10.12; M11 changes how files are
 
@@ -411,6 +411,20 @@ user confirms before Mass or Classification calculates on a file with problems.
   **Done when:** neither tab has Rows or Columns headers or cells; File ID stays its own column; File Name is wider; the preview of an input and of a result both show File ID, row count and column count, and a result also its function; every existing file operation still works.
 
   **Verification:** component tests for both tabs' headers and cells, the empty-state colspan, and the preview header for an input and a result; existing table, selection, sort and archive tests updated where they relied on the removed columns; `npm run verify`.
+
+- [x] **9.10** `feature/9.10-row-actions-menu` · **P2** — Replace the **Preview** and download buttons on each Active Files row with the same ⋯ **Actions** menu the Archived tab already uses, at the person's request on 2026-11-11 (the 9.9 mockup). The Active menu holds **Preview file** and **Download file**; the Archived menu keeps **Preview file**, **Download file** and **Restore file**. Archiving stays in the selection bar. Presentation only.
+
+  - Reuse `RowMenu` in `client/src/components/FileTable.tsx` (its keyboard behaviour: Enter/Space opens, arrow keys move, Escape or a click outside closes and returns focus to the trigger), with Restore shown only in Archived. The trigger keeps the ID-bearing label `Actions for <File ID> <filename>`; the Actions column is centred in both tabs.
+
+  - Opening the menu never selects the row; Preview opens the existing preview modal and Download uses the existing download link.
+
+  - Unchanged: selection, bulk Archive / Restore / Compare, processing, filters, sorting, downloads and the API.
+
+  **Depends on:** 9.9.
+
+  **Done when:** every Active Files row shows one ⋯ button and no Preview or download button; its menu offers Preview file and Download file only and both work; the Archived menu is unchanged; the menu works by keyboard and never toggles the row's selection.
+
+  **Verification:** component tests for both tabs' menus (items, preview opens, download link by File ID, no row selection, keyboard open/move/close and focus return); existing tests that clicked the Preview or download buttons updated; `npm run verify`.
 
 ### M10 — Code review fixes
 
