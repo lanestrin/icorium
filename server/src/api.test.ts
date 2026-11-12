@@ -7,7 +7,7 @@ import type { FastifyInstance } from 'fastify';
 import { codeOf, isInputFile, PROCESSORS, type CompareResult, type FileMeta, type ReplaceConflict, type FileRows, type GeneratedBatch, type ProcessorId } from '../../shared/types';
 import { parseCsv, toCsv } from './lib/csv';
 import { processors } from './processing';
-import { buildApp } from './app';
+import { buildApp, serverSettings } from './app';
 import { PARSED_CACHE_FILES } from './routes/files';
 import { openLocalStorage, reconcileMetadata } from './lib/storage';
 
@@ -86,6 +86,29 @@ describe('loading files', () => {
     const res = await app.inject('/api/files/nope/rows');
     expect(res.statusCode).toBe(404);
     expect(res.json().message).toBe('File not found');
+  });
+});
+
+describe('upload size limit', () => {
+  // A valid partner A CSV of about 1.75 MB: more than a 1 MB limit, well under the 10 MB default.
+  const header = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
+  const big = [header, ...Array.from({ length: 55000 }, (_, i) => `X-${i + 1},2026-09-01,100,40,30,30`)].join('\n');
+
+  it('accepts a CSV over 1.5 MB under the default 10 MB limit', async () => {
+    expect(Buffer.byteLength(big)).toBeGreaterThan(1.5 * 1024 * 1024);
+    expect((await upload('big_default.csv', big)).statusCode).toBe(200);
+  });
+
+  it('refuses the same CSV when MAX_UPLOAD_MB is 1', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reclaim-limit-'));
+    const small = await buildApp(false, await openLocalStorage(dir), serverSettings({ MAX_UPLOAD_MB: '1' }));
+    try {
+      const res = await upload('big_limited.csv', big, small);
+      expect({ status: res.statusCode, message: res.json().message }).toEqual({ status: 413, message: 'request file too large' });
+    } finally {
+      await small.close();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -1079,11 +1102,11 @@ const processSample = async (name: string, processor: ProcessorId) => (await pro
 const compare = (...ids: string[]) => app.inject(`/api/compare?ids=${ids.join(',')}`);
 
 /** Sends a real multipart upload, as the browser's file chooser does. */
-async function upload(name: string, text: string) {
+async function upload(name: string, text: string, to: FastifyInstance = app) {
   const form = new FormData();
   form.append('file', new Blob([text], { type: 'text/csv' }), name);
   const req = new Request('http://localhost/', { method: 'POST', body: form });
-  return app.inject({
+  return to.inject({
     method: 'POST',
     url: '/api/files',
     headers: { 'content-type': req.headers.get('content-type')! },

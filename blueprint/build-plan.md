@@ -602,7 +602,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   **Verification:** Blob storage unit tests counting SDK calls per operation; existing Blob tests; `npm run verify`.
 
-- [ ] **10.12** `chore/configurable-server-settings` · **P2** — Hard-coded values that should be configurable:
+- [x] **10.12** `chore/configurable-server-settings` · **P2** — Hard-coded values that should be configurable:
 
   - Upload size limit (10 MB) and log level (`warn`) in `server/src/app.ts`, and the bind host `0.0.0.0` in `server/src/index.ts`: read `MAX_UPLOAD_MB`, `LOG_LEVEL` and `HOST` from the environment, with today's values as defaults.
 
