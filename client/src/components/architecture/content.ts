@@ -48,12 +48,12 @@ export const TECH: Tech[] = [
   {
     name: 'Tailwind CSS 4', label: 'Tailwind CSS', role: 'Styling', icon: Wind, packages: [['client', 'tailwindcss'], ['client', '@tailwindcss/vite']],
     why: [
-      'Utility classes keep spacing, colour and type consistent without a separate stylesheet per component.',
-      'Responsive layouts down to phone width with no extra CSS files.',
+      'Utility classes keep spacing, colour and type consistent; short ones stay in the markup.',
+      'Longer combinations become named classes with @apply: shared ones in styles/components.css, the rest in each feature’s CSS Module.',
       'No large UI component framework to learn, theme or override.',
     ],
-    tradeoff: 'Long class lists in the markup; consistency relies on shared patterns rather than a component library.',
-    files: ['client/src/index.css'],
+    tradeoff: 'A style can live in two places, the markup or a CSS Module; consistency relies on shared classes rather than a component library.',
+    files: ['client/src/index.css', 'client/src/styles/components.css'],
   },
   {
     name: 'Fastify 5', label: 'Fastify 5', role: 'API', icon: Server, packages: [['server', 'fastify'], ['server', '@fastify/multipart']],
@@ -98,7 +98,7 @@ export const TECH: Tech[] = [
     name: 'Lucide', label: 'Lucide', role: 'Icons', icon: Shapes, packages: [['client', 'lucide-react']],
     why: ['Consistent, lightweight icons; only the icons a file imports are bundled.'],
     tradeoff: 'One more dependency, for icons alone.',
-    files: ['client/src/components/FileTable.tsx'],
+    files: ['client/src/components/files/FileTable.tsx'],
   },
   {
     name: 'Vitest + React Testing Library', label: 'Vitest', role: 'Testing', icon: FlaskConical,

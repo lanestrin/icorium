@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { ArchitecturePage } from './ArchitecturePage';
 import { HOW_IT_WORKS, TECH } from '../components/architecture/content';
+import sectionStyles from '../components/architecture/architecture.module.css';
 import { api } from '../lib/api';
 
 vi.mock('../lib/api', () => ({ api: {
@@ -28,7 +29,7 @@ describe('Architecture & Tech Stack page', () => {
     }
     // A line divides each section from the one before it; the first has none.
     const sections = links.map((l) => document.getElementById(l.getAttribute('href')!.slice(1))!);
-    for (const section of sections) expect(section).toHaveClass('border-t', 'first-of-type:border-t-0');
+    for (const section of sections) expect(section).toHaveClass(sectionStyles.section); // divider above, none on the first
     expect(sections[0].matches(':first-of-type')).toBe(true);
     expect(sections.slice(1).some((s) => s.matches(':first-of-type'))).toBe(false);
   });

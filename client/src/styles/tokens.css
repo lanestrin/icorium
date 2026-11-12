@@ -1,0 +1,8 @@
+/*
+ * Design tokens. Tailwind's own palette and spacing scale are the main tokens; these are the few
+ * app-specific values that were hardcoded before.
+ */
+@theme {
+  --font-app: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, sans-serif;
+  --color-page: #f3f6fb;
+}

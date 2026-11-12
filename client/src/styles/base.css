@@ -1,0 +1,11 @@
+/* Application-wide foundations: page font and background, native control spacing. */
+
+body {
+  font-family: var(--font-app);
+  background: var(--color-page);
+}
+
+/* Space inside open dropdown lists, so options don't sit against the left edge. Firefox honours this. */
+select option {
+  padding: 0.375rem 0.75rem;
+}

@@ -10,7 +10,7 @@ planning context, coding standards and the active spec only when needed.
 
 ## Layout
 
-- `client/` React 19 + Vite + Tailwind 4 + Recharts + Lucide. `src/App.tsx` picks the page from the URL: `src/pages/FilesPage.tsx` (the file workspace), `src/pages/GeneratorPage.tsx` at `/generator` and `src/pages/ArchitecturePage.tsx` at `/architecture`. Shared UI pieces in `src/components/`, one hook per file in `src/hooks/`, and the API client and pure logic in `src/lib/`. Each test sits next to the file it tests.
+- `client/` React 19 + Vite + Tailwind 4 + Recharts + Lucide. `src/App.tsx` picks the page from the URL: `src/pages/FilesPage.tsx` (the file workspace), `src/pages/GeneratorPage.tsx` at `/generator` and `src/pages/ArchitecturePage.tsx` at `/architecture`. Components are grouped by feature in `src/components/` (`files/`, `compare/`, `modals/`, `generator/`, `architecture/`), one hook per file in `src/hooks/`, the API client and pure logic in `src/lib/`, and global styles in `src/styles/`. Each test sits next to the file it tests.
 - `server/` Fastify 5 + Papa Parse + Zod, run with tsx. `src/adapters/` (partner columns and units), `src/processing/` (the three functions), `src/lib/` (csv, storage, compare), `src/routes/files.ts` (all endpoints).
 - `shared/types.ts` types and the processor list used by both sides.
 - `sample-data/` the person's five synthetic partner CSVs. `README.txt` there lists columns, units and the one planted error per file.

@@ -1,0 +1,127 @@
+@reference "tailwindcss";
+
+/* Styles for the dialogs: the shell, the run confirmations and the file preview. */
+
+/* Dialog shell */
+.backdrop {
+  @apply fixed inset-0 z-20 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm;
+}
+.backdropPadded {
+  @apply p-4;
+}
+.backdropFull {
+  @apply sm:p-4;
+}
+.panel {
+  @apply flex w-full flex-col bg-white shadow-2xl outline-none;
+}
+.panelFull {
+  @apply h-full max-w-[1400px] sm:rounded-2xl;
+}
+.panelDialog {
+  @apply max-h-[88vh] rounded-2xl;
+}
+.panelNarrow {
+  @apply max-w-lg;
+}
+.panelWide {
+  @apply max-w-[1400px];
+}
+.header {
+  @apply flex items-center gap-4 border-b border-slate-200 px-6 py-4;
+}
+.closeButton {
+  @apply rounded-lg p-2 hover:bg-slate-100;
+}
+.body {
+  @apply overflow-auto px-6 pb-6;
+}
+
+/* Run confirmations */
+.notice {
+  @apply flex items-start gap-3 pt-5;
+}
+.noticeIcon {
+  @apply mt-0.5 h-5 w-5 shrink-0;
+}
+.fileList {
+  @apply mt-4 max-h-60 space-y-2 overflow-auto;
+}
+.warningItem {
+  @apply rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm;
+}
+.replaceItem {
+  @apply rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm;
+}
+.note {
+  @apply mt-3 text-sm text-slate-600;
+}
+.confirmButtons {
+  @apply mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end;
+}
+.cancelButton {
+  @apply rounded-xl border border-slate-200 px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-50;
+}
+.confirmButton {
+  @apply rounded-xl px-4 py-2.5 font-semibold text-white shadow-sm;
+}
+.confirmSafe {
+  @apply bg-green-600 hover:bg-green-700;
+}
+.confirmDanger {
+  @apply bg-red-600 hover:bg-red-700;
+}
+
+/* File preview */
+.downloadLink {
+  @apply flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50;
+}
+.problems {
+  @apply mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900;
+}
+.problemsTitle {
+  @apply mb-1 flex items-center gap-2 font-semibold;
+}
+.problemList {
+  @apply max-h-32 space-y-1 overflow-auto text-sm;
+}
+.rowNumberHead {
+  @apply bg-white px-3 py-2 pt-6 text-right font-semibold text-slate-400;
+}
+.columnHead {
+  @apply whitespace-nowrap bg-white px-3 py-2 pt-6 text-left font-semibold;
+}
+.generatedHead {
+  @apply bg-blue-50 text-blue-800;
+}
+.row {
+  @apply border-t border-slate-100;
+}
+/* A row with a problem is amber across, including over generated columns. */
+.flaggedRow {
+  @apply bg-amber-50;
+  & > td {
+    @apply bg-transparent;
+  }
+}
+.rowNumber {
+  @apply px-3 py-1.5 text-right tabular-nums text-slate-400;
+}
+.rowNumberFlagged {
+  @apply font-semibold text-amber-800;
+}
+.cell {
+  @apply whitespace-nowrap px-3 py-1.5;
+}
+.generatedCell {
+  @apply bg-blue-50/50;
+}
+.errorCell {
+  @apply font-semibold text-red-600;
+}
+.footer {
+  @apply mt-4 flex items-center justify-between gap-4 text-sm text-slate-500;
+}
+.showMore {
+  @apply rounded-lg border border-slate-200 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50;
+}

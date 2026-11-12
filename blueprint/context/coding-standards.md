@@ -43,8 +43,8 @@
 ## File Organization
 
 - Client: `client/src/App.tsx` (page from the URL), `client/src/pages/<Name>Page.tsx`,
-  `client/src/components/<Name>.tsx` (one component per file; a feature with several pieces gets a
-  subfolder, such as `components/compare/`), `client/src/hooks/use<Name>.ts` and
+  `client/src/components/<feature>/<Name>.tsx` (one component per file, grouped by feature:
+  `files/`, `compare/`, `modals/`, `generator/`, `architecture/`), `client/src/hooks/use<Name>.ts` and
   `client/src/lib/<name>.ts`. Each test sits next to the file it tests
   (`<file>.test.ts(x)`); `client/src/hooks/hooks.test.ts` covers the hooks.
 - Server: `server/src/{adapters,processing,lib,routes}/`; tests in
@@ -63,8 +63,26 @@
 
 ## Styling
 
-- Tailwind CSS 4 via `@tailwindcss/vite`, CSS-first config in
-  `client/src/index.css`; no `tailwind.config.js`. Icons from Lucide React.
+- Tailwind CSS 4 via `@tailwindcss/vite`, CSS-first config; no `tailwind.config.js`.
+  Icons from Lucide React.
+- Where styles live:
+  - `client/src/index.css` imports Tailwind and the files in `client/src/styles/`:
+    `tokens.css` (app-specific design tokens in `@theme`), `base.css` (page font and
+    background), `components.css` (shared classes such as `card`, `btn`, `btn-primary`,
+    `btn-secondary`, `nav-link`, `eyebrow`, `table-head-row`, `table-row`) and
+    `menu-select.css`.
+  - Feature styles go in a CSS Module beside the feature (`files.module.css`,
+    `compare.module.css`, ...), starting with `@reference "tailwindcss";` and using
+    `@apply`. Name classes after what they are (`selectionBar`, `flaggedRow`), not how
+    they look.
+  - Keep short, obvious utilities inline (`flex gap-2`, `text-sm`, `mt-4`). Move long or
+    repeated combinations into a module or shared class. Combine classes with
+    `classNames` from `client/src/lib/class-names.ts`.
+  - A selected or active variant is a second class added after the base one, and it
+    repeats any hover colour it must keep, because the base class's hover rule is more
+    specific.
+  - Tests check module classes through the imported module (`styles.flaggedRow`), never
+    hashed names or raw utilities.
 - Light, Apple-inspired look from `blueprint/reference-ui.png`. Must work at phone
   width with no sideways page scroll.
 - Charts use Recharts, labelled with units and whether values are a sum, mean or count.

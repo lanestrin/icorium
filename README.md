@@ -104,9 +104,14 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 client/        React + Vite + Tailwind UI
   src/App.tsx      picks the page from the URL
   src/pages/       FilesPage (the file workspace), GeneratorPage (/generator), ArchitecturePage (/architecture)
-  src/components/  Sidebar, FileTable, FileFilters, SelectionBar, ArchiveToast, Banner, Modals
-    compare/       the comparison dialog and its charts and tables, one per file
-    architecture/  the Architecture page's sections, one per file, and content.ts with the text they show
+  src/components/  Banner (shared message box), and one folder per feature, one component per file:
+    files/         the CSV Files workspace: sidebar, filters, tabs, sort menu, file table, row menu, toolbars
+    compare/       the comparison dialog and its charts and tables
+    modals/        the dialog shell, the run confirmations and the file preview
+    generator/     the CSV Generator's options, generated file list and preview
+    architecture/  the Architecture page's sections, and content.ts with the text they show
+    Each feature folder has a CSS Module (*.module.css) with its longer Tailwind class combinations.
+  src/styles/      tokens, base page styles and shared classes (card, btn, nav-link, table rows)
   src/hooks/       the workspace state, one hook per file: file list, selection, filters, archiving, processing
   src/lib/         api (the typed API client), file-status (file rules), compare-view (comparison rules), format
 server/        Fastify API

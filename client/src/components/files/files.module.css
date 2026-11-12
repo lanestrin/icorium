@@ -1,0 +1,167 @@
+@reference "tailwindcss";
+
+/* Styles for the CSV Files workspace: sidebar, filter card, tabs, file table and its toolbars. */
+
+/* Page layout: sidebar beside the main column on large screens. */
+.workspace {
+  @apply flex flex-col gap-6 p-4 pt-8 sm:p-6 sm:pt-10 lg:flex-row;
+}
+.headerNav {
+  @apply ml-auto flex items-center gap-5 self-center text-sm font-medium;
+}
+
+/* Sidebar */
+.sidebar {
+  @apply w-full shrink-0 space-y-8 lg:w-88;
+}
+.dropZone {
+  @apply rounded-xl border-2 border-dashed border-slate-300 bg-white/50 p-6 text-center transition;
+}
+.dropZoneActive {
+  @apply border-blue-500 bg-blue-50;
+}
+.browseButton {
+  @apply font-semibold text-blue-600 hover:underline;
+}
+.processorOption {
+  @apply flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:bg-slate-50;
+}
+.processorOptionSelected {
+  @apply border-blue-200 bg-blue-50 hover:bg-blue-50;
+}
+.processorRadio {
+  @apply h-5 w-5 shrink-0 accent-blue-600;
+}
+.selectedInputs {
+  @apply mb-3 max-h-28 space-y-1 overflow-auto text-xs text-slate-600;
+}
+.runButton {
+  @apply flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3.5 font-semibold text-white shadow-sm transition;
+  @apply hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+/* Filter card */
+.filterCard {
+  @apply mt-5 flex flex-wrap items-stretch gap-3 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm;
+}
+.field {
+  @apply flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm sm:w-auto;
+}
+.searchField {
+  @apply min-w-0 sm:min-w-64 sm:flex-1;
+}
+.selectField {
+  @apply relative sm:min-w-56;
+}
+.fieldIcon {
+  @apply h-5 w-5 shrink-0 text-slate-600;
+}
+.fieldInput {
+  @apply min-w-0 flex-1 bg-transparent text-sm text-slate-600 outline-none;
+}
+.fieldSelect {
+  @apply w-full cursor-pointer appearance-none bg-transparent pr-7 text-sm text-slate-600 outline-none;
+}
+.fieldChevron {
+  @apply pointer-events-none absolute right-4 h-4 w-4 text-slate-600;
+}
+.divider {
+  @apply hidden w-px self-stretch bg-slate-200 xl:block;
+}
+.clearFilters {
+  @apply px-3 py-2 text-sm font-medium text-slate-700 hover:text-slate-950 disabled:cursor-default disabled:text-slate-400;
+}
+.sortChevron {
+  @apply pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2;
+}
+.sortSelect {
+  @apply cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-4 pr-10 shadow-sm outline-none focus:border-blue-400;
+}
+
+/* Tabs */
+.tabsRow {
+  @apply mt-5 flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-slate-200;
+}
+.tab {
+  @apply -mb-px flex items-center gap-3 rounded-t-lg border-b-2 border-transparent px-5 py-2.5 font-medium text-slate-600 transition hover:text-slate-900;
+}
+.tabActive {
+  @apply border-blue-600 bg-blue-50 text-blue-700 hover:text-blue-700;
+}
+.archivedNote {
+  @apply mb-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm;
+}
+
+/* File table */
+.tableCard {
+  @apply rounded-2xl border border-slate-200 bg-white p-2 shadow-sm;
+}
+/* On desktop the list scrolls inside this box with its header pinned, so the page stays put. */
+.scrollArea {
+  @apply overflow-auto rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-blue-400 lg:max-h-[calc(100vh-17rem)];
+}
+.headRow {
+  @apply text-left text-slate-700;
+  & > th {
+    @apply sticky top-0 z-[1] bg-slate-50 py-3 font-semibold;
+  }
+}
+.checkbox {
+  @apply h-[18px] w-[18px] cursor-pointer rounded accent-blue-600 disabled:cursor-not-allowed disabled:opacity-40;
+}
+.row {
+  @apply border-b border-slate-100 transition hover:bg-slate-50;
+}
+.rowSelectable {
+  @apply cursor-pointer;
+}
+.rowChecked {
+  @apply bg-blue-50 hover:bg-blue-50;
+}
+.idCell {
+  @apply whitespace-nowrap py-2.5 pl-1 pr-4 tabular-nums;
+}
+.importedTag {
+  @apply rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600;
+}
+.emptyRow {
+  @apply py-12 text-center text-slate-500;
+}
+
+/* Status badge */
+.badge {
+  @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-medium;
+}
+
+/* Row actions menu */
+.menuTrigger {
+  @apply rounded-lg border border-slate-200 px-2.5 py-1 hover:bg-slate-50;
+}
+.menu {
+  @apply absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg;
+}
+.menuItem {
+  @apply flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-slate-800 outline-none;
+  @apply hover:bg-blue-50 focus:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+/* Selected-files toolbar */
+.selectionBar {
+  @apply mb-2 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-blue-50/70 px-4 py-2.5;
+}
+.textButton {
+  @apply text-sm font-medium text-blue-700 hover:underline;
+}
+
+/* Archive toast */
+.toast {
+  @apply fixed inset-x-4 top-4 z-30 flex items-center gap-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 shadow-lg;
+  @apply sm:left-auto sm:right-6 sm:w-104;
+}
+.toastIcon {
+  @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-600 text-white;
+}
+.undoButton {
+  @apply rounded-xl border border-blue-200 bg-white px-4 py-1.5 font-medium text-blue-700 transition hover:bg-blue-50;
+  @apply disabled:cursor-not-allowed disabled:opacity-50;
+}

@@ -5,6 +5,7 @@ import type { FileMeta, GeneratedFile } from '../../../shared/types';
 import App from '../App';
 import { GeneratorPage } from './GeneratorPage';
 import { api } from '../lib/api';
+import generatorStyles from '../components/generator/generator.module.css';
 
 vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
@@ -87,7 +88,8 @@ describe('CSV generator page', () => {
       .toEqual(['Row 2 · mass missing', 'Row 5 · duplicate batch ID', 'Row 6 · duplicate batch ID']);
     const preview = () => within(results()).getByRole('table', { name: 'Preview' });
     expect(within(preview()).getAllByRole('row')).toHaveLength(11); // header + first 10 rows
-    expect(within(preview()).getAllByRole('row')[2]).toHaveClass('bg-amber-50');
+    expect(within(preview()).getAllByRole('row')[2]).toHaveClass(generatorStyles.flaggedRow); // highlighted
+    expect(within(preview()).getAllByRole('row')[1]).not.toHaveClass(generatorStyles.flaggedRow);
     expect(within(preview()).getAllByRole('row')[1]).toHaveTextContent('122720');
 
     await user.click(within(fileTable()).getByRole('button', { name: `Preview ${batch[1].name}` }));

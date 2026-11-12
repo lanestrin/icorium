@@ -1,0 +1,159 @@
+@reference "tailwindcss";
+
+/* Styles for the comparison dialog and its pieces. Shared table rows use .table-head-row and .table-row. */
+
+/* A white panel; the dialog's sections sit in these. */
+.panel {
+  @apply min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5;
+}
+.panelTitle {
+  @apply text-lg font-semibold;
+}
+.muted {
+  @apply text-sm text-slate-500;
+}
+.footnote {
+  @apply mt-2 text-xs text-slate-500;
+}
+.checkboxLabel {
+  @apply ml-auto flex items-center gap-2 text-sm;
+}
+.checkbox {
+  @apply h-4 w-4 accent-blue-600;
+}
+
+/* Selected files */
+.selectedFiles {
+  @apply mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 px-4 py-3;
+}
+.selectedFilesTitle {
+  @apply mr-2 font-semibold;
+}
+.fileChip {
+  @apply flex min-w-0 items-center gap-2 rounded-full border border-slate-200 px-3 py-1.5 text-sm;
+}
+.fileId {
+  @apply shrink-0 tabular-nums text-slate-500;
+}
+.flaggedIcon {
+  @apply h-4 w-4 shrink-0 text-red-500;
+}
+.cleanIcon {
+  @apply h-4 w-4 shrink-0 text-green-600;
+}
+.matchNote {
+  @apply w-full text-sm text-slate-500;
+}
+
+/* Toolbar: reference file, metric and view */
+.toolbar {
+  @apply mt-4 flex flex-wrap items-center gap-x-6 gap-y-3;
+}
+.referenceSelect {
+  @apply rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm;
+}
+.viewSwitch {
+  @apply flex gap-1 rounded-full bg-slate-100 p-1 lg:ml-auto;
+}
+.pill {
+  @apply rounded-full bg-slate-100 px-4 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-200;
+}
+.pillActive {
+  @apply rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow-sm transition;
+}
+
+/* Overview tab */
+.overview {
+  @apply mt-4 space-y-4;
+}
+.chartAndSummary {
+  @apply grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)];
+}
+.glance {
+  @apply grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)];
+}
+.stats {
+  @apply grid gap-3 sm:grid-cols-3;
+}
+.stat {
+  @apply rounded-xl border p-3;
+}
+.statReference {
+  @apply border-blue-100 bg-blue-50;
+}
+.statDiffering {
+  @apply border-green-100 bg-green-50;
+}
+.statFlagged {
+  @apply border-red-100 bg-red-50;
+}
+.statLabel {
+  @apply flex items-center gap-2 text-sm text-slate-600;
+}
+.statValue {
+  @apply mt-1 font-semibold;
+}
+.topDifferencesHeader {
+  @apply mb-2 flex flex-wrap items-center gap-3;
+}
+.viewAllButton {
+  @apply ml-auto flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50;
+}
+.differenceText {
+  @apply rounded-md bg-red-50 px-2 py-0.5 text-red-700;
+}
+.affectedFiles {
+  @apply flex flex-wrap gap-x-3 gap-y-1;
+}
+.affectedFile {
+  @apply flex items-center gap-1.5 whitespace-nowrap;
+}
+
+/* Summary by file */
+.flaggedCount {
+  @apply inline-block min-w-7 rounded-md px-2 py-0.5 text-center font-medium;
+}
+.flaggedSome {
+  @apply bg-red-50 text-red-700;
+}
+.flaggedNone {
+  @apply bg-green-50 text-green-700;
+}
+.referenceRow {
+  @apply bg-blue-50/60;
+}
+
+/* Row differences tab */
+.rowTable {
+  @apply mt-3 max-h-128 overflow-auto;
+}
+.stickyHead {
+  @apply text-left;
+  & > th {
+    @apply sticky top-0 whitespace-nowrap bg-slate-50 px-3 py-2 font-semibold;
+  }
+}
+.rowBodyRow {
+  @apply border-t border-slate-100;
+  & > td {
+    @apply px-3 py-1.5;
+  }
+}
+.rowLabel {
+  @apply whitespace-nowrap px-3 text-left font-medium;
+}
+.numberCell {
+  @apply text-right;
+}
+.differs {
+  @apply bg-amber-50 text-amber-900;
+}
+.notInFile {
+  @apply italic text-slate-400;
+}
+.headerDot {
+  @apply mr-1.5 inline-block h-2 w-2 rounded-full;
+}
+.emptyRow {
+  @apply py-8 text-center text-slate-500;
+}
