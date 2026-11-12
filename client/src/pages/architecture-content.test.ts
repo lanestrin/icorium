@@ -1,16 +1,16 @@
 // Keeps the Architecture & Tech Stack page honest: everything it names must exist in this repository.
 // Files are read with Vite's import.meta.glob (raw text), so the client needs no Node type definitions.
 import { describe, expect, it } from 'vitest';
-import { COMPARE_MAX } from '../../shared/types';
-import { TECH } from './components/ArchitecturePage';
+import { COMPARE_MAX } from '../../../shared/types';
+import { TECH } from './ArchitecturePage';
 
 const GLOBBED = import.meta.glob(
-  ['../../client/src/**/*', '../../client/*.ts', '../../client/package.json', '../../server/src/**/*.ts', '../../server/package.json', '../../shared/*.ts', '../../blueprint/vercel-deployment.md'],
+  ['../../../client/src/**/*', '../../../client/*.ts', '../../../client/package.json', '../../../server/src/**/*.ts', '../../../server/package.json', '../../../shared/*.ts', '../../../blueprint/vercel-deployment.md'],
   { query: '?raw', import: 'default', eager: true },
 ) as Record<string, string>;
 
 /** The same files keyed by repository path, e.g. "server/src/app.ts". */
-const REPO = Object.fromEntries(Object.entries(GLOBBED).map(([key, text]) => [new URL(key, 'file:///repo/client/src/x').pathname.slice('/repo/'.length), text]));
+const REPO = Object.fromEntries(Object.entries(GLOBBED).map(([key, text]) => [new URL(key, 'file:///repo/client/src/pages/x').pathname.slice('/repo/'.length), text]));
 const read = (file: string) => {
   expect(REPO, file).toHaveProperty([file]);
   return REPO[file];

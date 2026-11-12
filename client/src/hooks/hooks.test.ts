@@ -1,10 +1,12 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FileMeta } from '../../shared/types';
-import { api } from './api';
-import { TOAST_MS, useArchive, useFileList, useSelection } from './hooks';
+import type { FileMeta } from '../../../shared/types';
+import { api } from '../lib/api';
+import { TOAST_MS, useArchive } from './useArchive';
+import { useFileList } from './useFileList';
+import { useSelection } from './useSelection';
 
-vi.mock('./api', () => ({ api: { list: vi.fn(), archive: vi.fn() } }));
+vi.mock('../lib/api', () => ({ api: { list: vi.fn(), archive: vi.fn() } }));
 
 const file = (id: string): FileMeta => ({ id, name: `${id}.csv`, rows: 1, columns: 6, uploadedAt: '2026-11-06T12:00:00Z', status: 'Ready' });
 

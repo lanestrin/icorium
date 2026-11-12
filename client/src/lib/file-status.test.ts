@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isInputFile, type FileMeta } from '../../shared/types';
+import { isInputFile, type FileMeta } from '../../../shared/types';
 import { displayStatus, filterFiles, processingFunction, qualityWarning, replacements, sortFiles, type FileFilters } from './file-status';
 
 const file: FileMeta = { id: 'input', name: 'input.csv', rows: 25, columns: 7,

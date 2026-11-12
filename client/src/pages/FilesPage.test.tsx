@@ -1,12 +1,12 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CompareResult, FileMeta, FileRows } from '../../shared/types';
-import App from './App';
-import { Modal, PreviewModal } from './components/Modals';
-import { api } from './api';
+import type { CompareResult, FileMeta, FileRows } from '../../../shared/types';
+import { FilesPage } from './FilesPage';
+import { Modal, PreviewModal } from '../components/Modals';
+import { api } from '../lib/api';
 
-vi.mock('./api', () => ({ api: {
+vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
   downloadUrl: (id: string) => `/api/files/${id}/download`,
 } }));
@@ -39,7 +39,7 @@ beforeEach(() => {
 
 async function setup() {
   const user = userEvent.setup();
-  render(<App />);
+  render(<FilesPage />);
   await screen.findByRole('checkbox', { name: 'Select clean clean.csv' });
   return user;
 }
@@ -144,7 +144,7 @@ describe('input selection and status filtering', () => {
     const archivedLate: FileMeta = { ...clean, id: 'al', name: 'y_late.csv', archived: true, archivedAt: '2026-11-08T09:00:00Z' };
     vi.mocked(api.list).mockResolvedValue([older, newer, middle, archivedEarly, archivedLate]);
     const user = userEvent.setup();
-    render(<App />);
+    render(<FilesPage />);
     await screen.findByRole('checkbox', { name: 'Select older b_older.csv' });
     const order = () => screen.getAllByRole('checkbox', { name: /^Select (?!all)/ }).map((c) => c.getAttribute('aria-label')!.replace(/^Select \S+ /, ''));
     const sortBy = () => screen.getByRole('combobox', { name: 'Sort by' });
@@ -545,7 +545,7 @@ describe('archive and restore', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      render(<App />);
+      render(<FilesPage />);
       await screen.findByRole('checkbox', { name: 'Select clean clean.csv' });
       await user.click(check('clean.csv'));
       vi.mocked(api.archive).mockResolvedValueOnce([archived(clean)]);
@@ -737,7 +737,7 @@ describe('file IDs', () => {
   async function open() {
     vi.mocked(api.list).mockResolvedValue([input, twin, inputV, inputM, imported, archived]);
     const user = userEvent.setup();
-    render(<App />);
+    render(<FilesPage />);
     await screen.findByRole('checkbox', { name: 'Select 101010 data.csv' });
     return user;
   }
@@ -806,7 +806,7 @@ describe('file IDs', () => {
     const claimed: FileMeta = { ...imported, id: '101015-V', name: 'edited_copy.csv', processor: 'validation', importedFrom: '101011' };
     vi.mocked(api.list).mockResolvedValue([input, twin, linked, claimed, imported]);
     const user = userEvent.setup();
-    render(<App />);
+    render(<FilesPage />);
     await screen.findByRole('checkbox', { name: 'Select 101010 data.csv' });
     const marker = (id: string) => within(screen.getByRole('row', { name: new RegExp(id) })).getByText('Imported');
     expect(marker('101014-V')).toHaveAttribute('title', 'Uploaded result file, linked to original input 101010.');
@@ -876,7 +876,7 @@ describe('file identity regression', () => {
   async function open() {
     vi.mocked(api.list).mockResolvedValue([inputA, inputB, resultA, resultB]);
     const user = userEvent.setup();
-    render(<App />);
+    render(<FilesPage />);
     await screen.findByRole('checkbox', { name: 'Select 101010 data.csv' });
     return user;
   }
@@ -1118,7 +1118,7 @@ describe('comparing results', () => {
     const many = Array.from({ length: 6 }, (_, i) => val(`v${i}`, `result_extra_${i}_validation.csv`));
     vi.mocked(api.list).mockResolvedValue(many);
     const user = userEvent.setup();
-    render(<App />);
+    render(<FilesPage />);
     await screen.findByRole('checkbox', { name: withId('Select', many[0].name) });
     await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
     expect(compareButton()).toHaveAccessibleDescription('Compare up to 5 results at a time.');
@@ -1251,7 +1251,7 @@ describe('comparing results', () => {
     const inputB: FileMeta = { ...clean, id: 'in-b', name: 'b.csv' };
     vi.mocked(api.list).mockResolvedValue([inputA, inputB, valA, valB]);
     const user = userEvent.setup();
-    render(<App />);
+    render(<FilesPage />);
     await screen.findByRole('checkbox', { name: 'Select in-a a.csv' });
     vi.mocked(api.process).mockResolvedValueOnce(valA).mockResolvedValueOnce(valB);
     await user.click(check('a.csv'));
@@ -1283,7 +1283,7 @@ describe('request ordering', () => {
     vi.mocked(api.upload).mockResolvedValue(clean);
     const added: FileMeta = { ...clean, id: 'added', name: 'added.csv' };
     const user = userEvent.setup();
-    render(<App />);
+    render(<FilesPage />);
     await user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, [new File(['a'], 'added.csv')]);
     await act(async () => second.resolve([clean, added])); // the upload's refresh answers first
     expect(await screen.findByRole('checkbox', { name: 'Select added added.csv' })).toBeInTheDocument();
@@ -1298,7 +1298,7 @@ describe('request ordering', () => {
     vi.mocked(api.list).mockReturnValueOnce(first.promise).mockResolvedValueOnce([clean]);
     vi.mocked(api.upload).mockResolvedValue(clean);
     const user = userEvent.setup();
-    render(<App />);
+    render(<FilesPage />);
     await user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, [new File(['a'], 'clean.csv')]);
     expect(await screen.findByRole('checkbox', { name: 'Select clean clean.csv' })).toBeInTheDocument();
     await act(async () => first.reject(new Error('Network error')));

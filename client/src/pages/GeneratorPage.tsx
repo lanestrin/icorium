@@ -1,16 +1,15 @@
 import { useId, useState, type FormEvent } from 'react';
 import { ArrowLeft, Check, Network, CircleAlert, Download, Eye, FilePlus2, LoaderCircle, Wand2, X } from 'lucide-react';
 import { ADAPTERS, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
-import { api } from '../api';
+import { api } from '../lib/api';
+import { errorMessage, plural } from '../lib/format';
 
 const PREVIEW_ROWS = 10;
 const ERRORS_SHOWN = 20;
 
-const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** Generated values never contain commas or quotes, so a plain split is enough for the preview. */
 const splitCsv = (text: string) => text.split(/\r?\n/).filter(Boolean).map((line) => line.split(','));
 const withCsv = (name: string) => (name.trim().toLowerCase().endsWith('.csv') ? name.trim() : `${name.trim()}.csv`);
-const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`;
 /** Rows a file's planted errors flag (a duplicate batch ID is listed on both of its rows). */
 const flaggedRows = (f: GeneratedFile) => new Set(f.errors.map((x) => x.row)).size;
 
@@ -57,7 +56,7 @@ export function GeneratorPage() {
       setNames(made.files.map((f) => f.name));
       setShown(0);
     } catch (err) {
-      setError(`Could not generate: ${msg(err)}`);
+      setError(`Could not generate: ${errorMessage(err)}`);
     }
     setBusy(undefined);
   }
@@ -76,7 +75,7 @@ export function GeneratorPage() {
         await api.upload(new File([f.text], fileName, { type: 'text/csv' }));
         done.push(fileName);
       } catch (err) {
-        failed.push(`${fileName}: ${msg(err)}`);
+        failed.push(`${fileName}: ${errorMessage(err)}`);
       }
     }
     if (done.length) setAdded(done.length === 1 ? `Added ${done[0]} to CSV Files.` : `Added ${done.length} files to CSV Files.`);

@@ -14,11 +14,14 @@
 ## React (client)
 
 - React 19 function components and hooks; no state library, no router library.
-  `Root` in `client/src/App.tsx` picks the page from the URL.
-- State lives in `App.tsx` with `useState` / `useMemo` / `useRef`; components in
-  `client/src/components/` receive props. Prefer editing an existing component
-  file over adding one.
-- All HTTP calls go through the `api` object in `client/src/api.ts`, which turns
+  `App` in `client/src/App.tsx` picks the page from the URL.
+- Each page in `client/src/pages/` owns its state. The file workspace's state is
+  split into hooks in `client/src/hooks/` (one hook per file, named after it);
+  components in `client/src/components/` receive props. Prefer editing an
+  existing file over adding one.
+- Pure logic (rules, formats, calculations) lives in `client/src/lib/`, not in
+  components, so it can be unit tested without rendering.
+- All HTTP calls go through the `api` object in `client/src/lib/api.ts`, which turns
   non-OK responses into an `Error` carrying the server's `message`.
 - Ignore stale responses (list, preview) rather than letting late replies win.
 - Keyboard access and ARIA (`aria-sort`, dialog focus, menus with arrow keys and
@@ -39,8 +42,10 @@
 
 ## File Organization
 
-- Client: `client/src/App.tsx`, `client/src/components/<Name>.tsx`,
-  `client/src/api.ts`; tests in `client/src/*.test.ts(x)`.
+- Client: `client/src/App.tsx` (page from the URL), `client/src/pages/<Name>Page.tsx`,
+  `client/src/components/<Name>.tsx`, `client/src/hooks/use<Name>.ts` and
+  `client/src/lib/<name>.ts`. Each test sits next to the file it tests
+  (`<file>.test.ts(x)`); `client/src/hooks/hooks.test.ts` covers the hooks.
 - Server: `server/src/{adapters,processing,lib,routes}/`; tests in
   `server/src/core.test.ts` (unit), `api.test.ts` (endpoints),
   `blob-storage.test.ts`.

@@ -1,4 +1,4 @@
-import type { CompareResult, FileMeta, FileRows, GeneratedBatch, GeneratorPartner, ProcessorId, ReplaceConflict } from '../../shared/types';
+import type { CompareResult, FileMeta, FileRows, GeneratedBatch, GeneratorPartner, ProcessorId, ReplaceConflict } from '../../../shared/types';
 
 async function json<T>(res: Response): Promise<T> {
   const body = await res.json().catch(() => ({}));
