@@ -52,7 +52,7 @@ describe('Architecture page content', () => {
     expect(read('server/src/app.ts')).toContain('fileSize: 10 * 1024 * 1024'); // 10 MB uploads
     expect(read('server/src/app.ts')).toContain("level: 'warn'"); // warnings and errors only
     expect(read('server/src/processing/index.ts')).toContain('TOTAL_TOLERANCE_PCT = 0.5'); // ±0.5 points
-    expect(read('server/src/lib/generate.ts')).toMatch(/GENERATOR_MAX_ROWS = 5000;[\s\S]*GENERATOR_MAX_FILES = 10;/);
+    expect(read('shared/types.ts')).toMatch(/GENERATOR_MAX_ROWS = 5000;[\s\S]*GENERATOR_MAX_FILES = 10;/);
     expect(COMPARE_MAX).toBe(5);
     const storage = read('server/src/lib/storage.ts');
     expect(storage).toContain("'meta.json'");

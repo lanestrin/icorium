@@ -1,8 +1,8 @@
 // code: the fixed letter a result's File ID ends with (101010-V). Never change or reuse a code.
 export const PROCESSORS = [
-  { id: 'validation', code: 'V', label: 'Composition Validation', short: 'Validation', description: 'Check mixture percentages (≈100%)' },
-  { id: 'mass', code: 'M', label: 'Component Mass Calculation', short: 'Mass', description: 'Calculate mass of each refrigerant (kg)' },
-  { id: 'classification', code: 'C', label: 'Batch Classification', short: 'Classification', description: 'Categorize batches by composition' },
+  { id: 'validation', code: 'V', label: 'Composition Validation', short: 'Validation', tableLabel: 'Validation', description: 'Check mixture percentages (≈100%)' },
+  { id: 'mass', code: 'M', label: 'Component Mass Calculation', short: 'Mass', tableLabel: 'Mass Calculation', description: 'Calculate mass of each refrigerant (kg)' },
+  { id: 'classification', code: 'C', label: 'Batch Classification', short: 'Classification', tableLabel: 'Classification', description: 'Categorize batches by composition' },
 ] as const;
 
 export type ProcessorId = (typeof PROCESSORS)[number]['id'];
@@ -98,6 +98,11 @@ export interface FileRows {
 /** Compare 2 to 5 results at a time. */
 export const COMPARE_MIN = 2;
 export const COMPARE_MAX = 5;
+
+/** Largest file the generator makes; enough for demos without slowing the synchronous API. */
+export const GENERATOR_MAX_ROWS = 5000;
+/** Most files one generate request makes. */
+export const GENERATOR_MAX_FILES = 10;
 
 /** How rows were lined up across files: by batch ID when every pair of files shares IDs, otherwise by position. */
 export type RowMatch = 'batch_id' | 'position';

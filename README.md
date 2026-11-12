@@ -119,5 +119,5 @@ Local development needs no account or cloud service. An optional Vercel deployme
 ## Extending
 
 - **New partner CSV schema:** add one entry to `ADAPTERS` in `server/src/adapters/index.ts`, listing the column names and the unit factors. To generate it too, add its letter to `GENERATOR_PARTNERS` in `shared/types.ts` and its number formats to `DIGITS` in `server/src/lib/generate.ts`.
-- **New processing function:** add an entry to `processors` in `server/src/processing/index.ts`, plus its label in `PROCESSORS` in `shared/types.ts`. Add the id to the Zod enum in `routes/files.ts`.
+- **New processing function:** add an entry to `processors` in `server/src/processing/index.ts`, plus its id, code and labels in `PROCESSORS` in `shared/types.ts`. The API's accepted functions and the file table's label follow from `PROCESSORS`.
 - **Storage:** `server/src/lib/storage.ts` owns local files and selects the private Blob adapter in `server/src/lib/blob-storage.ts` when a server-side Blob token is configured. Deployed instances share durable objects; local development keeps file storage.

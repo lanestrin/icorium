@@ -69,7 +69,7 @@ Examples:
 ## Extending
 
 - New partner CSV format: add an entry to `ADAPTERS` in `server/src/adapters/index.ts`. To generate it, also add it to `GENERATOR_PARTNERS` in `shared/types.ts` and `DIGITS` in `server/src/lib/generate.ts`.
-- New processing function: add it to `processors` in `server/src/processing/index.ts`, to `PROCESSORS` in `shared/types.ts`, and to the Zod enum in `server/src/routes/files.ts`. Add a test in `server/src/core.test.ts`.
+- New processing function: add it to `processors` in `server/src/processing/index.ts` and to `PROCESSORS` in `shared/types.ts` (its id, code and labels). The API's accepted functions and the file table's label follow from `PROCESSORS`. Add a test in `server/src/core.test.ts`.
 
 ## Commands
 

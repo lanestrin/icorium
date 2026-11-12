@@ -1,11 +1,8 @@
 import { useId, useState, type FormEvent } from 'react';
 import { ArrowLeft, Check, Network, CircleAlert, Download, Eye, FilePlus2, LoaderCircle, Wand2, X } from 'lucide-react';
-import { GENERATOR_PARTNERS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
+import { GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
 import { api } from '../api';
 
-/** Kept in step with GENERATOR_MAX_ROWS and GENERATOR_MAX_FILES on the server, which has the final say. */
-const MAX_ROWS = 5000;
-const MAX_FILES = 10;
 const PREVIEW_ROWS = 10;
 const ERRORS_SHOWN = 20;
 
@@ -132,10 +129,10 @@ export function GeneratorPage() {
           </fieldset>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            <NumberField id={`${ids}-rows`} label="Rows" value={rows} setValue={setRows} min={1} max={MAX_ROWS}
-              help={`1 to ${MAX_ROWS.toLocaleString()} data rows in each file.`} />
-            <NumberField id={`${ids}-count`} label="Number of files" value={count} setValue={setCount} min={1} max={MAX_FILES}
-              help={`1 to ${MAX_FILES} files. No two files have the same data.`} />
+            <NumberField id={`${ids}-rows`} label="Rows" value={rows} setValue={setRows} min={1} max={GENERATOR_MAX_ROWS}
+              help={`1 to ${GENERATOR_MAX_ROWS.toLocaleString()} data rows in each file.`} />
+            <NumberField id={`${ids}-count`} label="Number of files" value={count} setValue={setCount} min={1} max={GENERATOR_MAX_FILES}
+              help={`1 to ${GENERATOR_MAX_FILES} files. No two files have the same data.`} />
           </div>
 
           <fieldset>
@@ -150,7 +147,7 @@ export function GeneratorPage() {
             </div>
             {withErrors && (
               <div className="mt-4">
-                <NumberField id={`${ids}-errors`} label="Rows with errors" value={errorRows} setValue={setErrorRows} min={1} max={Number(rows) || MAX_ROWS}
+                <NumberField id={`${ids}-errors`} label="Rows with errors" value={errorRows} setValue={setErrorRows} min={1} max={Number(rows) || GENERATOR_MAX_ROWS}
                   help="In each file. Each of these rows fails Composition Validation: missing or non-numeric mass, a negative percentage, a composition total off by 15 points, a missing batch ID, or a duplicate batch ID (which marks two rows)." />
               </div>
             )}

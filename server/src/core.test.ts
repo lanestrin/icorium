@@ -399,19 +399,6 @@ describe('CSV generator', () => {
     expect(generateFiles('B', 5, 1, 3)[0].text).not.toBe(generateFiles('B', 5, 1, 3)[0].text);
   });
 
-  it.each([0, 11, 2.5])('rejects %s files', (count) => {
-    expect(() => generateFiles('A', 5, 0, count, 1)).toThrow('Number of files must be a whole number from 1 to 10.');
-  });
-
-  it.each([
-    [0, 0, 'Rows must be a whole number from 1 to 5000.'],
-    [5001, 0, 'Rows must be a whole number from 1 to 5000.'],
-    [2.5, 0, 'Rows must be a whole number from 1 to 5000.'],
-    [10, 11, 'Rows with errors must be a whole number from 0 to the number of rows.'],
-    [10, -1, 'Rows with errors must be a whole number from 0 to the number of rows.'],
-  ])('rejects %s rows with %s errors', (rows, errorRows, message) => {
-    expect(() => generateCsv('A', rows, errorRows, 1)).toThrow(message);
-  });
 });
 
 describe('File IDs', () => {

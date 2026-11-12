@@ -3,7 +3,7 @@ import { Archive, ArrowDownUp, ArrowLeftRight, Calendar, Check, ChevronDown, Cir
 import { isInputFile, type CompareResult, type FileMeta, type ProcessorId, type ReplaceConflict } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
-import { displayStatus, FileTable, FileTabs, PROCESSING_FUNCTIONS, processingFunction, qualityWarning, replacements, SORT_OPTIONS, sortFiles, type SortKey, type QualityWarning, type Replacement, type Status, type Tab } from './components/FileTable';
+import { displayStatus, FileTable, FileTabs, PROCESSING_FUNCTIONS, processingFunctionId, qualityWarning, replacements, SORT_OPTIONS, sortFiles, STATUSES, type SortKey, type QualityWarning, type Replacement, type Status, type Tab } from './components/FileTable';
 import { compareBlocker, CompareWorkspace } from './components/CompareWorkspace';
 import { PreviewModal, QualityWarningModal, ReplaceResultModal } from './components/Modals';
 import { GeneratorPage } from './components/GeneratorPage';
@@ -59,7 +59,7 @@ export default function App() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [status, setStatus] = useState<'All' | Status>('All');
-  const [fn, setFn] = useState('All'); // processing function filter: 'All', 'Original' or a function name
+  const [fn, setFn] = useState('All'); // processing function filter: 'All', 'original' or a function id
   // Each tab keeps its own order: newest uploads first, and most recently archived first.
   const [sortBy, setSortBy] = useState<Record<'active' | 'archived', SortKey>>({ active: 'uploaded-desc', archived: 'archived-desc' });
   const [tab, setTab] = useState<Tab>('active');
@@ -105,7 +105,7 @@ export default function App() {
           // Each tab shows only its own files; the status filter applies within the tab.
           !!f.archived === viewArchived &&
           (status === 'All' || displayStatus(f, processingId, failedIds) === status) &&
-          (fn === 'All' || processingFunction(f) === fn) &&
+          (fn === 'All' || processingFunctionId(f) === fn) &&
           (!from || day >= from) &&
           (!to || day <= to)
         );
@@ -282,16 +282,12 @@ export default function App() {
             </div>
             <SelectFilter icon={Layers} label="Processing Function" value={fn} onChange={setFn}>
               <option value="All">All functions</option>
-              {PROCESSING_FUNCTIONS.map((name) => <option key={name}>{name}</option>)}
+              {PROCESSING_FUNCTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SelectFilter>
             <Divider />
             <SelectFilter icon={Filter} label="Status" value={status} onChange={(v) => setStatus(v as typeof status)}>
               <option value="All">All statuses</option>
-              <option>Ready</option>
-              <option>Needs Review</option>
-              <option>Processing</option>
-              <option>Processed</option>
-              <option>Error</option>
+              {STATUSES.map((s) => <option key={s}>{s}</option>)}
             </SelectFilter>
             <Divider />
             <button onClick={clearFilters} disabled={!filtersActive}

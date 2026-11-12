@@ -516,7 +516,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   **Verification:** updated unit/API/component tests; `npm run verify`.
 
-- [ ] **10.6** `refactor/single-source-names-and-limits` · **P2** — DRY: each fact defined once.
+- [x] **10.6** `refactor/single-source-names-and-limits` · **P2** — DRY: each fact defined once.
 
   - Processing function ids and names live in three places: `PROCESSORS` (`shared/types.ts`), the Zod enum in `server/src/routes/files.ts` and `FUNCTION_LABEL` in `client/src/components/FileTable.tsx`. Derive the enum from `PROCESSORS`, add the table label there, and filter the file list by processor id instead of by display label.
 
