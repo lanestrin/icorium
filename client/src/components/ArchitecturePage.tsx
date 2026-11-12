@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import {
-  ArrowDown, ArrowLeft, ArrowUp, Boxes, Braces, CheckCircle2, Cloud, Code2, Database, FileCog, FileInput, FileOutput, FileSpreadsheet,
-  FlaskConical, GitCompare, HardDrive, Layers, LayoutGrid, MonitorSmartphone, Palette, Scale, Server, ShieldCheck, Shapes,
-  Sparkles, Split, TestTubes, Wand2, Workflow, Zap, type LucideIcon,
+  ArrowDown, ArrowLeft, ArrowRight, Atom, Boxes, Braces, ChartColumn, Check, Cloud, Code2, Database, FileCog, FileSpreadsheet, FileText,
+  FlaskConical, Laptop, Layers, Scale, Server, Settings, Shapes, ShieldCheck, TriangleAlert, Upload, User, Users, Wand2, Wind, Workflow, Zap,
+  type LucideIcon,
 } from 'lucide-react';
 
 /*
@@ -15,7 +15,8 @@ type Workspace = 'client' | 'server';
 
 export interface Tech {
   name: string;
-  role: string;
+  label: string; // short name on the tile
+  role: string; // its purpose, under the label
   icon: LucideIcon;
   packages: [Workspace, string][];
   why: string[];
@@ -25,7 +26,7 @@ export interface Tech {
 
 export const TECH: Tech[] = [
   {
-    name: 'React 19', role: 'Frontend', icon: MonitorSmartphone, packages: [['client', 'react'], ['client', 'react-dom']],
+    name: 'React 19', label: 'React 19', role: 'UI', icon: Atom, packages: [['client', 'react'], ['client', 'react-dom']],
     why: [
       'Component-based UI: the file table, dialogs, comparison dashboard and generator are each one component.',
       'Fits the interactive workflow: selecting rows, processing in turn, confirming warnings, undoing an archive.',
@@ -35,7 +36,7 @@ export const TECH: Tech[] = [
     files: ['client/src/App.tsx', 'client/src/components'],
   },
   {
-    name: 'TypeScript', role: 'Shared language', icon: Code2, packages: [['client', 'typescript'], ['server', 'typescript']],
+    name: 'TypeScript', label: 'TypeScript', role: 'Type safety', icon: Code2, packages: [['client', 'typescript'], ['server', 'typescript']],
     why: [
       'One language and static types on both sides of the API.',
       'Shared contracts: FileMeta, CompareResult and the processor list live in one file both sides import.',
@@ -45,7 +46,7 @@ export const TECH: Tech[] = [
     files: ['shared/types.ts'],
   },
   {
-    name: 'Vite', role: 'Build tool', icon: Zap, packages: [['client', 'vite']],
+    name: 'Vite', label: 'Vite', role: 'Build & dev', icon: Zap, packages: [['client', 'vite']],
     why: [
       'Fast dev server with hot reload, and a small config: React, Tailwind and an /api proxy to the local API.',
       'A plain single-page build without the conventions of a larger full-stack framework.',
@@ -54,7 +55,7 @@ export const TECH: Tech[] = [
     files: ['client/vite.config.ts'],
   },
   {
-    name: 'Tailwind CSS 4', role: 'Styling', icon: Palette, packages: [['client', 'tailwindcss'], ['client', '@tailwindcss/vite']],
+    name: 'Tailwind CSS 4', label: 'Tailwind CSS', role: 'Styling', icon: Wind, packages: [['client', 'tailwindcss'], ['client', '@tailwindcss/vite']],
     why: [
       'Utility classes keep spacing, colour and type consistent without a separate stylesheet per component.',
       'Responsive layouts down to phone width with no extra CSS files.',
@@ -64,7 +65,7 @@ export const TECH: Tech[] = [
     files: ['client/src/index.css'],
   },
   {
-    name: 'Fastify 5', role: 'Backend', icon: Server, packages: [['server', 'fastify'], ['server', '@fastify/multipart']],
+    name: 'Fastify 5', label: 'Fastify 5', role: 'API', icon: Server, packages: [['server', 'fastify'], ['server', '@fastify/multipart']],
     why: [
       'A lightweight HTTP API; routes are registered as a plugin under /api.',
       'The multipart plugin handles CSV uploads, capped at 10 MB per file by default (MAX_UPLOAD_MB).',
@@ -74,7 +75,7 @@ export const TECH: Tech[] = [
     files: ['server/src/app.ts', 'server/src/routes/files.ts'],
   },
   {
-    name: 'Zod', role: 'Validation', icon: ShieldCheck, packages: [['server', 'zod']],
+    name: 'Zod', label: 'Zod', role: 'Validation', icon: ShieldCheck, packages: [['server', 'zod']],
     why: [
       'Runtime validation of request bodies and query strings: process, archive, compare and generate.',
       'Explicit input contracts with plain-language error messages.',
@@ -84,7 +85,7 @@ export const TECH: Tech[] = [
     files: ['server/src/routes/files.ts'],
   },
   {
-    name: 'Papa Parse', role: 'CSV handling', icon: FileSpreadsheet, packages: [['server', 'papaparse']],
+    name: 'Papa Parse', label: 'Papa Parse', role: 'CSV parsing', icon: FileSpreadsheet, packages: [['server', 'papaparse']],
     why: [
       'Parses uploads and writes result CSVs, including quoting and escaping.',
       'Reports malformed rows, which become clear upload errors.',
@@ -94,7 +95,7 @@ export const TECH: Tech[] = [
     files: ['server/src/lib/csv.ts'],
   },
   {
-    name: 'Recharts', role: 'Visualization', icon: GitCompare, packages: [['client', 'recharts']],
+    name: 'Recharts', label: 'Recharts', role: 'Charts', icon: ChartColumn, packages: [['client', 'recharts']],
     why: [
       'React chart components for the comparison dashboard: one line per file, grouped bars for categories.',
       'Enough for comparing 2–5 results without a complex visualization framework.',
@@ -103,13 +104,13 @@ export const TECH: Tech[] = [
     files: ['client/src/components/CompareWorkspace.tsx'],
   },
   {
-    name: 'Lucide', role: 'Icons', icon: Shapes, packages: [['client', 'lucide-react']],
+    name: 'Lucide', label: 'Lucide', role: 'Icons', icon: Shapes, packages: [['client', 'lucide-react']],
     why: ['Consistent, lightweight icons; only the icons a file imports are bundled.'],
     tradeoff: 'One more dependency, for icons alone.',
     files: ['client/src/components/FileTable.tsx'],
   },
   {
-    name: 'Vitest + React Testing Library', role: 'Testing', icon: TestTubes,
+    name: 'Vitest + React Testing Library', label: 'Vitest', role: 'Testing', icon: FlaskConical,
     packages: [['client', 'vitest'], ['server', 'vitest'], ['client', '@testing-library/react'], ['client', '@testing-library/user-event']],
     why: [
       'Server unit tests for calculations and validation rules, and API tests through the real Fastify app.',
@@ -120,7 +121,7 @@ export const TECH: Tech[] = [
     files: ['server/src/core.test.ts', 'server/src/api.test.ts', 'client/src/App.test.tsx'],
   },
   {
-    name: 'Local filesystem / Vercel Blob', role: 'Storage', icon: Database, packages: [['server', '@vercel/blob']],
+    name: 'Local filesystem / Vercel Blob', label: 'Files / Blob', role: 'File storage', icon: Database, packages: [['server', '@vercel/blob']],
     why: [
       'Simple persistence for CSV files and their metadata, matched to the scope.',
       'Local folder during development; private Vercel Blob when deployed to Vercel.',
@@ -131,127 +132,63 @@ export const TECH: Tech[] = [
   },
 ];
 
-export interface ArchNode {
-  id: string;
-  title: string;
-  icon: LucideIcon;
-  summary: string;
-  detail: string;
-  files: string[];
-}
-
-export const NODES: ArchNode[] = [
-  { id: 'browser', title: 'User / Browser', icon: MonitorSmartphone, summary: 'Chooses files, functions and comparisons',
-    detail: 'Everything starts with a person in the browser: uploading partner CSVs, running a processing function, previewing results, comparing files and generating test data.',
-    files: [] },
-  { id: 'frontend', title: 'React + TypeScript frontend', icon: LayoutGrid, summary: 'File workspace, comparison, generator',
-    detail: 'A single-page app with three pages picked from the URL: the file workspace, /generator and /architecture. A typed API client makes every request and turns error responses into readable messages.',
-    files: ['client/src/App.tsx', 'client/src/hooks.ts', 'client/src/file-status.ts', 'client/src/api.ts', 'client/src/components'] },
-  { id: 'api', title: 'Fastify REST API', icon: Server, summary: 'Routes, Zod validation, error handling',
-    detail: 'All endpoints live under /api: upload, list, preview rows, download, archive, process, compare and generate. Zod checks each request; one error handler returns a status code and a plain message.',
-    files: ['server/src/app.ts', 'server/src/routes/files.ts'] },
-  { id: 'csv', title: 'CSV parsing', icon: FileInput, summary: 'Papa Parse, header and row checks',
-    detail: 'Turns CSV text into headers and rows, rejecting malformed files or files with no data rows, and writes CSVs back out with correct quoting.',
-    files: ['server/src/lib/csv.ts'] },
-  { id: 'adapters', title: 'Partner normalization', icon: Split, summary: 'Each partner’s columns and units → one record',
-    detail: 'Each partner format is one ADAPTERS entry in shared/types.ts: its column names and units (kg, lb or g; percentages or fractions). The adapters module matches a file’s headers to an entry and maps each row onto one normalized record; a file that matches none is rejected. Adding a partner means adding one entry.',
-    files: ['shared/types.ts', 'server/src/adapters/index.ts'] },
-  { id: 'validation', title: 'Validation', icon: CheckCircle2, summary: 'Shared row rules, invalid rows kept',
-    detail: 'The same rules check every row for every function: missing or invalid mass, out-of-range percentages, composition totals outside ±0.5 points, missing or duplicate batch IDs. Invalid rows are kept with their reasons, never corrected silently.',
-    files: ['server/src/processing/index.ts'] },
-  { id: 'processing', title: 'Processing', icon: FileCog, summary: 'Validation, Mass, Classification',
-    detail: 'Three independent functions run on every row: composition validation, component mass calculation and demo-only blend classification. Each declares the columns it adds.',
-    files: ['server/src/processing/index.ts'] },
-  { id: 'results', title: 'Result generation', icon: FileOutput, summary: 'Original columns + generated columns',
-    detail: 'Every original column and value is kept, including the input’s file_id, and the function’s columns are appended, starting with result_id and ending with processing_status and validation_errors. Re-running a function on the same input replaces its earlier result only when the request sends replace: true; otherwise the server answers 409 and names the existing result.',
-    files: ['server/src/processing/index.ts', 'server/src/lib/csv.ts'] },
-  { id: 'compare', title: 'Comparison', icon: GitCompare, summary: '2–5 results, rows matched by batch ID or position',
-    detail: 'Compares 2–5 results of one function column by column. Rows are matched by batch ID when every pair of files shares IDs, otherwise by position, and the response says which. The dashboard draws it with Recharts.',
-    files: ['server/src/lib/compare.ts', 'client/src/components/CompareWorkspace.tsx'] },
-  { id: 'generator', title: 'CSV generator', icon: Wand2, summary: 'Synthetic partner files, nothing saved',
-    detail: 'Makes 1–10 synthetic CSVs in a partner’s own format, with an exact number of rows that fail validation. It saves nothing: the browser downloads the files or uploads them through the normal upload.',
-    files: ['server/src/lib/generate.ts', 'client/src/components/GeneratorPage.tsx'] },
-  { id: 'storage', title: 'Storage layer', icon: Layers, summary: 'Files keyed by File ID',
-    detail: 'The only module that touches persistence. Files are stored and found by File ID (101010, 101010-M), never by name. Routes call the same operations whichever backend is active: list, get, read, patch, create (claims the next ID), createAt (saves a new result only if its ID is free) and put (replaces a result when the person confirms); the backend is chosen once at startup from the environment.',
-    files: ['server/src/lib/storage.ts'] },
-  { id: 'local', title: 'Local filesystem', icon: HardDrive, summary: 'server/data: CSV files + meta.json',
-    detail: 'Used when no Blob token is set. Each CSV is a file under server/data/files and all metadata is one meta.json, replaced atomically (written to a temporary file, then renamed) so a crash mid-write cannot corrupt it. Deleting server/data resets the demo; the five samples load on first start.',
-    files: ['server/src/lib/storage.ts'] },
-  { id: 'blob', title: 'Vercel Blob (private)', icon: Cloud, summary: 'One private JSON object per file',
-    detail: 'Used when BLOB_READ_WRITE_TOKEN is set. Each file and its metadata are one private object named by its File ID; a new ID is claimed with a create-if-absent write, so two servers never hand out the same one, and a new result is saved the same way, so an unconfirmed run never overwrites one. Updates use ETag checks and return 409 on a conflicting change. On Vercel, startup fails rather than fall back to temporary disk.',
-    files: ['server/src/lib/blob-storage.ts'] },
-  { id: 'shared', title: 'Shared contracts', icon: Braces, summary: 'Types used by client and server',
-    detail: 'FileMeta, CompareResult, GeneratedFile, the processor list, the partner formats (ADAPTERS) and the comparison and generator limits are defined once and imported by both sides, so request and response shapes cannot silently diverge.',
-    files: ['shared/types.ts'] },
+/** The components data moves through, in order: the person first, then two rows of four. */
+export const PIPELINE: { title: string; sub?: string; icon: LucideIcon }[] = [
+  { title: 'User / Browser', sub: 'Upload CSVs and use the app', icon: User },
+  { title: 'React', sub: 'Frontend', icon: Atom },
+  { title: 'Fastify', sub: 'API', icon: Zap },
+  { title: 'Parse', icon: FileText },
+  { title: 'Normalize', icon: Layers },
+  { title: 'Validate', icon: ShieldCheck },
+  { title: 'Process', icon: Settings },
+  { title: 'Results', icon: ChartColumn },
+  { title: 'Storage', icon: Database },
 ];
 
-export interface Flow { id: string; label: string; steps: { node: string; text: string }[] }
-
-/** What actually happens for each main request, in order (see server/src/routes/files.ts). */
-export const FLOWS: Flow[] = [
-  { id: 'upload', label: 'Upload', steps: [
-    { node: 'browser', text: 'The person drops or chooses CSV files.' },
-    { node: 'frontend', text: 'api.upload sends each file to POST /api/files.' },
-    { node: 'api', text: 'The route reads the multipart file and checks it is a .csv.' },
-    { node: 'csv', text: 'Papa Parse reads headers and rows; malformed files are rejected.' },
-    { node: 'adapters', text: 'The headers must match a partner adapter, or the upload is refused.' },
-    { node: 'validation', text: 'Every row is checked; the invalid-row count sets Ready or Needs Review.' },
-    { node: 'storage', text: 'The CSV is saved under the next File ID, with that ID in a file_id column, and its metadata goes back to the browser.' },
-    { node: 'storage', text: 'An uploaded result gets a new ID and is linked to its original only when its file_id names that input and its original columns and values match.' },
-  ] },
-  { id: 'process', label: 'Process', steps: [
-    { node: 'browser', text: 'The person ticks inputs, picks a function and runs it (after a warning if rows are invalid).' },
-    { node: 'frontend', text: 'api.process calls POST /api/process once per file, one file at a time.' },
-    { node: 'api', text: 'Zod checks the body; result and archived files are refused.' },
-    { node: 'storage', text: 'The input CSV is read from storage.' },
-    { node: 'csv', text: 'Its rows are parsed.' },
-    { node: 'adapters', text: 'Each row is normalized to kg and percentages.' },
-    { node: 'validation', text: 'Each row is validated with the shared rules.' },
-    { node: 'processing', text: 'The chosen function calculates valid rows only.' },
-    { node: 'results', text: 'Original columns are kept and generated columns appended.' },
-    { node: 'storage', text: 'The result CSV is saved as the input’s ID plus the function’s code (101010-M). It replaces an earlier run only when the person confirms; otherwise the server answers 409. The browser then previews it via GET /api/files/:id/rows.' },
-  ] },
-  { id: 'compare', label: 'Compare', steps: [
-    { node: 'browser', text: 'The person ticks 2–5 results of one function and clicks Compare.' },
-    { node: 'frontend', text: 'api.compare calls GET /api/compare?ids=…' },
-    { node: 'api', text: 'Zod checks there are 2–5 different ids.' },
-    { node: 'storage', text: 'Each result CSV is read.' },
-    { node: 'csv', text: 'Each is parsed, and its result schema detected from its columns.' },
-    { node: 'compare', text: 'Rows are matched and per-file summaries, categories and values computed.' },
-    { node: 'frontend', text: 'The JSON response is drawn as charts and tables in the comparison dashboard.' },
-  ] },
-  { id: 'generate', label: 'Generate', steps: [
-    { node: 'browser', text: 'The person picks a partner, rows, files and error rows on /generator.' },
-    { node: 'frontend', text: 'api.generate calls POST /api/generate.' },
-    { node: 'api', text: 'Zod checks the limits: 1–5,000 rows, 1–10 files.' },
-    { node: 'generator', text: 'Files are built from the partner adapters’ columns; nothing is stored.' },
-    { node: 'frontend', text: 'The browser downloads the files, or adds them through the Upload flow.' },
-  ] },
+/** The same path in words, beside the diagram. */
+export const HOW_IT_WORKS = [
+  'Upload CSVs in the browser.',
+  'React handles the UI and sends each request to the API.',
+  'The Fastify API checks every request.',
+  'Each file is parsed, normalized to one record per row and validated.',
+  'A processing function adds its columns; results can be previewed, downloaded and compared.',
+  'Files are stored by File ID, locally or in Vercel Blob.',
 ];
 
-const nodeById = (id: string) => NODES.find((n) => n.id === id)!;
+/** The decision shown first and in full: where the CSV work runs. */
+const PROCESSING_LOCATION = {
+  title: 'Processing location (server vs. browser)',
+  text: 'A server-side API parses, normalizes, validates and processes every CSV; the browser only uploads, shows and downloads.',
+  benefits: ['Centralized, consistent processing', 'Easier to add business rules and integrations', 'Works across devices with a simple UI'],
+  tradeoff: 'Uploads and processing need the API running and reachable. If it is down, or the person is offline, files cannot be processed.',
+};
 
-const DECISIONS: { question: string; answer: string[] }[] = [
-  { question: 'Why React + Fastify instead of Next.js?', answer: [
+const DECISIONS: { question: string; icon: LucideIcon; summary: string; answer: string[] }[] = [
+  { question: 'Why React + Fastify?', icon: Code2,
+    summary: 'A fast, simple stack that covers what the UI and API need, without server rendering the app does not use.', answer: [
     'The app is one interactive screen plus two supporting pages, backed by a CSV-processing API. It needs no server rendering, no SEO and no file-based routing, which are where Next.js shines.',
     'Keeping the API as its own Fastify service puts all parsing, validation and calculation on the server, behind an explicit /api contract that is tested directly. The frontend stays a plain static bundle.',
     'Next.js would also work well; it simply was not necessary here, and a separate API keeps the processing logic independent of how the UI is built.',
   ] },
-  { question: 'Why TypeScript across the application?', answer: [
+  { question: 'Why TypeScript throughout?', icon: Braces,
+    summary: 'Shared types, fewer bugs and one consistent codebase on both sides of the API.', answer: [
     'The client and server import the same types from shared/types.ts, so a field added to a response is checked everywhere it is read.',
     'API contracts are clearer: the comparison response, generated files and file metadata each have one definition. Zod then validates what actually arrives at runtime.',
   ] },
-  { question: 'Why file storage instead of PostgreSQL?', answer: [
+  { question: 'Why files over PostgreSQL?', icon: Database,
+    summary: 'The app needs no database yet: CSV files plus a little metadata keep it simple and light.', answer: [
     'The primary data is CSV files plus a little metadata per file. The exercise needs no relational queries, user accounts or multi-step transactions.',
     'Files keep the originals byte-for-byte, are easy to inspect and reset, and need no database to install for a local demo.',
     'A database becomes worthwhile with users and permissions, searching or reporting across many files, audit history, or many concurrent writers.',
   ] },
-  { question: 'Why a modular processing pipeline?', answer: [
+  { question: 'Why a modular pipeline?', icon: Boxes,
+    summary: 'Separate steps (parse, normalize, validate, process) keep the code clear and easy to extend.', answer: [
     'Parsing, partner normalization, validation and the three functions are separate steps. Adapters absorb each partner’s column names and units, so processing only ever sees one normalized record.',
     'A new partner format is one entry in the adapter list. A new calculation is one processor that declares its columns, plus its entry in the shared processor list, which the API’s allowed values come from.',
     'Validation is shared, so every function treats bad rows the same way and the rules are tested once.',
   ] },
-  { question: 'Why synchronous processing?', answer: [
+  { question: 'Why synchronous processing?', icon: Zap,
+    summary: 'Files are small and calculations fast, so doing the work inside the request keeps the system simple to run.', answer: [
     'Each request parses, processes and saves one file and returns the result. The demo files are small: the samples have 25 rows and generated files are capped at 5,000. At that size, doing the work inside the request keeps things simple, and the UI shows a spinner per file while it runs.',
     'It keeps the system simple: no queue, worker or job status to build or explain.',
     'Large files, many concurrent users or long-running calculations would motivate background jobs: accept the upload, process on a worker and let the UI poll or be notified.',
@@ -259,12 +196,28 @@ const DECISIONS: { question: string; answer: string[] }[] = [
 ];
 
 const EVOLVE: { title: string; icon: LucideIcon; text: string }[] = [
-  { title: 'Authentication and access control', icon: ShieldCheck, text: 'User accounts, and partner- or team-level access to files. Today the API is unauthenticated and everyone shares one dataset: anyone can try every feature, which suits the demo but not unrestricted multi-user use.' },
-  { title: 'PostgreSQL for metadata', icon: Database, text: 'Once there are users, audit history or searches across many files, move metadata to a relational database and keep the CSVs in object storage.' },
-  { title: 'Background jobs and queues', icon: Workflow, text: 'Process large files on workers with job status in the UI, instead of within the request.' },
-  { title: 'Upload hardening', icon: FileInput, text: 'Uploads are already limited to 10 MB by default and checked against a partner schema. Next: rate limiting, per-user quotas and stricter content checks.' },
-  { title: 'Monitoring and logging', icon: Sparkles, text: 'Structured request logs, error tracking and alerts. Today the server logs warnings and errors by default (LOG_LEVEL raises it).' },
+  { title: 'Authentication', icon: Users, text: 'User accounts and partner permissions' },
+  { title: 'PostgreSQL', icon: Database, text: 'Searchable metadata and audit history' },
+  { title: 'Background jobs', icon: Workflow, text: 'Process large files asynchronously' },
+  { title: 'Upload hardening', icon: ShieldCheck, text: 'Rate limits, quotas and file safeguards' },
+  { title: 'Monitoring', icon: ChartColumn, text: 'Logs, error tracking and alerts' },
 ];
+
+/** Storage backends in the order they apply: built ones first, then the possible next one. */
+const STORAGE_OPTIONS: { name: string; icon: LucideIcon; note: string; built: boolean }[] = [
+  { name: 'Local filesystem', icon: Laptop, note: 'Default', built: true },
+  { name: 'Vercel Blob', icon: Cloud, note: 'When a token is set', built: true },
+  { name: 'S3 / Cloudflare R2', icon: Boxes, note: 'Not built', built: false },
+];
+
+/** A short list with a green tick before each item. */
+const Checks = ({ label, items }: { label: string; items: ReactNode[] }) => (
+  <ul aria-label={label} className="mt-3 space-y-1.5 text-sm text-slate-700">
+    {items.map((item, i) => (
+      <li key={i} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" aria-hidden /><span>{item}</span></li>
+    ))}
+  </ul>
+);
 
 const SECTIONS = [
   ['overview', 'Overview'], ['stack', 'Tech stack'], ['architecture', 'Architecture'], ['decisions', 'Decisions'],
@@ -277,123 +230,125 @@ const Path = ({ children }: { children: string }) => (
   <code className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700">{children}</code>
 );
 
-function Section({ id, eyebrow, title, intro, children }: { id: string; eyebrow: string; title: string; intro?: string; children: ReactNode }) {
+function Section({ id, eyebrow, title, intro, side, children }: {
+  id: string; eyebrow: string; title: string; intro?: string; side?: boolean; children: ReactNode;
+}) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-6 pt-12">
-      <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">{eyebrow}</p>
-      <h2 id={`${id}-title`} className={`${H2} mt-1`}>{title}</h2>
-      {intro && <p className="mt-2 max-w-3xl text-slate-600">{intro}</p>}
-      <div className="mt-6">{children}</div>
+    <section id={id} aria-labelledby={`${id}-title`}
+      className={`mt-12 scroll-mt-6 border-t border-slate-200 pt-12 first-of-type:mt-8 first-of-type:border-t-0 first-of-type:pt-0 ${side ? 'xl:grid xl:grid-cols-[16rem_minmax(0,1fr)] xl:items-start xl:gap-8' : ''}`}>
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">{eyebrow}</p>
+        <h2 id={`${id}-title`} className={`${H2} mt-1`}>{title}</h2>
+        {intro && <p className="mt-2 max-w-3xl text-slate-600">{intro}</p>}
+      </div>
+      <div className={side ? 'mt-6 min-w-0 xl:mt-0' : 'mt-6'}>{children}</div>
     </section>
   );
 }
 
-function ArchitectureDiagram() {
-  const [selected, setSelected] = useState('api');
-  const [flowId, setFlowId] = useState('process');
-  const flow = FLOWS.find((f) => f.id === flowId)!;
-  const inFlow = (id: string) => flow.steps.some((s) => s.node === id);
-  const firstStep = (id: string) => flow.steps.findIndex((s) => s.node === id) + 1;
-  const node = nodeById(selected);
+/** What the system does, one short card each. */
+const OVERVIEW: [LucideIcon, string, string][] = [
+  [Upload, 'Import CSVs', 'Three partner formats and units'],
+  [Layers, 'Normalize', 'One shared record per row'],
+  [ShieldCheck, 'Validate', 'Shared rules; bad rows kept'],
+  [FileCog, 'Process', 'Three functions; originals kept'],
+  [ChartColumn, 'Compare', '2–5 results side by side'],
+  [Cloud, 'Run anywhere', 'Local or cloud storage'],
+];
 
-  const Box = ({ id, compact }: { id: string; compact?: boolean }) => {
-    const n = nodeById(id);
-    const on = inFlow(id);
-    const step = firstStep(id);
+/** One tile per technology; selecting a tile shows why it is here, its trade-off and where it is used. */
+function TechStack() {
+  const [selected, setSelected] = useState(TECH[0].name);
+  const tech = TECH.find((t) => t.name === selected)!;
+  return (
+    <>
+      <div role="group" aria-label="Technology stack" className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2">
+        {TECH.map((t) => (
+          <button key={t.name} type="button" aria-pressed={selected === t.name} aria-label={`${t.name}, ${t.role}`} onClick={() => setSelected(t.name)}
+            className={`flex min-w-0 flex-col items-center rounded-2xl border px-2 py-3 text-center shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+              ${selected === t.name ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-200 bg-white hover:border-blue-300'}`}>
+            <t.icon className="h-6 w-6 text-blue-600" aria-hidden />
+            <span className="mt-2 text-sm font-semibold leading-tight">{t.label}</span>
+            <span className="mt-0.5 text-xs text-slate-500">{t.role}</span>
+          </button>
+        ))}
+      </div>
+      <section aria-label="Selected technology" aria-live="polite" className={`${CARD} mt-4`}>
+        <div className="flex items-start gap-3">
+          <span className="rounded-xl bg-blue-50 p-2"><tech.icon className="h-5 w-5 text-blue-600" aria-hidden /></span>
+          <div className="min-w-0">
+            <h3 className="font-semibold">{tech.name}</h3>
+            <p className="text-sm text-slate-500">{tech.role}</p>
+          </div>
+        </div>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
+          {tech.why.map((w) => <li key={w}>{w}</li>)}
+        </ul>
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"><span className="font-semibold">Trade-off: </span>{tech.tradeoff}</p>
+        <p className="mt-3 flex flex-wrap gap-1.5">{tech.files.map((f) => <Path key={f}>{f}</Path>)}</p>
+      </section>
+    </>
+  );
+}
+
+/** Turns a pipeline row's right end down and back to the left start (wide screens only). */
+const Turn = () => (
+  <li aria-hidden className="relative hidden h-10 md:col-span-4 md:block">
+    <div className="absolute inset-y-0 left-[calc((100%-6rem)/8)] right-[calc((100%-6rem)/8)]">
+      <svg viewBox="0 0 100 20" preserveAspectRatio="none" className="h-full w-full">
+        <path d="M100 0 V10 H0 V20" stroke="#60a5fa" strokeWidth="2" fill="none" vectorEffect="non-scaling-stroke" />
+      </svg>
+    </div>
+  </li>
+);
+
+/** Static diagram: the person, then two rows of four components joined by arrows. */
+function ArchitectureDiagram() {
+  const [person, ...steps] = PIPELINE;
+  const Step = ({ i }: { i: number }) => {
+    const p = steps[i];
+    const last = i === steps.length - 1;
     return (
-      <button
-        type="button"
-        aria-pressed={selected === id}
-        onClick={() => setSelected(id)}
-        className={`relative w-full min-w-0 rounded-xl border px-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${compact ? 'py-2.5' : 'py-3'}
-          ${selected === id ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : on ? 'border-blue-200 bg-white hover:bg-blue-50/50' : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-white'}`}
-      >
-        {on && (
-          <span aria-hidden className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[11px] font-semibold text-white">{step}</span>
-        )}
-        <span className="flex items-center gap-2 font-semibold">
-          <n.icon className={`h-4 w-4 shrink-0 ${on || selected === id ? 'text-blue-600' : 'text-slate-400'}`} aria-hidden />
-          <span className="truncate">{n.title}</span>
-        </span>
-        {!compact && <span className="mt-0.5 block truncate text-xs text-slate-500">{n.summary}</span>}
-        <span className="sr-only">{on ? `, step ${step} of the ${flow.label} flow` : ''}</span>
-      </button>
+      <li className="relative">
+        <div className={`flex h-full flex-col items-center justify-center rounded-xl border px-2 py-4 text-center shadow-sm ${last ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-white'}`}>
+          <p.icon className="h-6 w-6 text-blue-600" aria-hidden />
+          <span className="mt-2 font-semibold">{p.title}</span>
+          {p.sub && <span className="text-sm text-slate-500">{p.sub}</span>}
+        </div>
+        {i % 4 !== 3 && <ArrowRight aria-hidden className="absolute -right-6.5 top-1/2 hidden h-5 w-5 -translate-y-1/2 text-blue-500 md:block" />}
+        {!last && <ArrowDown aria-hidden className="mx-auto my-1 h-5 w-5 text-blue-500 md:hidden" />}
+      </li>
     );
   };
-
-  const Link = ({ down, up }: { down: string; up?: string }) => (
-    <div className="flex items-center justify-center gap-6 py-1.5 text-xs text-slate-500" aria-hidden>
-      <span className="flex items-center gap-1"><ArrowDown className="h-4 w-4 text-slate-400" />{down}</span>
-      {up && <span className="flex items-center gap-1"><ArrowUp className="h-4 w-4 text-slate-400" />{up}</span>}
-    </div>
-  );
-
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
       <div className={CARD}>
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-sm font-semibold">Follow a request</span>
-          <div role="group" aria-label="Request flow" className="flex flex-wrap gap-1 rounded-full bg-slate-100 p-1">
-            {FLOWS.map((f) => (
-              <button key={f.id} type="button" aria-pressed={flowId === f.id} onClick={() => setFlowId(f.id)}
-                className={`rounded-full px-3.5 py-1 text-sm font-medium transition ${flowId === f.id ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div aria-label="Architecture diagram" role="group">
-          <div className="mx-auto max-w-sm"><Box id="browser" /></div>
-          <Link down="actions" up="pages, charts, downloads" />
-          <div className="mx-auto max-w-md"><Box id="frontend" /></div>
-          <Link down="JSON / multipart requests to /api" up="JSON responses, CSV downloads" />
-          <div className="mx-auto max-w-md"><Box id="api" /></div>
-          <Link down="pipeline" />
-          <div className="rounded-xl border border-dashed border-slate-300 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Processing pipeline</p>
-            <div className="grid gap-2 sm:grid-cols-5">
-              {['csv', 'adapters', 'validation', 'processing', 'results'].map((id) => <Box key={id} id={id} compact />)}
+        <ol aria-label="Architecture diagram" className="grid md:grid-cols-4 md:gap-x-8">
+          <li className="md:col-span-4">
+            <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 md:w-[calc(50%-1rem)]">
+              <person.icon className="h-6 w-6 shrink-0 text-blue-600" aria-hidden />
+              <span><span className="block font-semibold">{person.title}</span><span className="text-sm text-slate-600">{person.sub}</span></span>
             </div>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              <Box id="compare" compact />
-              <Box id="generator" compact />
-            </div>
-          </div>
-          <Link down="read / save" up="CSV text, metadata" />
-          <div className="mx-auto max-w-md"><Box id="storage" /></div>
-          <Link down="one backend, chosen at startup" />
-          <div className="grid gap-2 sm:grid-cols-2"><Box id="local" /><Box id="blob" /></div>
-          <div className="mt-4 border-t border-slate-100 pt-4"><Box id="shared" compact /></div>
-        </div>
+            <ArrowDown aria-hidden className="mx-auto my-1 h-5 w-5 text-blue-500 md:mx-0 md:my-2 md:ml-[calc((100%-6rem)/8-0.625rem)]" />
+          </li>
+          {[0, 1, 2, 3].map((i) => <Step key={i} i={i} />)}
+          <Turn />
+          {[4, 5, 6, 7].map((i) => <Step key={i} i={i} />)}
+        </ol>
       </div>
-
-      <div className="space-y-4">
-        <section aria-label="Selected component" aria-live="polite" className={CARD}>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Selected component</p>
-          <h3 className="mt-1 flex items-center gap-2 text-lg font-semibold"><node.icon className="h-5 w-5 text-blue-600" aria-hidden />{node.title}</h3>
-          <p className="mt-2 text-sm text-slate-700">{node.detail}</p>
-          {node.files.length > 0 && (
-            <>
-              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Implemented in</p>
-              <ul aria-label="Implemented in" className="mt-1 flex flex-wrap gap-1.5">
-                {node.files.map((f) => <li key={f}><Path>{f}</Path></li>)}
-              </ul>
-            </>
-          )}
-        </section>
-        <section aria-label={`${flow.label} flow`} className={CARD}>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{flow.label} flow</p>
-          <ol className="mt-2 space-y-2 text-sm">
-            {flow.steps.map((s, i) => (
-              <li key={i} className="flex gap-3">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[11px] font-semibold text-white">{i + 1}</span>
-                <span><button type="button" onClick={() => setSelected(s.node)} className="font-semibold text-blue-700 hover:underline">{nodeById(s.node).title}</button>: {s.text}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      </div>
+      <section aria-labelledby="how-it-works" className={CARD}>
+        <h3 id="how-it-works" className="flex items-center gap-3 text-lg font-semibold">
+          <span className="rounded-xl bg-blue-50 p-2"><Layers className="h-5 w-5 text-blue-600" aria-hidden /></span> How it works
+        </h3>
+        <ol className="mt-4 space-y-3 text-sm text-slate-700">
+          {HOW_IT_WORKS.map((text, i) => (
+            <li key={text} className="flex gap-3">
+              <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">{i + 1}</span>
+              <span className="pt-0.5">{text}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
     </div>
   );
 }
@@ -419,20 +374,14 @@ export function ArchitecturePage() {
           ))}
         </nav>
 
-        <Section id="overview" eyebrow="1 · Engineering overview" title="What the system does"
-          intro="Reclaim Studio takes refrigerant-batch CSVs from partners who each use their own format, and turns them into consistent, validated, comparable results.">
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {([
-              [FileInput, 'Accepts CSVs from multiple partners', 'Three partner formats with different column names and units.'],
-              [Split, 'Normalizes and validates', 'One normalized record per row, checked by shared rules.'],
-              [FileCog, 'Runs independent functions', 'Validation, component mass and demo classification.'],
-              [FileOutput, 'Preserves original data', 'Results keep every original column and append new ones.'],
-              [GitCompare, 'Compares results visually', 'Two to five results in one comparison dashboard.'],
-              [Cloud, 'Runs locally or in the cloud', 'Local files by default; configured for optional Vercel deployment.'],
-            ] as [LucideIcon, string, string][]).map(([Icon, title, text]) => (
-              <li key={title} className={`${CARD} flex gap-3`}>
-                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" aria-hidden />
-                <span><span className="block font-semibold">{title}</span><span className="text-sm text-slate-600">{text}</span></span>
+        <Section id="overview" eyebrow="1 · System overview" title="What the system does" side
+          intro="Takes partner CSVs in different formats and turns them into consistent, validated, comparable results.">
+          <ul aria-label="What the system does" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            {OVERVIEW.map(([Icon, title, text]) => (
+              <li key={title} className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-3 py-4 text-center shadow-sm">
+                <Icon className="h-7 w-7 text-blue-600" aria-hidden />
+                <span className="mt-2 font-semibold">{title}</span>
+                <span className="mt-1 text-sm text-slate-600">{text}</span>
               </li>
             ))}
           </ul>
@@ -445,114 +394,92 @@ export function ArchitecturePage() {
           </blockquote>
         </Section>
 
-        <Section id="stack" eyebrow="2 · Technology stack" title="Each tool, and why it is here"
-          intro="Every entry is a dependency the code actually uses. Each card names the trade-off accepted with it.">
-          <ul aria-label="Technology stack" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {TECH.map((t) => (
-              <li key={t.name} className={`${CARD} flex flex-col`}>
-                <div className="flex items-start gap-3">
-                  <span className="rounded-xl bg-blue-50 p-2"><t.icon className="h-5 w-5 text-blue-600" aria-hidden /></span>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold">{t.name}</h3>
-                    <p className="text-sm text-slate-500">{t.role}</p>
-                  </div>
-                </div>
-                <ul className="mt-3 flex-1 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                  {t.why.map((w) => <li key={w}>{w}</li>)}
-                </ul>
-                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"><span className="font-semibold">Trade-off: </span>{t.tradeoff}</p>
-                <p className="mt-3 flex flex-wrap gap-1.5">{t.files.map((f) => <Path key={f}>{f}</Path>)}</p>
-              </li>
-            ))}
-          </ul>
+        <Section id="stack" eyebrow="2 · Technology stack" title="The tools and their purpose" side
+          intro="Every tile is a dependency the code actually uses. Select one to see why it is here and the trade-off accepted with it.">
+          <TechStack />
         </Section>
 
-        <Section id="architecture" eyebrow="3 · Architecture" title="How a request moves through the system"
-          intro="Choose a request to see the path it takes, then select any component to see what it does and where it lives in the repository.">
+        <Section id="architecture" eyebrow="3 · Architecture" title="How data moves through the app">
           <ArchitectureDiagram />
         </Section>
 
-        <Section id="decisions" eyebrow="4 · Why I chose this architecture" title="The main decisions">
-          <div className="grid gap-4 lg:grid-cols-2">
-            {DECISIONS.map((d) => (
-              <article key={d.question} className={CARD}>
-                <h3 className="text-lg font-semibold">{d.question}</h3>
-                <div className="mt-2 space-y-2 text-sm text-slate-700">{d.answer.map((p) => <p key={p}>{p}</p>)}</div>
+        <Section id="decisions" eyebrow="4 · Design decisions and constraints" title="The main decisions">
+          <article aria-label={PROCESSING_LOCATION.title}
+            className={`${CARD} grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-center`}>
+            <div className="flex gap-4">
+              <span className="h-fit rounded-2xl bg-blue-50 p-3"><Server className="h-8 w-8 text-blue-600" aria-hidden /></span>
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold">{PROCESSING_LOCATION.title}</h3>
+                <p className="mt-1 text-sm text-slate-600">{PROCESSING_LOCATION.text}</p>
+              </div>
+            </div>
+            <div className="lg:border-l lg:border-slate-200 lg:pl-6"><Checks label="Benefits" items={PROCESSING_LOCATION.benefits} /></div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+              <p className="flex items-center gap-2 font-semibold"><TriangleAlert className="h-5 w-5 shrink-0 text-amber-600" aria-hidden /> Trade-off: server dependency</p>
+              <p className="mt-1 text-sm">{PROCESSING_LOCATION.tradeoff}</p>
+            </div>
+          </article>
+          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+            {DECISIONS.map((d, i) => (
+              <article key={d.question} className={`${CARD} flex gap-4 ${i < 3 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+                <span className="h-fit rounded-2xl bg-blue-50 p-3"><d.icon className="h-6 w-6 text-blue-600" aria-hidden /></span>
+                <div className="min-w-0">
+                  <h3 className="font-semibold">{d.question}</h3>
+                  <p className="mt-1 text-sm text-slate-600">{d.summary}</p>
+                  <details className="mt-2 text-sm">
+                    <summary className="cursor-pointer font-medium text-blue-700 hover:underline">The full reasoning</summary>
+                    <div className="mt-2 space-y-2 text-slate-700">{d.answer.map((p) => <p key={p}>{p}</p>)}</div>
+                  </details>
+                </div>
               </article>
             ))}
           </div>
         </Section>
 
-        <Section id="storage" eyebrow="5 · Storage and deployment" title="Hosting and storage are separate decisions"
-          intro="Processing never touches persistence directly. Routes talk to one storage interface, and the backend behind it is chosen at startup, so where the app is hosted does not dictate how its files are stored.">
-          <div className="grid gap-4 md:grid-cols-2">
+        <Section id="storage" eyebrow="5 · Storage and deployment" title="Hosting and storage" side
+          intro="Separate concerns, one storage interface. Routes and processing never touch persistence; the backend is chosen at startup.">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)]">
             <article className={CARD}>
-              <h3 className="flex items-center gap-2 text-lg font-semibold"><HardDrive className="h-5 w-5 text-blue-600" aria-hidden /> Local development</h3>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                <li>The Fastify server runs on Node.js on your machine; Vite proxies <Path>/api</Path> to it.</li>
-                <li>Uploaded and processed CSVs are saved as files under <Path>server/data/files</Path>.</li>
-                <li>Metadata for every file is kept in one local <Path>meta.json</Path>.</li>
-              </ul>
+              <h3 className="flex items-center gap-2 font-semibold"><Laptop className="h-5 w-5 text-blue-600" aria-hidden /> Local development</h3>
+              <Checks label="Local development" items={[
+                'Node.js API with filesystem storage',
+                <>Originals, results and metadata under <Path>server/data</Path></>,
+              ]} />
             </article>
             <article className={CARD}>
-              <h3 className="flex items-center gap-2 text-lg font-semibold"><Cloud className="h-5 w-5 text-blue-600" aria-hidden /> Optional Vercel deployment</h3>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                <li>The repository is configured to host the frontend and the Fastify API as two Vercel services.</li>
-                <li>CSVs and metadata are stored as private Vercel Blob objects, one per file.</li>
-                <li>Storage persists independently of any single server instance; without a Blob token the server refuses to start.</li>
-              </ul>
-              <p className="mt-3 text-xs text-slate-500">Configured, not yet deployed: no Vercel project or Blob store has been created.</p>
+              <h3 className="flex items-center gap-2 font-semibold"><Cloud className="h-5 w-5 text-blue-600" aria-hidden /> Optional Vercel deployment</h3>
+              <Checks label="Optional Vercel deployment" items={['Separate frontend and API services', 'Private Vercel Blob storage', 'Configured, not yet deployed']} />
             </article>
-          </div>
-
-          <div className={`${CARD} mt-4`}>
-            <h3 className="font-semibold">The storage abstraction</h3>
-            <div className="mt-4 flex flex-col items-center" role="img"
-              aria-label="Routes and processing call one storage interface, which is backed by the local filesystem or Vercel Blob; S3 or Cloudflare R2 could be added as another backend.">
-              <div className="w-full max-w-md rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
-                <p className="font-semibold">Routes and processing</p>
-                <p className="text-xs text-slate-500">never read or write files themselves</p>
+            <div className="md:col-span-2 xl:col-span-1">
+              <h3 className="text-sm font-semibold">Storage options</h3>
+              <div role="img" className="mt-3 flex items-stretch gap-1"
+                aria-label="Storage options: the local filesystem (the default) and private Vercel Blob are built; S3 or Cloudflare R2 could be added as another backend behind the same interface.">
+                {STORAGE_OPTIONS.map((o, i) => (
+                  <div key={o.name} className="flex min-w-0 flex-1 items-center gap-1">
+                    {i > 0 && <ArrowRight className="h-4 w-4 shrink-0 text-blue-400" aria-hidden />}
+                    <div className={`flex h-full min-w-0 flex-1 flex-col items-center rounded-xl px-2 py-3 text-center ${i === 0 ? 'border border-blue-300 bg-blue-50' : o.built ? 'border border-slate-200 bg-white' : 'border border-dashed border-slate-300 bg-slate-50 text-slate-400'}`}>
+                      <o.icon className={`h-5 w-5 ${o.built ? 'text-blue-600' : 'text-slate-400'}`} aria-hidden />
+                      <span className={`mt-1 text-xs font-semibold ${o.built ? 'text-slate-800' : ''}`}>{o.name}</span>
+                      <span className="text-[11px] text-slate-500">{o.note}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <ArrowDown className="my-2 h-5 w-5 text-slate-400" aria-hidden />
-              <div className="w-full max-w-md rounded-xl border-2 border-blue-500 bg-blue-50 px-4 py-3 text-center">
-                <p className="font-semibold text-blue-800">storage</p>
-                <p className="font-mono text-xs text-blue-800">list · get · read · patch · create · createAt · put</p>
-              </div>
-              <svg viewBox="0 0 300 40" className="h-10 w-full max-w-2xl" aria-hidden preserveAspectRatio="none">
-                <path d="M150 0 V14 M50 14 H250 M50 14 V40 M150 14 V40 M250 14 V40" stroke="#94a3b8" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
-              </svg>
-              <div className="grid w-full max-w-2xl gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 bg-white p-3 text-center">
-                  <HardDrive className="mx-auto h-5 w-5 text-blue-600" aria-hidden />
-                  <p className="mt-1 text-sm font-semibold">Local filesystem</p>
-                  <p className="text-xs text-green-700">Implemented · default</p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3 text-center">
-                  <Cloud className="mx-auto h-5 w-5 text-blue-600" aria-hidden />
-                  <p className="mt-1 text-sm font-semibold">Vercel Blob</p>
-                  <p className="text-xs text-green-700">Implemented · when a token is set</p>
-                </div>
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-center">
-                  <Boxes className="mx-auto h-5 w-5 text-slate-400" aria-hidden />
-                  <p className="mt-1 text-sm font-semibold text-slate-600">S3 / Cloudflare R2</p>
-                  <p className="text-xs text-slate-500">Possible future backend · not built</p>
-                </div>
-              </div>
+              <p className="mt-3 text-xs text-slate-500">
+                One interface (list · get · read · patch · create · createAt · put) in <Path>server/src/lib</Path>, so another backend changes nothing else.
+              </p>
             </div>
-            <p className="mt-4 text-sm text-slate-600">
-              The app is not tied to Vercel. Hosting elsewhere would mean adding one more backend with the same operations in{' '}
-              <Path>server/src/lib</Path> and choosing it at startup; routes, validation and processing would not change.
-            </p>
           </div>
         </Section>
 
-        <Section id="evolve" eyebrow="6 · Evolution" title="What I would evolve as the product scales"
-          intro="None of these is needed for the current scope. Each is a response to a specific kind of growth.">
-          <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Section id="evolve" eyebrow="6 · How it can scale" title="Future evolution" side
+          intro="Planned enhancements, added only when a requirement calls for them.">
+          <ul aria-label="Future evolution" className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {EVOLVE.map((e) => (
-              <li key={e.title} className={CARD}>
-                <h3 className="flex items-center gap-2 font-semibold"><e.icon className="h-5 w-5 text-blue-600" aria-hidden />{e.title}</h3>
-                <p className="mt-2 text-sm text-slate-700">{e.text}</p>
+              <li key={e.title} className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-3 py-4 text-center shadow-sm">
+                <e.icon className="h-7 w-7 text-blue-600" aria-hidden />
+                <h3 className="mt-2 font-semibold">{e.title}</h3>
+                <p className="mt-1 text-sm text-slate-600">{e.text}</p>
               </li>
             ))}
           </ul>
