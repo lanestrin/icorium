@@ -70,8 +70,34 @@ async function originalMatching(storage: Storage, sourceId: string, headers: str
   return matchesInput(headers, rows, generatedColumns, input.headers, input.rows) ? source.id : undefined;
 }
 
+/** How many parsed files the preview and comparison routes keep in memory. */
+export const PARSED_CACHE_FILES = 10;
+
+/** A stored file's CSV, parsed and checked. Shared between requests, so callers only read it. */
+interface ParsedFile { headers: string[]; rows: Row[]; problems: ReturnType<typeof findProblems> }
+
 /** All API routes, reading and writing files through the storage buildApp opened. */
 export async function fileRoutes(app: FastifyInstance, { storage }: { storage: Storage }) {
+  // Recently parsed files, so paging through a preview reads and parses the CSV once. The key is the
+  // File ID plus its upload time: every save sets a new upload time, so a file saved again (here or
+  // by another server sharing Blob storage) is parsed afresh and its old rows are never served.
+  // Metadata is always read fresh from storage; only what comes from the CSV text is cached.
+  const parsed = new Map<string, ParsedFile>();
+  async function parsedFile(meta: FileMeta): Promise<ParsedFile> {
+    const key = `${meta.id}@${meta.uploadedAt}`;
+    const cached = parsed.get(key);
+    if (cached) {
+      parsed.delete(key); // re-insert, so the least recently used file is first
+      parsed.set(key, cached);
+      return cached;
+    }
+    const { headers, rows } = parseCsv(await storage.read(meta.id));
+    const file = { headers, rows, problems: findProblems(headers, rows) };
+    parsed.set(key, file);
+    if (parsed.size > PARSED_CACHE_FILES) parsed.delete(parsed.keys().next().value!);
+    return file;
+  }
+
   // A pure read: metadata from older versions is corrected once at startup (reconcileMetadata).
   app.get('/files', async () => storage.list());
 
@@ -112,14 +138,14 @@ export async function fileRoutes(app: FastifyInstance, { storage }: { storage: S
   app.get<IdParams>('/files/:id/rows', async (req) => {
     const { offset, limit } = pageQuery.parse(req.query);
     const meta = await storage.get(req.params.id);
-    const { headers, rows } = parseCsv(await storage.read(meta.id));
+    const { headers, rows, problems } = await parsedFile(meta);
     return {
       headers,
       rows: rows.slice(offset, offset + limit),
       offset,
       totalRows: rows.length,
       generatedColumns: meta.generatedColumns ?? [],
-      problems: findProblems(headers, rows),
+      problems,
     };
   });
 
@@ -187,15 +213,15 @@ export async function fileRoutes(app: FastifyInstance, { storage }: { storage: S
     const ids = compareQuery.parse(req.query);
     const load = async (id: string) => {
       const meta = await storage.get(id);
-      const csv = parseCsv(await storage.read(id));
-      if (meta.status !== 'Processed') return { meta, ...csv };
-      const result = detectResult(csv.headers);
+      const { headers, rows, problems } = await parsedFile(meta);
+      if (meta.status !== 'Processed') return { meta, headers, rows, problems };
+      const result = detectResult(headers);
       if (!result) throw httpError(400, `${meta.name} has an unrecognized result schema. Regenerate it from its original input.`);
-      return { meta: { ...meta, ...result }, ...csv };
+      return { meta: { ...meta, ...result }, headers, rows, problems };
     };
     const loaded = await Promise.all(ids.map(load));
     const result = compareResults(loaded);
     // Which rows in each file have problems, so the comparison can say which file an error is in.
-    return { ...result, files: result.files.map((f, k) => ({ ...f, problems: findProblems(loaded[k].headers, loaded[k].rows) })) };
+    return { ...result, files: result.files.map((f, k) => ({ ...f, problems: loaded[k].problems })) };
   });
 }
