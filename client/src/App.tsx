@@ -226,7 +226,7 @@ export default function App() {
       </div>
 
       {toast && (
-        <div role="status" className="fixed inset-x-4 top-4 z-30 flex items-center gap-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 shadow-lg sm:left-auto sm:right-6 sm:w-[26rem]">
+        <div role="status" className="fixed inset-x-4 top-4 z-30 flex items-center gap-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 shadow-lg sm:left-auto sm:right-6 sm:w-104">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-600 text-white"><Check className="h-5 w-5" /></span>
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-slate-900">{toast.title}</p>

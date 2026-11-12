@@ -57,7 +57,8 @@ describe('Architecture page content', () => {
     const storage = read('server/src/lib/storage.ts');
     expect(storage).toContain("'meta.json'");
     expect(storage).toContain('BLOB_READ_WRITE_TOKEN');
-    expect(storage).toMatch(/process\.env\.VERCEL && !useBlob/); // no Blob token on Vercel: refuse to start
+    expect(storage).toMatch(/env\.VERCEL && !useBlob/); // no Blob token on Vercel: refuse to start
+    expect(storage).toContain('rename('); // meta.json is replaced atomically
     // The page describes the Vercel setup as configured but not deployed, as the deployment notes record.
     expect(read('blueprint/vercel-deployment.md')).toContain('No project, store or deployment has been');
   });

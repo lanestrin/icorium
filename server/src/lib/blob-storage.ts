@@ -1,10 +1,9 @@
 import { BlobPreconditionFailedError, get, list, put } from '@vercel/blob';
 import { nextBaseId, parseFileId, type FileMeta, type ProcessorCode } from '../../../shared/types';
 import { httpError } from './csv';
+import type { NewFile, NewUpload, Storage } from './storage';
 
 type StoredFile = { meta: FileMeta; text: string };
-type NewFile = Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string };
-type NewUpload = Omit<NewFile, 'text'> & { text: string | ((id: string) => string) };
 /** How many times create() tries the next number when another server claims it first. */
 const CLAIM_ATTEMPTS = 20;
 
@@ -14,7 +13,7 @@ const CLAIM_ATTEMPTS = 20;
  * "fail if it exists", so servers running at the same time never hand out the same ID. Objects
  * saved before File IDs (under `records/`) are not read; that demo data is reset, not migrated.
  */
-export function createBlobStorage(prefix: string) {
+export function createBlobStorage(prefix: string): Storage {
   const base = prefix.replace(/\/+$/, '');
   const filesRoot = `${base}/files/`;
   const claimsRoot = `${base}/claims/`;
@@ -64,7 +63,7 @@ export function createBlobStorage(prefix: string) {
     }
   }
 
-  const store = {
+  const store: Storage = {
     async list() {
       const files = await Promise.all((await names(filesRoot)).map((id) => load(`${filesRoot}${id}.json`)));
       return files.filter((f): f is NonNullable<typeof f> => !!f).map((f) => f.file.meta)

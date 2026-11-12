@@ -175,7 +175,7 @@ export const NODES: ArchNode[] = [
     detail: 'The only module that touches persistence. Files are stored and found by File ID (101010, 101010-M), never by name. Routes call the same operations whichever backend is active: list, get, read, patch, create (claims the next ID) and put (writes a result at its ID); the backend is chosen once at startup from the environment.',
     files: ['server/src/lib/storage.ts'] },
   { id: 'local', title: 'Local filesystem', icon: HardDrive, summary: 'server/data: CSV files + meta.json',
-    detail: 'Used when no Blob token is set. Each CSV is a file under server/data/files and all metadata is one meta.json. Deleting server/data resets the demo; the five samples load on first start.',
+    detail: 'Used when no Blob token is set. Each CSV is a file under server/data/files and all metadata is one meta.json, replaced atomically (written to a temporary file, then renamed) so a crash mid-write cannot corrupt it. Deleting server/data resets the demo; the five samples load on first start.',
     files: ['server/src/lib/storage.ts'] },
   { id: 'blob', title: 'Vercel Blob (private)', icon: Cloud, summary: 'One private JSON object per file',
     detail: 'Used when BLOB_READ_WRITE_TOKEN is set. Each file and its metadata are one private object named by its File ID; a new ID is claimed with a create-if-absent write, so two servers never hand out the same one, and a new result is saved the same way, so an unconfirmed run never overwrites one. Updates use ETag checks and return 409 on a conflicting change. On Vercel, startup fails rather than fall back to temporary disk.',

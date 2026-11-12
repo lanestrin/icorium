@@ -7,20 +7,19 @@ import type { FastifyInstance } from 'fastify';
 import { codeOf, isInputFile, PROCESSORS, type CompareResult, type FileMeta, type ReplaceConflict, type FileRows, type GeneratedBatch, type ProcessorId } from '../../shared/types';
 import { parseCsv, toCsv } from './lib/csv';
 import { processors } from './processing';
+import { buildApp } from './app';
+import { openLocalStorage, reconcileMetadata } from './lib/storage';
 
-// Storage reads RECLAIM_DATA_DIR when first imported, so set it before loading the app.
+// Each test run uses its own throwaway data folder, opened as the app's storage.
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reclaim-api-'));
-process.env.RECLAIM_DATA_DIR = dataDir;
-const { buildApp } = await import('./app');
-// The app's own storage instance; importing it later, after vi.resetModules(), would give a separate copy.
-const { storage } = await import('./lib/storage');
+const storage = await openLocalStorage(dataDir);
 
 const SAMPLES = path.resolve(import.meta.dirname, '../../sample-data');
 const sample = (name: string) => fs.readFileSync(path.join(SAMPLES, name), 'utf8');
 const MASS_COLUMNS = ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'processing_status', 'validation_errors'];
 
 let app: FastifyInstance;
-beforeAll(async () => { app = await buildApp(false); });
+beforeAll(async () => { app = await buildApp(false, storage); });
 afterAll(async () => {
   await app.close();
   fs.rmSync(dataDir, { recursive: true, force: true });
@@ -205,11 +204,10 @@ describe('problem rows', () => {
   });
 
   it('fills in the count for files saved before it existed, at startup rather than when listing', async () => {
-    const { storage, reconcileMetadata } = await import('./lib/storage');
     const id = (await fileNamed('partner_b_followup.csv')).id;
     await storage.patch(id, { problemRows: undefined });
     expect((await fileNamed('partner_b_followup.csv')).problemRows).toBeUndefined(); // listing leaves it alone
-    await reconcileMetadata();
+    await reconcileMetadata(storage);
     expect((await fileNamed('partner_b_followup.csv')).problemRows).toBe(2);
   });
 });
@@ -366,7 +364,6 @@ describe('current result contract', () => {
     const result = await processSample('partner_a_baseline.csv', 'mass');
     const text = (await app.inject(`/api/files/${result.id}/download`)).body;
     const imported = (await upload('current_mass_stale_metadata.csv', text)).json<FileMeta>();
-    const { storage } = await import('./lib/storage');
     await storage.patch(imported.id, { generatedColumns: ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status'] });
     const response = await compare(imported.id, result.id);
     expect(response.statusCode).toBe(200);
@@ -413,7 +410,6 @@ describe('input review status', () => {
   });
 
   it('lists without writing, and reconciles old statuses and missing counts once at startup', async () => {
-    const { storage, reconcileMetadata } = await import('./lib/storage');
     const cleanMeta = (await upload('old_clean_status.csv', clean)).json<FileMeta>();
     const invalid = (await upload('old_invalid_status.csv', clean.replace(',100,', ',,'))).json<FileMeta>();
     const missing = (await upload('missing_count_status.csv', clean.replace(',100,', ',,'))).json<FileMeta>();
@@ -436,7 +432,7 @@ describe('input review status', () => {
       expect(create).not.toHaveBeenCalled();
       expect(put).not.toHaveBeenCalled();
 
-      const { updated, skipped } = await reconcileMetadata();
+      const { updated, skipped } = await reconcileMetadata(storage);
       expect(updated.sort()).toEqual([cleanMeta.name, invalid.name, missing.name, result.name].sort());
       expect(skipped).toEqual([]);
       const files = await listFiles();
@@ -450,7 +446,7 @@ describe('input review status', () => {
       expect(files.find((f) => f.id === result.id)).toMatchObject({ status: 'Processed', problemRows: 1 });
       expect(read.mock.calls.map(([id]) => id).sort()).toEqual([missing.id, result.id].sort());
       read.mockClear(); patch.mockClear();
-      expect((await reconcileMetadata()).updated).toEqual([]); // nothing left to correct
+      expect((await reconcileMetadata(storage)).updated).toEqual([]); // nothing left to correct
       expect(read).not.toHaveBeenCalled();
       expect(patch).not.toHaveBeenCalled();
     } finally { read.mockRestore(); patch.mockRestore(); create.mockRestore(); put.mockRestore(); }
@@ -459,9 +455,8 @@ describe('input review status', () => {
   });
 
   it('skips a stored file it cannot read instead of failing startup or the list', async () => {
-    const { storage, reconcileMetadata } = await import('./lib/storage');
     const broken = await storage.create({ name: 'unreadable_old_file.csv', text: 'batch_id,sample_date\nA-1,2026-09-01,extra\n', rows: 1, columns: 2, status: 'Ready' });
-    expect((await reconcileMetadata()).skipped).toEqual([broken.name]);
+    expect((await reconcileMetadata(storage)).skipped).toEqual([broken.name]);
     const listed = await app.inject('/api/files');
     expect(listed.statusCode).toBe(200);
     expect(listed.json<FileMeta[]>().find((f) => f.id === broken.id)).toEqual(broken);
@@ -497,16 +492,14 @@ describe('legacy result compatibility', () => {
   });
 
   it('loads persisted legacy metadata after restarting without rewriting CSVs', async () => {
-    const { storage } = await import('./lib/storage');
     const saved = await Promise.all((['validation', 'mass', 'classification'] as const).map(async (id) => {
       const text = legacyCsv(id);
       const meta = await storage.create({ name: `persisted_${id}.csv`, text, rows: 1, columns: originalHeaders.length + legacy[id].columns.length,
         status: 'Processed', processor: id, generatedColumns: legacy[id].columns, problemRows: 0 }, codeOf(id));
       return { meta, text };
     }));
-    vi.resetModules();
-    const { buildApp: restart } = await import('./app');
-    const restarted = await restart(false);
+    // A restart: a fresh storage instance reads meta.json back from the same folder.
+    const restarted = await buildApp(false, await openLocalStorage(dataDir));
     try {
       const files = (await restarted.inject('/api/files')).json<FileMeta[]>();
       for (const [name, status] of [['old_clean_status.csv', 'Ready'], ['old_invalid_status.csv', 'Needs Review'], ['missing_count_status.csv', 'Needs Review']] as const) {
@@ -589,14 +582,10 @@ describe('File IDs', () => {
     const old = fs.mkdtempSync(path.join(os.tmpdir(), 'reclaim-old-'));
     const meta = path.join(old, 'meta.json');
     fs.writeFileSync(meta, JSON.stringify([{ id: '0b6c5a8e-3c1f-4e7a-9f2d-6d1a2b3c4d5e', name: 'old.csv', rows: 1, columns: 6, uploadedAt: '', status: 'Ready' }]));
-    vi.stubEnv('RECLAIM_DATA_DIR', old);
-    vi.resetModules();
     try {
-      await expect(import('./lib/storage')).rejects.toThrow(/created before File IDs\. Stop the server, delete that folder/);
+      await expect(openLocalStorage(old)).rejects.toThrow(/created before File IDs\. Stop the server, delete that folder/);
       expect(fs.existsSync(meta)).toBe(true);
     } finally {
-      vi.unstubAllEnvs();
-      vi.resetModules();
       fs.rmSync(old, { recursive: true, force: true });
     }
   });
@@ -676,7 +665,6 @@ describe('replacing a result', () => {
     const input = (await upload('confirmed.csv', csv)).json<FileMeta>();
     const first = (await processFile(input.id, 'mass')).json<FileMeta>();
     // Rewrite the stored result so the replacement is visibly new content.
-    const { storage } = await import('./lib/storage');
     await storage.put(first.id, { ...first, text: (await download(first.id)).replace(/,Valid,/g, ',STALE,') });
     expect(await download(first.id)).toContain(',STALE,');
     const res = await processFile(input.id, 'mass', true);

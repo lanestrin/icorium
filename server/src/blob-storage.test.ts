@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileMeta } from '../../shared/types';
 
@@ -30,6 +33,8 @@ vi.mock('@vercel/blob', async (original) => {
 
 import { get, put } from '@vercel/blob';
 import { createBlobStorage } from './lib/blob-storage';
+import { createStorage, openLocalStorage, reconcileMetadata, type Storage } from './lib/storage';
+import { buildApp } from './app';
 
 const input = (name: string) => ({ name, text: 'batch_id,value\nA,unchanged', rows: 1, columns: 2, status: 'Ready' as const, problemRows: 0 });
 beforeEach(() => { blobs.files.clear(); blobs.revision = 0; vi.clearAllMocks(); });
@@ -147,17 +152,15 @@ describe('durable Blob storage', () => {
     vi.stubEnv('RECLAIM_DATA_DIR', undefined);
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-only-token');
     vi.stubEnv('RECLAIM_BLOB_PREFIX', 'test/api');
-    vi.resetModules();
-    const first = await (await import('./app')).buildApp(false);
-    let second: Awaited<ReturnType<typeof import('./app')['buildApp']>> | undefined;
+    const first = await buildApp(false);
+    let second: Awaited<ReturnType<typeof buildApp>> | undefined;
     try {
       const files = (await first.inject('/api/files')).json<FileMeta[]>();
       expect(files).toHaveLength(5);
       const processed = await first.inject({ method: 'POST', url: '/api/process', payload: { fileId: files[0].id, processor: 'mass' } });
       expect(processed.statusCode).toBe(200);
       const result = processed.json<FileMeta>();
-      vi.resetModules();
-      second = await (await import('./app')).buildApp(false);
+        second = await buildApp(false);
       expect((await second.inject('/api/files')).json<FileMeta[]>()).toHaveLength(6);
       const preview = await second.inject(`/api/files/${result.id}/rows`);
       expect(preview.statusCode).toBe(200);
@@ -174,9 +177,8 @@ describe('durable Blob storage', () => {
     vi.stubEnv('RECLAIM_DATA_DIR', undefined);
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-only-token');
     vi.stubEnv('RECLAIM_BLOB_PREFIX', 'test/identity');
-    vi.resetModules();
-    const first = await (await import('./app')).buildApp(false);
-    let second: Awaited<ReturnType<typeof import('./app')['buildApp']>> | undefined;
+    const first = await buildApp(false);
+    let second: Awaited<ReturnType<typeof buildApp>> | undefined;
     try {
       // Two different partner A files uploaded under one name, as the browser's file chooser sends them.
       const samples = (await first.inject('/api/files')).json<FileMeta[]>().filter((f) => f.name.startsWith('partner_a_'));
@@ -196,8 +198,7 @@ describe('durable Blob storage', () => {
       expect(results.map((r) => r.id)).toEqual(uploads.map((u) => `${u.id}-V`));
 
       // A fresh instance reads each file back by its ID alone.
-      vi.resetModules();
-      second = await (await import('./app')).buildApp(false);
+        second = await buildApp(false);
       const listed = (await second.inject('/api/files')).json<FileMeta[]>();
       for (const id of [...uploads, ...results].map((f) => f.id)) expect(listed.filter((f) => f.id === id)).toHaveLength(1);
       const bodies = [];
@@ -214,11 +215,6 @@ describe('durable Blob storage', () => {
   it('reconciles stale metadata when two servers start together, without failing either', async () => {
     const csv = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct\nA-1,2026-09-01,,40,30,30\n';
     const stale = await createBlobStorage('test/reconcile').create({ name: 'old.csv', text: csv, rows: 1, columns: 6, status: 'Ready' });
-    vi.stubEnv('VERCEL', '1');
-    vi.stubEnv('RECLAIM_DATA_DIR', undefined);
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-only-token');
-    vi.resetModules();
-    const { reconcileMetadata } = await import('./lib/storage');
     const [a, b] = [createBlobStorage('test/reconcile'), createBlobStorage('test/reconcile')];
     await expect(Promise.all([reconcileMetadata(a), reconcileMetadata(b)])).resolves.toHaveLength(2);
     expect(await a.get(stale.id)).toMatchObject({ status: 'Needs Review', problemRows: 1 });
@@ -227,11 +223,6 @@ describe('durable Blob storage', () => {
   });
 
   it('treats a 409 during reconciliation as already done, but surfaces other failures', async () => {
-    vi.stubEnv('VERCEL', '1');
-    vi.stubEnv('RECLAIM_DATA_DIR', undefined);
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-only-token');
-    vi.resetModules();
-    const { reconcileMetadata } = await import('./lib/storage');
     const meta = { id: 'x', name: 'x.csv', rows: 1, columns: 6, uploadedAt: '', status: 'Ready', problemRows: 3 } as FileMeta;
     const store = (statusCode: number) => ({
       list: async () => [meta],
@@ -243,10 +234,105 @@ describe('durable Blob storage', () => {
   });
 
   it('refuses a Vercel startup without durable storage configuration', async () => {
-    vi.stubEnv('VERCEL', '1');
-    vi.stubEnv('RECLAIM_DATA_DIR', undefined);
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', undefined);
-    vi.resetModules();
-    await expect(import('./lib/storage')).rejects.toThrow('Connect a private Vercel Blob store');
+    await expect(createStorage({ VERCEL: '1' })).rejects.toThrow('Connect a private Vercel Blob store');
+    await expect(createStorage({ VERCEL: '1', BLOB_READ_WRITE_TOKEN: '' })).rejects.toThrow('Connect a private Vercel Blob store');
+  });
+});
+
+// The same rules for both backends: the local folder (a fresh temp folder) and Blob (the mocked SDK above).
+const tempDirs: string[] = [];
+const tempDir = () => { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reclaim-storage-')); tempDirs.push(dir); return dir; };
+afterEach(() => { for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });
+
+describe.each([
+  ['local folder', () => openLocalStorage(tempDir())],
+  ['Vercel Blob', async () => createBlobStorage(`test/contract-${Math.random()}`)],
+] as const)('storage contract: %s', (_, open: () => Promise<Storage>) => {
+  it('numbers new uploads from 100001 and gives an uploaded result its code', async () => {
+    const storage = await open();
+    expect((await storage.create(input('a.csv'))).id).toBe('100001');
+    expect((await storage.create(input('b.csv'))).id).toBe('100002');
+    expect((await storage.create({ ...input('r.csv'), status: 'Processed' }, 'M')).id).toBe('100003-M');
+    expect((await storage.create({ ...input('c.csv'), text: (id) => `file_id\n${id}` })).id).toBe('100004');
+    expect(await storage.read('100004')).toBe('file_id\n100004');
+  });
+
+  it('hands out copies, so changing a returned file never changes what is stored', async () => {
+    const storage = await open();
+    const file = await storage.create(input('a.csv'));
+    (await storage.get(file.id)).name = 'changed.csv';
+    (await storage.list())[0].status = 'Processed';
+    file.rows = 99;
+    expect(await storage.get(file.id)).toMatchObject({ name: 'a.csv', status: 'Ready', rows: 1 });
+  });
+
+  it('replaces a file in place with put, and refuses createAt on a taken ID', async () => {
+    const storage = await open();
+    const source = await storage.create(input('source.csv'));
+    const id = `${source.id}-V`;
+    const first = await storage.createAt(id, { ...input('r.csv'), text: 'first', status: 'Processed' });
+    expect(first?.id).toBe(id);
+    expect(await storage.createAt(id, { ...input('other.csv'), text: 'second', status: 'Processed' })).toBeUndefined();
+    expect(await storage.read(id)).toBe('first');
+    await storage.put(id, { ...input('r.csv'), text: 'replaced', status: 'Processed' });
+    expect(await storage.read(id)).toBe('replaced');
+    expect((await storage.list()).filter((f) => f.id === id)).toHaveLength(1);
+  });
+
+  it('updates metadata fields with patch, keeping the ID and upload time', async () => {
+    const storage = await open();
+    const file = await storage.create(input('a.csv'));
+    const changed = await storage.patch(file.id, { archived: true, archivedAt: '2026-11-11T00:00:00Z' });
+    expect(changed).toEqual({ ...file, archived: true, archivedAt: '2026-11-11T00:00:00Z' });
+    expect(await storage.get(file.id)).toEqual(changed);
+  });
+
+  it('seeds a sample once and never overwrites it', async () => {
+    const storage = await open();
+    await storage.seed('100001', input('sample.csv'));
+    await storage.seed('100001', { ...input('sample.csv'), text: 'must not replace' });
+    expect(await storage.read('100001')).toBe(input('sample.csv').text);
+    expect((await storage.create(input('upload.csv'))).id).toBe('100002');
+  });
+
+  it('treats anything that is not a stored File ID as missing', async () => {
+    const storage = await open();
+    for (const id of ['100009', '../meta', 'x'])
+      await expect(storage.get(id)).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
+describe('local folder storage', () => {
+  it('gives two uploads at the same time different File IDs, and lets only one create a result', async () => {
+    const storage = await openLocalStorage(tempDir());
+    const ids = (await Promise.all([1, 2, 3].map((n) => storage.create(input(`${n}.csv`))))).map((f) => f.id);
+    expect(new Set(ids).size).toBe(3);
+    const both = await Promise.all([1, 2].map((n) => storage.createAt('100001-M', { ...input(`r${n}.csv`), status: 'Processed' })));
+    expect(both.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('keeps the previous meta.json when a metadata write is interrupted, and still starts', async () => {
+    const dir = tempDir();
+    const storage = await openLocalStorage(dir);
+    const file = await storage.create(input('a.csv'));
+    const before = fs.readFileSync(path.join(dir, 'meta.json'), 'utf8');
+    fs.mkdirSync(path.join(dir, 'meta.json.tmp')); // the temporary file cannot be written
+    await expect(storage.patch(file.id, { status: 'Needs Review' })).rejects.toThrow();
+    expect(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8')).toBe(before);
+    expect(await storage.get(file.id)).toEqual(file); // the failed change is undone in memory too
+    await expect(storage.create(input('b.csv'))).rejects.toThrow();
+    expect((await storage.list()).map((f) => f.id)).toEqual([file.id]);
+
+    fs.rmdirSync(path.join(dir, 'meta.json.tmp'));
+    const reopened = await openLocalStorage(dir);
+    expect(await reopened.list()).toEqual([file]);
+    expect((await reopened.create(input('b.csv'))).id).toBe('100002');
+  });
+
+  it('creates its folder when opened', async () => {
+    const dir = path.join(tempDir(), 'new');
+    expect(fs.existsSync(dir)).toBe(false);
+    await openLocalStorage(dir);
+    expect(fs.existsSync(path.join(dir, 'files'))).toBe(true);
   });
 });
