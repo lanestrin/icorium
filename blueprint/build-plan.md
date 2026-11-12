@@ -544,7 +544,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   **Verification:** generator unit tests unchanged in output; a test that every adapter is generatable; `npm run verify` (the Architecture content test must still pass).
 
-- [ ] **10.8** `refactor/client-structure` · **P2** — Logic at the wrong level:
+- [x] **10.8** `refactor/client-structure` · **P2** — Logic at the wrong level:
 
   - `client/src/components/FileTable.tsx` exports file rules (`displayStatus`, `qualityWarning`, `processingFunction`, `sortFiles`, `SORT_OPTIONS`) and `FileTabs` alongside the table. Move the rules into `client/src/file-status.ts`, which `file-status.test.ts` already tests.
 

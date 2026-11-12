@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isInputFile, type FileMeta } from '../../shared/types';
-import { displayStatus, processingFunction, qualityWarning, replacements, sortFiles } from './components/FileTable';
+import { displayStatus, filterFiles, processingFunction, qualityWarning, replacements, sortFiles, type FileFilters } from './file-status';
 
 const file: FileMeta = { id: 'input', name: 'input.csv', rows: 25, columns: 7,
   uploadedAt: '2026-11-06T12:00:00Z', status: 'Needs Review', problemRows: 1 };
@@ -91,5 +91,47 @@ describe('results a run would replace', () => {
     const files = [a, b, result('101010-M', { processor: 'mass' }), { ...result('101011-V'), name: 'same.csv' }];
     expect(replacements([a], 'validation', files)).toEqual([]);
     expect(replacements([a, b], 'classification', files)).toEqual([]);
+  });
+});
+
+describe('filtering files', () => {
+  // Midday UTC, so the local day is the same date in every common time zone.
+  const input: FileMeta = { ...file, id: '101010', name: 'Partner_A.csv', status: 'Ready', uploadedAt: '2026-11-05T12:00:00Z' };
+  const result: FileMeta = { ...file, id: '101010-M', name: 'result_partner_a_mass.csv', status: 'Processed', processor: 'mass', uploadedAt: '2026-11-06T12:00:00Z' };
+  const other: FileMeta = { ...file, id: '101011', name: 'other.csv', status: 'Needs Review', uploadedAt: '2026-11-07T12:00:00Z' };
+  const archived: FileMeta = { ...file, id: '101012', name: 'old.csv', status: 'Ready', archived: true, uploadedAt: '2026-11-05T12:00:00Z' };
+  const files = [input, result, other, archived];
+  const none: FileFilters = { search: '', from: '', to: '', status: 'All', fn: 'All', viewArchived: false, sort: 'id-asc' };
+  const ids = (filters: Partial<FileFilters>, state = {}) => filterFiles(files, { ...none, ...filters }, state).map((f) => f.id);
+
+  it('shows each tab only its own files, sorted', () => {
+    expect(ids({})).toEqual(['101010', '101010-M', '101011']);
+    expect(ids({ viewArchived: true })).toEqual(['101012']);
+    expect(ids({ sort: 'id-desc' })).toEqual(['101011', '101010', '101010-M']);
+  });
+
+  it('searches names and File IDs, ignoring case', () => {
+    expect(ids({ search: 'PARTNER_a' })).toEqual(['101010', '101010-M']);
+    expect(ids({ search: '101010' })).toEqual(['101010', '101010-M']);
+    expect(ids({ search: '-m' })).toEqual(['101010-M']);
+  });
+
+  it('filters by the status shown, including processing and failed files', () => {
+    expect(ids({ status: 'Ready' })).toEqual(['101010']);
+    expect(ids({ status: 'Processing' }, { processingId: '101011' })).toEqual(['101011']);
+    expect(ids({ status: 'Error' }, { failedIds: new Set(['101010']) })).toEqual(['101010']);
+    expect(ids({ status: 'Ready' }, { failedIds: new Set(['101010']) })).toEqual([]);
+  });
+
+  it('filters by processing function id', () => {
+    expect(ids({ fn: 'original' })).toEqual(['101010', '101011']);
+    expect(ids({ fn: 'mass' })).toEqual(['101010-M']);
+    expect(ids({ fn: 'validation' })).toEqual([]);
+  });
+
+  it('keeps uploads within the date range, both ends included', () => {
+    expect(ids({ from: '2026-11-06' })).toEqual(['101010-M', '101011']);
+    expect(ids({ to: '2026-11-06' })).toEqual(['101010', '101010-M']);
+    expect(ids({ from: '2026-11-06', to: '2026-11-06' })).toEqual(['101010-M']);
   });
 });

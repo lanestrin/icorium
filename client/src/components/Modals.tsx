@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Download, TriangleAlert, X } from 'lucide-react';
 import { PROCESSORS, type FileMeta, type FileRows, type ProblemList, type ProcessorId } from '../../../shared/types';
 import { api } from '../api';
-import { importedLineage, type QualityWarning, type Replacement } from './FileTable';
+import { importedLineage, type QualityWarning, type Replacement } from '../file-status';
 
 /** "1 row", "3 rows", or with a qualifier "1 valid row". */
 const rowsWord = (n: number, kind?: string) => `${n.toLocaleString()} ${kind ? `${kind} ` : ''}${n === 1 ? 'row' : 'rows'}`;

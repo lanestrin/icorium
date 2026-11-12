@@ -146,7 +146,7 @@ export const NODES: ArchNode[] = [
     files: [] },
   { id: 'frontend', title: 'React + TypeScript frontend', icon: LayoutGrid, summary: 'File workspace, comparison, generator',
     detail: 'A single-page app with three pages picked from the URL: the file workspace, /generator and /architecture. A typed API client makes every request and turns error responses into readable messages.',
-    files: ['client/src/App.tsx', 'client/src/api.ts', 'client/src/components'] },
+    files: ['client/src/App.tsx', 'client/src/hooks.ts', 'client/src/file-status.ts', 'client/src/api.ts', 'client/src/components'] },
   { id: 'api', title: 'Fastify REST API', icon: Server, summary: 'Routes, Zod validation, error handling',
     detail: 'All endpoints live under /api: upload, list, preview rows, download, archive, process, compare and generate. Zod checks each request; one error handler returns a status code and a plain message.',
     files: ['server/src/app.ts', 'server/src/routes/files.ts'] },
