@@ -536,7 +536,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   **Verification:** existing tests unchanged in behaviour; a unit test that the API enum matches `PROCESSORS`; `npm run verify`.
 
-- [ ] **10.7** `refactor/partner-adapter-formats` · **P2** — The generator finds an adapter by its display name (`` `Partner ${partner}` `` in `server/src/lib/generate.ts`) and keeps number formats in a separate `DIGITS` table, so a new partner needs three edits. Give each adapter an `id` (`A`/`B`/`C`) and its number formats, derive `GENERATOR_PARTNERS` from the adapters, and drop `DIGITS`. Update `CLAUDE.md`, the README and the Architecture page where they describe adding a partner.
+- [x] **10.7** `refactor/partner-adapter-formats` · **P2** — The generator finds an adapter by its display name (`` `Partner ${partner}` `` in `server/src/lib/generate.ts`) and keeps number formats in a separate `DIGITS` table, so a new partner needs three edits. Give each adapter an `id` (`A`/`B`/`C`) and its number formats, derive `GENERATOR_PARTNERS` from the adapters, and drop `DIGITS`. Update `CLAUDE.md`, the README and the Architecture page where they describe adding a partner.
 
   **Depends on:** 10.6.
 

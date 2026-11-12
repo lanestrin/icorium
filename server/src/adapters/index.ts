@@ -1,4 +1,4 @@
-import type { Row } from '../../../shared/types';
+import { ADAPTERS, type Row } from '../../../shared/types';
 import { httpError } from '../lib/csv';
 
 /** Canonical record every processor works on. null = missing, NaN = not a number. Percentages 0–100. */
@@ -12,19 +12,7 @@ export interface Normalized {
   r134a: number | null;
 }
 
-interface Adapter {
-  name: string;
-  columns: [id: string, date: string, mass: string, r32: string, r125: string, r134a: string];
-  massFactor: number; // source unit -> kg
-  pctFactor: number; // source unit -> %
-}
-
-// To support a new partner schema, add one entry here.
-export const ADAPTERS: Adapter[] = [
-  { name: 'Partner A', columns: ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'], massFactor: 1, pctFactor: 1 },
-  { name: 'Partner B', columns: ['lot_number', 'collected_on', 'weight_lb', 'hfc32_percent', 'hfc125_percent', 'hfc134a_percent'], massFactor: 0.45359237, pctFactor: 1 },
-  { name: 'Partner C', columns: ['material_ref', 'collection_date', 'quantity_g', 'R32_fraction', 'R125_fraction', 'R134a_fraction'], massFactor: 0.001, pctFactor: 100 },
-];
+// The partner formats themselves are ADAPTERS in shared/types.ts; this file matches and normalizes rows.
 
 const num = (v: string | undefined, factor: number) => {
   if (v == null || v.trim() === '') return null;

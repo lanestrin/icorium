@@ -147,9 +147,27 @@ export interface CompareResult {
   columns: CompareColumn[];
 }
 
-/** Partners the CSV generator can write for (see server/src/lib/generate.ts). */
-export const GENERATOR_PARTNERS = ['A', 'B', 'C'] as const;
-export type GeneratorPartner = (typeof GENERATOR_PARTNERS)[number];
+/** One partner's CSV format: its columns, units and how it writes numbers. */
+interface AdapterEntry {
+  id: string; // the letter used in generated batch IDs and file names (A-001, partnerA-…)
+  name: string;
+  description: string; // shown on the CSV generator page
+  columns: readonly [id: string, date: string, mass: string, r32: string, r125: string, r134a: string];
+  massFactor: number; // source unit -> kg
+  pctFactor: number; // source unit -> %
+  digits: { mass: number; pct: number }; // decimal places the generator writes, matching the sample files
+}
+
+// To support a new partner format, add one entry here. Uploads, processing and the CSV generator all read it.
+export const ADAPTERS = [
+  { id: 'A', name: 'Partner A', description: 'Kilograms and percentages', columns: ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'], massFactor: 1, pctFactor: 1, digits: { mass: 3, pct: 2 } },
+  { id: 'B', name: 'Partner B', description: 'Pounds and percentages', columns: ['lot_number', 'collected_on', 'weight_lb', 'hfc32_percent', 'hfc125_percent', 'hfc134a_percent'], massFactor: 0.45359237, pctFactor: 1, digits: { mass: 3, pct: 2 } },
+  { id: 'C', name: 'Partner C', description: 'Grams and fractions (0–1)', columns: ['material_ref', 'collection_date', 'quantity_g', 'R32_fraction', 'R125_fraction', 'R134a_fraction'], massFactor: 0.001, pctFactor: 100, digits: { mass: 0, pct: 5 } },
+] as const satisfies readonly AdapterEntry[];
+
+/** Partners the CSV generator can write for: every adapter. */
+export type GeneratorPartner = (typeof ADAPTERS)[number]['id'];
+export const GENERATOR_PARTNERS = ADAPTERS.map((a) => a.id) as [GeneratorPartner, ...GeneratorPartner[]];
 
 /** One planted error. A duplicate batch ID is reported on both rows that share it. 1-based rows. */
 export interface GeneratedError {

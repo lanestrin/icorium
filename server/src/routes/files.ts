@@ -26,7 +26,7 @@ const pageQuery = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(100),
 });
 const generateBody = z.object({
-  partner: z.enum(GENERATOR_PARTNERS, { message: 'Choose partner A, B or C' }),
+  partner: z.enum(GENERATOR_PARTNERS, { message: `Choose partner ${GENERATOR_PARTNERS.slice(0, -1).join(', ')} or ${GENERATOR_PARTNERS.at(-1)}` }),
   rows: z.number({ message: 'Rows must be a number' }).int('Rows must be a whole number').min(1, 'Generate at least 1 row')
     .max(GENERATOR_MAX_ROWS, `Generate at most ${GENERATOR_MAX_ROWS} rows`),
   errorRows: z.number({ message: 'Rows with errors must be a number' }).int('Rows with errors must be a whole number').min(0, 'Rows with errors cannot be negative'),

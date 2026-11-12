@@ -1,10 +1,11 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from './lib/csv';
 import { getAdapter } from './adapters';
 import { detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from './processing';
 import { compareResults, matchRows } from './lib/compare';
 import { GENERATE_MAX_ATTEMPTS, generateCsv, generatedName, generateFiles } from './lib/generate';
-import { nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../../shared/types';
+import { ADAPTERS, GENERATOR_PARTNERS, nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../../shared/types';
 
 const A_HEADERS = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
 const A_CSV = `${A_HEADERS}
@@ -310,6 +311,19 @@ A-3,d,100,40,30,30.5,upper edge`;
 });
 
 describe('CSV generator', () => {
+  it('offers every partner adapter in the generator', () => {
+    expect(GENERATOR_PARTNERS).toEqual(ADAPTERS.map((a) => a.id));
+  });
+
+  it('writes exactly the same file for the same partner, settings and seed', () => {
+    const hash = (partner: 'A' | 'B' | 'C') => createHash('sha256').update(generateCsv(partner, 25, 3, 7, 'pin.csv').text).digest('hex');
+    expect({ A: hash('A'), B: hash('B'), C: hash('C') }).toEqual({
+      A: '5f60d34432142e5fda5f195b679ea6c68771896213352f307945ec3534ac1133',
+      B: '0aaaf3f11f001dc2b6189960810adcb9a24dcdc140a7232ba7994aaa1e8b3e49',
+      C: 'db438f73a06640aa18b48037b7a810d0d486a2157122a18370ba488f1d93245f',
+    });
+  });
+
   // What Composition Validation says about each planted error kind.
   const MESSAGE: Record<GeneratedError['kind'], string> = {
     'mass missing': 'mass missing',
@@ -320,11 +334,11 @@ describe('CSV generator', () => {
     'duplicate batch ID': 'duplicate batch ID',
   };
 
-  it.each(['A', 'B', 'C'] as const)('writes clean Partner %s files in its own columns and units', (partner) => {
+  it.each(GENERATOR_PARTNERS)('writes clean Partner %s files in its own columns and units', (partner) => {
     const file = generateCsv(partner, 25, 0, 1);
     const { headers, rows } = parseCsv(file.text);
     const adapter = getAdapter(headers);
-    expect(adapter.name).toBe(`Partner ${partner}`);
+    expect(adapter.name).toBe(ADAPTERS.find((a) => a.id === partner)!.name);
     expect(file).toMatchObject({ partner, rows: 25, errors: [] });
     expect(file.name).toMatch(new RegExp(`^partner${partner}-\\d{8}-001\\.csv$`));
     expect(rows).toHaveLength(25);
