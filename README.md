@@ -135,7 +135,7 @@ These limits are fixed in code, each as one named constant:
 | `PARSED_CACHE_FILES` | 10 parsed files kept for previews and comparisons | `server/src/routes/files.ts` |
 | `BLOB_LIST_PAGE` | 1,000 objects per Blob listing request | `server/src/lib/blob-storage.ts` |
 | `GENERATOR_MAX_ROWS`, `GENERATOR_MAX_FILES` | 5,000 rows per generated file, 10 files per request | `shared/types.ts` |
-| `GENERATOR_FIRST_DAY`, `GENERATOR_RANGES` | Generated rows start on 2026-09-01; mass 110–140 kg, R-32 33–40 %, R-125 26–33 % | `server/src/lib/generate.ts` |
+| `GENERATOR_FIRST_DAY`, `GENERATOR_RANGES` | Generated rows start on 2026-09-01; mass 110–140 kg, R-32 33–43 %, R-125 26–33 % | `server/src/lib/generate.ts` |
 | `DEMO_CLASS_RULES` | Demo classification thresholds: R-32-rich from 40 %, R-134a-rich from 34 % | `server/src/processing/index.ts` |
 | `TOAST_MS` | The archive/restore toast stays 8 seconds | `client/src/hooks.ts` |
 

@@ -319,9 +319,9 @@ describe('CSV generator', () => {
   it('writes exactly the same file for the same partner, settings and seed', () => {
     const hash = (partner: 'A' | 'B' | 'C') => createHash('sha256').update(generateCsv(partner, 25, 3, 7, 'pin.csv').text).digest('hex');
     expect({ A: hash('A'), B: hash('B'), C: hash('C') }).toEqual({
-      A: '5f60d34432142e5fda5f195b679ea6c68771896213352f307945ec3534ac1133',
-      B: '0aaaf3f11f001dc2b6189960810adcb9a24dcdc140a7232ba7994aaa1e8b3e49',
-      C: 'db438f73a06640aa18b48037b7a810d0d486a2157122a18370ba488f1d93245f',
+      A: '46980e0760dd905713913a96c758483c134f6a6bf7dc6da86ff3d4acb70bb132',
+      B: '69ee0eb15683ce3fd16c24e82704722593fa7ab8be5e6bc89279f9d2afa26e85',
+      C: 'a468968c44bb4ee3ef126f69da73cbf24179ce6385c19495cb5d6115fba9da9b',
     });
   });
 
@@ -365,6 +365,15 @@ describe('CSV generator', () => {
           expect(file.errors.map((e) => e.row)).toEqual(problems.items.map((p) => p.row));
           file.errors.forEach((e, i) => expect(problems.items[i].message).toContain(MESSAGE[e.kind]));
         }
+  });
+
+  it.each(GENERATOR_PARTNERS)('gives clean Partner %s files every demo classification', (partner) => {
+    const classes = new Set<string>();
+    for (let seed = 1; seed <= 5; seed++) {
+      const { headers, rows } = parseCsv(generateCsv(partner, 50, 0, seed).text);
+      processRows(headers, rows, 'classification').rows.forEach((r) => classes.add(r.blend_class));
+    }
+    expect([...classes].sort()).toEqual(['Balanced (demo)', 'R-134a-rich (demo)', 'R-32-rich (demo)']);
   });
 
   it('plants every kind of error across seeds', () => {
