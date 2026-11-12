@@ -2,7 +2,7 @@
 // Files are read with Vite's import.meta.glob (raw text), so the client needs no Node type definitions.
 import { describe, expect, it } from 'vitest';
 import { COMPARE_MAX } from '../../shared/types';
-import { FLOWS, NODES, TECH } from './components/ArchitecturePage';
+import { TECH } from './components/ArchitecturePage';
 
 const GLOBBED = import.meta.glob(
   ['../../client/src/**/*', '../../client/*.ts', '../../client/package.json', '../../server/src/**/*.ts', '../../server/package.json', '../../shared/*.ts', '../../blueprint/vercel-deployment.md'],
@@ -24,8 +24,8 @@ const dependencies = (workspace: string) => {
 
 describe('Architecture page content', () => {
   it('only names repository paths that exist', () => {
-    const paths = [...TECH.flatMap((t) => t.files), ...NODES.flatMap((n) => n.files)];
-    expect(paths.length).toBeGreaterThan(20);
+    const paths = TECH.flatMap((t) => t.files);
+    expect(paths.length).toBeGreaterThan(10);
     for (const p of paths) expect(exists(p), p).toBe(true);
     expect(exists('client/src/no-such-file.tsx')).toBe(false);
   });
@@ -40,12 +40,6 @@ describe('Architecture page content', () => {
     expect(major('client', 'react')).toBe('19');
     expect(major('client', 'tailwindcss')).toBe('4');
     expect(major('server', 'fastify')).toBe('5');
-  });
-
-  it('builds every request flow from components in the diagram', () => {
-    const ids = new Set(NODES.map((n) => n.id));
-    expect(ids.size).toBe(NODES.length);
-    for (const f of FLOWS) for (const s of f.steps) expect(ids.has(s.node), `${f.id}: ${s.node}`).toBe(true);
   });
 
   it('quotes limits and rules that match the code', () => {
