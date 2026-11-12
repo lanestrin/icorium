@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from './lib/csv';
 import { getAdapter } from './adapters';
-import { detectProcessor, detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from './processing';
+import { detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from './processing';
 import { compareResults, matchRows } from './lib/compare';
 import { GENERATE_MAX_ATTEMPTS, generateCsv, generatedName, generateFiles } from './lib/generate';
 import { nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../../shared/types';
@@ -126,9 +126,9 @@ describe('processing and export', () => {
   });
 
   it('recognises an exported result file by its columns', () => {
-    expect(detectProcessor(processRows(headers, rows, 'mass').headers)).toBe('mass');
-    expect(detectProcessor(processRows(headers, rows, 'validation').headers)).toBe('validation');
-    expect(detectProcessor(headers)).toBeUndefined();
+    expect(detectResult(processRows(headers, rows, 'mass').headers)?.processor).toBe('mass');
+    expect(detectResult(processRows(headers, rows, 'validation').headers)?.processor).toBe('validation');
+    expect(detectResult(headers)?.processor).toBeUndefined();
   });
 });
 

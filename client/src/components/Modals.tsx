@@ -22,12 +22,14 @@ function ProblemItems({ list }: { list: ProblemList }) {
   );
 }
 
+// Invalid rows in current results, and the ERROR text older exports wrote, stand out in the preview.
+const isErrorCell = (header: string, value: string) => (header === 'processing_status' && value === 'Invalid') || value === 'ERROR';
+
 const processorLabel = (id?: string) => PROCESSORS.find((p) => p.id === id)?.label ?? '';
 
 // Disabled fields cannot take focus, so they are left out of the Tab cycle.
 const FOCUSABLE = 'a[href],button:not([disabled]),select:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-/** Accessible dialog: focus moves in on open, Tab stays inside, Escape closes, focus returns on close. */
 /** Dialog shell: focus moves in, Tab stays inside, Escape closes, focus returns. full = fills the screen on phones, near-full on larger screens. */
 export function Modal({ title, subtitle, actions, narrow, full, onClose, children }: { title: string; subtitle?: string; actions?: ReactNode; narrow?: boolean; full?: boolean; onClose: () => void; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -254,7 +256,7 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
                   {i + 1}
                 </td>
                 {data.headers.map((h) => (
-                  <td key={h} className={`whitespace-nowrap px-3 py-1.5 ${gen.has(h) ? 'bg-blue-50/50' : ''} ${r[h] === 'ERROR' ? 'font-semibold text-red-600' : ''}`}>{r[h]}</td>
+                  <td key={h} className={`whitespace-nowrap px-3 py-1.5 ${gen.has(h) ? 'bg-blue-50/50' : ''} ${isErrorCell(h, r[h]) ? 'font-semibold text-red-600' : ''}`}>{r[h]}</td>
                 ))}
               </tr>
             ))}

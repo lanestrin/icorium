@@ -13,7 +13,7 @@ const round = (v: number, d = 3) => Number(v.toFixed(d));
 const ok = (v: number | null): v is number => v !== null && Number.isFinite(v);
 const total = (n: Normalized) => COMPONENTS.reduce((s, c) => s + (ok(n[c]) ? n[c]! : 0), 0);
 /** Demo-only classification thresholds (%). Not real refrigerant specifications or Icorium policy. */
-export const DEMO_CLASS_RULES = { r32RichMin: 40, r134aRichMin: 34 };
+const DEMO_CLASS_RULES = { r32RichMin: 40, r134aRichMin: 34 };
 
 /** Field checks shared by all processors. Invalid values are reported, never replaced with zero. */
 export function issues(n: Normalized): string[] {
@@ -121,10 +121,6 @@ export function detectResult(headers: string[]): { processor: ProcessorId; gener
         return { processor, generatedColumns: [...generatedColumns] };
     }
   }
-}
-
-export function detectProcessor(headers: string[]): ProcessorId | undefined {
-  return detectResult(headers)?.processor;
 }
 
 /**

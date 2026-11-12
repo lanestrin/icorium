@@ -500,7 +500,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   **Verification:** unit tests for key collisions, numeric equality and the retry cap; a component test for Tab past a disabled field; `npm run verify`.
 
-- [ ] **10.5** `chore/dead-and-partial-code` · **P2** — Remove or finish half-done code:
+- [x] **10.5** `chore/dead-and-partial-code` · **P2** — Remove or finish half-done code:
 
   - The preview highlights cells equal to `ERROR` in red (`Modals.tsx`); only legacy exports contain that, and current results write `Invalid`. Highlight `Invalid` status cells (keeping legacy `ERROR`), or drop the rule.
 

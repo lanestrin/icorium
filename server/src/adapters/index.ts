@@ -12,7 +12,7 @@ export interface Normalized {
   r134a: number | null;
 }
 
-export interface Adapter {
+interface Adapter {
   name: string;
   columns: [id: string, date: string, mass: string, r32: string, r125: string, r134a: string];
   massFactor: number; // source unit -> kg

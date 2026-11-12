@@ -1318,6 +1318,25 @@ describe('request ordering', () => {
     expect(screen.getByText('row-of-invalid')).toBeInTheDocument();
   });
 
+  it('marks Invalid status cells and legacy ERROR cells in red in the preview', async () => {
+    vi.mocked(api.rows).mockResolvedValueOnce({
+      headers: ['batch_id', 'legacy_mass', 'processing_status', 'validation_errors'],
+      rows: [
+        { batch_id: 'B1', legacy_mass: '12.5', processing_status: 'Valid', validation_errors: '' },
+        { batch_id: 'B2', legacy_mass: 'ERROR', processing_status: 'Invalid', validation_errors: 'Invalid date' },
+      ],
+      offset: 0, totalRows: 2, generatedColumns: ['processing_status', 'validation_errors'], problems: { total: 0, items: [] },
+    });
+    render(<PreviewModal file={invalid} onClose={() => {}} />);
+    const marked = (text: string) => screen.getByText(text).className.includes('text-red-600');
+    expect(await screen.findByText('Invalid')).toBeInTheDocument();
+    expect(marked('Invalid')).toBe(true);
+    expect(marked('ERROR')).toBe(true);
+    expect(marked('Valid')).toBe(false);
+    expect(marked('Invalid date')).toBe(false);
+    expect(marked('12.5')).toBe(false);
+  });
+
   it('does not show an error from a file that is no longer open', async () => {
     const forClean = deferred<FileRows>();
     vi.mocked(api.rows).mockReturnValueOnce(forClean.promise).mockResolvedValueOnce(page('row-of-invalid'));
