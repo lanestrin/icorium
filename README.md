@@ -30,7 +30,7 @@ The File ID travels with the data. A stored input gets a `file_id` column with i
 | API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message, including archive and restore and CSV generation; all three functions on all five samples: exact invalid rows and reasons, every original column and value kept, download, renamed re-upload and compare; and a file identity regression for each function: same-named uploads, separate results, refused and confirmed re-runs, archive and restore, download, re-upload linking and 2- and 5-file comparison, all by full File ID |
 | Unit + API (Vitest, Blob SDK mocked in memory) | `server/src/blob-storage.test.ts` | The private Blob storage adapter: shared files across instances, atomic result replacement, idempotent sample seeding, conflict and failure handling, and refusing a Vercel start without storage configured; and same-named uploads and results kept apart by File ID across fresh API instances |
 | Unit (Vitest) | `client/src/lib/compare-view.test.ts` | When a selection can be compared, short file labels, metric names, Δ vs reference, number formats, top-difference ranking and the fitted chart axis |
-| Component (Vitest + React Testing Library) | `client/src/pages/ArchitecturePage.test.tsx` | Architecture page sections and links, technology cards, selecting diagram components (mouse and keyboard), following each request flow, storage and trade-off sections, and navigation from every page |
+| Component (Vitest + React Testing Library) | `client/src/pages/ArchitecturePage.test.tsx` | Architecture page sections and links, overview cards, technology tiles and their details (mouse and keyboard), the diagram and its numbered steps, the decisions and their full reasoning, storage options, evolution cards and section dividers |
 | Unit (Vitest) | `client/src/pages/architecture-content.test.ts` | Every repository path, package, card version and quoted limit on the Architecture page exists in or matches the code |
 | Component (Vitest + React Testing Library) | `client/src/pages/GeneratorPage.test.tsx` | Generator defaults, partner/rows/files/error choices, the file list, per-file preview and planted errors, download names, adding all files to CSV Files and partial failure, generate failure, double clicks, keyboard submit, and `/generator` routing |
 | Unit (Vitest) | `client/src/lib/file-status.test.ts` | Input eligibility, status precedence, when the Data Quality Warning appears and its per-file counts, and which results a run would replace (by File ID, archived included), and the list sort orders, including by File ID, and how the search, tab, status, function and date filters choose the files shown |
@@ -104,7 +104,9 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 client/        React + Vite + Tailwind UI
   src/App.tsx      picks the page from the URL
   src/pages/       FilesPage (the file workspace), GeneratorPage (/generator), ArchitecturePage (/architecture)
-  src/components/  Sidebar, FileTable, CompareWorkspace, Modals
+  src/components/  Sidebar, FileTable, FileFilters, SelectionBar, ArchiveToast, Banner, Modals
+    compare/       the comparison dialog and its charts and tables, one per file
+    architecture/  the Architecture page's sections, one per file, and content.ts with the text they show
   src/hooks/       the workspace state, one hook per file: file list, selection, filters, archiving, processing
   src/lib/         api (the typed API client), file-status (file rules), compare-view (comparison rules), format
 server/        Fastify API

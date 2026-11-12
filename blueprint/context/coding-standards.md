@@ -43,7 +43,8 @@
 ## File Organization
 
 - Client: `client/src/App.tsx` (page from the URL), `client/src/pages/<Name>Page.tsx`,
-  `client/src/components/<Name>.tsx`, `client/src/hooks/use<Name>.ts` and
+  `client/src/components/<Name>.tsx` (one component per file; a feature with several pieces gets a
+  subfolder, such as `components/compare/`), `client/src/hooks/use<Name>.ts` and
   `client/src/lib/<name>.ts`. Each test sits next to the file it tests
   (`<file>.test.ts(x)`); `client/src/hooks/hooks.test.ts` covers the hooks.
 - Server: `server/src/{adapters,processing,lib,routes}/`; tests in

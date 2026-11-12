@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from 'react';
-import { ArrowLeft, Check, Network, CircleAlert, Download, Eye, FilePlus2, LoaderCircle, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Download, Eye, FilePlus2, LoaderCircle, Network, Wand2 } from 'lucide-react';
 import { ADAPTERS, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
+import { Banner } from '../components/Banner';
 import { api } from '../lib/api';
 import { errorMessage, plural } from '../lib/format';
 
@@ -154,19 +155,8 @@ export function GeneratorPage() {
         </form>
 
         <section aria-label="Generated files" className={`${CARD} min-w-0 flex-1`}>
-          {error && (
-            <div role="alert" className="mb-4 flex items-start gap-3 whitespace-pre-line rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-              <span className="flex-1">{error}</span>
-              <button onClick={() => setError(undefined)} aria-label="Dismiss"><X className="h-4 w-4" /></button>
-            </div>
-          )}
-          {added && (
-            <div role="status" className="mb-4 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-              <Check className="mt-0.5 h-4 w-4 shrink-0" />
-              <span className="flex-1">{added} <a href="/" className="font-semibold underline">Open CSV Files</a></span>
-            </div>
-          )}
+          {error && <Banner tone="error" className="mb-4" onDismiss={() => setError(undefined)}>{error}</Banner>}
+          {added && <Banner tone="success" className="mb-4">{added} <a href="/" className="font-semibold underline">Open CSV Files</a></Banner>}
 
           {!file ? (
             <p className="py-16 text-center text-slate-500">Choose a partner, the number of rows and files, and whether to include errors, then click Generate.</p>

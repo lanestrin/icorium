@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
-import { ArchitecturePage, HOW_IT_WORKS, TECH } from './ArchitecturePage';
+import { ArchitecturePage } from './ArchitecturePage';
+import { HOW_IT_WORKS, TECH } from '../components/architecture/content';
 import { api } from '../lib/api';
 
 vi.mock('../lib/api', () => ({ api: {
