@@ -1,17 +1,19 @@
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Archive, ArrowDownUp, ArrowLeftRight, Calendar, Check, ChevronDown, CircleAlert, Filter, Layers, Network, RotateCcw, Search, Wand2, X, type LucideIcon } from 'lucide-react';
-import { isInputFile, type CompareResult, type FileMeta } from '../../shared/types';
-import { api } from './api';
-import { Sidebar } from './components/Sidebar';
-import { FileTable, FileTabs } from './components/FileTable';
-import { filterFiles, PROCESSING_FUNCTIONS, SORT_OPTIONS, STATUSES, type SortKey } from './file-status';
-import { plural, useArchive, useFileList, useFilters, useProcessing, useSelection } from './hooks';
-import { compareBlocker, CompareWorkspace } from './components/CompareWorkspace';
-import { PreviewModal, QualityWarningModal, ReplaceResultModal } from './components/Modals';
-import { GeneratorPage } from './components/GeneratorPage';
-import { ArchitecturePage } from './components/ArchitecturePage';
-
-const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+import { isInputFile, type CompareResult, type FileMeta } from '../../../shared/types';
+import { CompareWorkspace } from '../components/CompareWorkspace';
+import { FileTable, FileTabs } from '../components/FileTable';
+import { PreviewModal, QualityWarningModal, ReplaceResultModal } from '../components/Modals';
+import { Sidebar } from '../components/Sidebar';
+import { useArchive } from '../hooks/useArchive';
+import { useFileList } from '../hooks/useFileList';
+import { useFilters } from '../hooks/useFilters';
+import { useProcessing } from '../hooks/useProcessing';
+import { useSelection } from '../hooks/useSelection';
+import { api } from '../lib/api';
+import { compareBlocker } from '../lib/compare-view';
+import { filterFiles, PROCESSING_FUNCTIONS, SORT_OPTIONS, STATUSES, type SortKey } from '../lib/file-status';
+import { errorMessage, plural } from '../lib/format';
 
 const FIELD = 'flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm sm:w-auto';
 const Divider = () => <div className="hidden w-px self-stretch bg-slate-200 xl:block" aria-hidden />;
@@ -36,7 +38,8 @@ function SelectFilter({ icon: Icon, label, value, onChange, children }: {
   );
 }
 
-export default function App() {
+/** The file workspace: upload, filter, process, preview, archive and compare files. */
+export function FilesPage() {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [preview, setPreview] = useState<FileMeta>();
@@ -71,7 +74,7 @@ export default function App() {
     if (compareReason || comparing) return;
     setError(undefined);
     setComparing(true);
-    try { setComparison(await api.compare(selectedInView.map((f) => f.id))); } catch (e) { setError(`Comparison failed: ${msg(e)}`); }
+    try { setComparison(await api.compare(selectedInView.map((f) => f.id))); } catch (e) { setError(`Comparison failed: ${errorMessage(e)}`); }
     setComparing(false);
   }
 
@@ -261,12 +264,4 @@ export default function App() {
       {comparison && <CompareWorkspace result={comparison} onClose={() => setComparison(undefined)} />}
     </div>
   );
-}
-
-/** Picks the page from the URL: /generator and /architecture have their own pages; anything else is the file workspace. */
-export function Root() {
-  const path = window.location.pathname.replace(/\/+$/, '');
-  if (path === '/generator') return <GeneratorPage />;
-  if (path === '/architecture') return <ArchitecturePage />;
-  return <App />;
 }

@@ -1,12 +1,12 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FileMeta, GeneratedFile } from '../../shared/types';
-import { Root } from './App';
-import { GeneratorPage } from './components/GeneratorPage';
-import { api } from './api';
+import type { FileMeta, GeneratedFile } from '../../../shared/types';
+import App from '../App';
+import { GeneratorPage } from './GeneratorPage';
+import { api } from '../lib/api';
 
-vi.mock('./api', () => ({ api: {
+vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
   downloadUrl: (id: string) => `/api/files/${id}/download`,
 } }));
@@ -175,12 +175,12 @@ describe('page routing', () => {
   it('shows the generator at /generator and the file workspace elsewhere', async () => {
     vi.mocked(api.list).mockResolvedValue([]);
     window.history.pushState({}, '', '/generator');
-    const { unmount } = render(<Root />);
+    const { unmount } = render(<App />);
     expect(screen.getByRole('heading', { name: 'CSV Generator' })).toBeInTheDocument();
     unmount();
 
     window.history.pushState({}, '', '/');
-    render(<Root />);
+    render(<App />);
     expect(screen.getByRole('heading', { name: 'CSV Files' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
     await waitFor(() => expect(api.list).toHaveBeenCalled());

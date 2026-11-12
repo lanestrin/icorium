@@ -1,4 +1,4 @@
-import { parseFileId, PROCESSORS, resultFileId, type FileMeta, type ProcessorId } from '../../shared/types';
+import { parseFileId, PROCESSORS, resultFileId, type FileMeta, type ProcessorId } from '../../../shared/types';
 
 // Rules for files in the workspace: statuses, warnings, replacements, function names, sorting and filtering.
 

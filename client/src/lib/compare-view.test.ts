@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { FileMeta } from '../../shared/types';
-import type { CompareColumn, MatchedRow } from '../../shared/types';
-import { compareBlocker, deltas, deltaUnit, differsFromRef, fileLabels, fmtDelta, fmtValue, metricLabel, topDifferences, yDomain } from './components/CompareWorkspace';
+import type { FileMeta } from '../../../shared/types';
+import type { CompareColumn, MatchedRow } from '../../../shared/types';
+import { compareBlocker, deltas, deltaUnit, differsFromRef, fileLabels, fmtDelta, fmtValue, metricLabel, topDifferences, yDomain } from './compare-view';
 
 const result = (id: string, processor: FileMeta['processor'] = 'validation'): FileMeta =>
   ({ id, name: `${id}.csv`, rows: 25, columns: 9, uploadedAt: '', status: 'Processed', processor });

@@ -1,8 +1,8 @@
 import { ArrowDown, ArrowUp, Check, CircleAlert, Download, Eye, FileSpreadsheet, Layers, LoaderCircle, MoreHorizontal, RotateCcw, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { FileMeta } from '../../../shared/types';
-import { api } from '../api';
-import { displayStatus, importedLineage, processingFunction, type SortKey, type Status, type Tab } from '../file-status';
+import { api } from '../lib/api';
+import { displayStatus, importedLineage, processingFunction, type SortKey, type Status, type Tab } from '../lib/file-status';
 
 const BADGE: Record<Status, [string, LucideIcon]> = {
   Ready: ['bg-green-50 text-green-700', Check],

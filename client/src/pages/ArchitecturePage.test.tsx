@@ -1,11 +1,11 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Root } from './App';
-import { ArchitecturePage, HOW_IT_WORKS, TECH } from './components/ArchitecturePage';
-import { api } from './api';
+import App from '../App';
+import { ArchitecturePage, HOW_IT_WORKS, TECH } from './ArchitecturePage';
+import { api } from '../lib/api';
 
-vi.mock('./api', () => ({ api: {
+vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
   downloadUrl: (id: string) => `/api/files/${id}/download`,
 } }));
@@ -126,20 +126,20 @@ describe('navigation to the Architecture page', () => {
   it('opens at /architecture and is linked from the other pages', async () => {
     vi.mocked(api.list).mockResolvedValue([]);
     window.history.pushState({}, '', '/architecture');
-    const page = render(<Root />);
+    const page = render(<App />);
     expect(screen.getByRole('heading', { level: 1, name: 'Architecture & Tech Stack' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Back to CSV Files/ })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
     page.unmount();
 
     window.history.pushState({}, '', '/');
-    const files = render(<Root />);
+    const files = render(<App />);
     expect(within(screen.getByRole('navigation', { name: 'Pages' })).getByRole('link', { name: /Architecture/ })).toHaveAttribute('href', '/architecture');
     await waitFor(() => expect(api.list).toHaveBeenCalled());
     files.unmount();
 
     window.history.pushState({}, '', '/generator');
-    render(<Root />);
+    render(<App />);
     expect(screen.getByRole('link', { name: /Architecture/ })).toHaveAttribute('href', '/architecture');
   });
 });

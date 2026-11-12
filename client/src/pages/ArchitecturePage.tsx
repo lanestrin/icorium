@@ -33,7 +33,7 @@ export const TECH: Tech[] = [
       'A large ecosystem and familiar patterns keep the code maintainable.',
     ],
     tradeoff: 'A single-page app with no server rendering: data loads after the page does. That is fine for an internal tool.',
-    files: ['client/src/App.tsx', 'client/src/components'],
+    files: ['client/src/App.tsx', 'client/src/pages', 'client/src/components', 'client/src/hooks'],
   },
   {
     name: 'TypeScript', label: 'TypeScript', role: 'Type safety', icon: Code2, packages: [['client', 'typescript'], ['server', 'typescript']],
@@ -118,7 +118,7 @@ export const TECH: Tech[] = [
       'npm run verify runs them all plus the client type-check and build, locally and in CI.',
     ],
     tradeoff: 'Component tests run in jsdom: they check behaviour, not real-browser layout or chart drawing.',
-    files: ['server/src/core.test.ts', 'server/src/api.test.ts', 'client/src/App.test.tsx'],
+    files: ['server/src/core.test.ts', 'server/src/api.test.ts', 'client/src/pages/FilesPage.test.tsx'],
   },
   {
     name: 'Local filesystem / Vercel Blob', label: 'Files / Blob', role: 'File storage', icon: Database, packages: [['server', '@vercel/blob']],
