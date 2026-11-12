@@ -49,8 +49,8 @@ describe('Architecture page content', () => {
   });
 
   it('quotes limits and rules that match the code', () => {
-    expect(read('server/src/app.ts')).toContain('fileSize: 10 * 1024 * 1024'); // 10 MB uploads
-    expect(read('server/src/app.ts')).toContain("level: 'warn'"); // warnings and errors only
+    expect(read('server/src/app.ts')).toContain('DEFAULT_MAX_UPLOAD_MB = 10;'); // 10 MB uploads by default
+    expect(read('server/src/app.ts')).toContain("DEFAULT_LOG_LEVEL = 'warn';"); // warnings and errors only by default
     expect(read('server/src/processing/index.ts')).toContain('TOTAL_TOLERANCE_PCT = 0.5'); // ±0.5 points
     expect(read('shared/types.ts')).toMatch(/GENERATOR_MAX_ROWS = 5000;[\s\S]*GENERATOR_MAX_FILES = 10;/);
     expect(COMPARE_MAX).toBe(5);

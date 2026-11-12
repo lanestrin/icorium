@@ -2,6 +2,11 @@ import { randomInt } from 'node:crypto';
 import { httpError, toCsv } from './csv';
 import { ADAPTERS, type GeneratedError, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
 
+/** The first generated row's sample date (2026-09-01, UTC); each later row is one day after. */
+const GENERATOR_FIRST_DAY = Date.UTC(2026, 8, 1);
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Ranges clean generated rows are drawn from: feed mass in kg, R-32 and R-125 in %. R-134a makes up the rest. */
+const GENERATOR_RANGES = { massKg: [110, 140], r32Pct: [33, 40], r125Pct: [26, 33] } as const;
 /** Tries allowed in one generateFiles call before it gives up on making distinct files. */
 export const GENERATE_MAX_ATTEMPTS = 100;
 
@@ -36,7 +41,7 @@ export function generateCsv(partner: GeneratorPartner, rows: number, errorRows: 
   if (!adapter) throw httpError(400, `Unknown partner ${partner}.`);
 
   const rand = random(seed);
-  const between = (lo: number, hi: number) => lo + rand() * (hi - lo);
+  const between = ([lo, hi]: readonly [number, number]) => lo + rand() * (hi - lo);
   const { digits } = adapter;
   const fixed = (v: number, d: number) => v.toFixed(d);
   const [idCol, dateCol, massCol, r32Col, r125Col, r134aCol] = adapter.columns;
@@ -44,11 +49,11 @@ export function generateCsv(partner: GeneratorPartner, rows: number, errorRows: 
   const pctTotal = 100 / adapter.pctFactor; // 100 for percentages, 1 for fractions
 
   const out = Array.from({ length: rows }, (_, i) => {
-    const day = new Date(Date.UTC(2026, 8, 1 + i)).toISOString().slice(0, 10);
-    const massKg = between(110, 140);
+    const day = new Date(GENERATOR_FIRST_DAY + i * DAY_MS).toISOString().slice(0, 10);
+    const massKg = between(GENERATOR_RANGES.massKg);
     // Two components at random, the third makes up the rest, so the total is exactly 100% after rounding.
-    const r32 = Number(fixed(between(33, 40) / adapter.pctFactor, digits.pct));
-    const r125 = Number(fixed(between(26, 33) / adapter.pctFactor, digits.pct));
+    const r32 = Number(fixed(between(GENERATOR_RANGES.r32Pct) / adapter.pctFactor, digits.pct));
+    const r125 = Number(fixed(between(GENERATOR_RANGES.r125Pct) / adapter.pctFactor, digits.pct));
     return {
       [idCol]: `${partner}-${String(i + 1).padStart(width, '0')}`,
       [dateCol]: day,

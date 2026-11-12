@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { DEFAULT_LOG_LEVEL, DEFAULT_MAX_UPLOAD_MB, serverSettings } from './app';
 import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from './lib/csv';
 import { getAdapter } from './adapters';
@@ -507,5 +508,28 @@ describe('linking an imported result to its original', () => {
   it('keeps the original base ID in file_id for a linked result', () => {
     expect(stampFileIds(resultHeaders, resultRows, '101012-V', true, '101010').rows[0]).toMatchObject({ file_id: '101010', result_id: '101012-V' });
     expect(stampFileIds(resultHeaders, resultRows, '101012-V', true).rows[0]).toMatchObject({ file_id: '101012', result_id: '101012-V' });
+  });
+});
+
+describe('server settings', () => {
+  it("uses today's defaults when nothing is set, or a variable is empty", () => {
+    const defaults = { maxUploadMb: DEFAULT_MAX_UPLOAD_MB, logLevel: DEFAULT_LOG_LEVEL, host: '0.0.0.0', port: 3001 };
+    expect(serverSettings({})).toEqual(defaults);
+    expect(serverSettings({ MAX_UPLOAD_MB: '', LOG_LEVEL: '', HOST: '', PORT: '' })).toEqual(defaults);
+    expect(defaults).toMatchObject({ maxUploadMb: 10, logLevel: 'warn' });
+  });
+
+  it('reads each setting from its environment variable', () => {
+    expect(serverSettings({ MAX_UPLOAD_MB: '0.5', LOG_LEVEL: 'info', HOST: '127.0.0.1', PORT: '4000' }))
+      .toEqual({ maxUploadMb: 0.5, logLevel: 'info', host: '127.0.0.1', port: 4000 });
+  });
+
+  it.each(['0', '-1', 'ten', 'Infinity'])('refuses MAX_UPLOAD_MB=%s, naming the variable', (value) => {
+    expect(() => serverSettings({ MAX_UPLOAD_MB: value })).toThrow(`MAX_UPLOAD_MB must be a positive number of megabytes, got "${value}".`);
+  });
+
+  it('refuses an unknown LOG_LEVEL, listing the valid ones', () => {
+    expect(() => serverSettings({ LOG_LEVEL: 'loud' }))
+      .toThrow('LOG_LEVEL must be one of fatal, error, warn, info, debug, trace, silent, got "loud".');
   });
 });

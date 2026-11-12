@@ -114,6 +114,31 @@ shared/        types and the processor list used by both sides
 sample-data/   the five synthetic partner CSVs (never edited)
 ```
 
+## Settings
+
+The API reads these environment variables when it starts. Each is optional; unset or empty means the default. An invalid value stops the server with a message naming the variable.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `MAX_UPLOAD_MB` | `10` | Largest CSV upload, in megabytes (any positive number, e.g. `0.5`). A larger file is refused with 413 "request file too large". |
+| `LOG_LEVEL` | `warn` | Server log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent`. Use `info` to see the "API on http://localhost:3001" startup line. |
+| `HOST` | `0.0.0.0` | Address the API listens on. |
+| `PORT` | `3001` | Port the API listens on. |
+
+Storage is chosen by `RECLAIM_DATA_DIR`, `BLOB_READ_WRITE_TOKEN`, `RECLAIM_BLOB_PREFIX` and `VERCEL` (see `createStorage` in `server/src/lib/storage.ts` and the deployment notes below).
+
+These limits are fixed in code, each as one named constant:
+
+| Constant | Value | File |
+| --- | --- | --- |
+| `PREVIEW_MAX_ROWS` | 1,000 rows per preview page (100 by default) | `server/src/routes/files.ts` |
+| `PARSED_CACHE_FILES` | 10 parsed files kept for previews and comparisons | `server/src/routes/files.ts` |
+| `BLOB_LIST_PAGE` | 1,000 objects per Blob listing request | `server/src/lib/blob-storage.ts` |
+| `GENERATOR_MAX_ROWS`, `GENERATOR_MAX_FILES` | 5,000 rows per generated file, 10 files per request | `shared/types.ts` |
+| `GENERATOR_FIRST_DAY`, `GENERATOR_RANGES` | Generated rows start on 2026-09-01; mass 110–140 kg, R-32 33–40 %, R-125 26–33 % | `server/src/lib/generate.ts` |
+| `DEMO_CLASS_RULES` | Demo classification thresholds: R-32-rich from 40 %, R-134a-rich from 34 % | `server/src/processing/index.ts` |
+| `TOAST_MS` | The archive/restore toast stays 8 seconds | `client/src/hooks.ts` |
+
 ## Deploy
 
 Local development needs no account or cloud service. An optional Vercel deployment (client and server services, private Blob storage) is configured; see [deployment configuration and outstanding checks](blueprint/vercel-deployment.md).

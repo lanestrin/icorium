@@ -4,6 +4,8 @@ import { httpError } from './csv';
 import type { NewFile, NewUpload, Storage } from './storage';
 
 type StoredFile = { meta: FileMeta; text: string };
+/** Most objects one Blob listing request returns; longer listings are read page by page. */
+const BLOB_LIST_PAGE = 1000;
 /** How many times create() tries the next number when another server claims it first. */
 const CLAIM_ATTEMPTS = 20;
 
@@ -39,7 +41,7 @@ export function createBlobStorage(prefix: string): Storage {
     const out: string[] = [];
     let cursor: string | undefined;
     do {
-      const page = await list({ prefix: prefixPath, cursor, limit: 1000 });
+      const page = await list({ prefix: prefixPath, cursor, limit: BLOB_LIST_PAGE });
       for (const blob of page.blobs) out.push(blob.pathname.slice(prefixPath.length).replace(/\.json$/, ''));
       cursor = page.hasMore ? page.cursor : undefined;
     } while (cursor);

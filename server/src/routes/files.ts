@@ -20,10 +20,12 @@ const compareQuery = z.object({
 }).transform((q) => q.ids)
   .refine((ids) => ids.length >= COMPARE_MIN && ids.length <= COMPARE_MAX, `Choose ${COMPARE_MIN} to ${COMPARE_MAX} results to compare`)
   .refine((ids) => new Set(ids).size === ids.length, 'Choose different files');
+/** Most rows one preview page returns. */
+export const PREVIEW_MAX_ROWS = 1000;
 // Previews load a page at a time so a large CSV never has to be rendered all at once.
 const pageQuery = z.object({
   offset: z.coerce.number().int().min(0).default(0),
-  limit: z.coerce.number().int().min(1).max(1000).default(100),
+  limit: z.coerce.number().int().min(1).max(PREVIEW_MAX_ROWS).default(100),
 });
 const generateBody = z.object({
   partner: z.enum(GENERATOR_PARTNERS, { message: `Choose partner ${GENERATOR_PARTNERS.slice(0, -1).join(', ')} or ${GENERATOR_PARTNERS.at(-1)}` }),
