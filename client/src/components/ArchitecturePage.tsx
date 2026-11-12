@@ -67,7 +67,7 @@ export const TECH: Tech[] = [
     name: 'Fastify 5', role: 'Backend', icon: Server, packages: [['server', 'fastify'], ['server', '@fastify/multipart']],
     why: [
       'A lightweight HTTP API; routes are registered as a plugin under /api.',
-      'The multipart plugin handles CSV uploads, capped at 10 MB per file.',
+      'The multipart plugin handles CSV uploads, capped at 10 MB per file by default (MAX_UPLOAD_MB).',
       'One error handler turns validation and processing errors into clear messages with the right status code.',
     ],
     tradeoff: 'A second service to run and deploy alongside the frontend; locally, npm run dev starts both.',
@@ -80,7 +80,7 @@ export const TECH: Tech[] = [
       'Explicit input contracts with plain-language error messages.',
       'Covers what TypeScript cannot: data arriving from outside the program.',
     ],
-    tradeoff: 'Schemas sit beside the TypeScript types and must be kept in step, e.g. the processor list.',
+    tradeoff: 'Request schemas are a second definition beside the TypeScript types. The allowed functions and partners come from the shared lists, but field rules such as limits and messages are written in the schemas.',
     files: ['server/src/routes/files.ts'],
   },
   {
@@ -154,8 +154,8 @@ export const NODES: ArchNode[] = [
     detail: 'Turns CSV text into headers and rows, rejecting malformed files or files with no data rows, and writes CSVs back out with correct quoting.',
     files: ['server/src/lib/csv.ts'] },
   { id: 'adapters', title: 'Partner normalization', icon: Split, summary: 'Each partner’s columns and units → one record',
-    detail: 'An adapter per partner maps its column names and units (kg, lb or g; percentages or fractions) onto one normalized record. A file that matches no adapter is rejected. Adding a partner means adding one adapter entry.',
-    files: ['server/src/adapters/index.ts'] },
+    detail: 'Each partner format is one ADAPTERS entry in shared/types.ts: its column names and units (kg, lb or g; percentages or fractions). The adapters module matches a file’s headers to an entry and maps each row onto one normalized record; a file that matches none is rejected. Adding a partner means adding one entry.',
+    files: ['shared/types.ts', 'server/src/adapters/index.ts'] },
   { id: 'validation', title: 'Validation', icon: CheckCircle2, summary: 'Shared row rules, invalid rows kept',
     detail: 'The same rules check every row for every function: missing or invalid mass, out-of-range percentages, composition totals outside ±0.5 points, missing or duplicate batch IDs. Invalid rows are kept with their reasons, never corrected silently.',
     files: ['server/src/processing/index.ts'] },
@@ -172,7 +172,7 @@ export const NODES: ArchNode[] = [
     detail: 'Makes 1–10 synthetic CSVs in a partner’s own format, with an exact number of rows that fail validation. It saves nothing: the browser downloads the files or uploads them through the normal upload.',
     files: ['server/src/lib/generate.ts', 'client/src/components/GeneratorPage.tsx'] },
   { id: 'storage', title: 'Storage layer', icon: Layers, summary: 'Files keyed by File ID',
-    detail: 'The only module that touches persistence. Files are stored and found by File ID (101010, 101010-M), never by name. Routes call the same operations whichever backend is active: list, get, read, patch, create (claims the next ID) and put (writes a result at its ID); the backend is chosen once at startup from the environment.',
+    detail: 'The only module that touches persistence. Files are stored and found by File ID (101010, 101010-M), never by name. Routes call the same operations whichever backend is active: list, get, read, patch, create (claims the next ID), createAt (saves a new result only if its ID is free) and put (replaces a result when the person confirms); the backend is chosen once at startup from the environment.',
     files: ['server/src/lib/storage.ts'] },
   { id: 'local', title: 'Local filesystem', icon: HardDrive, summary: 'server/data: CSV files + meta.json',
     detail: 'Used when no Blob token is set. Each CSV is a file under server/data/files and all metadata is one meta.json, replaced atomically (written to a temporary file, then renamed) so a crash mid-write cannot corrupt it. Deleting server/data resets the demo; the five samples load on first start.',
@@ -181,7 +181,7 @@ export const NODES: ArchNode[] = [
     detail: 'Used when BLOB_READ_WRITE_TOKEN is set. Each file and its metadata are one private object named by its File ID; a new ID is claimed with a create-if-absent write, so two servers never hand out the same one, and a new result is saved the same way, so an unconfirmed run never overwrites one. Updates use ETag checks and return 409 on a conflicting change. On Vercel, startup fails rather than fall back to temporary disk.',
     files: ['server/src/lib/blob-storage.ts'] },
   { id: 'shared', title: 'Shared contracts', icon: Braces, summary: 'Types used by client and server',
-    detail: 'FileMeta, CompareResult, GeneratedFile, the processor list and the comparison and generator limits are defined once and imported by both sides, so request and response shapes cannot silently diverge.',
+    detail: 'FileMeta, CompareResult, GeneratedFile, the processor list, the partner formats (ADAPTERS) and the comparison and generator limits are defined once and imported by both sides, so request and response shapes cannot silently diverge.',
     files: ['shared/types.ts'] },
 ];
 
@@ -209,7 +209,7 @@ export const FLOWS: Flow[] = [
     { node: 'validation', text: 'Each row is validated with the shared rules.' },
     { node: 'processing', text: 'The chosen function calculates valid rows only.' },
     { node: 'results', text: 'Original columns are kept and generated columns appended.' },
-    { node: 'storage', text: 'The result CSV is saved as the input’s ID plus the function’s code (101010-M), replacing an earlier run; the browser then previews it via GET /api/files/:id/rows.' },
+    { node: 'storage', text: 'The result CSV is saved as the input’s ID plus the function’s code (101010-M). It replaces an earlier run only when the person confirms; otherwise the server answers 409. The browser then previews it via GET /api/files/:id/rows.' },
   ] },
   { id: 'compare', label: 'Compare', steps: [
     { node: 'browser', text: 'The person ticks 2–5 results of one function and clicks Compare.' },
@@ -258,27 +258,17 @@ const DECISIONS: { question: string; answer: string[] }[] = [
   ] },
 ];
 
-const TRADEOFFS: [string, string, string][] = [
-  ['React + Vite', 'A focused, lightweight frontend with fast feedback', 'A separate API to deploy and configure'],
-  ['Fastify', 'A simple, modular backend with clear error handling', 'Backend code and a second service to maintain'],
-  ['Filesystem / Blob storage', 'Low infrastructure complexity; originals kept as files', 'Less suitable for relational queries or large catalogues'],
-  ['Synchronous processing', 'Straightforward execution and error reporting', 'Limited scalability for large or slow workloads'],
-  ['Shared TypeScript types', 'Consistent data structures on both sides', 'Runtime validation (Zod) is still necessary'],
-  ['No authentication', 'Less demo complexity; anyone can try every feature', 'Not suitable for unrestricted multi-user production use'],
-];
-
 const EVOLVE: { title: string; icon: LucideIcon; text: string }[] = [
-  { title: 'Authentication and access control', icon: ShieldCheck, text: 'User accounts, and partner- or team-level access to files. Today the API is unauthenticated and everyone shares one dataset.' },
+  { title: 'Authentication and access control', icon: ShieldCheck, text: 'User accounts, and partner- or team-level access to files. Today the API is unauthenticated and everyone shares one dataset: anyone can try every feature, which suits the demo but not unrestricted multi-user use.' },
   { title: 'PostgreSQL for metadata', icon: Database, text: 'Once there are users, audit history or searches across many files, move metadata to a relational database and keep the CSVs in object storage.' },
-  { title: 'S3-compatible object storage', icon: Cloud, text: 'If hosting moves away from Vercel, add an S3 or Cloudflare R2 backend behind the same storage interface. Not implemented today.' },
   { title: 'Background jobs and queues', icon: Workflow, text: 'Process large files on workers with job status in the UI, instead of within the request.' },
-  { title: 'Upload hardening', icon: FileInput, text: 'Uploads are already limited to 10 MB and checked against a partner schema. Next: rate limiting, per-user quotas and stricter content checks.' },
-  { title: 'Monitoring and logging', icon: Sparkles, text: 'Structured request logs, error tracking and alerts. Today the server logs warnings and errors only.' },
+  { title: 'Upload hardening', icon: FileInput, text: 'Uploads are already limited to 10 MB by default and checked against a partner schema. Next: rate limiting, per-user quotas and stricter content checks.' },
+  { title: 'Monitoring and logging', icon: Sparkles, text: 'Structured request logs, error tracking and alerts. Today the server logs warnings and errors by default (LOG_LEVEL raises it).' },
 ];
 
 const SECTIONS = [
   ['overview', 'Overview'], ['stack', 'Tech stack'], ['architecture', 'Architecture'], ['decisions', 'Decisions'],
-  ['storage', 'Storage'], ['tradeoffs', 'Trade-offs'], ['evolve', 'Evolution'],
+  ['storage', 'Storage'], ['evolve', 'Evolution'],
 ] as const;
 
 const CARD = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm';
@@ -526,7 +516,7 @@ export function ArchitecturePage() {
               <ArrowDown className="my-2 h-5 w-5 text-slate-400" aria-hidden />
               <div className="w-full max-w-md rounded-xl border-2 border-blue-500 bg-blue-50 px-4 py-3 text-center">
                 <p className="font-semibold text-blue-800">storage</p>
-                <p className="font-mono text-xs text-blue-800">list · get · read · patch · create · put</p>
+                <p className="font-mono text-xs text-blue-800">list · get · read · patch · create · createAt · put</p>
               </div>
               <svg viewBox="0 0 300 40" className="h-10 w-full max-w-2xl" aria-hidden preserveAspectRatio="none">
                 <path d="M150 0 V14 M50 14 H250 M50 14 V40 M150 14 V40 M250 14 V40" stroke="#94a3b8" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
@@ -556,28 +546,7 @@ export function ArchitecturePage() {
           </div>
         </Section>
 
-        <Section id="tradeoffs" eyebrow="6 · Trade-offs" title="What each decision buys, and what it costs">
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table aria-label="Trade-offs" className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="bg-slate-50 text-left [&>th]:px-4 [&>th]:py-3 [&>th]:font-semibold">
-                  <th>Decision</th><th>Benefit</th><th>Trade-off</th>
-                </tr>
-              </thead>
-              <tbody>
-                {TRADEOFFS.map(([decision, benefit, cost]) => (
-                  <tr key={decision} className="border-t border-slate-100 align-top [&>td]:px-4 [&>td]:py-3">
-                    <td className="font-semibold">{decision}</td>
-                    <td className="text-slate-700">{benefit}</td>
-                    <td className="text-slate-700">{cost}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Section>
-
-        <Section id="evolve" eyebrow="7 · Evolution" title="What I would evolve as the product scales"
+        <Section id="evolve" eyebrow="6 · Evolution" title="What I would evolve as the product scales"
           intro="None of these is needed for the current scope. Each is a response to a specific kind of growth.">
           <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {EVOLVE.map((e) => (

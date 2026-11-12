@@ -22,7 +22,7 @@ describe('Architecture & Tech Stack page', () => {
     expect(screen.getByText('Building a maintainable CSV processing application with a focused, type-safe technology stack.')).toBeInTheDocument();
     expect(screen.getByText(/Choose the simplest technology that meets the requirements/)).toBeInTheDocument();
     const links = within(screen.getByRole('navigation', { name: 'On this page' })).getAllByRole('link');
-    expect(links.map((l) => l.textContent)).toEqual(['Overview', 'Tech stack', 'Architecture', 'Decisions', 'Storage', 'Trade-offs', 'Evolution']);
+    expect(links.map((l) => l.textContent)).toEqual(['Overview', 'Tech stack', 'Architecture', 'Decisions', 'Storage', 'Evolution']);
     for (const link of links) {
       const id = link.getAttribute('href')!.slice(1);
       expect(document.getElementById(id)?.tagName).toBe('SECTION');
@@ -51,8 +51,9 @@ describe('Architecture & Tech Stack page', () => {
     await user.click(node(/^Partner normalization/));
     expect(node(/^Partner normalization/)).toHaveAttribute('aria-pressed', 'true');
     expect(node(/^Fastify REST API/)).toHaveAttribute('aria-pressed', 'false');
-    expect(selected()).toHaveTextContent('Adding a partner means adding one adapter entry.');
-    expect(within(selected()).getByRole('list', { name: 'Implemented in' })).toHaveTextContent('server/src/adapters/index.ts');
+    expect(selected()).toHaveTextContent('Each partner format is one ADAPTERS entry in shared/types.ts');
+    expect(selected()).toHaveTextContent('Adding a partner means adding one entry.');
+    expect(within(selected()).getByRole('list', { name: 'Implemented in' })).toHaveTextContent('shared/types.tsserver/src/adapters/index.ts');
 
     // Keyboard: Tab to a component and press Enter.
     node(/^Vercel Blob/).focus();
@@ -88,15 +89,17 @@ describe('Architecture & Tech Stack page', () => {
     expect(within(storage).getByRole('img', { name: /S3 or Cloudflare R2 could be added/ })).toHaveTextContent('S3 / Cloudflare R2Possible future backend · not built');
   });
 
-  it('lists the trade-offs and how the product would evolve', () => {
+  it('lists how the product would evolve, without a separate trade-offs table', () => {
     render(<ArchitecturePage />);
-    const rows = within(screen.getByRole('table', { name: 'Trade-offs' })).getAllByRole('row').slice(1);
-    expect(rows.map((r) => r.querySelector('td')!.textContent)).toEqual([
-      'React + Vite', 'Fastify', 'Filesystem / Blob storage', 'Synchronous processing', 'Shared TypeScript types', 'No authentication',
-    ]);
+    expect(screen.queryByRole('table', { name: 'Trade-offs' })).not.toBeInTheDocument();
     const evolve = document.getElementById('evolve')!;
     expect(within(evolve).getByRole('heading', { level: 2 })).toHaveTextContent('What I would evolve as the product scales');
-    expect(evolve).toHaveTextContent('Uploads are already limited to 10 MB');
+    expect(within(evolve).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Authentication and access control', 'PostgreSQL for metadata', 'Background jobs and queues', 'Upload hardening', 'Monitoring and logging',
+    ]);
+    expect(evolve).toHaveTextContent('not unrestricted multi-user use');
+    expect(evolve).toHaveTextContent('Uploads are already limited to 10 MB by default');
+    expect(evolve).toHaveTextContent('warnings and errors by default (LOG_LEVEL raises it)');
   });
 });
 
