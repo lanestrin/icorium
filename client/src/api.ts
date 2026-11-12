@@ -11,6 +11,10 @@ async function json<T>(res: Response): Promise<T> {
   return body as T;
 }
 
+/** Sends a JSON body with POST and reads the JSON answer. */
+const postJson = <T>(url: string, body: unknown) =>
+  fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(json<T>);
+
 export const api = {
   list: () => fetch('/api/files').then(json<FileMeta[]>),
   rows: (id: string, offset = 0, limit = 100) => fetch(`/api/files/${id}/rows?offset=${offset}&limit=${limit}`).then(json<FileRows>),
@@ -22,22 +26,10 @@ export const api = {
   },
   /** replace: true only after the person confirmed replacing this input's existing result. */
   process: (fileId: string, processor: ProcessorId, replace?: boolean) =>
-    fetch('/api/process', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(replace ? { fileId, processor, replace: true } : { fileId, processor }),
-    }).then(json<FileMeta>),
+    postJson<FileMeta>('/api/process', replace ? { fileId, processor, replace: true } : { fileId, processor }),
   archive: (ids: string[], archived: boolean) =>
-    fetch('/api/files/archive', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ids, archived }),
-    }).then(json<FileMeta[]>),
+    postJson<FileMeta[]>('/api/files/archive', { ids, archived }),
   generate: (body: { partner: GeneratorPartner; rows: number; errorRows: number; files: number }) =>
-    fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    }).then(json<GeneratedBatch>),
+    postJson<GeneratedBatch>('/api/generate', body),
   compare: (ids: string[]) => fetch(`/api/compare?ids=${ids.map(encodeURIComponent).join(',')}`).then(json<CompareResult>),
 };

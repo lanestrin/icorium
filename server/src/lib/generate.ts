@@ -3,10 +3,6 @@ import { ADAPTERS } from '../adapters';
 import { httpError, toCsv } from './csv';
 import type { GeneratedError, GeneratedFile, GeneratorPartner } from '../../../shared/types';
 
-/** Largest file the generator makes; enough for demos without slowing the synchronous API. */
-export const GENERATOR_MAX_ROWS = 5000;
-/** Most files one request makes. */
-export const GENERATOR_MAX_FILES = 10;
 /** Tries allowed in one generateFiles call before it gives up on making distinct files. */
 export const GENERATE_MAX_ATTEMPTS = 100;
 
@@ -44,8 +40,6 @@ const SINGLE_ERRORS: GeneratedError['kind'][] = ['mass missing', 'mass not a num
  * fail, so it is only planted when at least two error rows remain.
  */
 export function generateCsv(partner: GeneratorPartner, rows: number, errorRows: number, seed = randomInt(2 ** 31), name = generatedName(partner, 1, new Date())): GeneratedFile {
-  if (!Number.isInteger(rows) || rows < 1 || rows > GENERATOR_MAX_ROWS) throw httpError(400, `Rows must be a whole number from 1 to ${GENERATOR_MAX_ROWS}.`);
-  if (!Number.isInteger(errorRows) || errorRows < 0 || errorRows > rows) throw httpError(400, 'Rows with errors must be a whole number from 0 to the number of rows.');
   const adapter = ADAPTERS.find((a) => a.name === `Partner ${partner}`);
   if (!adapter) throw httpError(400, `Unknown partner ${partner}.`);
 
@@ -107,7 +101,6 @@ export function generateCsv(partner: GeneratorPartner, rows: number, errorRows: 
  * a clear error instead of retrying forever. `make` is the file generator; tests can replace it.
  */
 export function generateFiles(partner: GeneratorPartner, rows: number, errorRows: number, count: number, seed = randomInt(2 ** 31), made = new Date(), make = generateCsv): GeneratedFile[] {
-  if (!Number.isInteger(count) || count < 1 || count > GENERATOR_MAX_FILES) throw httpError(400, `Number of files must be a whole number from 1 to ${GENERATOR_MAX_FILES}.`);
   const files: GeneratedFile[] = [];
   const seen = new Set<string>();
   let next = seed;

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { codeOf, type CompareResult, type FileMeta, type ReplaceConflict, type FileRows, type GeneratedBatch, type ProcessorId } from '../../shared/types';
+import { codeOf, isInputFile, PROCESSORS, type CompareResult, type FileMeta, type ReplaceConflict, type FileRows, type GeneratedBatch, type ProcessorId } from '../../shared/types';
 import { parseCsv, toCsv } from './lib/csv';
 import { processors } from './processing';
 
@@ -116,6 +116,13 @@ describe('preview paging', () => {
 });
 
 describe('processing', () => {
+  it('accepts exactly the processing functions listed in PROCESSORS', async () => {
+    expect(PROCESSORS.map((p) => p.id)).toEqual([...PROCESSOR_IDS]);
+    const input = (await listFiles()).find(isInputFile)!;
+    for (const { id } of PROCESSORS) expect((await processFile(input.id, id, true)).statusCode).toBe(200);
+    expect((await processFile(input.id, 'sorting')).statusCode).toBe(400);
+  });
+
   // The one planted problem per file, from sample-data/README.txt (1-based data rows).
   it.each([
     ['partner_a_baseline.csv', [8], 'mass missing'],

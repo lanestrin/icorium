@@ -3,7 +3,9 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { parseFileId, PROCESSORS, resultFileId, type FileMeta, type ProcessorId } from '../../../shared/types';
 import { api } from '../api';
 
-export type Status = FileMeta['status'] | 'Processing' | 'Error';
+/** Every status a file row can show, in the order the Status filter lists them. */
+export const STATUSES = ['Ready', 'Needs Review', 'Processing', 'Processed', 'Error'] as const;
+export type Status = (typeof STATUSES)[number];
 
 /** Stored status, overridden while this file is processing or after its processing failed. */
 export const displayStatus = (f: FileMeta, processingId?: string, failedIds?: Set<string>): Status =>
@@ -58,12 +60,17 @@ function StatusBadge({ status }: { status: Status }) {
   );
 }
 
-const FUNCTION_LABEL: Record<ProcessorId, string> = { validation: 'Validation', mass: 'Mass Calculation', classification: 'Classification' };
-/** Choices for the processing function filter, in the order the functions are listed. */
-export const PROCESSING_FUNCTIONS = ['Original', ...Object.values(FUNCTION_LABEL)];
-/** Which processing function made a file: "Original" for inputs, the function's name for results. */
+/** Choices for the processing function filter: inputs first, then each function in PROCESSORS order. */
+export const PROCESSING_FUNCTIONS: { value: 'original' | ProcessorId; label: string }[] = [
+  { value: 'original', label: 'Original' },
+  ...PROCESSORS.map((p) => ({ value: p.id, label: p.tableLabel })),
+];
+/** Which processing function made a file: 'original' for inputs, the function's id for results (undefined if unknown). */
+export const processingFunctionId = (f: FileMeta): 'original' | ProcessorId | undefined =>
+  f.status !== 'Processed' ? 'original' : f.processor;
+/** That function's name for the table: "Original" for inputs, "—" for a result whose function is unknown. */
 export const processingFunction = (f: FileMeta) =>
-  f.status !== 'Processed' ? 'Original' : f.processor ? FUNCTION_LABEL[f.processor] : '—';
+  PROCESSING_FUNCTIONS.find((o) => o.value === processingFunctionId(f))?.label ?? '—';
 
 export type SortKey = 'archived-desc' | 'uploaded-desc' | 'uploaded-asc' | 'name-asc' | 'name-desc' | 'id-asc' | 'id-desc';
 /** Sort by choices. "Archived (newest)" is offered only in the Archived tab, where it is the default. */

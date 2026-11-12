@@ -1,16 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { codeOf, COMPARE_MAX, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ReplaceConflict, type Row } from '../../../shared/types';
+import { codeOf, COMPARE_MAX, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ProcessorId, type ReplaceConflict, type Row } from '../../../shared/types';
 import { getAdapter } from '../adapters';
 import { detectResult, embeddedSourceId, findProblems, matchesInput, processRows, stampFileIds } from '../processing';
 import { compareResults } from '../lib/compare';
 import { httpError, parseCsv, toCsv } from '../lib/csv';
 import { storage } from '../lib/storage';
-import { GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, generateFiles } from '../lib/generate';
+import { generateFiles } from '../lib/generate';
 
 const processBody = z.object({
   fileId: z.string().min(1),
-  processor: z.enum(['validation', 'mass', 'classification']),
+  processor: z.enum(PROCESSORS.map((p) => p.id) as [ProcessorId, ...ProcessorId[]]),
   replace: z.boolean().default(false), // must be true to overwrite an existing result
 });
 const archiveBody = z.object({ ids: z.array(z.string().min(1)).min(1), archived: z.boolean() });
@@ -32,7 +32,7 @@ const generateBody = z.object({
   errorRows: z.number({ message: 'Rows with errors must be a number' }).int('Rows with errors must be a whole number').min(0, 'Rows with errors cannot be negative'),
   files: z.number({ message: 'Number of files must be a number' }).int('Number of files must be a whole number').min(1, 'Generate at least 1 file')
     .max(GENERATOR_MAX_FILES, `Generate at most ${GENERATOR_MAX_FILES} files at a time`).default(1),
-});
+}).refine((body) => body.errorRows <= body.rows, { message: 'Rows with errors must be a whole number from 0 to the number of rows.', path: ['errorRows'] });
 type IdParams = { Params: { id: string } };
 
 /**
