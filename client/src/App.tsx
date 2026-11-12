@@ -1,20 +1,17 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Archive, ArrowDownUp, ArrowLeftRight, Calendar, Check, ChevronDown, CircleAlert, Filter, Layers, Network, RotateCcw, Search, Wand2, X, type LucideIcon } from 'lucide-react';
-import { isInputFile, type CompareResult, type FileMeta, type ProcessorId, type ReplaceConflict } from '../../shared/types';
+import { isInputFile, type CompareResult, type FileMeta } from '../../shared/types';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
-import { displayStatus, FileTable, FileTabs, PROCESSING_FUNCTIONS, processingFunctionId, qualityWarning, replacements, SORT_OPTIONS, sortFiles, STATUSES, type SortKey, type QualityWarning, type Replacement, type Status, type Tab } from './components/FileTable';
+import { FileTable, FileTabs } from './components/FileTable';
+import { filterFiles, PROCESSING_FUNCTIONS, SORT_OPTIONS, STATUSES, type SortKey } from './file-status';
+import { plural, useArchive, useFileList, useFilters, useProcessing, useSelection } from './hooks';
 import { compareBlocker, CompareWorkspace } from './components/CompareWorkspace';
 import { PreviewModal, QualityWarningModal, ReplaceResultModal } from './components/Modals';
 import { GeneratorPage } from './components/GeneratorPage';
 import { ArchitecturePage } from './components/ArchitecturePage';
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const plural = (n: number) => `${n} file${n === 1 ? '' : 's'}`;
-const TOAST_MS = 8000;
-
-/** Archive/restore confirmation. undo reverses exactly the files it names. */
-interface Toast { title: string; detail: string; undo?: { ids: string[]; archive: boolean } }
 
 const FIELD = 'flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 shadow-sm sm:w-auto';
 const Divider = () => <div className="hidden w-px self-stretch bg-slate-200 xl:block" aria-hidden />;
@@ -40,188 +37,31 @@ function SelectFilter({ icon: Icon, label, value, onChange, children }: {
 }
 
 export default function App() {
-  const [files, setFiles] = useState<FileMeta[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [processor, setProcessor] = useState<ProcessorId>('validation');
-  const [processingId, setProcessingId] = useState<string>(); // batches run one file at a time
-  const busy = useRef(false); // set synchronously, so a double click cannot start a second batch
-  // A run waiting for confirmation: items lists results it would replace (Replace dialog); a warning
-  // alone is the Data Quality Warning.
-  const [pending, setPending] = useState<{ batch: FileMeta[]; processor: ProcessorId; warning?: QualityWarning; items?: Replacement[] }>();
-  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
-  const [uploading, setUploading] = useState(false);
-  const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
-  const [toast, setToast] = useState<Toast>();
-
-  const [search, setSearch] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [status, setStatus] = useState<'All' | Status>('All');
-  const [fn, setFn] = useState('All'); // processing function filter: 'All', 'original' or a function id
-  // Each tab keeps its own order: newest uploads first, and most recently archived first.
-  const [sortBy, setSortBy] = useState<Record<'active' | 'archived', SortKey>>({ active: 'uploaded-desc', archived: 'archived-desc' });
-  const [tab, setTab] = useState<Tab>('active');
-  const viewArchived = tab === 'archived';
-  const sort = sortBy[tab];
-
   const [preview, setPreview] = useState<FileMeta>();
   const [comparison, setComparison] = useState<CompareResult>();
   const [comparing, setComparing] = useState(false);
+  const busy = useRef(false); // set synchronously, so a double click cannot start a second batch or archive
 
-  // Reloads the file list. Each request is numbered and only the latest one's answer is used,
-  // so a slow older response (e.g. from an upload during a processing batch) never overwrites newer data.
-  const listRequest = useRef(0);
-  const refresh = () => {
-    const request = ++listRequest.current;
-    return api.list()
-      .then((list) => { if (request === listRequest.current) setFiles(list); })
-      .catch((e) => { if (request === listRequest.current) setError(msg(e)); });
-  };
-  useEffect(() => { refresh(); }, []);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(undefined), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  const filtersActive = !!(search || from || to || status !== 'All' || fn !== 'All');
-  const clearFilters = () => { setSearch(''); setFrom(''); setTo(''); setStatus('All'); setFn('All'); };
+  const { files, refresh, upload, uploading } = useFileList(setError);
+  const { selectedIds, setSelectedIds, toggle, toggleAll } = useSelection();
+  const {
+    search, setSearch, from, setFrom, to, setTo, status, setStatus, fn, setFn, tab, setTab,
+    viewArchived, sort, setSort, filtersActive, clearFilters,
+  } = useFilters();
+  const { archiving, toast, dismissToast, setArchived } = useArchive({ busy, refresh, deselect: (ids) => toggleAll(ids, false), onError: setError });
+  const { processor, setProcessor, processingId, failedIds, pending, cancelPending, requestRun, confirmRun } =
+    useProcessing({ files, busy, refresh, setSelectedIds, onError: setError, onNotice: setNotice, onPreview: setPreview });
 
   const selectedInputs = files.filter((f) => selectedIds.has(f.id) && isInputFile(f) && !f.archived);
-  const toggle = (id: string) =>
-    setSelectedIds((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const toggleAll = (ids: string[], on: boolean) =>
-    setSelectedIds((s) => { const n = new Set(s); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; });
   const visible = useMemo(
-    () => {
-      const query = search.toLowerCase();
-      const shown = files.filter((f) => {
-        const day = new Date(f.uploadedAt).toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
-        return (
-          // Search finds files by name or File ID: "101010" finds the input and its results.
-          (f.name.toLowerCase().includes(query) || f.id.toLowerCase().includes(query)) &&
-          // Each tab shows only its own files; the status filter applies within the tab.
-          !!f.archived === viewArchived &&
-          (status === 'All' || displayStatus(f, processingId, failedIds) === status) &&
-          (fn === 'All' || processingFunctionId(f) === fn) &&
-          (!from || day >= from) &&
-          (!to || day <= to)
-        );
-      });
-      return sortFiles(shown, sort);
-    },
+    () => filterFiles(files, { search, from, to, status, fn, viewArchived, sort }, { processingId, failedIds }),
     [files, search, status, fn, viewArchived, sort, from, to, processingId, failedIds],
   );
   const archivedCount = files.filter((f) => f.archived).length;
   // Archive and Restore act only on the selected files in view, never on hidden selections.
   const selectedInView = visible.filter((f) => selectedIds.has(f.id));
-
-  /** Archives the given files, or restores them when archive is false. undoable adds Undo to the toast. */
-  async function setArchived(ids: string[], archive: boolean, undoable = true) {
-    if (!ids.length || busy.current) return;
-    busy.current = true;
-    setArchiving(true);
-    setError(undefined);
-    setToast(undefined);
-    try {
-      await api.archive(ids, archive);
-      toggleAll(ids, false);
-      setToast({
-        title: `${plural(ids.length)} ${archive ? 'archived' : 'restored'}`,
-        detail: archive ? 'Moved out of Active Files.' : 'Back in Active Files.',
-        undo: undoable ? { ids, archive: !archive } : undefined,
-      });
-    } catch (e) {
-      setError(`${archive ? 'Archive' : 'Restore'} failed: ${msg(e)}`);
-    }
-    await refresh();
-    busy.current = false;
-    setArchiving(false);
-  }
-
-  async function upload(list: File[]) {
-    setUploading(true);
-    setError(undefined);
-    const errors: string[] = [];
-    for (const f of list) {
-      try { await api.upload(f); } catch (e) { errors.push(`${f.name}: ${msg(e)}`); }
-    }
-    setUploading(false);
-    if (errors.length) setError(`Upload failed\n${errors.join('\n')}`);
-    await refresh();
-  }
-
-  /**
-   * Run Processing: asks first when the run would replace existing results (one dialog, which also
-   * carries the Data Quality Warning when it applies), or when Mass or Classification would skip invalid rows.
-   */
-  function requestRun() {
-    const batch = selectedInputs;
-    if (!batch.length || busy.current) return;
-    const warning = qualityWarning(batch, processor);
-    const items = replacements(batch, processor, files);
-    if (items.length) return setPending({ batch, processor, warning, items });
-    if (warning) return setPending({ batch, processor, warning });
-    run(batch, processor);
-  }
-
-  /** Process Valid Rows or Run & Replace: runs exactly the files the dialog showed, replacing only those it listed. */
-  function confirmRun() {
-    if (!pending) return;
-    setPending(undefined);
-    run(pending.batch, pending.processor, new Set(pending.items?.map((r) => r.inputId)));
-  }
-
-  /** Processes the given input files, one after another, with the given function. */
-  async function run(batch: FileMeta[], processor: ProcessorId, replaceIds = new Set<string>()) {
-    if (!batch.length || busy.current) return;
-    busy.current = true;
-    setError(undefined);
-    setNotice(undefined);
-    setFailedIds(new Set());
-    const failed = new Set<string>();
-    const errors: string[] = [];
-    const made: FileMeta[] = [];
-    const conflicts: { input: FileMeta; conflict: ReplaceConflict }[] = [];
-    for (const f of batch) {
-      setProcessingId(f.id);
-      try {
-        made.push(await (replaceIds.has(f.id) ? api.process(f.id, processor, true) : api.process(f.id, processor)));
-        await refresh();
-      } catch (e) {
-        // A result appeared since the list loaded: ask about it after the batch instead of failing.
-        const conflict = (e as { conflict?: ReplaceConflict }).conflict;
-        if (conflict) conflicts.push({ input: f, conflict });
-        else {
-          failed.add(f.id);
-          errors.push(`${f.name}: ${msg(e)}`);
-        }
-      }
-    }
-    busy.current = false; // per-file errors are caught above, so this always runs
-    setProcessingId(undefined);
-    setFailedIds(failed);
-    // Failed and conflicting files stay checked so they can be retried. After a clean batch, the new
-    // results are checked instead, so they can be compared straight away.
-    const comparable = !failed.size && !conflicts.length && made.length >= 2;
-    setSelectedIds(comparable ? new Set(made.map((m) => m.id)) : new Set([...failed, ...conflicts.map((c) => c.input.id)]));
-    if (errors.length) setError(`Processing failed\n${errors.join('\n')}`);
-
-    if (conflicts.length) {
-      await refresh(); // show the result that appeared
-      if (made.length) setNotice(`Processed ${plural(made.length)}.`);
-      // The data quality warning, if any, was already confirmed for this batch.
-      return setPending({
-        batch: conflicts.map((c) => c.input),
-        processor,
-        items: conflicts.map(({ input, conflict: { existing } }) => ({ inputId: input.id, resultId: existing.id, resultName: existing.name, archived: !!existing.archived })),
-      });
-    }
-    if (made.length === 1) return setPreview(made[0]); // single file: show the result right away
-    if (made.length > 1) setNotice(`Processed ${made.length} files.${comparable ? ' Their results are selected, so you can compare them.' : ' Results are in the list.'}`);
-  }
 
   // Compare is offered once the selection in view includes a result; it explains when it can't run.
   const showCompare = !viewArchived && selectedInView.some((f) => f.status === 'Processed');
@@ -242,7 +82,7 @@ export default function App() {
           processor={processor}
           setProcessor={setProcessor}
           onUpload={upload}
-          onRun={requestRun}
+          onRun={() => requestRun(selectedInputs)}
           canRun={selectedInputs.length > 0 && !processingId && !archiving}
           running={!!processingId}
           uploading={uploading}
@@ -320,7 +160,7 @@ export default function App() {
                 <ArrowDownUp className="h-5 w-5 shrink-0" aria-hidden />
                 <span>Sort by</span>
                 <span className="relative">
-                  <select value={sort} onChange={(e) => setSortBy((b) => ({ ...b, [tab]: e.target.value as SortKey }))}
+                  <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}
                     className="menu-select cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-4 pr-10 shadow-sm outline-none focus:border-blue-400">
                     {SORT_OPTIONS.filter((o) => viewArchived || !o.archivedOnly).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
                   </select>
@@ -406,7 +246,7 @@ export default function App() {
               {processingId && <span id="undo-wait" className="text-xs text-slate-500">Available when processing finishes</span>}
             </div>
           )}
-          <button onClick={() => setToast(undefined)} aria-label="Dismiss notification" className="text-slate-500 hover:text-slate-800"><X className="h-5 w-5" /></button>
+          <button onClick={dismissToast} aria-label="Dismiss notification" className="text-slate-500 hover:text-slate-800"><X className="h-5 w-5" /></button>
         </div>
       )}
 
@@ -414,9 +254,9 @@ export default function App() {
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}
       {pending?.items ? (
         <ReplaceResultModal items={pending.items} otherCount={pending.batch.length - pending.items.length} warning={pending.warning}
-          processor={pending.processor} onCancel={() => setPending(undefined)} onConfirm={confirmRun} />
+          processor={pending.processor} onCancel={cancelPending} onConfirm={confirmRun} />
       ) : pending?.warning && (
-        <QualityWarningModal warning={pending.warning} processor={pending.processor} onCancel={() => setPending(undefined)} onConfirm={confirmRun} />
+        <QualityWarningModal warning={pending.warning} processor={pending.processor} onCancel={cancelPending} onConfirm={confirmRun} />
       )}
       {comparison && <CompareWorkspace result={comparison} onClose={() => setComparison(undefined)} />}
     </div>
