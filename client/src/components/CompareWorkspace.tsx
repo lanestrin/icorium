@@ -5,7 +5,7 @@ import { COMPARE_MAX, COMPARE_MIN, PROCESSORS, type CompareColumn, type CompareF
 import { Modal } from './Modals';
 
 /** One colour per compared file, in order. A file keeps its colour in every chip, chart and table. */
-export const FILE_COLORS = ['#2563eb', '#f59e0b', '#16a34a', '#9333ea', '#ec4899'];
+const FILE_COLORS = ['#2563eb', '#f59e0b', '#16a34a', '#9333ea', '#ec4899'];
 
 /** Why the selected files can't be compared, or undefined when they can. */
 export function compareBlocker(selected: FileMeta[]): string | undefined {
@@ -73,7 +73,7 @@ export function yDomain(values: (number | string | null)[]): [number, number] | 
   return [Math.floor(min - pad), Math.ceil(max + pad)];
 }
 
-export interface TopDifference { key: string; label: string; text: string; files: number[] }
+interface TopDifference { key: string; label: string; text: string; files: number[] }
 
 /**
  * The rows that differ most from the reference file for one metric. Numbers rank by the largest gap;

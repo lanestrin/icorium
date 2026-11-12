@@ -806,7 +806,7 @@ describe('generating CSVs', () => {
 
   it('returns a partner CSV and its planted errors without saving anything', async () => {
     const before = (await listFiles()).length;
-    const res = await generate({ partner: 'B', rows: 10, errorRows: 2, seed: 4 });
+    const res = await generate({ partner: 'B', rows: 10, errorRows: 2 });
     expect(res.statusCode).toBe(200);
     const { files } = res.json<GeneratedBatch>();
     expect(files).toHaveLength(1); // one file unless asked for more
@@ -819,9 +819,14 @@ describe('generating CSVs', () => {
   });
 
   it.each([[0, 'Ready'], [3, 'Needs Review']] as const)('uploads a generated file with %s error rows as %s, like any partner CSV', async (errorRows, status) => {
-    const [file] = (await generate({ partner: 'C', rows: 12, errorRows, seed: 9 })).json<GeneratedBatch>().files;
+    const [file] = (await generate({ partner: 'C', rows: 12, errorRows })).json<GeneratedBatch>().files;
     const meta = (await upload(file.name, file.text)).json<FileMeta>();
     expect(meta).toMatchObject({ name: file.name, rows: 12, columns: 7, problemRows: errorRows, status });
+  });
+
+  it('ignores a seed in the request, so every request makes new data', async () => {
+    const make = async () => (await generate({ partner: 'A', rows: 20, errorRows: 1, seed: 4 })).json<GeneratedBatch>().files[0].text;
+    expect(await make()).not.toBe(await make());
   });
 
   it('makes several files with different data and names, each uploadable', async () => {

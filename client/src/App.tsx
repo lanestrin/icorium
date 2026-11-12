@@ -116,7 +116,7 @@ export default function App() {
   );
   const archivedCount = files.filter((f) => f.archived).length;
   // Archive and Restore act only on the selected files in view, never on hidden selections.
-  const archiveTargets = visible.filter((f) => selectedIds.has(f.id));
+  const selectedInView = visible.filter((f) => selectedIds.has(f.id));
 
   /** Archives the given files, or restores them when archive is false. undoable adds Undo to the toast. */
   async function setArchived(ids: string[], archive: boolean, undoable = true) {
@@ -224,14 +224,14 @@ export default function App() {
   }
 
   // Compare is offered once the selection in view includes a result; it explains when it can't run.
-  const showCompare = !viewArchived && archiveTargets.some((f) => f.status === 'Processed');
-  const compareReason = compareBlocker(archiveTargets);
+  const showCompare = !viewArchived && selectedInView.some((f) => f.status === 'Processed');
+  const compareReason = compareBlocker(selectedInView);
 
   async function compare() {
     if (compareReason || comparing) return;
     setError(undefined);
     setComparing(true);
-    try { setComparison(await api.compare(archiveTargets.map((f) => f.id))); } catch (e) { setError(`Comparison failed: ${msg(e)}`); }
+    try { setComparison(await api.compare(selectedInView.map((f) => f.id))); } catch (e) { setError(`Comparison failed: ${msg(e)}`); }
     setComparing(false);
   }
 
@@ -342,10 +342,10 @@ export default function App() {
               </p>
             )}
             <FileTable
-              selectionBar={archiveTargets.length > 0 && (
+              selectionBar={selectedInView.length > 0 && (
                 <div role="toolbar" aria-label="Selected files" className="mb-2 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-blue-50/70 px-4 py-2.5">
-                  <span className="font-semibold text-slate-900">{archiveTargets.length} selected</span>
-                  <button onClick={() => toggleAll(archiveTargets.map((f) => f.id), false)} className="text-sm font-medium text-blue-700 hover:underline">
+                  <span className="font-semibold text-slate-900">{selectedInView.length} selected</span>
+                  <button onClick={() => toggleAll(selectedInView.map((f) => f.id), false)} className="text-sm font-medium text-blue-700 hover:underline">
                     Clear selection
                   </button>
                   <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
@@ -357,16 +357,16 @@ export default function App() {
                         aria-describedby={compareReason ? 'compare-reason' : undefined}
                         className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <ArrowLeftRight className="h-4 w-4" /> Compare {plural(archiveTargets.length)}
+                        <ArrowLeftRight className="h-4 w-4" /> Compare {plural(selectedInView.length)}
                       </button>
                     )}
                     <button
-                      onClick={() => setArchived(archiveTargets.map((f) => f.id), !viewArchived)}
+                      onClick={() => setArchived(selectedInView.map((f) => f.id), !viewArchived)}
                       disabled={!!processingId || archiving}
                       className={`flex items-center gap-2 rounded-xl px-5 py-2 font-medium shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${showCompare ? 'border border-slate-200 bg-white text-slate-800 hover:bg-slate-50' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                     >
                       {viewArchived ? <RotateCcw className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-                      {viewArchived ? 'Restore' : 'Archive'} {plural(archiveTargets.length)}
+                      {viewArchived ? 'Restore' : 'Archive'} {plural(selectedInView.length)}
                     </button>
                   </div>
                 </div>

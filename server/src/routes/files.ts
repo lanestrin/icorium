@@ -32,7 +32,6 @@ const generateBody = z.object({
   errorRows: z.number({ message: 'Rows with errors must be a number' }).int('Rows with errors must be a whole number').min(0, 'Rows with errors cannot be negative'),
   files: z.number({ message: 'Number of files must be a number' }).int('Number of files must be a whole number').min(1, 'Generate at least 1 file')
     .max(GENERATOR_MAX_FILES, `Generate at most ${GENERATOR_MAX_FILES} files at a time`).default(1),
-  seed: z.number().int().optional(), // same seed, same files; used by tests
 });
 type IdParams = { Params: { id: string } };
 
@@ -179,8 +178,8 @@ export async function fileRoutes(app: FastifyInstance) {
 
   // Generates 1–10 synthetic partner CSVs with different data. Nothing is saved: the page downloads them or uploads them like any CSV.
   app.post('/generate', async (req) => {
-    const { partner, rows, errorRows, files, seed } = generateBody.parse(req.body);
-    return { files: generateFiles(partner, rows, errorRows, files, seed) };
+    const { partner, rows, errorRows, files } = generateBody.parse(req.body);
+    return { files: generateFiles(partner, rows, errorRows, files) };
   });
 
   app.get('/compare', async (req) => {

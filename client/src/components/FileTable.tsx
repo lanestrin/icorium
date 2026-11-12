@@ -127,7 +127,7 @@ export function importedLineage(f: Pick<FileMeta, 'sourceId' | 'importedFrom'>):
   return { note: 'Uploaded result file. Its original input is not linked in this workspace.', short: 'Imported: original input not linked' };
 }
 
-export const fmtDate = (iso: string) =>
+const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 
