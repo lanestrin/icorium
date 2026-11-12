@@ -2,7 +2,7 @@
 // Files are read with Vite's import.meta.glob (raw text), so the client needs no Node type definitions.
 import { describe, expect, it } from 'vitest';
 import { COMPARE_MAX } from '../../../shared/types';
-import { TECH } from './ArchitecturePage';
+import { TECH } from '../components/architecture/content';
 
 const GLOBBED = import.meta.glob(
   ['../../../client/src/**/*', '../../../client/*.ts', '../../../client/package.json', '../../../server/src/**/*.ts', '../../../server/package.json', '../../../shared/*.ts', '../../../blueprint/vercel-deployment.md'],
