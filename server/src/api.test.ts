@@ -8,6 +8,7 @@ import { codeOf, isInputFile, PROCESSORS, type CompareResult, type FileMeta, typ
 import { parseCsv, toCsv } from './lib/csv';
 import { processors } from './processing';
 import { buildApp } from './app';
+import { PARSED_CACHE_FILES } from './routes/files';
 import { openLocalStorage, reconcileMetadata } from './lib/storage';
 
 // Each test run uses its own throwaway data folder, opened as the app's storage.
@@ -111,6 +112,45 @@ describe('preview paging', () => {
 
   it.each(['limit=0', 'limit=1001', 'offset=-1', 'limit=abc'])('rejects %s', async (query) => {
     expect((await page(id, query)).statusCode).toBe(400);
+  });
+
+  it('reads and parses a file once while paging through it', async () => {
+    const fresh = (await upload('paged_once.csv', bigCsv(250))).json<FileMeta>().id;
+    const read = vi.spyOn(storage, 'read');
+    try {
+      const pages = [];
+      for (const offset of [0, 100, 200]) pages.push((await page(fresh, `offset=${offset}&limit=100`)).json<FileRows>());
+      expect(pages.map((p) => p.rows[0].batch_id)).toEqual(['X-1', 'X-101', 'X-201']);
+      expect(pages.every((p) => p.totalRows === 250 && p.problems.total === 0)).toBe(true);
+      expect(read.mock.calls.filter(([fileId]) => fileId === fresh)).toHaveLength(1);
+    } finally { read.mockRestore(); }
+  });
+
+  it('serves new rows once a file is saved again, never its cached ones', async () => {
+    const input = (await upload('saved_again.csv', bigCsv(3))).json<FileMeta>();
+    const result = (await processFile(input.id, 'validation')).json<FileMeta>();
+    const preview = async () => (await app.inject(`/api/files/${result.id}/rows`)).json<FileRows>();
+    expect((await preview()).rows[0].processing_status).toBe('Valid');
+    const text = (await app.inject(`/api/files/${result.id}/download`)).body;
+    await storage.put(result.id, { ...result, text: text.replace(/,Valid,/g, ',STALE,') });
+    expect((await preview()).rows[0].processing_status).toBe('STALE');
+    expect((await processFile(input.id, 'validation', true)).statusCode).toBe(200);
+    expect((await preview()).rows.map((r) => r.processing_status)).toEqual(['Valid', 'Valid', 'Valid']);
+  });
+
+  it(`keeps at most ${PARSED_CACHE_FILES} parsed files, dropping the least recently used`, async () => {
+    const ids: string[] = [];
+    for (let i = 0; i <= PARSED_CACHE_FILES; i++) ids.push((await upload(`cached_${i}.csv`, bigCsv(2))).json<FileMeta>().id);
+    const read = vi.spyOn(storage, 'read');
+    try {
+      const reads = (fileId: string) => read.mock.calls.filter(([x]) => x === fileId).length;
+      await page(ids[0], 'limit=1');
+      await page(ids[0], 'limit=1');
+      expect(reads(ids[0])).toBe(1); // cached
+      for (const other of ids.slice(1)) await page(other, 'limit=1'); // ten more files push it out
+      await page(ids[0], 'limit=1');
+      expect(reads(ids[0])).toBe(2);
+    } finally { read.mockRestore(); }
   });
 });
 

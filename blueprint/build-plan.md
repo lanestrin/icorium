@@ -576,7 +576,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   **Verification:** storage unit tests run against both backends; an atomic-write test; existing API and Blob tests; `npm run verify`.
 
-- [ ] **10.10** `perf/avoid-repeated-parsing` · **P2** — Every preview page (`GET /api/files/:id/rows`) re-reads and re-parses the whole CSV and re-validates every row to return 100 rows. Comparison normalizes each row once to match rows and again in `findProblems`. Cache the parsed rows and problem list per file id (invalidated when a file is saved or replaced), and reuse the normalized rows within one comparison.
+- [x] **10.10** `perf/avoid-repeated-parsing` · **P2** — Every preview page (`GET /api/files/:id/rows`) re-reads and re-parses the whole CSV and re-validates every row to return 100 rows. Comparison normalizes each row once to match rows and again in `findProblems`. Cache the parsed rows and problem list per file id (invalidated when a file is saved or replaced), and reuse the normalized rows within one comparison.
 
   **Depends on:** 10.9.
 
