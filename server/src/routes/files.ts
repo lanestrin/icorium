@@ -5,7 +5,7 @@ import { getAdapter } from '../adapters';
 import { detectResult, embeddedSourceId, findProblems, matchesInput, processRows, stampFileIds } from '../processing';
 import { compareResults } from '../lib/compare';
 import { httpError, parseCsv, toCsv } from '../lib/csv';
-import { storage } from '../lib/storage';
+import type { Storage } from '../lib/storage';
 import { generateFiles } from '../lib/generate';
 
 const processBody = z.object({
@@ -48,7 +48,7 @@ function attachment(name: string) {
 }
 
 /** The file with this ID, or undefined when there is none. */
-async function findFile(id: string) {
+async function findFile(storage: Storage, id: string) {
   try {
     return await storage.get(id);
   } catch (error) {
@@ -62,15 +62,16 @@ async function findFile(id: string) {
  * be the base ID of an input in this workspace (archived included) whose data the result's original
  * columns hold exactly.
  */
-async function originalMatching(sourceId: string, headers: string[], rows: Row[], generatedColumns: string[]) {
+async function originalMatching(storage: Storage, sourceId: string, headers: string[], rows: Row[], generatedColumns: string[]) {
   if (parseFileId(sourceId)?.code) return undefined; // names a result, not an original
-  const source = await findFile(sourceId);
+  const source = await findFile(storage, sourceId);
   if (!source || !isInputFile(source)) return undefined;
   const input = parseCsv(await storage.read(source.id));
   return matchesInput(headers, rows, generatedColumns, input.headers, input.rows) ? source.id : undefined;
 }
 
-export async function fileRoutes(app: FastifyInstance) {
+/** All API routes, reading and writing files through the storage buildApp opened. */
+export async function fileRoutes(app: FastifyInstance, { storage }: { storage: Storage }) {
   // A pure read: metadata from older versions is corrected once at startup (reconcileMetadata).
   app.get('/files', async () => storage.list());
 
@@ -93,7 +94,7 @@ export async function fileRoutes(app: FastifyInstance) {
     // to that original (sourceId, and the original's base ID stays in file_id) only when the original
     // is an input in this workspace and the result's original columns hold exactly its data.
     const importedFrom = result ? embeddedSourceId(headers, rows) : undefined;
-    const linkedTo = result && importedFrom ? await originalMatching(importedFrom, headers, rows, result.generatedColumns) : undefined;
+    const linkedTo = result && importedFrom ? await originalMatching(storage, importedFrom, headers, rows, result.generatedColumns) : undefined;
     const textFor = (id: string) => {
       if (result && !hasIdColumns) return text;
       const stored = stampFileIds(headers, rows, id, !!result, linkedTo);
@@ -152,7 +153,7 @@ export async function fileRoutes(app: FastifyInstance) {
       message: `${PROCESSORS.find((p) => p.id === processor)!.label} has already been run for file ${meta.id}. Confirm to replace the existing result ${id}.`,
       existing: { id: existing.id, name: existing.name, archived: existing.archived },
     });
-    const existing = await findFile(id);
+    const existing = await findFile(storage, id);
     if (existing && !replace) return reply.code(409).send(conflict(existing));
     const { headers, rows } = parseCsv(await storage.read(fileId));
     const out = processRows(headers, rows, processor, id);

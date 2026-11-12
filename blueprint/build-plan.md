@@ -556,7 +556,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   **Verification:** existing component tests; unit tests for any extracted hook logic; `npm run verify`.
 
-- [ ] **10.9** `refactor/storage-interface` · **P2** — Leaky storage abstraction (`server/src/lib/storage.ts`, `blob-storage.ts`):
+- [x] **10.9** `refactor/storage-interface` · **P2** — Leaky storage abstraction (`server/src/lib/storage.ts`, `blob-storage.ts`):
 
   - Local and Blob storage share no declared interface: one is synchronous, one asynchronous, and only Blob has `seed`, so `seedSamples` checks `'seed' in storage`. Declare one async `Storage` interface both implement, including seeding.
 
