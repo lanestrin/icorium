@@ -1,0 +1,10 @@
+@reference "tailwindcss";
+
+.intro {
+  @apply mt-3 max-w-3xl text-lg text-slate-700;
+}
+/* A rounded "On this page" link. */
+.sectionLink {
+  @apply rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700 shadow-sm;
+  @apply hover:border-blue-300 hover:text-blue-700;
+}

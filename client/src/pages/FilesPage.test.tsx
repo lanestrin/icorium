@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CompareResult, FileMeta, FileRows } from '../../../shared/types';
 import { FilesPage } from './FilesPage';
-import { Modal, PreviewModal } from '../components/Modals';
+import { Modal } from '../components/modals/Modal';
+import { PreviewModal } from '../components/modals/PreviewModal';
+import modalStyles from '../components/modals/modals.module.css';
 import { api } from '../lib/api';
 
 vi.mock('../lib/api', () => ({ api: {
@@ -1328,7 +1330,7 @@ describe('request ordering', () => {
       offset: 0, totalRows: 2, generatedColumns: ['processing_status', 'validation_errors'], problems: { total: 0, items: [] },
     });
     render(<PreviewModal file={invalid} onClose={() => {}} />);
-    const marked = (text: string) => screen.getByText(text).className.includes('text-red-600');
+    const marked = (text: string) => screen.getByText(text).classList.contains(modalStyles.errorCell);
     expect(await screen.findByText('Invalid')).toBeInTheDocument();
     expect(marked('Invalid')).toBe(true);
     expect(marked('ERROR')).toBe(true);

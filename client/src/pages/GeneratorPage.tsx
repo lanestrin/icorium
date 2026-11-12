@@ -1,36 +1,31 @@
 import { useId, useState, type FormEvent } from 'react';
-import { ArrowLeft, Download, Eye, FilePlus2, LoaderCircle, Network, Wand2 } from 'lucide-react';
+import { ArrowLeft, FilePlus2, LoaderCircle, Network, Wand2 } from 'lucide-react';
 import { ADAPTERS, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
 import { Banner } from '../components/Banner';
+import { ChoiceOption } from '../components/generator/ChoiceOption';
+import { GeneratedFileList } from '../components/generator/GeneratedFileList';
+import { GeneratedFilePreview } from '../components/generator/GeneratedFilePreview';
+import { NumberField } from '../components/generator/NumberField';
+import styles from '../components/generator/generator.module.css';
 import { api } from '../lib/api';
+import { classNames } from '../lib/class-names';
 import { errorMessage, plural } from '../lib/format';
+import { flaggedRows, withCsv } from '../lib/generated-files';
 
-const PREVIEW_ROWS = 10;
-const ERRORS_SHOWN = 20;
+const ERROR_ROWS_HELP = 'In each file. Each of these rows fails Composition Validation: missing or non-numeric mass, a negative percentage, '
+  + 'a composition total off by 15 points, a missing batch ID, or a duplicate batch ID (which marks two rows).';
 
-/** Generated values never contain commas or quotes, so a plain split is enough for the preview. */
-const splitCsv = (text: string) => text.split(/\r?\n/).filter(Boolean).map((line) => line.split(','));
-const withCsv = (name: string) => (name.trim().toLowerCase().endsWith('.csv') ? name.trim() : `${name.trim()}.csv`);
-/** Rows a file's planted errors flag (a duplicate batch ID is listed on both of its rows). */
-const flaggedRows = (f: GeneratedFile) => new Set(f.errors.map((x) => x.row)).size;
-
-const CARD = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm';
-const INPUT = 'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-400';
-
-/** A whole-number field with its help text linked as a description, not as part of its name. */
-function NumberField({ id, label, value, setValue, min, max, help }: {
-  id: string; label: string; value: string; setValue: (v: string) => void; min: number; max: number; help: string;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className="mb-1.5 block font-semibold">{label}</label>
-      <input id={id} type="number" inputMode="numeric" min={min} max={max} step={1} required value={value}
-        onChange={(e) => setValue(e.target.value)} aria-describedby={`${id}-help`} className={INPUT} />
-      <p id={`${id}-help`} className="mt-1 text-sm text-slate-500">{help}</p>
-    </div>
-  );
+/** "1 file · Partner A · 25 rows each · 2 rows with errors each" for the generated batch. */
+function batchSummary(files: GeneratedFile[]) {
+  const first = files[0];
+  const sameErrorCount = files.every((f) => flaggedRows(f) === flaggedRows(first));
+  const errors = !sameErrorCount ? 'rows with errors vary'
+    : flaggedRows(first) ? `${plural(flaggedRows(first), 'row')} with errors each`
+    : 'no errors';
+  return `${plural(files.length, 'file')} · Partner ${first.partner} · ${plural(first.rows, 'row')} each · ${errors}`;
 }
 
+/** The CSV Generator (/generator): make synthetic partner CSVs, preview and download them, or add them to CSV Files. */
 export function GeneratorPage() {
   const [partner, setPartner] = useState<GeneratorPartner>('A');
   const [rows, setRows] = useState('25');
@@ -71,7 +66,7 @@ export function GeneratorPage() {
     const done: string[] = [];
     const failed: string[] = [];
     for (const [i, f] of files.entries()) {
-      const fileName = withCsv(names[i] || f.name);
+      const fileName = nameOf(i);
       try {
         await api.upload(new File([f.text], fileName, { type: 'text/csv' }));
         done.push(fileName);
@@ -84,40 +79,35 @@ export function GeneratorPage() {
     setBusy(undefined);
   }
 
-  const file = files[shown];
-  const table = file ? splitCsv(file.text) : [];
-  const errorRowSet = new Set(file?.errors.map((x) => x.row));
+  /** The name a file is downloaded or added under: the edited name (or the generated one), ending in .csv. */
   const nameOf = (i: number) => withCsv(names[i] || files[i].name);
-  const sameErrors = files.every((f) => flaggedRows(f) === flaggedRows(files[0]));
+  const rename = (index: number, name: string) => setNames((current) => current.map((n, k) => (k === index ? name : n)));
+  const file = files[shown];
+  const generateLabel = busy === 'generate' ? 'Generating…' : Number(count) > 1 ? `Generate ${count} CSV files` : 'Generate CSV';
 
   return (
-    <div className="min-h-screen overflow-x-clip px-4 pb-10 pt-8 text-slate-900 sm:px-6 sm:pt-10">
-      <nav aria-label="Pages" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium">
-        <a href="/" className="inline-flex items-center gap-2 text-blue-700 hover:underline">
-          <ArrowLeft className="h-4 w-4" /> Back to CSV Files
-        </a>
-        <a href="/architecture" className="inline-flex items-center gap-2 text-blue-700 hover:underline">
-          <Network className="h-4 w-4" /> Architecture
-        </a>
+    <div className="page-shell px-4 pb-10 pt-8 sm:px-6 sm:pt-10">
+      <nav aria-label="Pages" className="page-nav">
+        <a href="/" className="nav-link"><ArrowLeft className="h-4 w-4" /> Back to CSV Files</a>
+        <a href="/architecture" className="nav-link"><Network className="h-4 w-4" /> Architecture</a>
       </nav>
       <div className="mt-3 flex flex-wrap items-baseline gap-4">
         <h1 className="text-3xl font-bold tracking-tight">CSV Generator</h1>
         <p className="text-slate-600">Create synthetic partner CSVs for testing. All values are invented.</p>
       </div>
 
-      <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-        <form onSubmit={generate} className={`${CARD} w-full space-y-6 lg:w-[24rem] lg:shrink-0`} aria-label="Generate CSV files">
+      <div className={styles.layout}>
+        <form onSubmit={generate} className={classNames('card', styles.form)} aria-label="Generate CSV files">
           <fieldset>
-            <legend className="mb-3 text-lg font-semibold">Partner</legend>
+            <legend className={styles.legend}>Partner</legend>
             <div className="space-y-2">
-              {ADAPTERS.map(({ id: p, name, description }) => (
-                <label key={p} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ${partner === p ? 'border-blue-300 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}>
-                  <input type="radio" name={`${ids}-partner`} checked={partner === p} onChange={() => setPartner(p)} className="mt-1 h-4 w-4 accent-blue-600" />
+              {ADAPTERS.map((adapter) => (
+                <ChoiceOption key={adapter.id} layout="card" name={`${ids}-partner`} checked={partner === adapter.id} onSelect={() => setPartner(adapter.id)}>
                   <span>
-                    <span className="block font-semibold">{name}</span>
-                    <span className="block text-sm text-slate-500">{description}</span>
+                    <span className="block font-semibold">{adapter.name}</span>
+                    <span className="block text-sm text-slate-500">{adapter.description}</span>
                   </span>
-                </label>
+                </ChoiceOption>
               ))}
             </div>
           </fieldset>
@@ -130,31 +120,26 @@ export function GeneratorPage() {
           </div>
 
           <fieldset>
-            <legend className="mb-3 text-lg font-semibold">Data quality</legend>
+            <legend className={styles.legend}>Data quality</legend>
             <div className="flex flex-wrap gap-2">
-              {[false, true].map((on) => (
-                <label key={String(on)} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 transition ${withErrors === on ? 'border-blue-300 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}>
-                  <input type="radio" name={`${ids}-quality`} checked={withErrors === on} onChange={() => setWithErrors(on)} className="h-4 w-4 accent-blue-600" />
-                  {on ? 'Include errors' : 'No errors'}
-                </label>
-              ))}
+              <ChoiceOption layout="chip" name={`${ids}-quality`} checked={!withErrors} onSelect={() => setWithErrors(false)}>No errors</ChoiceOption>
+              <ChoiceOption layout="chip" name={`${ids}-quality`} checked={withErrors} onSelect={() => setWithErrors(true)}>Include errors</ChoiceOption>
             </div>
             {withErrors && (
               <div className="mt-4">
-                <NumberField id={`${ids}-errors`} label="Rows with errors" value={errorRows} setValue={setErrorRows} min={1} max={Number(rows) || GENERATOR_MAX_ROWS}
-                  help="In each file. Each of these rows fails Composition Validation: missing or non-numeric mass, a negative percentage, a composition total off by 15 points, a missing batch ID, or a duplicate batch ID (which marks two rows)." />
+                <NumberField id={`${ids}-errors`} label="Rows with errors" value={errorRows} setValue={setErrorRows}
+                  min={1} max={Number(rows) || GENERATOR_MAX_ROWS} help={ERROR_ROWS_HELP} />
               </div>
             )}
           </fieldset>
 
-          <button type="submit" disabled={!!busy}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+          <button type="submit" disabled={!!busy} className="btn btn-primary w-full px-6 py-3">
             {busy === 'generate' ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
-            {busy === 'generate' ? 'Generating…' : Number(count) > 1 ? `Generate ${count} CSV files` : 'Generate CSV'}
+            {generateLabel}
           </button>
         </form>
 
-        <section aria-label="Generated files" className={`${CARD} min-w-0 flex-1`}>
+        <section aria-label="Generated files" className={classNames('card', styles.results)}>
           {error && <Banner tone="error" className="mb-4" onDismiss={() => setError(undefined)}>{error}</Banner>}
           {added && <Banner tone="success" className="mb-4">{added} <a href="/" className="font-semibold underline">Open CSV Files</a></Banner>}
 
@@ -165,75 +150,15 @@ export function GeneratorPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <div>
                   <h2 className="text-lg font-semibold">Generated files</h2>
-                  <p className="text-sm text-slate-600">
-                    {plural(files.length, 'file')} · Partner {file.partner} · {plural(file.rows, 'row')} each ·{' '}
-                    {sameErrors ? (flaggedRows(file) ? `${plural(flaggedRows(file), 'row')} with errors each` : 'no errors') : 'rows with errors vary'}
-                  </p>
+                  <p className="text-sm text-slate-600">{batchSummary(files)}</p>
                 </div>
-                <button onClick={addAll} disabled={!!busy}
-                  className="ml-auto flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 font-medium text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+                <button onClick={addAll} disabled={!!busy} className="btn btn-primary ml-auto px-4 py-2.5">
                   {busy === 'add' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
                   {files.length > 1 ? `Add all ${files.length} to CSV Files` : 'Add to CSV Files'}
                 </button>
               </div>
-
-              <div className="mt-4 overflow-x-auto">
-                <table aria-label="Generated files" className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 text-left [&>th]:whitespace-nowrap [&>th]:px-3 [&>th]:py-2 [&>th]:font-semibold">
-                      <th>File name</th><th className="text-right">Rows with errors</th><th className="text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {files.map((f, i) => (
-                      <tr key={i} className={`border-t border-slate-100 [&>td]:px-3 [&>td]:py-2 ${i === shown ? 'bg-blue-50/60' : ''}`}>
-                        <td className="min-w-56">
-                          <input aria-label={`File name ${i + 1}`} value={names[i] ?? ''} onChange={(e) => setNames((n) => n.map((v, k) => (k === i ? e.target.value : v)))}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5" />
-                        </td>
-                        <td className="text-right">{flaggedRows(f)}</td>
-                        <td>
-                          <div className="flex justify-end gap-2">
-                            <button onClick={() => setShown(i)} aria-pressed={i === shown} aria-label={`Preview ${nameOf(i)}`}
-                              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 ${i === shown ? 'border-blue-300 bg-white text-blue-700' : 'border-slate-200 hover:bg-slate-50'}`}>
-                              <Eye className="h-4 w-4" /> Preview
-                            </button>
-                            <a href={`data:text/csv;charset=utf-8,${encodeURIComponent(f.text)}`} download={nameOf(i)} aria-label={`Download ${nameOf(i)}`}
-                              className="flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 hover:bg-slate-50">
-                              <Download className="h-4 w-4" /> Download
-                            </a>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <h3 className="mt-6 font-semibold">{nameOf(shown)}</h3>
-              {file.errors.length > 0 && (
-                <ul aria-label="Planted errors" className="mt-1 grid gap-x-6 gap-y-0.5 text-sm text-amber-900 sm:grid-cols-2">
-                  {file.errors.slice(0, ERRORS_SHOWN).map((x) => <li key={`${x.row}-${x.kind}`}><span className="font-semibold">Row {x.row}</span> · {x.kind}</li>)}
-                  {file.errors.length > ERRORS_SHOWN && <li className="opacity-75">…and {file.errors.length - ERRORS_SHOWN} more</li>}
-                </ul>
-              )}
-              <p className="mt-2 text-sm text-slate-500">First {Math.min(PREVIEW_ROWS, file.rows)} of {file.rows.toLocaleString()} rows. Rows with planted errors are highlighted.</p>
-              <div className="mt-2 overflow-x-auto">
-                <table aria-label="Preview" className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 text-left [&>th]:whitespace-nowrap [&>th]:px-3 [&>th]:py-2 [&>th]:font-semibold">
-                      <th>Row</th>{table[0]?.map((h) => <th key={h}>{h}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {table.slice(1, PREVIEW_ROWS + 1).map((cells, i) => (
-                      <tr key={i} className={`border-t border-slate-100 [&>td]:whitespace-nowrap [&>td]:px-3 [&>td]:py-1.5 ${errorRowSet.has(i + 1) ? 'bg-amber-50' : ''}`}>
-                        <td className="text-slate-500">{i + 1}</td>{cells.map((c, k) => <td key={k}>{c}</td>)}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <GeneratedFileList files={files} names={names} nameOf={nameOf} onRename={rename} shown={shown} onShow={setShown} />
+              <GeneratedFilePreview file={file} name={nameOf(shown)} />
             </>
           )}
         </section>

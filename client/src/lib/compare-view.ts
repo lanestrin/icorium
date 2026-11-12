@@ -67,7 +67,7 @@ export function yDomain(values: (number | string | null)[]): [number, number] | 
   return [Math.floor(min - pad), Math.ceil(max + pad)];
 }
 
-interface TopDifference { key: string; label: string; text: string; files: number[] }
+export interface TopDifference { key: string; label: string; text: string; files: number[] }
 
 /**
  * The rows that differ most from the reference file for one metric. Numbers rank by the largest gap;

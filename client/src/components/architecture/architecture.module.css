@@ -1,0 +1,169 @@
+@reference "tailwindcss";
+
+/* Styles for the Architecture page's sections. Cards use the shared .card class. */
+
+/* Section frame: a divider line above every section except the first. */
+.section {
+  @apply mt-12 scroll-mt-6 border-t border-slate-200 pt-12;
+  &:first-of-type {
+    @apply mt-8 border-t-0 pt-0;
+  }
+}
+/* Heading on the left, content on the right, on wide screens. */
+.sideBySide {
+  @apply xl:grid xl:grid-cols-[16rem_minmax(0,1fr)] xl:items-start xl:gap-8;
+}
+.sectionTitle {
+  @apply mt-1 text-2xl font-bold tracking-tight;
+}
+.sectionIntro {
+  @apply mt-2 max-w-3xl text-slate-600;
+}
+.sectionBody {
+  @apply mt-6;
+}
+.sideBody {
+  @apply mt-6 min-w-0 xl:mt-0;
+}
+
+/* Small shared pieces */
+.checkList {
+  @apply mt-3 space-y-1.5 text-sm text-slate-700;
+}
+.checkIcon {
+  @apply mt-0.5 h-4 w-4 shrink-0 text-green-600;
+}
+.iconBadge {
+  @apply rounded-xl bg-blue-50 p-2;
+}
+.largeIconBadge {
+  @apply h-fit rounded-2xl bg-blue-50 p-3;
+}
+.cardHeading {
+  @apply flex items-center gap-2 font-semibold;
+}
+
+/* Centred icon cards: the overview and the evolution ideas */
+.tile {
+  @apply flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-3 py-4 text-center shadow-sm;
+}
+.overviewGrid {
+  @apply grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6;
+}
+.evolutionGrid {
+  @apply grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5;
+}
+.principle {
+  @apply mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-5;
+}
+.principleStatement {
+  @apply flex items-start gap-3 text-lg font-semibold text-slate-900;
+}
+.principleNote {
+  @apply mt-2 pl-8 text-sm text-slate-600;
+}
+.testedNote {
+  @apply mt-8 flex items-center gap-2 text-sm text-slate-500;
+}
+
+/* Technology tiles */
+.techGrid {
+  @apply grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2;
+}
+.techTile {
+  @apply flex min-w-0 flex-col items-center rounded-2xl border border-slate-200 bg-white px-2 py-3 text-center shadow-sm transition hover:border-blue-300;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500;
+}
+.techTileSelected {
+  @apply border-blue-500 bg-blue-50 ring-1 ring-blue-500 hover:border-blue-500;
+}
+.tradeoff {
+  @apply mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900;
+}
+
+/* Architecture diagram: the person, then two rows of four steps */
+.diagramLayout {
+  @apply grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)];
+}
+.pipeline {
+  @apply grid md:grid-cols-4 md:gap-x-8;
+}
+.person {
+  @apply flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 md:w-[calc(50%-1rem)];
+}
+.personArrow {
+  @apply mx-auto my-1 h-5 w-5 text-blue-500 md:mx-0 md:my-2 md:ml-[calc((100%-6rem)/8-0.625rem)];
+}
+.step {
+  @apply flex h-full flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-2 py-4 text-center shadow-sm;
+}
+.lastStep {
+  @apply border-blue-200 bg-blue-50;
+}
+.rightArrow {
+  @apply absolute -right-6.5 top-1/2 hidden h-5 w-5 -translate-y-1/2 text-blue-500 md:block;
+}
+.downArrow {
+  @apply mx-auto my-1 h-5 w-5 text-blue-500 md:hidden;
+}
+.turn {
+  @apply relative hidden h-10 md:col-span-4 md:block;
+}
+.turnLine {
+  @apply absolute inset-y-0 left-[calc((100%-6rem)/8)] right-[calc((100%-6rem)/8)];
+}
+.cardTitle {
+  @apply flex items-center gap-3 text-lg font-semibold;
+}
+.stepNumber {
+  @apply flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white;
+}
+
+/* Decisions */
+.featuredDecision {
+  @apply grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-center;
+}
+.benefits {
+  @apply lg:border-l lg:border-slate-200 lg:pl-6;
+}
+.tradeoffBox {
+  @apply rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900;
+}
+.decisionGrid {
+  @apply mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-6;
+}
+.decision {
+  @apply flex gap-4;
+}
+.decisionNarrow {
+  @apply lg:col-span-2;
+}
+.decisionWide {
+  @apply lg:col-span-3;
+}
+.reasoningToggle {
+  @apply cursor-pointer font-medium text-blue-700 hover:underline;
+}
+
+/* Storage */
+.storageGrid {
+  @apply grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)];
+}
+.storageOptions {
+  @apply md:col-span-2 xl:col-span-1;
+}
+.storageOption {
+  @apply flex h-full min-w-0 flex-1 flex-col items-center rounded-xl border border-slate-200 bg-white px-2 py-3 text-center;
+}
+.storageOptionDefault {
+  @apply border-blue-300 bg-blue-50;
+}
+.storageOptionPlanned {
+  @apply border-dashed border-slate-300 bg-slate-50 text-slate-400;
+}
+.storageOptionName {
+  @apply mt-1 text-xs font-semibold;
+}
+.storageOptionNote {
+  @apply text-[11px] text-slate-500;
+}

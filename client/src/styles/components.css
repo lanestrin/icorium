@@ -1,0 +1,65 @@
+/*
+ * Shared UI classes for patterns used across several pages. Feature-specific styles live in a CSS
+ * Module next to their component. These sit in the components layer, so an inline utility can
+ * still adjust one of them (for example padding on a button).
+ */
+@layer components {
+  /* The outer frame of a page: full height, no sideways scroll. Pages add their own padding. */
+  .page-shell {
+    @apply min-h-screen overflow-x-clip text-slate-900;
+  }
+
+  /* White card with a soft border and shadow. */
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm;
+  }
+
+  /* Buttons: .btn sets shape and states; add one colour variant and padding. */
+  .btn {
+    @apply flex items-center justify-center gap-2 rounded-xl font-medium shadow-sm transition;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700;
+  }
+  .btn-secondary {
+    @apply border border-slate-200 bg-white text-slate-800 hover:bg-slate-50;
+  }
+
+  /* Blue text link with an icon, as in the page navigation. */
+  .nav-link {
+    @apply inline-flex items-center gap-2 text-blue-700 hover:underline;
+  }
+  .page-nav {
+    @apply flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-medium;
+  }
+
+  /* Small uppercase label above a heading. */
+  .eyebrow {
+    @apply text-sm font-semibold uppercase tracking-wide text-blue-700;
+  }
+
+  /* A repository path or other code-like value. */
+  .code-chip {
+    @apply rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700;
+  }
+
+  /* Data tables: grey header row and bordered body rows. */
+  .table-head-row {
+    @apply bg-slate-50 text-left;
+    & > th {
+      @apply whitespace-nowrap px-3 py-2 font-semibold;
+    }
+  }
+  .table-row {
+    @apply border-t border-slate-100;
+    & > td {
+      @apply px-3 py-2;
+    }
+  }
+
+  /* Small close button with an icon, in banners and toasts. */
+  .dismiss-button {
+    @apply text-slate-500 hover:text-slate-800;
+  }
+}

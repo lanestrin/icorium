@@ -1,14 +1,18 @@
 import { useMemo, useRef, useState } from 'react';
-import { Archive, ArrowDownUp, ChevronDown, Network, Wand2 } from 'lucide-react';
+import { Archive, Network, Wand2 } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta } from '../../../shared/types';
-import { ArchiveToast } from '../components/ArchiveToast';
 import { Banner } from '../components/Banner';
 import { CompareWorkspace } from '../components/compare/CompareWorkspace';
-import { FileFilters } from '../components/FileFilters';
-import { FileTable, FileTabs } from '../components/FileTable';
-import { PreviewModal, QualityWarningModal, ReplaceResultModal } from '../components/Modals';
-import { SelectionBar } from '../components/SelectionBar';
-import { Sidebar } from '../components/Sidebar';
+import { PreviewModal } from '../components/modals/PreviewModal';
+import { QualityWarningModal, ReplaceResultModal } from '../components/modals/RunConfirmations';
+import { ArchiveToast } from '../components/files/ArchiveToast';
+import { FileFilters } from '../components/files/FileFilters';
+import { FileTable } from '../components/files/FileTable';
+import { FileTabs } from '../components/files/FileTabs';
+import { SelectionBar } from '../components/files/SelectionBar';
+import { Sidebar } from '../components/files/Sidebar';
+import { SortMenu } from '../components/files/SortMenu';
+import styles from '../components/files/files.module.css';
 import { useArchive } from '../hooks/useArchive';
 import { useFileList } from '../hooks/useFileList';
 import { useFilters } from '../hooks/useFilters';
@@ -16,7 +20,7 @@ import { useProcessing } from '../hooks/useProcessing';
 import { useSelection } from '../hooks/useSelection';
 import { api } from '../lib/api';
 import { compareBlocker } from '../lib/compare-view';
-import { filterFiles, SORT_OPTIONS, type SortKey } from '../lib/file-status';
+import { filterFiles } from '../lib/file-status';
 import { errorMessage } from '../lib/format';
 
 /** The file workspace: upload, filter, process, preview, archive and compare files. */
@@ -60,8 +64,8 @@ export function FilesPage() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-clip pb-10 text-slate-900">
-      <div className="flex flex-col gap-6 p-4 pt-8 sm:p-6 sm:pt-10 lg:flex-row">
+    <div className="page-shell pb-10">
+      <div className={styles.workspace}>
         <Sidebar
           processor={processor}
           setProcessor={setProcessor}
@@ -77,11 +81,11 @@ export function FilesPage() {
           <div className="flex flex-wrap items-baseline gap-4">
             <h1 className="text-3xl font-bold tracking-tight">CSV Files</h1>
             <p className="text-slate-600">Upload, preview, process, and compare refrigerant datasets.</p>
-            <nav aria-label="Pages" className="ml-auto flex items-center gap-5 self-center text-sm font-medium">
-              <a href="/generator" className="flex items-center gap-2 text-blue-700 hover:underline">
+            <nav aria-label="Pages" className={styles.headerNav}>
+              <a href="/generator" className="nav-link">
                 <Wand2 className="h-4 w-4" /> CSV Generator
               </a>
-              <a href="/architecture" className="flex items-center gap-2 text-blue-700 hover:underline">
+              <a href="/architecture" className="nav-link">
                 <Network className="h-4 w-4" /> Architecture
               </a>
             </nav>
@@ -100,24 +104,12 @@ export function FilesPage() {
             tab={tab}
             setTab={setTab}
             counts={{ active: files.length - archivedCount, archived: archivedCount }}
-            extra={
-              <label className="flex items-center gap-3 text-slate-700">
-                <ArrowDownUp className="h-5 w-5 shrink-0" aria-hidden />
-                <span>Sort by</span>
-                <span className="relative">
-                  <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}
-                    className="menu-select cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-4 pr-10 shadow-sm outline-none focus:border-blue-400">
-                    {SORT_OPTIONS.filter((o) => viewArchived || !o.archivedOnly).map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
-                </span>
-              </label>
-            }
+            extra={<SortMenu sort={sort} setSort={setSort} viewArchived={viewArchived} />}
           />
 
           <div role="tabpanel" id="file-tabpanel" aria-labelledby={`tab-${tab}`} className="mt-4">
             {viewArchived && (
-              <p className="mb-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+              <p className={styles.archivedNote}>
                 <Archive className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
                 Archived files are excluded from processing and comparison.
               </p>
