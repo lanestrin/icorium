@@ -1,6 +1,6 @@
 # Reclaim Studio - Project Overview
 
-<!-- blueprint:source-hash 55003cccf3e0ecef0d802c6ea80485f14c33bd4b2f7a861a70d189516a1c2845 -->
+<!-- blueprint:source-hash be96f62b6d4e0416627fc8af9e2bbf8fbaad31d25a9094a68e64d4950a0b8bda -->
 
 > Upload partner refrigerant CSVs, run one of three processing functions on every row, export results that keep every original column, and compare 2 to 5 results in charts. Icorium interview exercise; all data fictional, classification rules demo-only.
 

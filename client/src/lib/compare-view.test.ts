@@ -25,6 +25,8 @@ describe('comparison labels and numbers', () => {
     expect(metricLabel('composition_total_pct')).toBe('Composition total (%)');
     expect(metricLabel('r32_mass_kg')).toBe('R32 mass (kg)');
     expect(metricLabel('validation_errors')).toBe('Validation errors');
+    expect(metricLabel('r32_r125_over_50')).toBe('R32 + R125 over 50%');
+    expect(metricLabel('blend_class')).toBe('Blend class');
   });
   it('shortens file names to partner and remaining name', () => {
     expect(fileLabels([
