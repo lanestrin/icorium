@@ -121,6 +121,21 @@ describe('processing and export', () => {
     expect(processRows(headers, rows, 'classification').rows.map((r) => r.blend_class)).toEqual(['R-32-rich (demo)', 'R-134a-rich (demo)', 'Balanced (demo)']);
   });
 
+  it('flags rows where R-32 + R-125 is strictly above 50%, leaving blend_class unchanged', () => {
+    // r32 + r125: 50.01, exactly 50, 49.99, 25.1 + 24.9 (float noise), 70; the last row is invalid.
+    const { headers, rows } = parseCsv(`${A_HEADERS}
+A,d,100,30,20.01,49.99
+B,d,100,30,20,50
+C,d,100,29.99,20,50.01
+D,d,100,25.1,24.9,50
+E,d,100,40,30,30
+F,d,,40,30,30`);
+    const out = processRows(headers, rows, 'classification');
+    expect(out.headers.slice(-4)).toEqual(['dominant_component', 'r32_r125_over_50', 'processing_status', 'validation_errors']);
+    expect(out.rows.map((r) => r.r32_r125_over_50)).toEqual(['Yes', 'No', 'No', 'No', 'Yes', '']);
+    expect(out.rows.map((r) => r.blend_class)).toEqual(['R-134a-rich (demo)', 'R-134a-rich (demo)', 'R-134a-rich (demo)', 'R-134a-rich (demo)', 'R-32-rich (demo)', 'Needs review']);
+  });
+
   it('escapes commas, quotes and line breaks', () => {
     const tricky: Row = { a: 'one, two', b: 'say "hi"', c: 'line1\nline2' };
     const text = toCsv(['a', 'b', 'c'], [tricky]);
@@ -195,6 +210,20 @@ describe('compare', () => {
     expect(differing([''], ['100'])).toBe(1);
     expect(differing(['100'], ['100.5'])).toBe(1);
     expect(differing(['100', '1'], ['100'])).toBe(1); // the second row is missing from b
+  });
+  it('compares the R-32 + R-125 flag only when every file has it', () => {
+    const previous = ['result_id', 'blend_class', 'dominant_component', 'processing_status', 'validation_errors'];
+    const current = ['result_id', 'blend_class', 'dominant_component', 'r32_r125_over_50', 'processing_status', 'validation_errors'];
+    const row = { blend_class: 'R-32-rich (demo)', dominant_component: 'R-32', r32_r125_over_50: 'Yes', processing_status: 'Valid', validation_errors: '' };
+    const names = (...fs: ReturnType<typeof file>[]) => compareResults(fs).columns.map((c) => c.name);
+    const old = file('classification', previous, [row], 'old');
+    const a = file('classification', current, [row], 'a');
+    const b = file('classification', current, [row], 'b');
+    expect(names(old, a)).toEqual(['blend_class', 'dominant_component', 'processing_status', 'validation_errors']);
+    expect(names(a, old, b)).toEqual(['blend_class', 'dominant_component', 'processing_status', 'validation_errors']);
+    expect(compareResults([a, b]).columns.find((c) => c.name === 'r32_r125_over_50')).toMatchObject({ kind: 'category', categories: [{ label: 'Yes', counts: [1, 1] }] });
+    // Any other difference is still refused.
+    expect(() => compareResults([file('classification', ['blend_class', 'dominant_component'], [row], 'legacy'), a])).toThrow(/Regenerate the older result/);
   });
   it('still compares category columns as text', () => {
     const out = compareResults([file('mass', ['s'], [{ s: 'Valid' }], 'a'), file('mass', ['s'], [{ s: 'valid' }], 'b')]);
@@ -305,7 +334,11 @@ A-3,d,100,40,30,30.5,upper edge`;
       ['validation', ['composition_total_pct', 'validation_status', 'validation_message']],
       ['mass', ['r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', 'mass_status']],
       ['classification', ['blend_class', 'dominant_component']],
+      // Classification exports from before the R-32 + R-125 flag, with and without result_id.
+      ['classification', ['result_id', 'blend_class', 'dominant_component', 'processing_status', 'validation_errors']],
+      ['classification', ['blend_class', 'dominant_component', 'processing_status', 'validation_errors']],
     ] as const) expect(detectResult([...headers, ...suffix])).toEqual({ processor: id, generatedColumns: suffix });
+    expect(detectResult([...headers, 'r32_r125_over_50', 'processing_status', 'validation_errors'])).toBeUndefined();
     expect(detectResult([...headers, 'processing_status', 'validation_errors'])).toBeUndefined();
     expect(detectResult([...headers, 'r32_mass_kg', 'processing_status', 'validation_errors'])).toBeUndefined();
   });

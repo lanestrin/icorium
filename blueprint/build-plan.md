@@ -426,6 +426,8 @@ user confirms before Mass or Classification calculates on a file with problems.
 
   **Verification:** component tests for both tabs' menus (items, preview opens, download link by File ID, no row selection, keyboard open/move/close and focus return); existing tests that clicked the Preview or download buttons updated; `npm run verify`.
 
+- [x] **9.11** `feature/9.11-r32-r125-over-50-flag` · **P2** — Add a Yes/No `r32_r125_over_50` column to Batch Classification results, at the person's request on 2026-11-12, marking rows where R-32 + R-125 is above 50% (strictly greater). It sits after `dominant_component` and before `processing_status`; invalid rows leave it blank, the same way Mass leaves its values blank. `blend_class` and `DEMO_CLASS_RULES` are unchanged. Classification exports made before this change (without the column) still upload, are still recognised as Classification results and can be compared with new ones. Update the README rules and the Architecture page where they name Classification columns. On the sample data every valid row reads Yes (R-32 + R-125 is 62–77%).
+
 ### M10 — Code review fixes
 
 From a full read-only review of the code on 2026-11-10 (after 9.8), covering

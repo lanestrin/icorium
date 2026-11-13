@@ -80,11 +80,11 @@ Each sample has one planted problem (B follow-up's duplicate makes two rows inva
 | `partner_b_followup.csv` | 10 and 11 (B-010) | `duplicate batch ID B-010` | 23 |
 | `partner_c_baseline.csv` | 18 (C-018) | `composition totals 78.37%` | 24 |
 
-Every result ends with `processing_status` (`Valid`/`Invalid`) and `validation_errors`. Invalid rows keep their original values: Mass leaves the masses blank, and Classification writes `Needs review` with a blank `dominant_component`. Validation also adds `composition_total_pct`.
+Every result ends with `processing_status` (`Valid`/`Invalid`) and `validation_errors`. Invalid rows keep their original values: Mass leaves the masses blank, and Classification writes `Needs review` with a blank `dominant_component` and `r32_r125_over_50`. Validation also adds `composition_total_pct`.
 
-Older exported results remain readable and downloadable unchanged. Compare results from the same function and output schema (with or without `result_id`); if one uses the much older pre-`processing_status` columns, regenerate it from its original input before comparing it with a new result. No data reset or migration is required. Processing rejects source-column names that would be overwritten by generated columns.
+Older exported results remain readable and downloadable unchanged. Compare results from the same function and output schema (with or without `result_id`). Classification results made before `r32_r125_over_50` existed still compare with new ones; that column is then left out of the comparison. If one uses the much older pre-`processing_status` columns, regenerate it from its original input before comparing it with a new result. No data reset or migration is required. Processing rejects source-column names that would be overwritten by generated columns.
 
-Composition totals within ±0.5 percentage points of 100% count as valid. Batch Classification uses demo-only thresholds (`DEMO_CLASS_RULES` in `server/src/processing/index.ts`): R-32 ≥ 40% is *R-32-rich*, otherwise R-134a ≥ 34% is *R-134a-rich*, otherwise *Balanced*.
+Composition totals within ±0.5 percentage points of 100% count as valid. Batch Classification uses demo-only thresholds (`DEMO_CLASS_RULES` in `server/src/processing/index.ts`): R-32 ≥ 40% is *R-32-rich*, otherwise R-134a ≥ 34% is *R-134a-rich*, otherwise *Balanced*. It also adds `r32_r125_over_50`: `Yes` when R-32 + R-125 is above 50% (exactly 50% is `No`), `No` otherwise. On the sample files every valid row reads `Yes`, since R-32 + R-125 is 62–77% there.
 
 ## Known limitations
 
@@ -146,6 +146,7 @@ These limits are fixed in code, each as one named constant:
 | `GENERATOR_MAX_ROWS`, `GENERATOR_MAX_FILES` | 5,000 rows per generated file, 10 files per request | `shared/types.ts` |
 | `GENERATOR_FIRST_DAY`, `GENERATOR_RANGES` | Generated rows start on 2026-09-01; mass 110–140 kg, R-32 33–43 %, R-125 26–33 % | `server/src/lib/generate.ts` |
 | `DEMO_CLASS_RULES` | Demo classification thresholds: R-32-rich from 40 %, R-134a-rich from 34 % | `server/src/processing/index.ts` |
+| `R32_R125_FLAG_ABOVE` | `r32_r125_over_50` reads Yes when R-32 + R-125 is above 50 % | `server/src/processing/index.ts` |
 | `TOAST_MS` | The archive/restore toast stays 8 seconds | `client/src/hooks/useArchive.ts` |
 
 ## Deploy

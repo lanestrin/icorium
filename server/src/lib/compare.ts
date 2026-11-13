@@ -1,6 +1,7 @@
 import { COMPARE_MAX, COMPARE_MIN, PROCESSORS, RESULT_ID_COLUMN, type CompareColumn, type CompareResult, type FileMeta, type MatchedRow, type Row, type RowMatch } from '../../../shared/types';
 import { getAdapter } from '../adapters';
 import { httpError } from './csv';
+import { R32_R125_FLAG_COLUMN } from '../processing';
 
 interface Loaded { meta: FileMeta; headers: string[]; rows: Row[] }
 
@@ -67,8 +68,12 @@ export function compareResults(files: Loaded[]): Omit<CompareResult, 'files'> & 
     throw httpError(400, `These files can't be compared: ${first.meta.name} is a ${label(first.meta.processor)} result but ${other.meta.name} is a ${label(other.meta.processor)} result. Pick results from the same function.`);
 
   // Compare the function's own columns. result_id always differs between files, so it is left out,
-  // which also lets results exported before File ID columns compare with new ones.
-  const functionColumns = (f: Loaded) => (f.meta.generatedColumns ?? []).filter((c) => c !== RESULT_ID_COLUMN);
+  // which also lets results exported before File ID columns compare with new ones. The R-32 + R-125
+  // flag is compared only when every file has it, so Classification results made before it existed
+  // still compare with new ones.
+  const everyHasFlag = files.every((f) => (f.meta.generatedColumns ?? []).includes(R32_R125_FLAG_COLUMN));
+  const functionColumns = (f: Loaded) =>
+    (f.meta.generatedColumns ?? []).filter((c) => c !== RESULT_ID_COLUMN && (everyHasFlag || c !== R32_R125_FLAG_COLUMN));
   const cols = functionColumns(first);
   for (const f of files) {
     const c = functionColumns(f);

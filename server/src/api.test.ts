@@ -586,6 +586,35 @@ describe('legacy result compatibility', () => {
   });
 });
 
+describe('R-32 + R-125 flag', () => {
+  const PREVIOUS = ['result_id', 'blend_class', 'dominant_component', 'processing_status', 'validation_errors'];
+
+  it('reads Yes on every valid sample row and stays blank on invalid ones', async () => {
+    const result = await processSample('partner_a_baseline.csv', 'classification');
+    const { rows } = await rowsOf(result.id);
+    expect(rows.some((r) => r.processing_status === 'Invalid')).toBe(true);
+    for (const r of rows) expect(r.r32_r125_over_50).toBe(r.processing_status === 'Valid' ? 'Yes' : '');
+  });
+
+  it('recognises, links and compares a Classification export made before the flag existed', async () => {
+    const source = await fileNamed('partner_a_baseline.csv');
+    const current = await processSample('partner_a_baseline.csv', 'classification');
+    // The same export as today minus the flag column: what Classification wrote before 9.11.
+    const exported = parseCsv((await app.inject(`/api/files/${current.id}/download`)).body);
+    const headers = exported.headers.filter((h) => h !== 'r32_r125_over_50');
+    const old = (await upload('pre_flag_classification.csv', toCsv(headers, exported.rows))).json<FileMeta>();
+    expect(old).toMatchObject({ status: 'Processed', processor: 'classification', generatedColumns: PREVIOUS, imported: true, sourceId: source.id });
+    for (const ids of [[old.id, current.id], [current.id, old.id]]) {
+      const response = await compare(...ids);
+      expect(response.statusCode).toBe(200);
+      expect(response.json<CompareResult>().columns.map((c) => c.name)).toEqual(PREVIOUS.slice(1));
+    }
+    const other = await processSample('partner_a_followup.csv', 'classification');
+    const both = (await compare(current.id, other.id)).json<CompareResult>();
+    expect(both.columns.find((c) => c.name === 'r32_r125_over_50')).toMatchObject({ kind: 'category' });
+  });
+});
+
 describe('File IDs', () => {
   const csv = sample('partner_a_baseline.csv');
 

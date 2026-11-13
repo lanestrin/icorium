@@ -14,6 +14,10 @@ const ok = (v: number | null): v is number => v !== null && Number.isFinite(v);
 const total = (n: Normalized) => COMPONENTS.reduce((s, c) => s + (ok(n[c]) ? n[c]! : 0), 0);
 /** Demo-only classification thresholds (%). Not real refrigerant specifications or Icorium policy. */
 const DEMO_CLASS_RULES = { r32RichMin: 40, r134aRichMin: 34 };
+/** Demo-only flag (%): Classification marks rows where R-32 + R-125 is strictly above this. */
+const R32_R125_FLAG_ABOVE = 50;
+/** Classification's Yes/No column for R-32 + R-125 above R32_R125_FLAG_ABOVE. */
+export const R32_R125_FLAG_COLUMN = 'r32_r125_over_50';
 
 /** Field checks shared by all processors. Invalid values are reported, never replaced with zero. */
 export function issues(n: Normalized): string[] {
@@ -79,6 +83,11 @@ const LEGACY_COLUMNS: Record<ProcessorId, string[]> = {
   classification: ['blend_class', 'dominant_component'],
 };
 
+// Earlier current columns that are still accepted: Classification before it gained the R-32 + R-125 flag.
+const PREVIOUS_COLUMNS: Partial<Record<ProcessorId, string[]>> = {
+  classification: [...ID_COLUMNS, 'blend_class', 'dominant_component', ...STATUS_COLUMNS],
+};
+
 // To add a processing function: add an entry here and to PROCESSORS in shared/types.ts.
 export const processors: Record<ProcessorId, Processor> = {
   validation: {
@@ -95,28 +104,33 @@ export const processors: Record<ProcessorId, Processor> = {
   },
   classification: {
     // Uses DEMO_CLASS_RULES; checked in order, first match wins.
-    columns: [...ID_COLUMNS, 'blend_class', 'dominant_component', ...STATUS_COLUMNS],
+    columns: [...ID_COLUMNS, 'blend_class', 'dominant_component', R32_R125_FLAG_COLUMN, ...STATUS_COLUMNS],
     run: (n, errors) => {
-      if (errors.length) return { blend_class: 'Needs review', dominant_component: '' };
+      if (errors.length) return { blend_class: 'Needs review', dominant_component: '', [R32_R125_FLAG_COLUMN]: '' };
       const dominant = COMPONENTS.reduce((a, b) => (n[b]! > n[a]! ? b : a));
       const blend_class =
         n.r32! >= DEMO_CLASS_RULES.r32RichMin ? 'R-32-rich (demo)'
         : n.r134a! >= DEMO_CLASS_RULES.r134aRichMin ? 'R-134a-rich (demo)'
         : 'Balanced (demo)';
-      return { blend_class, dominant_component: LABEL[dominant] };
+      // Rounded so float noise (25.1 + 24.9) never reads as just over the threshold.
+      const flagged = round(n.r32! + n.r125!) > R32_R125_FLAG_ABOVE;
+      return { blend_class, dominant_component: LABEL[dominant], [R32_R125_FLAG_COLUMN]: flagged ? 'Yes' : 'No' };
     },
   },
 };
 
 /**
  * Which processor produced a CSV, judged by its last columns. undefined = an input file. Accepts the
- * current columns, the same columns without result_id (exports made before File ID columns), and the
- * older legacy columns.
+ * current columns, the same columns without result_id (exports made before File ID columns), the
+ * previous current columns (with or without result_id) and the older legacy columns.
  */
 export function detectResult(headers: string[]): { processor: ProcessorId; generatedColumns: string[] } | undefined {
   for (const processor of Object.keys(processors) as ProcessorId[]) {
+    const withoutIds = (cols: string[]) => cols.filter((c) => !ID_COLUMNS.includes(c));
     const current = processors[processor].columns;
-    for (const generatedColumns of [current, current.filter((c) => !ID_COLUMNS.includes(c)), LEGACY_COLUMNS[processor]]) {
+    const previous = PREVIOUS_COLUMNS[processor] ?? [];
+    const accepted = [current, withoutIds(current), ...(previous.length ? [previous, withoutIds(previous)] : []), LEGACY_COLUMNS[processor]];
+    for (const generatedColumns of accepted) {
       if (generatedColumns.every((c, i) => headers[headers.length - generatedColumns.length + i] === c))
         return { processor, generatedColumns: [...generatedColumns] };
     }

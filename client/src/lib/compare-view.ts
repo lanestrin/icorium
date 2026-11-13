@@ -10,8 +10,12 @@ export function compareBlocker(selected: FileMeta[]): string | undefined {
   return undefined;
 }
 
+// Column names the general rule below would read badly.
+const METRIC_LABELS: Record<string, string> = { r32_r125_over_50: 'R32 + R125 over 50%' };
+
 /** "composition_total_pct" -> "Composition total (%)", "r32_mass_kg" -> "R32 mass (kg)". */
 export function metricLabel(name: string) {
+  if (METRIC_LABELS[name]) return METRIC_LABELS[name];
   const unit = name.endsWith('_pct') ? ' (%)' : name.endsWith('_kg') ? ' (kg)' : '';
   const words = name.replace(/_(pct|kg)$/, '').replace(/_/g, ' ');
   return words.charAt(0).toUpperCase() + words.slice(1) + unit;
