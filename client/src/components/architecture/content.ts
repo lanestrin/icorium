@@ -42,8 +42,8 @@ export const TECH: Tech[] = [
       'Fast dev server with hot reload, and a small config: React, Tailwind and an /api proxy to the local API.',
       'A plain single-page build without the conventions of a larger full-stack framework.',
     ],
-    tradeoff: 'No built-in router or server. The app picks its pages from the URL itself, and the API is a separate service.',
-    files: ['client/vite.config.ts'],
+    tradeoff: 'No built-in router or server. The app picks its pages from the URL itself, so the build copies index.html for /generator and /architecture to keep them loading on a static host; the API is a separate service.',
+    files: ['client/vite.config.ts', 'client/src/lib/pages.ts'],
   },
   {
     name: 'Tailwind CSS 4', label: 'Tailwind CSS', role: 'Styling', icon: Wind, packages: [['client', 'tailwindcss'], ['client', '@tailwindcss/vite']],

@@ -96,7 +96,7 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 - Processing is synchronous and handles one file at a time, which suits interview-sized files. Preview lists the first 100 problem rows in detail.
 - Classification thresholds are demo-only, and no purity or recovery is inferred from feed composition.
 - Automated tests cover behavior in jsdom; they do not check real-browser layout or visuals.
-- `/generator` and `/architecture` are client-side pages. The Vite dev and preview servers serve them directly; opening them directly on the optional Vercel deployment has not been verified.
+- `/generator` and `/architecture` are client-side pages. The Vite dev and preview servers serve them directly, and the build copies `index.html` to `dist/generator/` and `dist/architecture/` (`client/src/lib/pages.ts`) so a static host such as the optional Vercel deployment serves them too. That has not yet been confirmed on a live deployment.
 
 ## Layout
 
