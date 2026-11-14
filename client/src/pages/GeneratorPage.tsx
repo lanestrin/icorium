@@ -11,6 +11,7 @@ import { api } from '../lib/api';
 import { classNames } from '../lib/class-names';
 import { errorMessage, plural } from '../lib/format';
 import { flaggedRows, withCsv } from '../lib/generated-files';
+import { AppVersion } from '../components/AppVersion';
 
 const ERROR_ROWS_HELP = 'In each file. Each of these rows fails Composition Validation: missing or non-numeric mass, a negative percentage, '
   + 'a composition total off by 15 points, a missing batch ID, or a duplicate batch ID (which marks two rows).';
@@ -90,6 +91,7 @@ export function GeneratorPage() {
       <nav aria-label="Pages" className="page-nav">
         <a href="/" className="nav-link"><ArrowLeft className="h-4 w-4" /> Back to CSV Files</a>
         <a href="/architecture" className="nav-link"><Network className="h-4 w-4" /> Architecture</a>
+        <AppVersion />
       </nav>
       <div className="mt-3 flex flex-wrap items-baseline gap-4">
         <h1 className="text-3xl font-bold tracking-tight">CSV Generator</h1>

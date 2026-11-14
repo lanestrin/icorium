@@ -85,6 +85,8 @@ Base CSV parsing and schema checks run on upload regardless of the processing fu
 
 **Approved exception:** an optional Vercel deployment with private Blob storage (PR #6, confirmed by the person on 2026-11-06; see `blueprint/vercel-deployment.md`). It is server-side only and needs no accounts. Local development still uses local files and no cloud service. Any further cloud addition needs a new decision.
 
+**Approved exception:** browser-side file conversion with SheetJS (`xlsx`), `pdfjs-dist` and `tesseract.js`, so partners' Excel files, text PDFs and scanned PDFs or images can be imported (build-plan 9.14, confirmed by the person on 2026-11-13). Conversion runs in the browser; the server stays CSV-only. No account, server-side service or AI service is involved: OCR runs locally, and only Tesseract's language data is downloaded from a CDN.
+
 ## Acceptance evidence
 
 These product checks are covered by automated tests (`npm run verify`), not a

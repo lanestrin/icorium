@@ -153,6 +153,8 @@ These limits are fixed in code, each as one named constant:
 
 Local development needs no account or cloud service. An optional Vercel deployment (client and server services, private Blob storage) is configured; see [deployment configuration and outstanding checks](blueprint/vercel-deployment.md).
 
+**Releases.** Versions are worked out automatically from the PR titles (`fix:` patch, `feat:` minor, `feat!:` major) by release-please, which keeps one `chore: release X.Y.Z` PR open with the next version and `CHANGELOG.md`. Merging it creates the `vX.Y.Z` tag and GitHub Release. The current version shows at the end of each page's navigation (`v1.0.0`, plus `· Test` or `· Preview` on Vercel Preview builds). See "Releases" in [blueprint/commit-rules.md](blueprint/commit-rules.md).
+
 ## Extending
 
 - **New partner CSV schema:** add one entry to `ADAPTERS` in `shared/types.ts`, listing its id, name, description, column names, unit factors and number formats. Uploads, processing and the CSV generator all read it.

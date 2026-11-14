@@ -22,6 +22,7 @@ import { api } from '../lib/api';
 import { compareBlocker } from '../lib/compare-view';
 import { filterFiles } from '../lib/file-status';
 import { errorMessage } from '../lib/format';
+import { AppVersion } from '../components/AppVersion';
 
 /** The file workspace: upload, filter, process, preview, archive and compare files. */
 export function FilesPage() {
@@ -88,6 +89,7 @@ export function FilesPage() {
               <a href="/architecture" className="nav-link">
                 <Network className="h-4 w-4" /> Architecture
               </a>
+              <AppVersion />
             </nav>
           </div>
 

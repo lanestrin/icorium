@@ -121,7 +121,9 @@ HEAD or clean status alone is insufficient.
 
 - CI (`.github/workflows/ci.yml`) runs `npm run verify` on every push to `main`
   and every PR; `.github/workflows/pr-title.yml` checks PR titles with
-  `scripts/check-pr-title.ps1`.
+  `scripts/check-pr-title.ps1`; `.github/workflows/release.yml` runs
+  release-please on every push to `main` (see "Releases" in
+  `blueprint/commit-rules.md`).
 - Reset the demo data: stop the servers, delete `server/data/`, start again.
 - On Windows, stopping a background `npm run dev` can leave the tsx server
   holding port 3001. Check the port and stop only that process.
