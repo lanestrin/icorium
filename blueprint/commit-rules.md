@@ -158,6 +158,12 @@ the last release, which are the PR titles above:
   ```
 
   Never rewrite `main`, move tags or add a corrective commit for this.
+- Write those two marker words only inside an intentional override block,
+  in the description of the PR being corrected. Everywhere else (commit
+  messages, PR descriptions, drafts) call it "the commit-override block".
+  release-please treats everything after the start marker in a merged PR's
+  description as that commit's subject, even with no end marker, so a
+  passing mention breaks its parsing (as on PR #62).
 - Agents never create tags, publish releases, change that secret or merge
   the release PR without the person's explicit authorization in the current
   chat.
