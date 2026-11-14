@@ -135,6 +135,8 @@ the last release, which are the PR titles above:
 - The workflow authenticates with the `RELEASE_PLEASE_TOKEN` repository
   secret. GitHub does not run CI on PRs opened with the default
   `GITHUB_TOKEN`.
+- To retry a failed run without another merge, start "Release" from the
+  Actions tab with **Run workflow**. It does the same as a push to `main`.
 - Agents never create tags, publish releases, change that secret or merge
   the release PR without the person's explicit authorization in the current
   chat.

@@ -3,9 +3,12 @@ name: Release
 # Keeps one "chore: release x.y.z" PR open with the next version and changelog,
 # worked out from the squash-merged PR titles (fix: patch, feat: minor,
 # feat!: major). Merging that PR creates the vX.Y.Z tag and GitHub Release.
+# Runs on every push to main; "Run workflow" in the Actions tab retries a
+# failed run without another merge.
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
