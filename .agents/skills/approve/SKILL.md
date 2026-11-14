@@ -64,22 +64,23 @@ authorized commit now exists. The tested file manifest must still match.
   from the rest. With `gh`, use a temporary body file and `--body-file`.
   Do not append the template or overwrite unrelated PRs. Read back the title
   and body when possible and report the actual PR URL.
-- If neither a GitHub connector nor `gh` is available, the person opens the
-  PR by hand. Stop after the push; do not search for `gh`, suggest installing
-  it or report it as a blocker. Run `node scripts/pr-link.mjs` from the
-  repository root. It builds a link from `landing-pr.md` that opens the new
-  PR with the reviewed title and the full description already filled in, so
-  the person only clicks **Create pull request**. Output that link as the
-  single next action; do not also print the title and description to paste.
-  Only when the script says the description is too long for a link, output
-  its title-only link and the description it prints for pasting. If the
-  script refuses the draft (for example, it mentions the commit-override
-  marker words), stop without a link and fix the draft through Complete.
-  Never build the link by hand. GitHub otherwise fills in a title from the
-  branch name when the branch has more than one commit, and its own default
-  description, and the squash commit takes the PR title, so a wrong title
-  reaches `main` and release-please cannot read it. Do not claim a PR was
-  created.
+- If neither a GitHub connector nor `gh` is available, run
+  `node scripts/open-pr.mjs` from the repository root after the push. It
+  authenticates with the credential Git already uses to push to github.com,
+  checks that the remote branch is at the reviewed commit, then creates the
+  PR, or updates the one open PR for this branch, with the reviewed title and
+  description from `landing-pr.md`, reads it back and prints the PR link,
+  whether it was created or updated, and its checks. Report exactly that
+  output. If the script refuses or fails (for example, the draft mentions the
+  commit-override marker words, the remote branch is not the reviewed commit,
+  or no credential is stored), stop, report its message and whether the
+  commit and push succeeded, and fix the cause through Complete or the person.
+  Never build GitHub API calls by hand, print or log the credential, ask the
+  person to paste a title or description, or search for or suggest
+  installing `gh`. GitHub's own new-PR page fills in a title from the branch
+  name when the branch has more than one commit, and its own description,
+  and the squash commit takes the PR title, so a hand-opened PR can put a
+  title on `main` that release-please cannot read.
 - For a retry after a partial success, inspect the existing commit, remote
   branch and PR first. Confirm the existing commit matches the reviewed work;
   resume only the remaining authorized actions. Never create an empty or
