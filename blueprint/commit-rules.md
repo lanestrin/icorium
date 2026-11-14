@@ -109,9 +109,19 @@ Use squash merge with the PR title as the resulting commit subject, followed
 by GitHub's `(#<number>)`, so one work item lands as one conventional commit.
 The person performs the merge.
 
-Recommended GitHub settings: require a PR and the "verify" and "PR title"
-checks before merging to `main`, and enable squash merging. These are remote
-repository settings; adding these files does not configure or enforce them.
+The squash commit's subject comes from the PR title, not from the branch's
+local commits. A correct local commit subject is not enough: when a branch
+has more than one commit, GitHub fills in a title from the branch name, and
+that title reaches `main` unless it is replaced. `/approve` links to a new PR
+with the drafted title already filled in.
+
+Required one-time GitHub settings (remote repository settings; these files do
+not configure or enforce them):
+
+- A branch ruleset or protection on `main` that requires a PR and the
+  "verify" and "PR title" checks, so a failing title cannot be merged.
+- Squash merging only (merge commits and rebase merging off).
+- Squash merge "Default commit message" set to **Pull request title**.
 
 ## Releases
 
@@ -137,6 +147,17 @@ the last release, which are the PR titles above:
   `GITHUB_TOKEN`.
 - To retry a failed run without another merge, start "Release" from the
   Actions tab with **Run workflow**. It does the same as a push to `main`.
+- If a PR already landed with a non-conventional title, release-please skips
+  it ("commit could not be parsed"). Add this block to the end of that merged
+  PR's description, then run "Release" again:
+
+  ```text
+  BEGIN_COMMIT_OVERRIDE
+  feat: <the subject it should have had>
+  END_COMMIT_OVERRIDE
+  ```
+
+  Never rewrite `main`, move tags or add a corrective commit for this.
 - Agents never create tags, publish releases, change that secret or merge
   the release PR without the person's explicit authorization in the current
   chat.
