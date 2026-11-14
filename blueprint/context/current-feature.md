@@ -69,6 +69,10 @@ When no GitHub connector or `gh` is available, `/approve` hands over a link made
 - [x] **Step 2 - Hand-off**
   - Replace the link bullet in `.agents/skills/approve/SKILL.md` as above.
   - *Done when:* the bullet runs the script, reports its output, and covers refusals, without printing the credential or making hand-built API calls.
+- [x] **Step 3 - Repair F-02 (scrub before truncating)**
+  - In `githubRequest`, remove the token from GitHub's error text before cutting it to 400 characters, so a token that GitHub echoes across the cut can't leave a partial token behind.
+  - Add a test whose echoed token crosses the 400-character boundary.
+  - *Done when:* the new test passes, and F-02 is marked `fixed` for the next independent review to close.
 
 ## Verify
 

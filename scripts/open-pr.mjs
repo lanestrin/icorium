@@ -76,7 +76,8 @@ export function githubRequest(token, fetchImpl = fetch) {
       } catch {
         // GitHub's error body was not JSON; keep the raw text.
       }
-      throw new Error(scrub(`GitHub ${method} ${path} failed with ${response.status}: ${message}`.slice(0, 400), token));
+      // Scrub before shortening: cutting first could leave part of an echoed token that no longer matches it.
+      throw new Error(scrub(`GitHub ${method} ${path} failed with ${response.status}: ${message}`, token).slice(0, 400));
     }
     return text ? JSON.parse(text) : null;
   };

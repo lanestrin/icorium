@@ -143,6 +143,17 @@ describe('GitHub request', () => {
     await expect(failure).rejects.not.toThrow(token);
   });
 
+  it('keeps every part of the token out of an error message cut at 400 characters', async () => {
+    const path = `/repos/${repo}/pulls`;
+    const prefix = `GitHub GET ${path} failed with 401: `;
+    // Place the echoed token so that it crosses the 400th character of the message.
+    const message = `${'x'.repeat(400 - prefix.length - 5)}${token} trailing text`;
+    const fetchImpl = async () => new Response(JSON.stringify({ message }), { status: 401 });
+    const error = await githubRequest(token, fetchImpl)('GET', path).catch((caught: Error) => caught);
+    expect(error.message.length).toBeLessThanOrEqual(400);
+    expect(error.message).not.toContain(token.slice(0, 5));
+  });
+
   it('keeps the token out of network errors', async () => {
     const fetchImpl = async () => {
       throw new Error(`connect failed (Authorization: Bearer ${token})`);
