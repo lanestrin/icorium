@@ -64,9 +64,17 @@ authorized commit now exists. The tested file manifest must still match.
   from the rest. With `gh`, use a temporary body file and `--body-file`.
   Do not append the template or overwrite unrelated PRs. Read back the title
   and body when possible and report the actual PR URL.
-- If PR tooling is unavailable, keep the completed drafts and report the
-  exact access or tooling issue. Do not claim a PR was created or require the
-  person to write its description.
+- If neither a GitHub connector nor `gh` is available, the person opens the
+  PR by hand. Stop after the push; do not search for `gh`, suggest installing
+  it or report it as a blocker. Output only the PR title and the full
+  description from `landing-pr.md`, ready to paste, then a link that opens
+  the new PR with the title already filled in:
+  `https://github.com/<owner>/<repo>/compare/main...<branch>?quick_pull=1&title=<title>`,
+  with the title URL-encoded (for example `feat%3A%20add%20...%20(12.1)`).
+  GitHub otherwise fills in a title from the branch name when the branch has
+  more than one commit, and the squash commit takes the PR title, so a
+  wrong title reaches `main` and release-please cannot read it. Do not claim
+  a PR was created or require the person to write its description.
 - For a retry after a partial success, inspect the existing commit, remote
   branch and PR first. Confirm the existing commit matches the reviewed work;
   resume only the remaining authorized actions. Never create an empty or
