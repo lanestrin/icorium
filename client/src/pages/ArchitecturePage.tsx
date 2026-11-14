@@ -7,6 +7,7 @@ import { OverviewSection } from '../components/architecture/OverviewSection';
 import { StorageSection } from '../components/architecture/StorageSection';
 import { TechStackSection } from '../components/architecture/TechStackSection';
 import styles from './ArchitecturePage.module.css';
+import { AppVersion } from '../components/AppVersion';
 
 /*
  * Architecture & Tech Stack page (/architecture), for walking through the design in an interview.
@@ -19,6 +20,7 @@ export function ArchitecturePage() {
         <nav aria-label="Pages" className="page-nav">
           <a href="/" className="nav-link"><ArrowLeft className="h-4 w-4" /> Back to CSV Files</a>
           <a href="/generator" className="nav-link"><Wand2 className="h-4 w-4" /> CSV Generator</a>
+          <AppVersion />
         </nav>
 
         <header className="mt-6">

@@ -428,6 +428,43 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 - [x] **9.11** `feature/9.11-r32-r125-over-50-flag` · **P2** — Add a Yes/No `r32_r125_over_50` column to Batch Classification results, at the person's request on 2026-11-12, marking rows where R-32 + R-125 is above 50% (strictly greater). It sits after `dominant_component` and before `processing_status`; invalid rows leave it blank, the same way Mass leaves its values blank. `blend_class` and `DEMO_CLASS_RULES` are unchanged. Classification exports made before this change (without the column) still upload, are still recognised as Classification results and can be compared with new ones. Update the README rules and the Architecture page where they name Classification columns. On the sample data every valid row reads Yes (R-32 + R-125 is 62–77%).
 
+- [ ] **9.12** `feature/9.12-show-new-uploads-first` · **P2** — After an upload, set the file list's filters so the new files show first, at the person's request on 2026-11-13: **Processing Function** becomes **Original** and **Date Range** becomes today to today (the browser's local date). This only happens when at least one file in the upload succeeds. If the Archived tab is open, switch to Active Files, where new uploads land. Search and Status are left as they are. The person can still change any filter, and **Clear filters** shows everything again. Uploads made from the CSV Generator page are not covered. No API change: the filters work in the browser, so this shortens what is shown but not what the server sends (that is 10.11).
+
+- [ ] **9.13** `feature/9.13-show-new-results-first` · **P2** — After **Run Processing**, set the file list's filters so the new results show first, at the person's request on 2026-11-13. **Processing Function** becomes the function that was run (**Validation**, **Mass Calculation** or **Classification**), and **Date Range** becomes today to today (the browser's local date). This only happens when at least one result is made. A replaced result counts, since replacing gives it today's date. If the Archived tab is open, switch to Active Files. Search and Status are left as they are. **Clear filters** still shows everything. Reuse the 9.12 filter change rather than adding a second one. No API change.
+
+  **Depends on:** 9.12.
+
+- [ ] **9.14** Convert non-CSV partner files · **P2** — Partners may send Excel files, text PDFs or scanned PDFs and images, added at the person's request on 2026-11-13. They chose to have all three converted, with OCR running in the browser (Tesseract), not an AI service. Conversion runs entirely in the browser before upload. A non-CSV file becomes a table, the header row is found by matching one partner adapter's columns (`ADAPTERS` in `shared/types.ts`), and the person reviews the rows in a dialog (**Cancel** or **Import as CSV**). Only then is it sent as `<name>.csv` through the existing upload. The server stays CSV-only, so validation, File IDs and **Needs Review** work unchanged, and Vercel's 4.5 MB limit applies only to the CSV. Rows with the wrong number of cells are kept and flagged, never guessed. Readers are loaded only when used (dynamic `import()`). Limits: 20 pages per PDF, 20 MB per source file, English OCR. A failed file never blocks the others in a multi-file upload. Libraries: SheetJS `xlsx` 0.20.x from the official cdn.sheetjs.com tarball (npm's 0.18.5 has advisories), `pdfjs-dist` and `tesseract.js`. Tesseract downloads its English language data (~10 MB) from a CDN on first use; no partner data leaves the browser except as the uploaded CSV. Real PDF and OCR reading can't run in jsdom, so tests mock the libraries, and each sub-item's Try it now uses a real file.
+
+  - [ ] **9.14a** `feature/9.14a-convert-excel-uploads` — The pipeline: choosing a reader by extension, header detection against `ADAPTERS`, the review dialog, the "`report.docx` can't be converted. Upload a CSV, Excel, PDF or image file." message, a wider drop-zone `accept` list, and the Excel reader (first sheet). Also the stack exception, and the README and Architecture page updates for the new packages.
+  - [ ] **9.14b** `feature/9.14b-read-text-pdfs` — The pdf.js reader. Text items are grouped into rows by y position and into cells by x gaps. A page with no text layer is refused with "this page is a scanned image" until 9.14c.
+  - [ ] **9.14c** `feature/9.14c-ocr-scanned-pdfs-and-images` — Tesseract for image-only PDF pages and `.png` / `.jpg` files, with "Reading page 2 of 5…" progress and **Cancel**, and an "Read by OCR: check the numbers" warning in the review dialog.
+
+  **Depends on:** 10.13 (clear upload errors).
+
+- [ ] **9.15** `feature/9.15-architecture-scaling-and-security` · **P2** — Extend the Architecture & Tech Stack page to answer three interview questions, at the person's request on 2026-11-13: the trade-offs of Tesseract OCR in the browser, the recommended stack if the product scales, and how customer uploads should be secured once the product serves several customers. Presentation only: no API, dependency or stack change. Planned and recommended items are labelled **Planned** or **Recommended, not built**, like the existing "S3 / Cloudflare R2 · Not built". No tech card names Tesseract, SheetJS or pdf.js until 9.14a installs them.
+
+  - **Decisions:** make the existing processing-location card a reusable featured card, and add **File conversion in the browser (planned, 9.14)**. It has benefits (free, no API key, files stay in the browser, no server load, avoids Vercel's limits) and a trade-off box (weaker on blurry, skewed, handwritten or merged-cell scans; ~10 MB language data on first use; slow on many pages or weak devices; no unattended batch runs; every file needs review; switch to a managed document-AI service such as AWS Textract or Azure Document Intelligence when volume or accuracy targets require it).
+  - **New section 7, Customers and security (recommended, not built):**
+    - One hosted multi-tenant app rather than copies customers download; a dedicated deployment only for contracts that need it.
+    - People sign in per customer through a managed OIDC provider with organizations, SSO and MFA, and roles (admin, uploader, viewer).
+    - Systems that upload automatically use per-customer OAuth client credentials or scoped API keys: hashed, shown once, expiring, revocable, rate-limited and logged.
+    - IP allowlisting is an optional extra layer, never the identity.
+    - API keys are not needed today; the only secret is the server-side Blob token.
+    - Tenant isolation: the customer ID comes from the session or key and is enforced in the one storage layer, plus PostgreSQL row-level security and cross-customer tests.
+    - Upload safeguards: quotas and rate limits, content-type checks, presigned uploads to private per-customer storage, malware scanning for any stored PDF or image, encryption, an audit log, retention rules, and formula escaping for files shared outside.
+  - **Evolution:** replace the five tiles with a "today → at scale" table:
+    - UI: same.
+    - API: Fastify in containers.
+    - Identity: a managed OIDC provider.
+    - Data: PostgreSQL with row-level security, plus S3 or R2 via presigned URLs.
+    - Work: a queue and workers.
+    - OCR: Tesseract, then managed document AI.
+    - Operations: logs, Sentry, metrics, a secrets manager and backups.
+  - Content stays in `client/src/components/architecture/content.ts`, reusing the existing section and card patterns, with no sideways scroll at phone width.
+
+  **Done when:** section 7 is in the page and its "On this page" links; the conversion card shows **Planned** with its trade-off; the scale table shows today and at-scale values per layer; component tests cover all three and the content test checks that the planned card is labelled planned; `npm run verify` passes.
+
 ### M10 — Code review fixes
 
 From a full read-only review of the code on 2026-11-10 (after 9.8), covering
@@ -586,7 +623,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   **Verification:** API tests that page results are unchanged and that a re-run result serves its new rows; a unit test that parsing runs once per file across pages; `npm run verify`.
 
-- [ ] **10.11** `perf/blob-storage-lookups` · **P2, only if the Vercel deployment goes ahead** — With Vercel Blob, `find(id)` lists and downloads every record, CSV text included, one at a time, to find one file (`server/src/lib/blob-storage.ts`). Most routes call `get` then `read`, so a preview is two full scans and a five-file comparison ten; `patch` re-uploads the whole CSV to change a flag.
+- [ ] **10.11** `perf/blob-storage-lookups` · **P1** — The deployment went ahead, so this now applies; updated on 2026-11-13 after a review. Since 10.9, a lookup by File ID is a direct read, so `get`, `read` and `patch` no longer scan. What remains: `list()` in `server/src/lib/blob-storage.ts` downloads every stored object, CSV text included, on every file-list load, so the page slows down as files pile up. `patch` still re-uploads the whole CSV to change a flag. Store each file's metadata as its own small object, separate from its CSV text, and convert files already stored online once at startup, the way `reconcileMetadata` runs. The original notes below are kept for history; the first, second and fourth are covered by 10.9 and 11.1.
 
   - Load records in parallel.
 
@@ -619,6 +656,12 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
   **Done when:** each setting can be changed without editing code; defaults are unchanged.
 
   **Verification:** API tests for a custom upload limit and the default; the Architecture content test updated to read the default; `npm run verify`.
+
+- [ ] **10.13** `fix/blank-error-messages` · **P1** — Errors that come from Vercel itself show an empty message, found in a review on 2026-11-13. Vercel rejects requests over 4.5 MB before they reach the app (the app allows 10 MB), and its timeouts and crashed functions also answer without the app's `{ message }` JSON. `client/src/lib/api.ts` then falls back to `res.statusText`, which is usually empty over HTTP/2. When a failed response has no message, show one based on the error code instead. For a 413, say the file is too large to upload online (about 4.5 MB). For anything else, say the server could not complete the request and give the error code. Add a client unit test for both cases and one where the server's own message still shows.
+
+- [ ] **10.14** `fix/file-list-loading-state` · **P2** — On first load, the file table says "No CSV files match your filters." until the list arrives, found in a review on 2026-11-13. Online, with a slow list (10.11), the app looks empty. `useFileList` (`client/src/hooks/useFileList.ts`) starts with `[]`. Add a `loading` state that lasts until the first `api.list()` settles, and show "Loading files…" in the table's empty row. A failure still shows the error banner. Component tests for loading → loaded and loading → error.
+
+- [ ] **10.15** `fix/online-size-limits` · **P2** — Online, Vercel can't send a response over 4.5 MB, found in a review on 2026-11-13. Measured: a result is about 2× its input (5,000 rows: 225 KB → 439 KB for Classification), so an input over about 2.3 MB uploads but its result can't be downloaded. Comparing 5 files fails above about 16,000 rows each (5 × 20,000 rows is a 5.57 MB response). Recommended: set `MAX_UPLOAD_MB=2` on the Vercel deployment and document it, so the server refuses larger CSVs with its own clear message, and have comparison return a plain "too many rows to compare online" 400 above a set row count. Confirm the approach with the person when the spec starts. Whether to add deleting or resetting files online (archive only hides them) is a separate open decision, not part of this item.
 
 ### M11 — File IDs
 
@@ -775,6 +818,36 @@ The filename `data.csv` is permitted for every row above. A partner may name a f
   **Done when:** duplicate names never collide; one original's re-run never replaces another original's result; the ID relationships are stable; imported results follow the 11.7 rule and are never misrepresented as linked; tests cover all three suffixes.
 
   **Verification:** server API/storage tests, client component tests, full `npm run verify`; manual demo optional, not an unperformed acceptance claim.
+
+### M12 — Releases and environments
+
+Added on 2026-11-13. The person considers phase one done and chose three things: automatic versions; Production updated only when a release is published; and a stable Test site deployed from `main` with its own storage. Today's `main` becomes **v1.0.0**. Version bumps come from the squash-merged PR titles that `scripts/check-pr-title.ps1` already enforces: `fix:` → patch, `feat:` → minor, `feat!:` or `BREAKING CHANGE:` → major, and `chore:`/`docs:`/`test:` don't bump.
+
+- [ ] **12.1** `feature/12.1-automated-releases` · **P1** — Automatic versions with release-please.
+  - Root `package.json` gets `"version": "1.0.0"`. Add `release-please-config.json` (`release-type: node`, single package `"."`, `pull-request-title-pattern: "chore: release ${version}"` so the release PR passes the title check, Features and Bug Fixes sections, `bootstrap-sha` at the v1.0.0 commit) and `.release-please-manifest.json` (`{ ".": "1.0.0" }`).
+  - `.github/workflows/release.yml` runs `googleapis/release-please-action@v4` on push to `main`, using the `RELEASE_PLEASE_TOKEN` secret. GitHub doesn't run CI on PRs opened with the default `GITHUB_TOKEN`. The action keeps one release PR open with the version bump and `CHANGELOG.md`; merging it creates the `vX.Y.Z` tag and GitHub Release. Only the person merges it.
+  - A small `v1.0.0 · Test` label on all three pages. `client/vite.config.ts` defines `__APP_VERSION__` from the root `package.json`, and an environment label from Vercel's build variables: **Test** for a Preview build of `main`, **Preview** for other branches, nothing for production or locally. The label logic is a pure function in `client/src/lib/` with a unit test, and there's a component test per page.
+  - Docs: a Releases section in `blueprint/commit-rules.md`, `release.yml` named in `AGENTS.md`, and the README Deploy section.
+  - After merge: the person tags the merge commit `v1.0.0` and publishes it as the first GitHub Release (or authorizes that explicitly). They also create the `RELEASE_PLEASE_TOKEN` secret (a fine-grained token for this repo with Contents and Pull requests read/write).
+
+  **Done when:** `npm run verify` passes with the label tests, and the config and workflow files exist. The workflow itself can only be proven by its first real run on GitHub.
+
+- [ ] **12.2** `feature/12.2-test-and-production-environments` · **P1** — Production follows releases; `main` is Test.
+  - `.github/workflows/promote-production.yml` runs on `release: published` and on `workflow_dispatch` with a `tag` input; the manual run is the rollback. It checks that the tag matches `v*.*.*`, then runs `git push origin "<tag>^{commit}:refs/heads/production"` with `RELEASE_PLEASE_TOKEN`. It never writes to `main`, and never moves `production` to anything but a release tag.
+  - Environments:
+    - **Preview:** PR branches, `icorium/preview` storage.
+    - **Test:** `main`, a Vercel Preview with `RECLAIM_BLOB_PREFIX=icorium/test` and a fixed branch URL or `test.<domain>`.
+    - **Production:** the `production` branch, `icorium/production` storage, unchanged so today's data is kept.
+  - Document in a new "Environments" section of `blueprint/vercel-deployment.md`, and update the Architecture page's hosting text.
+  - One-time manual setup by the person (external settings, never done by an agent):
+    - In Vercel, set Production Branch to `production`.
+    - In Vercel, add the Preview env var `RECLAIM_BLOB_PREFIX=icorium/test` scoped to branch `main`.
+    - In Vercel, optionally assign a test domain to `main`.
+    - In GitHub, create `production` from `v1.0.0` and protect it (no force-push or delete; pushes only by the token's owner).
+
+  **Depends on:** 12.1.
+
+  **Done when:** `npm run verify` passes; the workflow and docs are in place. After setup: a merge to `main` updates only Test; publishing a release moves `production` and deploys it; a manual run with an older tag rolls production back; Test and Production keep separate files.
 
 ### M7 — Final interview readiness
 

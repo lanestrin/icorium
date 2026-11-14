@@ -112,3 +112,34 @@ The person performs the merge.
 Recommended GitHub settings: require a PR and the "verify" and "PR title"
 checks before merging to `main`, and enable squash merging. These are remote
 repository settings; adding these files does not configure or enforce them.
+
+## Releases
+
+Versions are automatic. `.github/workflows/release.yml` runs release-please
+on every push to `main`. It reads the squash-merged commit subjects since
+the last release, which are the PR titles above:
+
+| Subject | Version change |
+| --- | --- |
+| `fix: ...` | patch (1.0.0 → 1.0.1) |
+| `feat: ...` | minor (1.0.0 → 1.1.0) |
+| `feat!: ...` or a `BREAKING CHANGE:` footer | major (1.0.0 → 2.0.0) |
+| `chore:`, `docs:`, `test:` | none on their own, and hidden from the changelog |
+
+- release-please keeps one PR open, titled `chore: release X.Y.Z`. It updates
+  the root `package.json` version, `.release-please-manifest.json` and
+  `CHANGELOG.md`, and refreshes after every merge.
+- Merging that PR is the release: it creates the `vX.Y.Z` tag and a GitHub
+  Release with the notes. Only the person merges it.
+- Never edit versions, the manifest or `CHANGELOG.md` by hand.
+- The workflow authenticates with the `RELEASE_PLEASE_TOKEN` repository
+  secret. GitHub does not run CI on PRs opened with the default
+  `GITHUB_TOKEN`.
+- Agents never create tags, publish releases, change that secret or merge
+  the release PR without the person's explicit authorization in the current
+  chat.
+- The baseline is `v1.0.0`, which the person tags on `main` before the first
+  release-please run.
+- The running version shows at the end of each page's navigation:
+  `v1.0.0`, plus `· Test` for a Vercel Preview build of `main` and
+  `· Preview` for other branches.
