@@ -1,8 +1,8 @@
 # Project Plan
 
-> Seeded by `/adopt` on 2026-11-11 from `CLAUDE.md`, `README.md`,
+> Written on 2026-11-11 from the project instructions, `README.md`,
 > `blueprint/stack.md` and `blueprint/build-plan.md`. Those documents keep the
-> full detail; this plan is the summary `/overview` distills. Edit freely.
+> full detail; this plan is the summary. Edit freely.
 
 ## 1. Problem - What problem are we solving?
 

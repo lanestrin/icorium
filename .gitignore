@@ -4,3 +4,16 @@ server/data
 blueprint/context/landing-*
 .vercel
 .env*
+
+# Private development workflow: kept locally, never published
+.claude/
+.agents/
+AGENTS.md
+CLAUDE.md
+blueprint/.state/
+blueprint/config.json
+blueprint/context/
+blueprint/history/
+blueprint/workflow.md
+scripts/open-pr.mjs
+server/src/open-pr.test.ts

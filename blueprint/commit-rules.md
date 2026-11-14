@@ -1,6 +1,6 @@
 # Commit messages and PRs
 
-Adapted from Vetiflow's `blueprint/context/coding-standards.md` for Icorium.
+Adapted from Vetiflow's coding standards for Icorium.
 This is the single source for commit and PR conventions in this project.
 
 ## Approval and branches
@@ -9,17 +9,10 @@ Commit and push only when the person asks. Otherwise leave changes uncommitted.
 Use one work item per branch and per commit. Never commit directly to `main`,
 merge or force-push.
 
-Use `/complete` to verify the work and present the commit and PR drafts.
-Then wait for the person to type `/approve`: this explicitly authorizes that
-one reviewed commit, push and PR creation/update. A request to add or edit
-these skills is not an invocation. Approval to commit alone still does not
-authorize pushing or publishing a PR.
-
-Skills live in `.agents/skills/complete/` and `.agents/skills/approve/` for
-Codex (`$complete` and `$approve`), with `.claude/skills/` entrypoints for
-Claude Code (`/complete` and `/approve`). If a client reserves slash commands,
-use the Codex skill picker or `$complete` / `$approve` instead. Reload the
-project/session if newly added skills are not yet listed.
+Present the full commit message, PR title and description and the verification
+result for review. Explicit approval of that review authorizes that one commit,
+push and PR creation or update. Approval to commit alone does not authorize
+pushing or publishing a PR.
 
 For every new work item, follow this sequence:
 
@@ -59,14 +52,12 @@ Choose the conventional type from the branch prefix:
 - Then 3 to 6 bullets describing what changed.
 - Trailers last, one per line: `Refs: build-plan <phase or item>` when applicable,
   or `Refs: <existing project document>` for other documented work;
-  `BREAKING CHANGE: ...` when applicable. No AI attribution: no AI
-  `Co-Authored-By` trailer or generated-by line in commits or PRs; keep
-  genuine human attribution. Do not invent an identity or a reference to a
+  `BREAKING CHANGE: ...` when applicable. Keep genuine human
+  attribution. Do not invent an identity or a reference to a
   nonexistent history file.
 
-AI writes the full commit message, PR title and description from the actual
-diff, relevant project documents and verification evidence. The person reviews
-and approves publication; do not ask them to compose routine wording.
+Write the full commit message, PR title and description from the actual diff,
+relevant project documents and verification evidence.
 
 ## PR title and description
 
@@ -95,10 +86,7 @@ possible, confirm the posted title and body after publication.
 
 Run `npm run verify` for the finished candidate before declaring work verified
 or publishing it. Reuse a passing result only with evidence identifying the exact
-unchanged candidate and relevant inputs. Complete records the command, result,
-evidence reference and candidate identity in ignored `landing-review.md` after
-tracked archival edits; Approve validates them rather than rerunning solely at
-the publication handoff. Tracked changes, failed checks, missing evidence,
+unchanged candidate and relevant inputs. Tracked changes, failed checks, missing evidence,
 changed runtime/dependency inputs or uncertainty require a fresh run. Content
 changes after review still require fresh drafts and approval. Report failures
 honestly. The separate "PR title" workflow checks the subject format,
@@ -112,8 +100,8 @@ The person performs the merge.
 The squash commit's subject comes from the PR title, not from the branch's
 local commits. A correct local commit subject is not enough: when a branch
 has more than one commit, GitHub fills in a title from the branch name, and
-that title reaches `main` unless it is replaced. `/approve` links to a new PR
-with the drafted title already filled in.
+that title reaches `main` unless it is replaced. Open the PR with the
+drafted title, not the one GitHub suggests.
 
 Required one-time GitHub settings (remote repository settings; these files do
 not configure or enforce them):
@@ -164,9 +152,8 @@ the last release, which are the PR titles above:
   release-please treats everything after the start marker in a merged PR's
   description as that commit's subject, even with no end marker, so a
   passing mention breaks its parsing (as on PR #62).
-- Agents never create tags, publish releases, change that secret or merge
-  the release PR without the person's explicit authorization in the current
-  chat.
+- Only the person creates tags, publishes releases, changes that secret or
+  merges the release PR.
 - The baseline is `v1.0.0`, which the person tags on `main` before the first
   release-please run.
 - The running version shows at the end of each page's navigation:

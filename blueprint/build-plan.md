@@ -156,9 +156,8 @@ is next, and one concrete starting action.
 
   for completion; do not claim unperformed checks passed.
 
-- Use a named feature branch, then implement and run `npm run verify`, use
-
-  `/complete` to prepare review drafts, and wait for `/approve` before commit,
+- Use a named feature branch, then implement and run `npm run verify`, present
+  the commit and PR drafts, and wait for explicit approval before commit,
 
   push and PR publication. The person squash-merges the PR.
 
@@ -228,7 +227,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.1** `feature/8.1-shared-row-validation` — Use the same Composition Validation rules for all three functions, including missing and duplicate batch IDs. End every result with `processing_status` (`Valid` / `Invalid`) and `validation_errors` (empty when valid), replacing `validation_status`, `validation_message` and `mass_status`. Validation retains `composition_total_pct`; invalid mass rows have empty calculated values and invalid classification rows use `Needs review`. Update result detection and comparison so newly exported or renamed/re-uploaded results work in this same PR.
 
-  **Result:** merged in PR #3 (`7a8ac14`); automated verification passed. See [feature scope and results](history/features/8.1-shared-row-validation.md).
+  **Result:** merged in PR #3 (`7a8ac14`); automated verification passed.
 
   **Depends on:** existing processing, export and comparison baseline.
 
@@ -252,7 +251,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.2** `feature/8.2-needs-review-status` — Show invalid input files as **Needs Review** with an **N invalid** tag and add that status to the filter. Results remain **Processed** with the invalid-row tag. Keep processing/error feedback and file eligibility consistent with the new input status.
 
-  **Result:** merged in PR #4 (`6f08728`); automated verification passed (96 server tests, 13 client unit/component tests and client build on 2026-11-06). Person confirmed filters work and removed remaining manual UI acceptance gates. See [scope and verification status](history/features/8.2-needs-review-status.md).
+  **Result:** merged in PR #4 (`6f08728`); automated verification passed (96 server tests, 13 client unit/component tests and client build on 2026-11-06). Person confirmed filters work and removed remaining manual UI acceptance gates.
 
   **Depends on:** 8.1.
 
@@ -274,7 +273,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.3** `feature/8.3-data-quality-warning` — Before Mass or Classification runs on selected inputs with invalid rows, show a **Data Quality Warning** dialog with valid/error row counts per file. Explain: "Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values." Provide **Cancel** and **Process Valid Rows**. Validation runs without this warning.
 
-  **Result:** merged in PR #13 (`9425c11`); automated verification passed (2026-11-09). See [feature scope and results](history/features/8.3-data-quality-warning.md).
+  **Result:** merged in PR #13 (`9425c11`); automated verification passed (2026-11-09).
 
   **Depends on:** 8.1 and 8.2.
 
@@ -296,7 +295,7 @@ Block a whole file only when it is unreadable or cannot map to a partner schema.
 
 - [x] **8.4** `feature/8.4-partial-processing-demo` — Update README examples and the interview walkthrough for the new columns, Needs Review status and confirmation dialog; verify all three functions against all five samples and the saved-result round trip.
 
-  **Result:** merged in PR #14 (`0b87809`); automated verification passed (2026-11-09). The API contract test pins every sample's invalid rows and reasons for all three functions. See [feature scope and results](history/features/8.4-partial-processing-demo.md).
+  **Result:** merged in PR #14 (`0b87809`); automated verification passed (2026-11-09). The API contract test pins every sample's invalid rows and reasons for all three functions.
 
   **Depends on:** 8.1–8.3.
 
@@ -485,7 +484,7 @@ injection: files are stored under generated IDs and the upload name never
 
 reaches a path. If an item changes a route, limit, file or dependency named on
 
-the Architecture page, update the page in the same item (see `CLAUDE.md`).
+the Architecture page, update the page in the same item.
 
 - [x] **10.1** `fix/download-file-names` · **P1** — Downloading a file whose name has characters outside Latin-1 returns **500 `ERR_INVALID_CHAR`**: `/api/files/:id/download` puts the raw name in `Content-Disposition` (`server/src/routes/files.ts`). Confirmed by uploading `報告.csv` (200) and downloading it (500). Send an ASCII fallback `filename="…"` plus an RFC 5987 `filename*=UTF-8''…` so any upload name downloads.
 
@@ -567,7 +566,7 @@ the Architecture page, update the page in the same item (see `CLAUDE.md`).
 
   - Generator inputs are validated twice with different messages (Zod and `generateCsv`); keep one set of messages.
 
-  - Update the `CLAUDE.md` "Extending" steps to match.
+  - Update the "Extending" steps in the project instructions to match.
 
   **Depends on:** 10.5 (touches the same files).
 
@@ -727,7 +726,7 @@ The filename `data.csv` is permitted for every row above. A partner may name a f
 
   - Samples seed as `100001`–`100005` in name order. Document the reset in the README.
 
-  - Update the `CLAUDE.md` "Result file names" rule to the File ID rules, the README and the Architecture page (storage keys, the Upload and Process flows); its content test must still pass.
+  - Update the "Result file names" rule in the project instructions to the File ID rules, the README and the Architecture page (storage keys, the Upload and Process flows); its content test must still pass.
 
   **Result:** merged in PR #31 (`fa493ff`); automated verification and CI passed (2026-11-11). `PROCESSORS` carries each code; `parseFileId`, `resultFileId` and `nextBaseId` in `shared/types.ts` are the shared rules. Both storage backends offer `create` (next base ID, or base plus code for an uploaded result), `put` (write at an exact ID; re-runs replace) and `seed` (fixed IDs, idempotent), and treat anything that is not a File ID as a 404 before touching storage. Blob stores files at `files/\<id>.json` (direct reads) and claims numbers at `claims/\<base>.json` with create-if-absent; old `records/` objects are ignored. Local storage refuses to start on pre-File-ID data with a message to delete `server/data` (never deleted automatically). `replaceByName` and the `'seed' in storage` check are gone. The uploaded-result ID (new base + code) is done here; marking it Imported is 11.2.
 
@@ -827,7 +826,7 @@ Added on 2026-11-13. The person considers phase one done and chose three things:
   - Root `package.json` gets `"version": "1.0.0"`. Add `release-please-config.json` (`release-type: node`, single package `"."`, `pull-request-title-pattern: "chore: release ${version}"` so the release PR passes the title check, Features and Bug Fixes sections, `bootstrap-sha` at the v1.0.0 commit) and `.release-please-manifest.json` (`{ ".": "1.0.0" }`).
   - `.github/workflows/release.yml` runs `googleapis/release-please-action@v4` on push to `main`, using the `RELEASE_PLEASE_TOKEN` secret. GitHub doesn't run CI on PRs opened with the default `GITHUB_TOKEN`. The action keeps one release PR open with the version bump and `CHANGELOG.md`; merging it creates the `vX.Y.Z` tag and GitHub Release. Only the person merges it.
   - A small `v1.0.0 · Test` label on all three pages. `client/vite.config.ts` defines `__APP_VERSION__` from the root `package.json`, and an environment label from Vercel's build variables: **Test** for a Preview build of `main`, **Preview** for other branches, nothing for production or locally. The label logic is a pure function in `client/src/lib/` with a unit test, and there's a component test per page.
-  - Docs: a Releases section in `blueprint/commit-rules.md`, `release.yml` named in `AGENTS.md`, and the README Deploy section.
+  - Docs: a Releases section in `blueprint/commit-rules.md`, `release.yml` named in the project instructions, and the README Deploy section.
   - After merge: the person tags the merge commit `v1.0.0` and publishes it as the first GitHub Release (or authorizes that explicitly). They also create the `RELEASE_PLEASE_TOKEN` secret (a fine-grained token for this repo with Contents and Pull requests read/write).
 
   **Done when:** `npm run verify` passes with the label tests, and the config and workflow files exist. The workflow itself can only be proven by its first real run on GitHub.
@@ -839,7 +838,7 @@ Added on 2026-11-13. The person considers phase one done and chose three things:
     - **Test:** `main`, a Vercel Preview with `RECLAIM_BLOB_PREFIX=icorium/test` and a fixed branch URL or `test.<domain>`.
     - **Production:** the `production` branch, `icorium/production` storage, unchanged so today's data is kept.
   - Document in a new "Environments" section of `blueprint/vercel-deployment.md`, and update the Architecture page's hosting text.
-  - One-time manual setup by the person (external settings, never done by an agent):
+  - One-time manual setup by the person (external settings, never automated):
     - In Vercel, set Production Branch to `production`.
     - In Vercel, add the Preview env var `RECLAIM_BLOB_PREFIX=icorium/test` scoped to branch `main`.
     - In Vercel, optionally assign a test domain to `main`.
@@ -853,7 +852,7 @@ Added on 2026-11-13. The person considers phase one done and chose three things:
 
 - [x] **7.1** `feature/7.1-interview-readiness` — Review final interview documentation and automated verification after partial processing and any explicitly requested UI changes. This is an integration review, not a redesign.
 
-  **Result:** merged in PR #15 (`d28064b`); automated verification passed (2026-11-09). Added client component coverage for upload, preview paging, compare footer and comparison. Aligned README, plan layout and stack doc with the code. See [feature scope and results](history/features/7.1-interview-readiness.md).
+  **Result:** merged in PR #15 (`d28064b`); automated verification passed (2026-11-09). Added client component coverage for upload, preview paging, compare footer and comparison. Aligned README, plan layout and stack doc with the code.
 
   **Depends on:** 8.1–8.4 and any subsequently approved UI feature affecting the demo.
 
