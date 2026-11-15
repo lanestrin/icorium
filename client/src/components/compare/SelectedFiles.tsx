@@ -1,7 +1,7 @@
 import { CircleCheck, TriangleAlert } from 'lucide-react';
 import type { CompareFile, CompareResult } from '../../../../shared/types';
 import { Dot } from './fileColors';
-import styles from './compare.module.css';
+import styles from './compare.module.scss';
 
 /** The compared files as coloured chips, each with its File ID and whether it has flagged rows, and how rows were matched. */
 export function SelectedFiles({ files, labels, rowMatch }: {
@@ -16,11 +16,11 @@ export function SelectedFiles({ files, labels, rowMatch }: {
   return (
     <div className={styles.selectedFiles}>
       <h3 className={styles.selectedFilesTitle}>Selected files ({files.length})</h3>
-      <ul aria-label="Compared files" className="flex flex-wrap gap-2">
+      <ul aria-label="Compared files" className={styles.fileChips}>
         {files.map((file, k) => (
           <li key={file.id} title={file.name} className={styles.fileChip}>
             <Dot k={k} />
-            <span className="truncate">{labels[k]}</span>
+            <span className={styles.chipLabel}>{labels[k]}</span>
             <span className={styles.fileId}>{file.id}</span>
             {file.problems.total
               ? <TriangleAlert className={styles.flaggedIcon} aria-label={`${file.problems.total} flagged`} />

@@ -3,7 +3,7 @@ import type { CompareColumn, CompareFile } from '../../../../shared/types';
 import { metricLabel } from '../../lib/compare-view';
 import { FILE_COLORS } from './fileColors';
 import tables from '../../styles/tables.module.scss';
-import styles from './compare.module.css';
+import styles from './compare.module.scss';
 
 /** Bar chart and table of how many rows in each file fall in each category. */
 export function CategoryChart({ col, files, labels }: { col: CompareColumn; files: CompareFile[]; labels: string[] }) {
@@ -29,19 +29,19 @@ export function CategoryChart({ col, files, labels }: { col: CompareColumn; file
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <div className="overflow-x-auto">
-        <table aria-label="Rows per category" className="w-full text-sm">
+      <div className={styles.tableScroll}>
+        <table aria-label="Rows per category" className={tables.table}>
           <thead>
             <tr className={tables.headRow}>
               <th>Category</th>
-              {files.map((file, k) => <th key={file.id} className="text-right">{labels[k]}</th>)}
+              {files.map((file, k) => <th key={file.id} className={tables.numeric}>{labels[k]}</th>)}
             </tr>
           </thead>
           <tbody>
             {categories.map((c) => (
               <tr key={c.label} className={tables.row}>
-                <td className="font-medium">{c.label}</td>
-                {c.counts.map((count, k) => <td key={files[k].id} className="text-right">{count}</td>)}
+                <td className={styles.labelCell}>{c.label}</td>
+                {c.counts.map((count, k) => <td key={files[k].id} className={tables.numeric}>{count}</td>)}
               </tr>
             ))}
           </tbody>

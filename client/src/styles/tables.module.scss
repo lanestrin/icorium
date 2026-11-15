@@ -1,5 +1,18 @@
-// Shared data-table rows for the Compare and CSV Generator tables: a grey header row and bordered
-// body rows. Use on the <tr>: <tr className={tables.headRow}> and <tr className={tables.row}>.
+// Shared data-table styles for the Compare and CSV Generator tables: the table itself, a grey header
+// row, bordered body rows and right-aligned number cells.
+// <table className={tables.table}>, <tr className={tables.headRow}>, <tr className={tables.row}>,
+// <td className={tables.numeric}>.
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
+
+.numeric {
+  text-align: right;
+}
 
 .headRow {
   background: var(--app-color-surface-subtle);

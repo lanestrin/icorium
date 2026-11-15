@@ -8,7 +8,7 @@ import { GeneratedFilePreview } from '../components/generator/GeneratedFilePrevi
 import { NumberField } from '../components/generator/NumberField';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import styles from '../components/generator/generator.module.css';
+import styles from '../components/generator/generator.module.scss';
 import { api } from '../lib/api';
 import { errorMessage, plural } from '../lib/format';
 import { flaggedRows, withCsv } from '../lib/generated-files';

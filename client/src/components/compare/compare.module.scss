@@ -1,0 +1,409 @@
+// Styles for the comparison dialog and its pieces. The white panels are ui/Card; the shared table
+// styles come from styles/tables.module.scss.
+@use '../../styles/mixins' as *;
+
+@mixin text-xs {
+  font-size: var(--app-text-xs);
+  line-height: var(--app-leading-xs);
+}
+@mixin text-sm {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
+@mixin icon($size) {
+  flex-shrink: 0;
+  width: $size;
+  height: $size;
+}
+@mixin truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Layout for a Card inside a grid: lets wide content (charts, tables) shrink instead of overflowing.
+.cardContent {
+  min-width: 0;
+}
+.panelTitle {
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-semibold);
+}
+.panelTitleSpaced {
+  margin-bottom: var(--app-space-3);
+}
+.muted {
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.footnote {
+  margin-top: var(--app-space-2);
+  @include text-xs;
+  color: var(--app-color-text-muted);
+}
+// A grey note after a value or title: "(40%)", "(3 rows)".
+.note {
+  @include text-sm;
+  font-weight: var(--app-weight-normal);
+  color: var(--app-color-text-muted);
+}
+.refTag {
+  font-weight: var(--app-weight-normal);
+  color: var(--app-color-text-muted);
+}
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  margin-left: auto;
+  @include text-sm;
+}
+.checkbox {
+  @include icon(var(--app-space-4));
+  accent-color: var(--app-color-primary);
+}
+.tableScroll {
+  overflow-x: auto;
+}
+.dot {
+  display: inline-block;
+  @include icon(0.625rem); // 10px
+  border-radius: var(--app-radius-full);
+}
+
+// Selected files
+.selectedFiles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-2);
+  margin-top: var(--app-space-4);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-2xl);
+  padding: var(--app-space-3) var(--app-space-4);
+}
+.selectedFilesTitle {
+  margin-right: var(--app-space-2);
+  font-weight: var(--app-weight-semibold);
+}
+.fileChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+}
+.fileChip {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  min-width: 0;
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-full);
+  padding: var(--app-space-1-5) var(--app-space-3);
+  @include text-sm;
+}
+.chipLabel {
+  @include truncate;
+}
+.fileId {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-color-text-muted);
+}
+.flaggedIcon {
+  @include icon(var(--app-space-4));
+  color: var(--app-color-danger);
+}
+.cleanIcon {
+  @include icon(var(--app-space-4));
+  color: var(--app-color-success);
+}
+.matchNote {
+  width: 100%;
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+
+// Toolbar: reference file, metric and view
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-3) var(--app-space-6);
+  margin-top: var(--app-space-4);
+}
+.referenceLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+}
+.toolbarLabel {
+  font-weight: var(--app-weight-semibold);
+}
+.referenceSelect {
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-color-surface);
+  padding: var(--app-space-1-5) var(--app-space-3);
+  @include text-sm;
+  @include focus-ring;
+}
+.metricGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-2);
+}
+.metricLabel {
+  margin-right: var(--app-space-1);
+}
+.viewSwitch {
+  display: flex;
+  gap: var(--app-space-1);
+  border-radius: var(--app-radius-full);
+  background: var(--app-color-surface-hover);
+  padding: var(--app-space-1);
+  @include up(lg) {
+    margin-left: auto;
+  }
+}
+// A toggle pill (aria-pressed); the pressed one is filled blue.
+.pill {
+  border: 0;
+  border-radius: var(--app-radius-full);
+  background: var(--app-color-surface-hover);
+  padding: var(--app-space-1-5) var(--app-space-4);
+  @include text-sm;
+  font-weight: var(--app-weight-medium);
+  color: var(--app-color-text-secondary);
+  cursor: pointer;
+  transition-property: color, background-color, box-shadow;
+  transition-duration: var(--app-duration-fast);
+  transition-timing-function: var(--app-ease);
+  @include focus-ring;
+
+  &:hover {
+    background: var(--app-color-surface-strong);
+  }
+}
+.pillActive,
+.pillActive:hover {
+  background: var(--app-color-primary);
+  color: var(--app-color-on-primary);
+  box-shadow: var(--app-shadow-sm);
+}
+
+// Overview tab
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-4);
+  margin-top: var(--app-space-4);
+}
+// The metric's chart beside its summary by file on large screens.
+.chartAndSummary {
+  display: grid;
+  gap: var(--app-space-4);
+  @include up(lg) {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+}
+// "Comparison at a glance" beside its top differences on large screens.
+.glance {
+  display: grid;
+  gap: var(--app-space-6);
+  min-width: 0;
+  @include up(lg) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  }
+}
+.stats {
+  display: grid;
+  gap: var(--app-space-3);
+  @include up(sm) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.stat {
+  border: var(--app-border-width) solid;
+  border-radius: var(--app-radius-xl);
+  padding: var(--app-space-3);
+}
+.statReference {
+  border-color: var(--app-color-primary-border);
+  background: var(--app-color-primary-surface);
+}
+.statDiffering {
+  border-color: var(--app-color-success-border);
+  background: var(--app-color-success-surface);
+}
+.statFlagged {
+  border-color: var(--app-color-danger-border);
+  background: var(--app-color-danger-surface);
+}
+.statLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.statIcon {
+  @include icon(var(--app-space-4));
+}
+.statIconReference {
+  color: var(--app-color-primary);
+}
+.statIconDiffering {
+  color: var(--app-color-success);
+}
+.statIconFlagged {
+  color: var(--app-color-danger);
+}
+.statValue {
+  margin-top: var(--app-space-1);
+  font-weight: var(--app-weight-semibold);
+}
+.statValueTruncate {
+  @include truncate;
+}
+.flaggedValue {
+  color: var(--app-color-danger-text);
+}
+.topDifferences {
+  min-width: 0;
+}
+.topDifferencesHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-3);
+  margin-bottom: var(--app-space-2);
+}
+.viewAll {
+  margin-left: auto;
+}
+.differenceLabel {
+  white-space: nowrap;
+  font-weight: var(--app-weight-medium);
+}
+.differenceText {
+  border-radius: var(--app-radius-md);
+  background: var(--app-color-danger-surface);
+  padding: var(--app-space-0-5) var(--app-space-2);
+  color: var(--app-color-danger-text);
+}
+.affectedFiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-1) var(--app-space-3);
+}
+.affectedFile {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-1-5);
+  white-space: nowrap;
+}
+
+// Charts
+.chartHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--app-space-3);
+}
+.chartArea {
+  height: 18rem;
+  margin-top: var(--app-space-2);
+}
+
+// Summary by file and Rows per category
+.labelCell {
+  font-weight: var(--app-weight-medium);
+}
+.fileCell {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+}
+.flaggedCount {
+  display: inline-block;
+  min-width: 1.75rem;
+  border-radius: var(--app-radius-md);
+  padding: var(--app-space-0-5) var(--app-space-2);
+  text-align: center;
+  font-weight: var(--app-weight-medium);
+}
+.flaggedSome {
+  background: var(--app-color-danger-surface);
+  color: var(--app-color-danger-text);
+}
+.flaggedNone {
+  background: var(--app-color-success-surface);
+  color: var(--app-color-success-text);
+}
+.referenceRow {
+  background: var(--app-color-selection-surface);
+}
+
+// Row differences tab
+.rowDifferences {
+  min-width: 0;
+  margin-top: var(--app-space-4);
+}
+.rowDifferencesHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-3);
+}
+.rowTable {
+  max-height: 32rem;
+  margin-top: var(--app-space-3);
+  overflow: auto;
+}
+.stickyHead {
+  text-align: left;
+
+  & > th {
+    position: sticky;
+    top: 0;
+    white-space: nowrap;
+    background: var(--app-color-surface-subtle);
+    padding: var(--app-space-2) var(--app-space-3);
+    font-weight: var(--app-weight-semibold);
+  }
+}
+.rowBodyRow {
+  border-top: var(--app-border-width) solid var(--app-color-border-subtle);
+
+  & > td {
+    padding: var(--app-space-1-5) var(--app-space-3);
+  }
+}
+.rowLabel {
+  white-space: nowrap;
+  padding: 0 var(--app-space-3);
+  text-align: left;
+  font-weight: var(--app-weight-medium);
+}
+.differs {
+  background: var(--app-color-warning-surface);
+  color: var(--app-color-warning-text);
+}
+.notInFile {
+  font-style: italic;
+  color: var(--app-color-text-muted);
+}
+.headerDot {
+  display: inline-block;
+  width: var(--app-space-2); // 8px
+  height: var(--app-space-2);
+  margin-right: var(--app-space-1-5);
+  border-radius: var(--app-radius-full);
+}
+.emptyRow {
+  padding: var(--app-space-8) 0;
+  text-align: center;
+  color: var(--app-color-text-muted);
+}

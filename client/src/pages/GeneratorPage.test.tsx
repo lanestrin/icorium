@@ -5,7 +5,7 @@ import type { FileMeta, GeneratedFile } from '../../../shared/types';
 import App from '../App';
 import { GeneratorPage } from './GeneratorPage';
 import { api } from '../lib/api';
-import generatorStyles from '../components/generator/generator.module.css';
+import generatorStyles from '../components/generator/generator.module.scss';
 
 vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
