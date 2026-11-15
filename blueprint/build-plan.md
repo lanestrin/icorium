@@ -831,22 +831,17 @@ Added on 2026-11-13. The person considers phase one done and chose three things:
 
   **Done when:** `npm run verify` passes with the label tests, and the config and workflow files exist. The workflow itself can only be proven by its first real run on GitHub.
 
-- [ ] **12.2** `feature/12.2-test-and-production-environments` · **P1** — Production follows releases; `main` is Test.
-  - `.github/workflows/promote-production.yml` runs on `release: published` and on `workflow_dispatch` with a `tag` input; the manual run is the rollback. It checks that the tag matches `v*.*.*`, then runs `git push origin "<tag>^{commit}:refs/heads/production"` with `RELEASE_PLEASE_TOKEN`. It never writes to `main`, and never moves `production` to anything but a release tag.
-  - Environments:
-    - **Preview:** PR branches, `icorium/preview` storage.
-    - **Test:** `main`, a Vercel Preview with `RECLAIM_BLOB_PREFIX=icorium/test` and a fixed branch URL or `test.<domain>`.
-    - **Production:** the `production` branch, `icorium/production` storage, unchanged so today's data is kept.
-  - Document in a new "Environments" section of `blueprint/vercel-deployment.md`, and update the Architecture page's hosting text.
-  - One-time manual setup by the person (external settings, never automated):
-    - In Vercel, set Production Branch to `production`.
-    - In Vercel, add the Preview env var `RECLAIM_BLOB_PREFIX=icorium/test` scoped to branch `main`.
-    - In Vercel, optionally assign a test domain to `main`.
-    - In GitHub, create `production` from `v1.0.0` and protect it (no force-push or delete; pushes only by the token's owner).
+- [x] **12.2** `feature/12.2-release-artifact` · **P1** — Release artifact: every published release produces a versioned, deployable copy of the app from the exact tag. Revised on 2026-11-14 at the person's request: Vercel stays the Test site, and Production hosting and any production repository stay undecided (this replaces the earlier `production`-branch plan).
+  - **Test:** Vercel keeps deploying `main` (its Production environment is the Test site; data folder unchanged) and PR branches as Previews. The person sets `APP_ENV_LABEL=Test` in Vercel's Production environment; `environmentLabel` uses a non-empty `APP_ENV_LABEL` first, so the label reads `vX.Y.Z · Test`.
+  - **Server start:** `npm start -w server` (`tsx src/index.ts`, with `tsx` a runtime dependency), so the API runs outside Vercel.
+  - **Allowlist:** `release/allowlist.txt` names what ships (client and server app source and config, `shared/`, `sample-data/`, root `package.json`, `package-lock.json`, `vercel.json`, `README.md`, `CHANGELOG.md`; test files removed). A file ships only if it is tracked at the tag and allowlisted. A forbidden check fails the build on planning, tooling, workflow, script or secret paths and on token-like text.
+  - **Build:** `scripts/build-release.mjs` checks the tag (`vX.Y.Z`, matching `package.json`), builds `icorium-vX.Y.Z.zip` with `git archive` (same tag, same zip), and adds `RELEASE-MANIFEST.json` (version, tag, commit, file SHA-256s) and `DEPLOY.md`.
+  - **Workflow:** `.github/workflows/release-artifact.yml` runs on `release: published` and by hand for an existing tag. It checks out the exact tag, runs `npm run verify`, builds the zip, installs and smoke-tests the unzipped copy, keeps the zip, its `.sha256` and the manifest as a workflow artifact (the contract a later publish job uses), and attaches the same three files as GitHub Release assets. It never pushes, deploys or creates repositories.
+  - **Docs:** a "Releases and environments" section in `blueprint/vercel-deployment.md`, the Architecture page's hosting text and the README.
 
   **Depends on:** 12.1.
 
-  **Done when:** `npm run verify` passes; the workflow and docs are in place. After setup: a merge to `main` updates only Test; publishing a release moves `production` and deploys it; a manual run with an older tag rolls production back; Test and Production keep separate files.
+  **Done when:** `npm run verify` passes with tests for the label override, the start command, the allowlist and forbidden check, the manifest, a repeatable zip build and the workflow's structure. After merge, publishing a release attaches the zip, checksum and manifest; a manual run rebuilds an existing release's assets. Nothing is deployed and no Production repository or branch is created.
 
 ### M7 — Final interview readiness
 

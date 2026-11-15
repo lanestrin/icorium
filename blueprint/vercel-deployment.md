@@ -97,6 +97,38 @@ upload limit does not override Vercel's 4.5 MB body limit; use small demo CSVs.
 Larger-file support would need direct Blob uploads/downloads and is not part
 of this change. Do not raise the local limit expecting to bypass the platform.
 
+## Releases and environments
+
+Added in 12.2 (2026-11-14).
+
+- **Test:** this Vercel project. It deploys `main` (Vercel calls that
+  environment Production, and its data folder is unchanged) and PR branches as
+  Previews. Set the build variable `APP_ENV_LABEL=Test` in Vercel's Production
+  environment so the navigation label reads `vX.Y.Z · Test`.
+- **Production:** not decided. No production branch, repository or host is
+  configured, and nothing deploys automatically.
+- **Release zip:** when a GitHub Release is published,
+  `.github/workflows/release-artifact.yml` builds from the exact tag:
+  - it runs `npm run verify`;
+  - `scripts/build-release.mjs` zips only the files in `release/allowlist.txt`
+    that are tracked at the tag, refusing planning, tooling, workflow, script
+    or secret paths and token-like text;
+  - it installs, builds and starts the unzipped copy;
+  - it attaches `icorium-vX.Y.Z.zip`, `icorium-vX.Y.Z.zip.sha256` and
+    `icorium-vX.Y.Z.manifest.json` to the release.
+
+  "Run workflow" with a tag rebuilds an existing release's assets. Building
+  the same tag gives the same zip.
+- **Deploying a release:** download the three assets from the GitHub Release,
+  check them with `sha256sum -c icorium-vX.Y.Z.zip.sha256`, unzip, and follow
+  `DEPLOY.md` inside: Node 24, `npm ci`, `npm run build -w client` (static
+  `client/dist`), `npm start -w server` (API), with `/api/*` routed to the API
+  on the same origin.
+- **Artifact contract:** the build job's only output is the workflow artifact
+  `release-icorium-vX.Y.Z` holding those three files. A future job that
+  publishes to another repository or host should consume that artifact rather
+  than rebuild.
+
 ## Validation and outstanding checks
 
 - Vercel CLI 65.12.1 detected both service names/frameworks from the config.
