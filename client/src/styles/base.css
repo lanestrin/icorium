@@ -1,11 +1,27 @@
-/* Application-wide foundations: page font and background, native control spacing. */
+/* Application-wide foundations: page font and background, native control spacing, reduced motion. */
 
 body {
-  font-family: var(--font-app);
-  background: var(--color-page);
+  font-family: var(--app-font-sans);
+  background: var(--app-color-page);
 }
 
 /* Space inside open dropdown lists, so options don't sit against the left edge. Firefox honours this. */
 select option {
   padding: 0.375rem 0.75rem;
+}
+
+/* People who ask their system for less motion get near-instant animations and transitions everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  html {
+    scroll-behavior: auto !important;
+  }
 }

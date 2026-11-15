@@ -843,6 +843,57 @@ Added on 2026-11-13. The person considers phase one done and chose three things:
 
   **Done when:** `npm run verify` passes with tests for the label override, the start command, the allowlist and forbidden check, the manifest, a repeatable zip build and the workflow's structure. After merge, publishing a release attaches the zip, checksum and manifest; a manual run rebuilds an existing release's assets. Nothing is deployed and no Production repository or branch is created.
 
+### M13 — Styling architecture and design system
+
+Added on 2026-11-14 at the person's request. The client moves from Tailwind utility classes to SCSS Modules built on central design tokens, with shared components in `client/src/components/ui/`, documented in Storybook, and Radix primitives for the dialog and row menu. The person chose a full migration that ends with Tailwind removed. Rules for every item:
+
+- **No visual change.** Token values copy the Tailwind values in use today (the slate, blue, green, red and amber steps, the 0.25rem spacing steps, Tailwind's radii and shadows, breakpoints 640/768/1024/1280), so migrated pixels match. One exception, chosen by the person on 2026-11-14: semantic colours use AA-passing shades even where today's classes don't, so `success` is green-700 (not green-600) and muted text is slate-600 (not slate-500). Areas pick these up as they migrate, so the darker shades appear from 13.2 on.
+- **One area at a time, completely.** An item moves its whole area (inline utilities in the TSX and `@apply` in its module) to token-based `*.module.scss`. Afterwards nothing in that area uses Tailwind, and no component has both a Tailwind and an SCSS version.
+- **Tests.** Existing tests keep passing, changed only where a class name they reference changes. New components get Vitest and React Testing Library tests for their variants, states (disabled, loading, error, empty), keyboard use and visible focus. `npm run verify` is the gate; each item ends with a Try it now list of pages for the person's visual check at desktop and phone widths.
+- **Architecture page.** Updated whenever a package changes (tech tiles, `content.ts` and their tests).
+
+- [x] **13.1** `feature/13.1-design-tokens-and-scss` · **P2** — Design tokens and the SCSS foundation.
+  - **Sass:** `sass` as a client dev dependency; Vite compiles `.module.scss` with no extra config.
+  - **Tokens:** `client/src/styles/tokens.css` becomes `:root` CSS custom properties named `--app-*` (so they don't clash with Tailwind's): palette steps plus semantic aliases (page, surface, text, muted, border, primary, success, danger, warning, focus); font family, sizes, weights and line heights; spacing; radii and borders; shadows; durations and easings; z-index layers (base, sticky, menu, toast, modal). Components use the semantic aliases, so a later `[data-theme="dark"]` block could override them. No dark theme is built.
+  - **Mixins:** `client/src/styles/_mixins.scss` with breakpoint variables and an `up($bp)` mixin (media queries can't read CSS variables), `focus-ring`, `reduced-motion` and `visually-hidden`.
+  - **Globals:** `base.css` uses the tokens, and a global `prefers-reduced-motion` rule shortens animations and transitions.
+  - **First module:** `Banner` moves completely off Tailwind (`Banner.module.scss` with the tokens and mixins, no utility classes left in `Banner.tsx`) as the pipeline proof.
+  - **Docs:** a "Styling" section in `README.md`: where tokens live, how to write a module, naming, when to make a `ui/` component, and no new Tailwind.
+
+  **Done when:** `npm run verify` passes with a token test that checks every required token exists and each semantic text/background pair meets WCAG AA contrast (4.5:1 for text, 3:1 for large text and UI); `Banner.module.scss` using the tokens and mixins builds; the app looks unchanged.
+
+- [ ] **13.2** `feature/13.2-button-card-storybook` · **P2** — Component library start: Button and Card, plus Storybook.
+  - `ui/Button` (variants `primary`, `secondary`, `success`, `danger`, `ghost`, `link`; sizes `sm`, `md`, `lg`; `loading` with a spinner and `aria-busy`; `disabled`; optional icon; native button props pass through) and `ui/Card`, each with its `.module.scss`.
+  - Replace every `.btn*` and `.card` use and the duplicate button classes in the modules (`runButton`, `cancelButton`, `confirmButton`, `closeButton`, `undoButton`, `textButton`, `viewAllButton`, `browseButton` and similar), then delete those classes.
+  - Storybook (`@storybook/react-vite`, current major, pinned) in `client/.storybook/`, with `npm run storybook` and `npm run build-storybook`. One `*.stories.tsx` per `ui/` component covering variants, sizes and states, with notes on accessibility and when (not) to use it. A Vitest test renders every story through `composeStories`, so stale stories fail `npm run verify`; the Storybook build stays out of verify.
+  - `release/allowlist.txt` excludes `**/*.stories.tsx`.
+
+  **Depends on:** 13.1.
+
+  **Done when:** `npm run verify` passes with Button and Card tests and the story test; `npm run build-storybook` succeeds locally; no `.btn`, `.card` or duplicate button class remains.
+
+- [ ] **13.3** `feature/13.3-radix-dialog` · **P2** — Dialog on Radix, plus the modals area: `modals/Modal.tsx` on `@radix-ui/react-dialog`, replacing the hand-written focus trap; `modals.module.css` becomes SCSS. Escape, the focus trap, focus returning to the trigger, and the dialog's label and description keep working; the existing modal and FilesPage focus tests are the contract.
+
+  **Depends on:** 13.2.
+
+- [ ] **13.4** `feature/13.4-radix-row-menu-file-workspace` · **P2** — Row menu on Radix, plus the file workspace: `files/RowMenu.tsx` on `@radix-ui/react-dropdown-menu`; `files.module.css` and the `files/*.tsx` inline utilities become SCSS; shared table styles replace `.table-head-row` and `.table-row`. The native filter and Sort by dropdowns stay native (`menu-select.css` stays plain CSS). jsdom polyfills go in `test-setup.ts` only if Radix needs them.
+
+  **Depends on:** 13.3.
+
+- [ ] **13.5** `feature/13.5-compare-generator-scss` · **P2** — The Compare and CSV Generator areas move to SCSS Modules and `ui/` components.
+
+  **Depends on:** 13.4.
+
+- [ ] **13.6** `feature/13.6-pages-layout-scss` · **P2** — Pages, layout and the remaining globals: `pages/*`, `AppVersion`, the Architecture components, and the shell and navigation classes (`.page-shell`, `.page-nav`, `.nav-link`, `.eyebrow`, `.code-chip`, `.dismiss-button`) move to `ui/` components or SCSS partials; `components.css` is removed.
+
+  **Depends on:** 13.5.
+
+- [ ] **13.7** `feature/13.7-remove-tailwind` · **P2** — Remove Tailwind: `tailwindcss` and `@tailwindcss/vite`, the Vite plugin and `@import "tailwindcss"`. A test fails on any `@apply` or `@reference` and on Tailwind-like `className` strings. The Architecture page swaps the Tailwind tile for Sass and adds Radix and Storybook; `blueprint/stack.md`, `blueprint/project-plan.md` and the README are updated.
+
+  **Depends on:** 13.6.
+
+  **Done when:** `npm run verify` passes with the guard test, and Tailwind is in no `package.json`, config or stylesheet.
+
 ### M7 — Final interview readiness
 
 - [x] **7.1** `feature/7.1-interview-readiness` — Review final interview documentation and automated verification after partial processing and any explicitly requested UI changes. This is an integration review, not a redesign.

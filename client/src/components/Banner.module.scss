@@ -1,0 +1,48 @@
+// The page message box. Same look as the Tailwind version it replaced (rounded-xl border px-4 py-3 text-sm).
+@use '../styles/mixins' as *;
+
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--app-space-3);
+  border: var(--app-border-width) solid;
+  border-radius: var(--app-radius-xl);
+  padding: var(--app-space-3) var(--app-space-4);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
+
+.success {
+  border-color: var(--app-color-success-border);
+  background: var(--app-color-success-surface);
+  color: var(--app-color-success-text);
+}
+
+.error {
+  white-space: pre-line;
+  border-color: var(--app-color-danger-border);
+  background: var(--app-color-danger-surface);
+  color: var(--app-color-danger-text);
+}
+
+.icon {
+  margin-top: var(--app-space-0-5);
+  width: var(--app-space-4);
+  height: var(--app-space-4);
+  flex-shrink: 0;
+}
+
+.message {
+  flex: 1;
+}
+
+.dismiss {
+  display: inline-flex;
+  border-radius: var(--app-radius-sm);
+  @include focus-ring;
+
+  svg {
+    width: var(--app-space-4);
+    height: var(--app-space-4);
+  }
+}
