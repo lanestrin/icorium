@@ -1,10 +1,10 @@
 /*
  * Design tokens: the one place for colours, type, spacing, radii, shadows, motion and layers.
  *
- * Palette steps copy Tailwind 4's exact values, so migrated styles look the same while Tailwind remains.
+ * The palette steps are the source of every colour (oklch values, kept from the app's original styling).
  * Components use only the semantic aliases (--app-color-page, --app-color-text, ...), never palette steps,
  * so a later [data-theme="dark"] block could override just the aliases. tokens.test.ts checks every name,
- * the palette values and the contrast of each text/background pair.
+ * that semantic colours are built from palette steps, and the contrast of each text/background pair.
  *
  * Breakpoints are not here: media queries can't read CSS variables, so they live in _mixins.scss.
  */
@@ -94,7 +94,7 @@
   --app-color-link: var(--app-color-blue-700);
   --app-color-primary-surface: var(--app-color-blue-50);
   --app-color-primary-text: var(--app-color-blue-700);
-  /* Selected rows in the file list (Tailwind's bg-blue-50/70). */
+  /* Selected rows in the file list (blue-50 at 70%). */
   --app-color-selection-surface: color-mix(in oklab, var(--app-color-blue-50) 70%, transparent);
   --app-color-primary-border: var(--app-color-blue-200);
   --app-color-success: var(--app-color-green-700);
@@ -120,7 +120,7 @@
   --app-color-generated-surface: var(--app-color-blue-50);
   --app-color-generated-text: var(--app-color-blue-800);
   --app-color-generated-cell: color-mix(in oklab, var(--app-color-blue-50) 50%, transparent);
-  /* The dimmed page behind a dialog (Tailwind's bg-slate-900/30). */
+  /* The dimmed page behind a dialog (slate-900 at 30%). */
   --app-color-backdrop: color-mix(in oklab, var(--app-color-slate-900) 30%, transparent);
   --app-color-focus: var(--app-color-blue-500);
   /* Arrows and lines that join boxes in a diagram (3:1 on the page and on white). */
@@ -154,7 +154,7 @@
   --app-weight-semibold: 600;
   --app-weight-bold: 700;
 
-  /* Spacing: multiples of the unit, named like Tailwind's steps (--app-space-4 is 4 units, 1rem). */
+  /* Spacing: multiples of the unit, named by the number of units (--app-space-4 is 4 units, 1rem). */
   --app-space-unit: 0.25rem;
   --app-space-0-5: calc(var(--app-space-unit) * 0.5);
   --app-space-1: calc(var(--app-space-unit) * 1);

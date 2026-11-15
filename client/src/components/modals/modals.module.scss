@@ -11,7 +11,7 @@
   justify-content: center;
   background: var(--app-color-backdrop);
   -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px); // Tailwind's backdrop-blur-sm
+  backdrop-filter: blur(8px); // a light blur of the page behind
 }
 .backdropPadded {
   padding: var(--app-space-4);

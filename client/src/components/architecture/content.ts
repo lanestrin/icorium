@@ -1,4 +1,4 @@
-import { Atom, Boxes, Braces, ChartColumn, Cloud, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Laptop, Layers, Server, Settings, Shapes, ShieldCheck, Upload, User, Users, Wind, Workflow, Zap, type LucideIcon } from 'lucide-react';
+import { Atom, BookOpen, Boxes, Braces, ChartColumn, Cloud, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Laptop, Layers, Palette, PanelsTopLeft, Server, Settings, Shapes, ShieldCheck, Upload, User, Users, Workflow, Zap, type LucideIcon } from 'lucide-react';
 
 // Everything the Architecture page says, kept as data so the section components only lay it out.
 // pages/architecture-content.test.ts checks every path and package named here against the repository.
@@ -39,20 +39,31 @@ export const TECH: Tech[] = [
   {
     name: 'Vite', label: 'Vite', role: 'Build & dev', icon: Zap, packages: [['client', 'vite']],
     why: [
-      'Fast dev server with hot reload, and a small config: React, Tailwind and an /api proxy to the local API.',
+      'Fast dev server with hot reload, and a small config: React, built-in Sass support and an /api proxy to the local API.',
       'A plain single-page build without the conventions of a larger full-stack framework.',
     ],
     tradeoff: 'No built-in router or server. The app picks its pages from the URL itself, so the build copies index.html for /generator and /architecture to keep them loading on a static host; the API is a separate service.',
     files: ['client/vite.config.ts', 'client/src/lib/pages.ts'],
   },
   {
-    name: 'Tailwind CSS 4', label: 'Tailwind CSS', role: 'Styling', icon: Wind, packages: [['client', 'tailwindcss'], ['client', '@tailwindcss/vite']],
+    name: 'Sass (SCSS Modules)', label: 'Sass', role: 'Styling', icon: Palette, packages: [['client', 'sass']],
     why: [
-      'Kept only for its base reset while the migration to SCSS Modules finishes.',
-      'Every component and page now styles itself with an SCSS Module on the shared design tokens.',
+      'Each component has its own SCSS Module, so class names never clash and styles sit next to the markup they belong to.',
+      'Every colour, size and space comes from the design tokens in tokens.css, and a test checks each text colour against its background for WCAG AA contrast.',
+      'Vite compiles .scss with no plugin or extra config.',
     ],
-    tradeoff: 'Two styling tools during the migration; Tailwind and its Vite plugin are removed in the next step.',
-    files: ['client/src/index.css'],
+    tradeoff: 'More files than utility classes, and a shared pattern needs a deliberate home: a ui/ component, a shared module or a token.',
+    files: ['client/src/styles/tokens.css', 'client/src/styles/_mixins.scss', 'client/src/styles/reset.css'],
+  },
+  {
+    name: 'Radix UI', label: 'Radix', role: 'Dialog & menu', icon: PanelsTopLeft,
+    packages: [['client', '@radix-ui/react-dialog'], ['client', '@radix-ui/react-dropdown-menu']],
+    why: [
+      'The dialog and the row ⋯ menu handle focus, Escape, outside clicks and screen-reader roles as the WAI-ARIA patterns describe.',
+      'Unstyled, so the app keeps its own look from its SCSS Modules.',
+    ],
+    tradeoff: 'Two more runtime packages, and their behaviour (portals, where focus returns) has to be learnt rather than written by hand.',
+    files: ['client/src/components/modals/Modal.tsx', 'client/src/components/files/RowMenu.tsx'],
   },
   {
     name: 'Fastify 5', label: 'Fastify 5', role: 'API', icon: Server, packages: [['server', 'fastify'], ['server', '@fastify/multipart']],
@@ -109,6 +120,16 @@ export const TECH: Tech[] = [
     ],
     tradeoff: 'Component tests run in jsdom: they check behaviour, not real-browser layout or chart drawing.',
     files: ['server/src/core.test.ts', 'server/src/api.test.ts', 'client/src/pages/FilesPage.test.tsx'],
+  },
+  {
+    name: 'Storybook 10', label: 'Storybook', role: 'Component docs', icon: BookOpen,
+    packages: [['client', 'storybook'], ['client', '@storybook/react-vite']],
+    why: [
+      'Shows every shared ui/ component in each variant, size and state, with notes on when to use it.',
+      'A Vitest test renders every story, so a story that no longer matches its component fails npm run verify.',
+    ],
+    tradeoff: 'A development-only tool with its own build (npm run build-storybook), kept out of the app and the release zip.',
+    files: ['client/.storybook/main.ts', 'client/src/components/ui/Button.stories.tsx', 'client/src/components/ui/stories.test.tsx'],
   },
   {
     name: 'Local filesystem / Vercel Blob', label: 'Files / Blob', role: 'File storage', icon: Database, packages: [['server', '@vercel/blob']],

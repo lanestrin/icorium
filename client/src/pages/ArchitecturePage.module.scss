@@ -9,7 +9,7 @@
   }
 }
 .content {
-  max-width: 72rem; // Tailwind's max-w-6xl
+  max-width: 72rem; // the page's content width
   margin: 0 auto;
 }
 .header {
@@ -23,7 +23,7 @@
   letter-spacing: var(--app-tracking-tight);
 }
 .intro {
-  max-width: 48rem; // Tailwind's max-w-3xl
+  max-width: 48rem; // a comfortable reading width
   margin-top: var(--app-space-3);
   font-size: var(--app-text-lg);
   line-height: var(--app-leading-lg);

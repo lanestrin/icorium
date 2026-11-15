@@ -5,7 +5,7 @@ import { COMPARE_MAX } from '../../../shared/types';
 import { TECH } from '../components/architecture/content';
 
 const GLOBBED = import.meta.glob(
-  ['../../../client/src/**/*', '../../../client/*.ts', '../../../client/package.json', '../../../server/src/**/*.ts', '../../../server/package.json', '../../../shared/*.ts', '../../../blueprint/vercel-deployment.md'],
+  ['../../../client/src/**/*', '../../../client/*.ts', '../../../client/.storybook/*.ts', '../../../client/package.json', '../../../server/src/**/*.ts', '../../../server/package.json', '../../../shared/*.ts', '../../../blueprint/vercel-deployment.md'],
   { query: '?raw', import: 'default', eager: true },
 ) as Record<string, string>;
 
@@ -38,7 +38,7 @@ describe('Architecture page content', () => {
   it('states the major versions in its card titles correctly', () => {
     const major = (workspace: string, name: string) => dependencies(workspace)[name].replace(/^[^\d]*/, '').split('.')[0];
     expect(major('client', 'react')).toBe('19');
-    expect(major('client', 'tailwindcss')).toBe('4');
+    expect(major('client', 'storybook')).toBe('10');
     expect(major('server', 'fastify')).toBe('5');
   });
 
