@@ -1,9 +1,10 @@
 import type { CompareColumn, CompareResult } from '../../../../shared/types';
 import { classNames } from '../../lib/class-names';
 import { deltas, deltaUnit, differsFromRef, fmtDelta, fmtValue } from '../../lib/compare-view';
+import { Card } from '../ui/Card';
 import { Dot } from './fileColors';
 import tables from '../../styles/tables.module.scss';
-import styles from './compare.module.css';
+import styles from './compare.module.scss';
 
 /** A file's flagged-row count: red when there are any, green when there are none. */
 function FlaggedCount({ count }: { count: number }) {
@@ -22,37 +23,37 @@ export function SummaryByFile({ col, result, labels, refIndex }: { col: CompareC
   const valueUnit = col.unit === '%' ? undefined : col.unit;
 
   return (
-    <div className={styles.panel}>
-      <h3 className={classNames(styles.panelTitle, 'mb-3')}>Summary by file</h3>
-      <div className="overflow-x-auto">
-        <table aria-label="Summary by file" className="w-full text-sm">
+    <Card className={styles.cardContent}>
+      <h3 className={classNames(styles.panelTitle, styles.panelTitleSpaced)}>Summary by file</h3>
+      <div className={styles.tableScroll}>
+        <table aria-label="Summary by file" className={tables.table}>
           <thead>
             <tr className={tables.headRow}>
               <th>File</th>
               {isNumeric
-                ? <><th className="text-right">{valueHeader}</th><th className="text-right">Δ vs ref.</th></>
-                : <th className="text-right">Rows differing from ref.</th>}
-              <th className="text-right">Flagged rows</th>
+                ? <><th className={tables.numeric}>{valueHeader}</th><th className={tables.numeric}>Δ vs ref.</th></>
+                : <th className={tables.numeric}>Rows differing from ref.</th>}
+              <th className={tables.numeric}>Flagged rows</th>
             </tr>
           </thead>
           <tbody>
             {files.map((file, k) => (
               <tr key={file.id} className={classNames(tables.row, k === refIndex && styles.referenceRow)}>
-                <td className="font-medium">
-                  <span className="flex items-center gap-2" title={file.name}>
-                    <Dot k={k} />{labels[k]}{k === refIndex && <span className="font-normal text-slate-500">(ref)</span>}
+                <td className={styles.labelCell}>
+                  <span className={styles.fileCell} title={file.name}>
+                    <Dot k={k} />{labels[k]}{k === refIndex && <span className={styles.refTag}>(ref)</span>}
                   </span>
                 </td>
                 {isNumeric
-                  ? <><td className="text-right">{fmtValue(summary[k], valueUnit)}</td><td className="text-right">{fmtDelta(delta[k], deltaUnit(col))}</td></>
-                  : <td className="text-right">{k === refIndex ? '—' : rowsDiffering[k]}</td>}
-                <td className="text-right"><FlaggedCount count={file.problems.total} /></td>
+                  ? <><td className={tables.numeric}>{fmtValue(summary[k], valueUnit)}</td><td className={tables.numeric}>{fmtDelta(delta[k], deltaUnit(col))}</td></>
+                  : <td className={tables.numeric}>{k === refIndex ? '—' : rowsDiffering[k]}</td>}
+                <td className={tables.numeric}><FlaggedCount count={file.problems.total} /></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       {isNumeric && col.unit === '%' && <p className={styles.footnote}>Δ is measured against the reference file. pp = percentage points.</p>}
-    </div>
+    </Card>
   );
 }

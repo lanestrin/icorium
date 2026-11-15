@@ -1,6 +1,7 @@
 import type { CompareColumn, CompareFile } from '../../../../shared/types';
 import { metricLabel } from '../../lib/compare-view';
-import styles from './compare.module.css';
+import { classNames } from '../../lib/class-names';
+import styles from './compare.module.scss';
 
 export type CompareView = 'overview' | 'rows';
 
@@ -9,7 +10,7 @@ const VIEW_LABELS: Record<CompareView, string> = { overview: 'Overview', rows: '
 /** A rounded toggle button; the pressed one is filled blue. */
 function PillButton({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: string }) {
   return (
-    <button aria-pressed={pressed} onClick={onClick} className={pressed ? styles.pillActive : styles.pill}>
+    <button aria-pressed={pressed} onClick={onClick} className={classNames(styles.pill, pressed && styles.pillActive)}>
       {children}
     </button>
   );
@@ -29,15 +30,15 @@ export function CompareToolbar({ files, labels, columns, refIndex, onRefChange, 
 }) {
   return (
     <div className={styles.toolbar}>
-      <label className="flex items-center gap-3">
-        <span className="font-semibold">Reference file</span>
+      <label className={styles.referenceLabel}>
+        <span className={styles.toolbarLabel}>Reference file</span>
         <select value={refIndex} onChange={(e) => onRefChange(Number(e.target.value))} className={styles.referenceSelect}>
           {files.map((file, k) => <option key={file.id} value={k}>{`${labels[k]} · ${file.id}`}</option>)}
         </select>
       </label>
 
-      <div role="group" aria-label="Metric" className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 font-semibold" aria-hidden>Metric</span>
+      <div role="group" aria-label="Metric" className={styles.metricGroup}>
+        <span className={classNames(styles.toolbarLabel, styles.metricLabel)} aria-hidden>Metric</span>
         {columns.map((column, k) => (
           <PillButton key={column.name} pressed={k === metric} onClick={() => onMetricChange(k)}>
             {metricLabel(column.name)}

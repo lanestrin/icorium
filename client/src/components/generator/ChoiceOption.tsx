@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { classNames } from '../../lib/class-names';
-import styles from './generator.module.css';
+import styles from './generator.module.scss';
 
 /**
  * One radio choice drawn as a card; the chosen one is blue. layout "card" is a larger option with a
@@ -12,7 +12,7 @@ export function ChoiceOption({ name, checked, onSelect, layout, children }: {
   const isCard = layout === 'card';
   return (
     <label className={classNames(styles.choice, isCard ? styles.choiceCard : styles.choiceChip, checked && styles.choiceSelected)}>
-      <input type="radio" name={name} checked={checked} onChange={onSelect} className={classNames(styles.radio, isCard && 'mt-1')} />
+      <input type="radio" name={name} checked={checked} onChange={onSelect} className={classNames(styles.radio, isCard && styles.radioCard)} />
       {children}
     </label>
   );

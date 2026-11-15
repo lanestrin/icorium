@@ -880,7 +880,7 @@ Added on 2026-11-14 at the person's request. The client moves from Tailwind util
 
   **Depends on:** 13.3.
 
-- [ ] **13.5** `feature/13.5-compare-generator-scss` · **P2** — The Compare and CSV Generator areas move to SCSS Modules and `ui/` components.
+- [x] **13.5** `feature/13.5-compare-generator-scss` · **P2** — The Compare and CSV Generator areas move to SCSS Modules and `ui/` components: the Compare panels become `Card`, and `styles/tables.module.scss` gains the shared `.table` and `.numeric` classes for their data tables.
 
   **Depends on:** 13.4.
 

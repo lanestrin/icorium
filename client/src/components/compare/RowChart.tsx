@@ -2,7 +2,7 @@ import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContai
 import type { CompareColumn, CompareResult } from '../../../../shared/types';
 import { fmtDelta, fmtValue, metricLabel, yDomain } from '../../lib/compare-view';
 import { FILE_COLORS } from './fileColors';
-import styles from './compare.module.css';
+import styles from './compare.module.scss';
 
 /** Line chart of a numeric metric across rows, one line per file, optionally as the deviation from 100%. */
 export function RowChart({ col, result, labels, deviation, setDeviation }: {
@@ -20,7 +20,7 @@ export function RowChart({ col, result, labels, deviation, setDeviation }: {
 
   return (
     <>
-      <div className="flex flex-wrap items-start gap-3">
+      <div className={styles.chartHeader}>
         <div>
           <h3 className={styles.panelTitle}>{metricLabel(col.name)} by row{deviation && ', deviation from 100%'}</h3>
           <p className={styles.muted}>All {files.length} files across {rows.length} rows. Gaps are blank values or rows a file lacks.</p>
@@ -32,7 +32,7 @@ export function RowChart({ col, result, labels, deviation, setDeviation }: {
           </label>
         )}
       </div>
-      <div className="mt-2 h-72">
+      <div className={styles.chartArea}>
         <ResponsiveContainer>
           <LineChart data={data} margin={{ top: 10, right: 10, bottom: 10, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />

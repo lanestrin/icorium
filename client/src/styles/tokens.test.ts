@@ -82,7 +82,7 @@ const PALETTE_TOKENS = [
 ];
 
 const SEMANTIC_COLORS = [
-  'page', 'surface', 'surface-subtle', 'surface-hover', 'surface-frosted', 'surface-soft',
+  'page', 'surface', 'surface-subtle', 'surface-hover', 'surface-strong', 'surface-frosted', 'surface-soft',
   'text', 'text-secondary', 'text-muted', 'icon', 'border', 'border-strong', 'border-subtle',
   'primary', 'primary-hover', 'on-primary', 'link', 'primary-surface', 'primary-text', 'primary-border', 'selection-surface',
   'success', 'success-hover', 'on-success', 'success-surface', 'success-border', 'success-text',
@@ -162,6 +162,8 @@ describe('design tokens', () => {
       ['warning-text', 'warning-surface'],
       ['generated-text', 'generated-surface'],
       ['primary-text', 'primary-surface'],
+      ['text-secondary', 'surface-hover'],
+      ['text-secondary', 'surface-strong'],
       ['processed-text', 'processed-surface'],
       ['link', 'primary-surface'],
     ];

@@ -1,8 +1,10 @@
 import type { CompareColumn, CompareResult } from '../../../../shared/types';
 import { classNames } from '../../lib/class-names';
 import { differsFromRef, fmtValue, metricLabel } from '../../lib/compare-view';
+import { Card } from '../ui/Card';
 import { FILE_COLORS } from './fileColors';
-import styles from './compare.module.css';
+import tables from '../../styles/tables.module.scss';
+import styles from './compare.module.scss';
 
 /** The Row differences tab: each row's value in every file, highlighting values that differ from the reference. */
 export function RowDifferences({ col, result, labels, refIndex, onlyDiffering, setOnlyDiffering }: {
@@ -24,8 +26,8 @@ export function RowDifferences({ col, result, labels, refIndex, onlyDiffering, s
   }
 
   return (
-    <section aria-label="Row differences" className={classNames(styles.panel, 'mt-4')}>
-      <div className="flex flex-wrap items-center gap-3">
+    <Card as="section" aria-label="Row differences" className={styles.rowDifferences}>
+      <div className={styles.rowDifferencesHeader}>
         <h3 className={styles.panelTitle}>{metricLabel(col.name)}: row differences</h3>
         <p className={styles.muted}>
           {col.rowsDiffering} of {col.rowsCompared} rows differ between files. Highlighted cells differ from the reference file.
@@ -36,12 +38,12 @@ export function RowDifferences({ col, result, labels, refIndex, onlyDiffering, s
         </label>
       </div>
       <div className={styles.rowTable}>
-        <table className="w-full text-sm">
+        <table className={tables.table}>
           <thead>
             <tr className={styles.stickyHead}>
               <th>{result.rowMatch === 'batch_id' ? 'Batch ID' : 'Row'}</th>
               {files.map((file, k) => (
-                <th key={file.id} className={isNumeric ? 'text-right' : ''}>
+                <th key={file.id} className={isNumeric ? tables.numeric : undefined}>
                   <span className={styles.headerDot} style={{ background: FILE_COLORS[k] }} aria-hidden />
                   {labels[k]}{k === refIndex && ' (ref)'}
                 </th>
@@ -56,7 +58,7 @@ export function RowDifferences({ col, result, labels, refIndex, onlyDiffering, s
                   const differs = differsFromRef(col, r, k, refIndex);
                   return (
                     <td key={file.id} data-differs={differs || undefined}
-                      className={classNames(isNumeric && styles.numberCell, differs && styles.differs, isMissing(r, k) && styles.notInFile)}>
+                      className={classNames(isNumeric && tables.numeric, differs && styles.differs, isMissing(r, k) && styles.notInFile)}>
                       {cellText(r, k)}
                     </td>
                   );
@@ -69,6 +71,6 @@ export function RowDifferences({ col, result, labels, refIndex, onlyDiffering, s
           </tbody>
         </table>
       </div>
-    </section>
+    </Card>
   );
 }

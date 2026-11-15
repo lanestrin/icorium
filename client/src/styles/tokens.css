@@ -75,6 +75,8 @@
   --app-color-surface: var(--app-color-white);
   --app-color-surface-subtle: var(--app-color-slate-50);
   --app-color-surface-hover: var(--app-color-slate-100);
+  /* A darker grey fill: a hovered toggle pill. */
+  --app-color-surface-strong: var(--app-color-slate-200);
   /* See-through white panels over the page: the filter card (80%) and the upload drop zone (50%). */
   --app-color-surface-frosted: color-mix(in oklab, var(--app-color-white) 80%, transparent);
   --app-color-surface-soft: color-mix(in oklab, var(--app-color-white) 50%, transparent);
