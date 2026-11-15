@@ -1,0 +1,129 @@
+name: Release artifact
+
+# Builds the deployable zip for a published release from its exact tag, checks that
+# the unzipped copy installs, builds and starts, and attaches the zip, its .sha256 and
+# its manifest to that GitHub Release. "Run workflow" with a tag rebuilds an existing
+# release's assets. It never pushes, deploys or creates repositories.
+#
+# The build job's only output is the workflow artifact "release-icorium-vX.Y.Z"
+# (zip, .sha256, manifest). A later publish job can consume that artifact without
+# changing how releases are built.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild, for example v1.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-artifact-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      name: ${{ steps.release.outputs.name }}
+    # The tag is untrusted input: it reaches scripts only through this variable.
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Check the tag has a published release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::The tag must look like v1.2.3."
+            exit 1
+          fi
+          draft=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)
+          if [ "$draft" != "false" ]; then
+            echo "::error::$TAG has no published GitHub Release."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "name=icorium-$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          ref: refs/tags/${{ steps.release.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm the checkout is the tagged commit
+        run: test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$TAG^{commit}")"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Unit + API tests, client type-check and build, on the exact release.
+      - run: npm run verify
+
+      - name: Build the release zip
+        run: node scripts/build-release.mjs "$TAG" "$RUNNER_TEMP/release"
+
+      - name: Install, build and start the unzipped release
+        run: |
+          mkdir -p "$RUNNER_TEMP/extract" "$RUNNER_TEMP/smoke-data"
+          cd "$RUNNER_TEMP/extract"
+          unzip -q "$RUNNER_TEMP/release/icorium-$TAG.zip"
+          cd "icorium-$TAG"
+          npm ci
+          npm run build -w client
+          RECLAIM_DATA_DIR="$RUNNER_TEMP/smoke-data" PORT=3123 HOST=127.0.0.1 setsid npm start -w server > "$RUNNER_TEMP/api.log" 2>&1 &
+          api=$!
+          files=""
+          for attempt in $(seq 1 30); do
+            if files=$(curl -fsS http://127.0.0.1:3123/api/files); then break; fi
+            sleep 1
+          done
+          kill -- "-$api" 2>/dev/null || true
+          count=$(printf '%s' "$files" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).length)}catch{console.log(0)}})')
+          if [ "$count" != "5" ]; then
+            echo "::error::The unzipped release's API did not list the 5 sample files."
+            cat "$RUNNER_TEMP/api.log"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-${{ steps.release.outputs.name }}
+          path: |
+            ${{ runner.temp }}/release/${{ steps.release.outputs.name }}.zip
+            ${{ runner.temp }}/release/${{ steps.release.outputs.name }}.zip.sha256
+            ${{ runner.temp }}/release/${{ steps.release.outputs.name }}.manifest.json
+          if-no-files-found: error
+
+  attach:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-${{ needs.build.outputs.name }}
+          path: assets
+
+      - name: Attach the zip, checksum and manifest to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+          NAME: ${{ needs.build.outputs.name }}
+        run: |
+          gh release upload "$TAG" "assets/$NAME.zip" "assets/$NAME.zip.sha256" "assets/$NAME.manifest.json" \
+            --clobber --repo "$GITHUB_REPOSITORY"

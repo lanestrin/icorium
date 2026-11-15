@@ -104,7 +104,9 @@ describe('Architecture & Tech Stack page', () => {
     render(<ArchitecturePage />);
     const storage = document.getElementById('storage')!;
     expect(within(storage).getByRole('heading', { level: 2 })).toHaveTextContent('Hosting and storage');
-    expect(within(storage).getByRole('list', { name: 'Optional Vercel deployment' })).toHaveTextContent('Configured, not yet deployed');
+    const vercel = within(storage).getByRole('list', { name: 'Optional Vercel deployment' });
+    expect(vercel).toHaveTextContent('Test site: deploys main');
+    expect(vercel).toHaveTextContent('Each release also ships as a deployable zip (scripts/build-release.mjs); Production host not chosen yet');
     expect(within(storage).getByRole('img', { name: /S3 or Cloudflare R2 could be added/ })).toHaveTextContent(
       'Local filesystemDefaultVercel BlobWhen a token is setS3 / Cloudflare R2Not built');
     expect(storage).toHaveTextContent('list · get · read · patch · create · createAt · put');

@@ -54,7 +54,12 @@ export function StorageSection() {
         </article>
         <article className="card">
           <h3 className={styles.cardHeading}><Cloud className="h-5 w-5 text-blue-600" aria-hidden /> Optional Vercel deployment</h3>
-          <Checks label="Optional Vercel deployment" items={['Separate frontend and API services', 'Private Vercel Blob storage', 'Configured, not yet deployed']} />
+          <Checks label="Optional Vercel deployment" items={[
+            'Separate frontend and API services',
+            'Private Vercel Blob storage',
+            'Test site: deploys main',
+            <>Each release also ships as a deployable zip (<Path>scripts/build-release.mjs</Path>); Production host not chosen yet</>,
+          ]} />
         </article>
         <StorageOptions />
       </div>

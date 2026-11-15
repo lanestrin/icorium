@@ -153,7 +153,9 @@ These limits are fixed in code, each as one named constant:
 
 Local development needs no account or cloud service. An optional Vercel deployment (client and server services, private Blob storage) is configured; see [deployment configuration and outstanding checks](blueprint/vercel-deployment.md).
 
-**Releases.** Versions are worked out automatically from the PR titles (`fix:` patch, `feat:` minor, `feat!:` major) by release-please, which keeps one `chore: release X.Y.Z` PR open with the next version and `CHANGELOG.md`. Merging it creates the `vX.Y.Z` tag and GitHub Release. The current version shows at the end of each page's navigation (`v1.0.0`, plus `· Test` or `· Preview` on Vercel Preview builds). See "Releases" in [blueprint/commit-rules.md](blueprint/commit-rules.md).
+**Releases.** Versions are worked out automatically from the PR titles (`fix:` patch, `feat:` minor, `feat!:` major) by release-please, which keeps one `chore: release X.Y.Z` PR open with the next version and `CHANGELOG.md`. Merging it creates the `vX.Y.Z` tag and GitHub Release. The current version shows at the end of each page's navigation: `· Test` on the Vercel site (set with the build variable `APP_ENV_LABEL=Test`) and `· Preview` on other branches' Vercel Previews. See "Releases" in [blueprint/commit-rules.md](blueprint/commit-rules.md).
+
+**Release zip.** Each published release also gets `icorium-vX.Y.Z.zip`, its `.sha256` and a manifest as release assets, built from the exact tag by `.github/workflows/release-artifact.yml`. The zip holds only the files in `release/allowlist.txt` plus `DEPLOY.md` (how to install, build and run it anywhere, with `npm start -w server` for the API). Vercel is the Test site; where Production runs is not decided yet. See "Releases and environments" in [blueprint/vercel-deployment.md](blueprint/vercel-deployment.md).
 
 ## Extending
 

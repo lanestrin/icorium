@@ -6,11 +6,14 @@ import { environmentLabel } from './src/lib/app-version';
 import rootPackage from '../package.json';
 
 export default defineConfig({
-  // The version label in each page's navigation. VERCEL_ENV and VERCEL_GIT_COMMIT_REF are Vercel's build-time
-  // variables; locally they are unset, so the label shows the version alone.
+  // The version label in each page's navigation. APP_ENV_LABEL, when set, names the environment (Vercel's
+  // Production environment sets it to Test). VERCEL_ENV and VERCEL_GIT_COMMIT_REF are Vercel's build-time
+  // variables; locally all are unset, so the label shows the version alone.
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(rootPackage.version),
-    'import.meta.env.VITE_APP_ENV': JSON.stringify(environmentLabel({ vercelEnv: process.env.VERCEL_ENV, branch: process.env.VERCEL_GIT_COMMIT_REF })),
+    'import.meta.env.VITE_APP_ENV': JSON.stringify(
+      environmentLabel({ vercelEnv: process.env.VERCEL_ENV, branch: process.env.VERCEL_GIT_COMMIT_REF, label: process.env.APP_ENV_LABEL }),
+    ),
   },
   // pageCopies writes dist/generator/index.html and dist/architecture/index.html so static hosts serve those pages.
   plugins: [react(), tailwindcss(), pageCopies()],

@@ -1,8 +1,13 @@
 // Which version is running and where, for the small label in each page's navigation.
 // The values are worked out at build time in vite.config.ts and contain no secrets.
 
-/** "Test" for a Vercel Preview build of main, "Preview" for any other branch, "" for production and local builds. */
-export function environmentLabel({ vercelEnv, branch }: { vercelEnv?: string; branch?: string }) {
+/**
+ * An explicit label (the APP_ENV_LABEL build variable) when one is set; otherwise "Test" for a Vercel Preview
+ * build of main, "Preview" for any other branch, and "" for production and local builds. Vercel's Production
+ * environment deploys main as the Test site, so it sets APP_ENV_LABEL=Test.
+ */
+export function environmentLabel({ vercelEnv, branch, label }: { vercelEnv?: string; branch?: string; label?: string }) {
+  if (label) return label;
   if (vercelEnv !== 'preview') return '';
   return branch === 'main' ? 'Test' : 'Preview';
 }

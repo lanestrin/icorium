@@ -1,0 +1,34 @@
+# Files that ship in a release zip (scripts/build-release.mjs).
+# One glob per line: * matches within a folder, ** across folders.
+# A line starting with ! removes matches (used only for test files).
+# A file ships only if it is tracked at the release tag AND matches this list.
+# The build also refuses planning, tooling, workflow, script and secret paths
+# whatever this list says, so never widen it to make a build pass.
+
+# Client (static web app)
+client/index.html
+client/package.json
+client/tsconfig.json
+client/vite.config.ts
+client/src/**
+
+# Server (Fastify API)
+server/package.json
+server/tsconfig.json
+server/src/**
+
+# Shared code and the sample partner files the API seeds
+shared/**
+sample-data/**
+
+# Workspace and hosting configuration, and customer-facing docs
+package.json
+package-lock.json
+vercel.json
+README.md
+CHANGELOG.md
+
+# Tests are development-only
+!**/*.test.ts
+!**/*.test.tsx
+!client/src/test-setup.ts

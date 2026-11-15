@@ -11,6 +11,17 @@ describe('environment label', () => {
     expect(environmentLabel({ vercelEnv: 'production', branch: 'production' })).toBe('');
     expect(environmentLabel({})).toBe('');
   });
+
+  it('uses an explicit APP_ENV_LABEL first', () => {
+    // Vercel's Production environment deploys main as the Test site.
+    expect(environmentLabel({ vercelEnv: 'production', branch: 'main', label: 'Test' })).toBe('Test');
+    expect(environmentLabel({ vercelEnv: 'preview', branch: 'feature/x', label: 'Test' })).toBe('Test');
+  });
+
+  it('ignores an empty APP_ENV_LABEL', () => {
+    expect(environmentLabel({ vercelEnv: 'production', branch: 'main', label: '' })).toBe('');
+    expect(environmentLabel({ vercelEnv: 'preview', branch: 'main', label: '' })).toBe('Test');
+  });
 });
 
 describe('version label', () => {
