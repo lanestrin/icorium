@@ -719,6 +719,22 @@
   @include text-xs;
   color: var(--app-color-text-muted);
 }
-.dismissIcon {
+
+// The page around the workspace (FilesPage).
+.filesPage {
+  padding-bottom: var(--app-space-10);
+}
+.main {
+  flex: 1;
+  min-width: 0;
+}
+.tabPanel {
+  margin-top: var(--app-space-4);
+}
+.archivedIcon {
   @include icon(var(--app-space-5));
+  color: var(--app-color-icon);
+}
+.banner {
+  margin-top: var(--app-space-4);
 }

@@ -3,7 +3,7 @@ import { classNames } from '../../lib/class-names';
 import { Card } from '../ui/Card';
 import { STORAGE_OPTIONS } from './content';
 import { Checks, Path, Section } from './Section';
-import styles from './architecture.module.css';
+import styles from './architecture.module.scss';
 
 type StorageOption = (typeof STORAGE_OPTIONS)[number];
 
@@ -12,8 +12,8 @@ function StorageOptionBox({ option, isDefault }: { option: StorageOption; isDefa
   const look = isDefault ? styles.storageOptionDefault : !option.built && styles.storageOptionPlanned;
   return (
     <div className={classNames(styles.storageOption, look)}>
-      <option.icon className={`h-5 w-5 ${option.built ? 'text-blue-600' : 'text-slate-400'}`} aria-hidden />
-      <span className={classNames(styles.storageOptionName, option.built && 'text-slate-800')}>{option.name}</span>
+      <option.icon className={classNames(styles.storageIcon, !option.built && styles.storageIconPlanned)} aria-hidden />
+      <span className={classNames(styles.storageOptionName, option.built && styles.storageOptionBuilt)}>{option.name}</span>
       <span className={styles.storageOptionNote}>{option.note}</span>
     </div>
   );
@@ -23,17 +23,17 @@ function StorageOptionBox({ option, isDefault }: { option: StorageOption; isDefa
 function StorageOptions() {
   return (
     <div className={styles.storageOptions}>
-      <h3 className="text-sm font-semibold">Storage options</h3>
-      <div role="img" className="mt-3 flex items-stretch gap-1"
+      <h3 className={styles.storageHeading}>Storage options</h3>
+      <div role="img" className={styles.storageRow}
         aria-label="Storage options: the local filesystem (the default) and private Vercel Blob are built; S3 or Cloudflare R2 could be added as another backend behind the same interface.">
         {STORAGE_OPTIONS.map((option, i) => (
-          <div key={option.name} className="flex min-w-0 flex-1 items-center gap-1">
-            {i > 0 && <ArrowRight className="h-4 w-4 shrink-0 text-blue-400" aria-hidden />}
+          <div key={option.name} className={styles.storageStep}>
+            {i > 0 && <ArrowRight className={styles.storageArrow} aria-hidden />}
             <StorageOptionBox option={option} isDefault={i === 0} />
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-slate-500">
+      <p className={styles.storageNote}>
         One interface (list · get · read · patch · create · createAt · put) in <Path>server/src/lib</Path>, so another backend changes nothing else.
       </p>
     </div>
@@ -47,14 +47,14 @@ export function StorageSection() {
       intro="Separate concerns, one storage interface. Routes and processing never touch persistence; the backend is chosen at startup.">
       <div className={styles.storageGrid}>
         <Card as="article">
-          <h3 className={styles.cardHeading}><Laptop className="h-5 w-5 text-blue-600" aria-hidden /> Local development</h3>
+          <h3 className={styles.cardHeading}><Laptop className={styles.headingIcon} aria-hidden /> Local development</h3>
           <Checks label="Local development" items={[
             'Node.js API with filesystem storage',
             <>Originals, results and metadata under <Path>server/data</Path></>,
           ]} />
         </Card>
         <Card as="article">
-          <h3 className={styles.cardHeading}><Cloud className="h-5 w-5 text-blue-600" aria-hidden /> Optional Vercel deployment</h3>
+          <h3 className={styles.cardHeading}><Cloud className={styles.headingIcon} aria-hidden /> Optional Vercel deployment</h3>
           <Checks label="Optional Vercel deployment" items={[
             'Separate frontend and API services',
             'Private Vercel Blob storage',

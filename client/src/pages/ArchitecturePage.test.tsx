@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { ArchitecturePage } from './ArchitecturePage';
 import { HOW_IT_WORKS, TECH } from '../components/architecture/content';
-import sectionStyles from '../components/architecture/architecture.module.css';
+import sectionStyles from '../components/architecture/architecture.module.scss';
 import { api } from '../lib/api';
 
 vi.mock('../lib/api', () => ({ api: {
@@ -37,7 +37,7 @@ describe('Architecture & Tech Stack page', () => {
   it('summarises what the system does in six cards', () => {
     render(<ArchitecturePage />);
     const cards = within(screen.getByRole('list', { name: 'What the system does' })).getAllByRole('listitem');
-    expect(cards.map((c) => c.querySelector('.font-semibold')!.textContent)).toEqual(['Import CSVs', 'Normalize', 'Validate', 'Process', 'Compare', 'Run anywhere']);
+    expect(cards.map((c) => c.querySelector(`.${sectionStyles.tileTitle}`)!.textContent)).toEqual(['Import CSVs', 'Normalize', 'Validate', 'Process', 'Compare', 'Run anywhere']);
   });
 
   it('shows a tile for each technology, and its reasons, trade-off and files when selected', async () => {

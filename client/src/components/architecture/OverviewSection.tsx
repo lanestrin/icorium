@@ -1,7 +1,7 @@
 import { Scale } from 'lucide-react';
 import { OVERVIEW } from './content';
 import { Section } from './Section';
-import styles from './architecture.module.css';
+import styles from './architecture.module.scss';
 
 /** Section 1: what the system does, and the principle behind the design. */
 export function OverviewSection() {
@@ -11,15 +11,15 @@ export function OverviewSection() {
       <ul aria-label="What the system does" className={styles.overviewGrid}>
         {OVERVIEW.map(([Icon, title, text]) => (
           <li key={title} className={styles.tile}>
-            <Icon className="h-7 w-7 text-blue-600" aria-hidden />
-            <span className="mt-2 font-semibold">{title}</span>
-            <span className="mt-1 text-sm text-slate-600">{text}</span>
+            <Icon className={styles.tileIcon} aria-hidden />
+            <span className={styles.tileTitle}>{title}</span>
+            <span className={styles.tileText}>{text}</span>
           </li>
         ))}
       </ul>
       <blockquote className={styles.principle}>
         <p className={styles.principleStatement}>
-          <Scale className="mt-1 h-5 w-5 shrink-0 text-blue-600" aria-hidden />
+          <Scale className={styles.principleIcon} aria-hidden />
           Choose the simplest technology that meets the requirements, while keeping the system maintainable and extensible.
         </p>
         <p className={styles.principleNote}>

@@ -30,7 +30,7 @@ export function ArchiveToast({ toast, archiving, processing, onUndo, onDismiss }
           {processing && <span id="undo-wait" className={styles.undoWait}>Available when processing finishes</span>}
         </div>
       )}
-      <button onClick={onDismiss} aria-label="Dismiss notification" className="dismiss-button"><X className={styles.dismissIcon} /></button>
+      <Button variant="ghost" size="sm" onClick={onDismiss} aria-label="Dismiss notification" icon={<X />} />
     </div>
   );
 }

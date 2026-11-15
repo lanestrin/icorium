@@ -1,7 +1,7 @@
 import { FlaskConical } from 'lucide-react';
 import { EVOLVE } from './content';
 import { Section } from './Section';
-import styles from './architecture.module.css';
+import styles from './architecture.module.scss';
 
 /** Section 6: what would be added as the product grows. */
 export function EvolutionSection() {
@@ -11,14 +11,14 @@ export function EvolutionSection() {
       <ul aria-label="Future evolution" className={styles.evolutionGrid}>
         {EVOLVE.map((idea) => (
           <li key={idea.title} className={styles.tile}>
-            <idea.icon className="h-7 w-7 text-blue-600" aria-hidden />
-            <h3 className="mt-2 font-semibold">{idea.title}</h3>
-            <p className="mt-1 text-sm text-slate-600">{idea.text}</p>
+            <idea.icon className={styles.tileIcon} aria-hidden />
+            <h3 className={styles.tileTitle}>{idea.title}</h3>
+            <p className={styles.tileText}>{idea.text}</p>
           </li>
         ))}
       </ul>
       <p className={styles.testedNote}>
-        <FlaskConical className="h-4 w-4" aria-hidden /> Every repository path and package named on this page is checked by an automated test.
+        <FlaskConical aria-hidden /> Every repository path and package named on this page is checked by an automated test.
       </p>
     </Section>
   );

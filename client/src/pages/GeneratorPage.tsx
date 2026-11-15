@@ -9,6 +9,8 @@ import { NumberField } from '../components/generator/NumberField';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import styles from '../components/generator/generator.module.scss';
+import page from '../styles/page.module.scss';
+import { classNames } from '../lib/class-names';
 import { api } from '../lib/api';
 import { errorMessage, plural } from '../lib/format';
 import { flaggedRows, withCsv } from '../lib/generated-files';
@@ -88,34 +90,34 @@ export function GeneratorPage() {
   const generateLabel = busy === 'generate' ? 'Generating…' : Number(count) > 1 ? `Generate ${count} CSV files` : 'Generate CSV';
 
   return (
-    <div className="page-shell px-4 pb-10 pt-8 sm:px-6 sm:pt-10">
-      <nav aria-label="Pages" className="page-nav">
-        <a href="/" className="nav-link"><ArrowLeft className="h-4 w-4" /> Back to CSV Files</a>
-        <a href="/architecture" className="nav-link"><Network className="h-4 w-4" /> Architecture</a>
+    <div className={classNames(page.shell, styles.page)}>
+      <nav aria-label="Pages" className={page.nav}>
+        <a href="/" className={page.navLink}><ArrowLeft aria-hidden /> Back to CSV Files</a>
+        <a href="/architecture" className={page.navLink}><Network aria-hidden /> Architecture</a>
         <AppVersion />
       </nav>
-      <div className="mt-3 flex flex-wrap items-baseline gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">CSV Generator</h1>
-        <p className="text-slate-600">Create synthetic partner CSVs for testing. All values are invented.</p>
+      <div className={classNames(page.titleRow, styles.header)}>
+        <h1 className={page.title}>CSV Generator</h1>
+        <p className={page.intro}>Create synthetic partner CSVs for testing. All values are invented.</p>
       </div>
 
       <div className={styles.layout}>
         <Card as="form" onSubmit={generate} className={styles.form} aria-label="Generate CSV files">
           <fieldset>
             <legend className={styles.legend}>Partner</legend>
-            <div className="space-y-2">
+            <div className={styles.choiceList}>
               {ADAPTERS.map((adapter) => (
                 <ChoiceOption key={adapter.id} layout="card" name={`${ids}-partner`} checked={partner === adapter.id} onSelect={() => setPartner(adapter.id)}>
                   <span>
-                    <span className="block font-semibold">{adapter.name}</span>
-                    <span className="block text-sm text-slate-500">{adapter.description}</span>
+                    <span className={styles.choiceTitle}>{adapter.name}</span>
+                    <span className={styles.choiceDescription}>{adapter.description}</span>
                   </span>
                 </ChoiceOption>
               ))}
             </div>
           </fieldset>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+          <div className={styles.numberFields}>
             <NumberField id={`${ids}-rows`} label="Rows" value={rows} setValue={setRows} min={1} max={GENERATOR_MAX_ROWS}
               help={`1 to ${GENERATOR_MAX_ROWS.toLocaleString()} data rows in each file.`} />
             <NumberField id={`${ids}-count`} label="Number of files" value={count} setValue={setCount} min={1} max={GENERATOR_MAX_FILES}
@@ -124,37 +126,37 @@ export function GeneratorPage() {
 
           <fieldset>
             <legend className={styles.legend}>Data quality</legend>
-            <div className="flex flex-wrap gap-2">
+            <div className={styles.chips}>
               <ChoiceOption layout="chip" name={`${ids}-quality`} checked={!withErrors} onSelect={() => setWithErrors(false)}>No errors</ChoiceOption>
               <ChoiceOption layout="chip" name={`${ids}-quality`} checked={withErrors} onSelect={() => setWithErrors(true)}>Include errors</ChoiceOption>
             </div>
             {withErrors && (
-              <div className="mt-4">
+              <div className={styles.errorRowsField}>
                 <NumberField id={`${ids}-errors`} label="Rows with errors" value={errorRows} setValue={setErrorRows}
                   min={1} max={Number(rows) || GENERATOR_MAX_ROWS} help={ERROR_ROWS_HELP} />
               </div>
             )}
           </fieldset>
 
-          <Button type="submit" size="lg" className="w-full" disabled={!!busy} loading={busy === 'generate'} icon={<Wand2 />}>
+          <Button type="submit" size="lg" className={styles.generateButton} disabled={!!busy} loading={busy === 'generate'} icon={<Wand2 />}>
             {generateLabel}
           </Button>
         </Card>
 
         <Card as="section" aria-label="Generated files" className={styles.results}>
-          {error && <Banner tone="error" className="mb-4" onDismiss={() => setError(undefined)}>{error}</Banner>}
-          {added && <Banner tone="success" className="mb-4">{added} <a href="/" className="font-semibold underline">Open CSV Files</a></Banner>}
+          {error && <Banner tone="error" className={styles.banner} onDismiss={() => setError(undefined)}>{error}</Banner>}
+          {added && <Banner tone="success" className={styles.banner}>{added} <a href="/" className={styles.bannerLink}>Open CSV Files</a></Banner>}
 
           {!file ? (
-            <p className="py-16 text-center text-slate-500">Choose a partner, the number of rows and files, and whether to include errors, then click Generate.</p>
+            <p className={styles.empty}>Choose a partner, the number of rows and files, and whether to include errors, then click Generate.</p>
           ) : (
             <>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className={styles.resultsHeader}>
                 <div>
-                  <h2 className="text-lg font-semibold">Generated files</h2>
-                  <p className="text-sm text-slate-600">{batchSummary(files)}</p>
+                  <h2 className={styles.resultsTitle}>Generated files</h2>
+                  <p className={styles.resultsSummary}>{batchSummary(files)}</p>
                 </div>
-                <Button onClick={addAll} className="ml-auto" disabled={!!busy} loading={busy === 'add'} icon={<FilePlus2 />}>
+                <Button onClick={addAll} className={styles.addButton} disabled={!!busy} loading={busy === 'add'} icon={<FilePlus2 />}>
                   {files.length > 1 ? `Add all ${files.length} to CSV Files` : 'Add to CSV Files'}
                 </Button>
               </div>

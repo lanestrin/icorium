@@ -884,7 +884,7 @@ Added on 2026-11-14 at the person's request. The client moves from Tailwind util
 
   **Depends on:** 13.4.
 
-- [ ] **13.6** `feature/13.6-pages-layout-scss` · **P2** — Pages, layout and the remaining globals: `pages/*`, `AppVersion`, the Architecture components, and the shell and navigation classes (`.page-shell`, `.page-nav`, `.nav-link`, `.eyebrow`, `.code-chip`, `.dismiss-button`) move to `ui/` components or SCSS partials; `components.css` is removed.
+- [x] **13.6** `feature/13.6-pages-layout-scss` · **P2** — Pages, layout and the remaining globals: `pages/*`, `AppVersion`, the Architecture components, and the shell and navigation classes (`.page-shell`, `.page-nav`, `.nav-link`, `.eyebrow`, `.code-chip`, `.dismiss-button`) move to SCSS: the three-page ones to a shared `styles/page.module.scss`, `.eyebrow` and `.code-chip` to the Architecture module, and the toast's dismiss to a ghost `Button`; `components.css` is removed.
 
   **Depends on:** 13.5.
 

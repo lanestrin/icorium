@@ -13,6 +13,8 @@ import { SelectionBar } from '../components/files/SelectionBar';
 import { Sidebar } from '../components/files/Sidebar';
 import { SortMenu } from '../components/files/SortMenu';
 import styles from '../components/files/files.module.scss';
+import page from '../styles/page.module.scss';
+import { classNames } from '../lib/class-names';
 import { useArchive } from '../hooks/useArchive';
 import { useFileList } from '../hooks/useFileList';
 import { useFilters } from '../hooks/useFilters';
@@ -65,7 +67,7 @@ export function FilesPage() {
   }
 
   return (
-    <div className="page-shell pb-10">
+    <div className={classNames(page.shell, styles.filesPage)}>
       <div className={styles.workspace}>
         <Sidebar
           processor={processor}
@@ -78,16 +80,16 @@ export function FilesPage() {
           selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
         />
 
-        <main className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-4">
-            <h1 className="text-3xl font-bold tracking-tight">CSV Files</h1>
-            <p className="text-slate-600">Upload, preview, process, and compare refrigerant datasets.</p>
+        <main className={styles.main}>
+          <div className={page.titleRow}>
+            <h1 className={page.title}>CSV Files</h1>
+            <p className={page.intro}>Upload, preview, process, and compare refrigerant datasets.</p>
             <nav aria-label="Pages" className={styles.headerNav}>
-              <a href="/generator" className="nav-link">
-                <Wand2 className="h-4 w-4" /> CSV Generator
+              <a href="/generator" className={page.navLink}>
+                <Wand2 aria-hidden /> CSV Generator
               </a>
-              <a href="/architecture" className="nav-link">
-                <Network className="h-4 w-4" /> Architecture
+              <a href="/architecture" className={page.navLink}>
+                <Network aria-hidden /> Architecture
               </a>
               <AppVersion />
             </nav>
@@ -99,8 +101,8 @@ export function FilesPage() {
             filtersActive={filtersActive} clearFilters={clearFilters}
           />
 
-          {notice && <Banner tone="success" className="mt-4" onDismiss={() => setNotice(undefined)}>{notice}</Banner>}
-          {error && <Banner tone="error" className="mt-4" onDismiss={() => setError(undefined)}>{error}</Banner>}
+          {notice && <Banner tone="success" className={styles.banner} onDismiss={() => setNotice(undefined)}>{notice}</Banner>}
+          {error && <Banner tone="error" className={styles.banner} onDismiss={() => setError(undefined)}>{error}</Banner>}
 
           <FileTabs
             tab={tab}
@@ -109,10 +111,10 @@ export function FilesPage() {
             extra={<SortMenu sort={sort} setSort={setSort} viewArchived={viewArchived} />}
           />
 
-          <div role="tabpanel" id="file-tabpanel" aria-labelledby={`tab-${tab}`} className="mt-4">
+          <div role="tabpanel" id="file-tabpanel" aria-labelledby={`tab-${tab}`} className={styles.tabPanel}>
             {viewArchived && (
               <p className={styles.archivedNote}>
-                <Archive className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
+                <Archive className={styles.archivedIcon} aria-hidden />
                 Archived files are excluded from processing and comparison.
               </p>
             )}

@@ -123,6 +123,8 @@
   /* The dimmed page behind a dialog (Tailwind's bg-slate-900/30). */
   --app-color-backdrop: color-mix(in oklab, var(--app-color-slate-900) 30%, transparent);
   --app-color-focus: var(--app-color-blue-500);
+  /* Arrows and lines that join boxes in a diagram (3:1 on the page and on white). */
+  --app-color-connector: var(--app-color-blue-500);
   --app-disabled-opacity: 0.5;
 
   /* Type */
@@ -144,6 +146,8 @@
   --app-text-4xl: 2.25rem;
   --app-leading-4xl: calc(2.5 / 2.25);
   --app-leading-tight: 1.25;
+  --app-tracking-tight: -0.025em;
+  --app-tracking-wide: 0.025em;
 
   --app-weight-normal: 400;
   --app-weight-medium: 500;

@@ -1,0 +1,61 @@
+// The frame every page shares: the full-height shell, the page navigation, and the title row on
+// CSV Files and CSV Generator. Pages add their own padding in their own module.
+// <div className={page.shell}>, <nav className={page.nav}>, <a className={page.navLink}>.
+@use 'mixins' as *;
+
+// Full height, no sideways scroll.
+.shell {
+  min-height: 100vh;
+  overflow-x: clip;
+  color: var(--app-color-text);
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-2) var(--app-space-6);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  font-weight: var(--app-weight-medium);
+}
+
+// A blue text link with an icon, as in the page navigation.
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-color-link);
+  text-decoration: none;
+  @include focus-ring;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  svg {
+    flex-shrink: 0;
+    width: var(--app-space-4);
+    height: var(--app-space-4);
+  }
+}
+
+// The page title with its one-line description beside it, wrapping on narrow screens.
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--app-space-4);
+}
+
+.title {
+  font-size: var(--app-text-3xl);
+  line-height: var(--app-leading-3xl);
+  font-weight: var(--app-weight-bold);
+  letter-spacing: var(--app-tracking-tight);
+}
+
+.intro {
+  color: var(--app-color-text-muted);
+}

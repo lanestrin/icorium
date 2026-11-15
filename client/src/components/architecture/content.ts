@@ -48,12 +48,11 @@ export const TECH: Tech[] = [
   {
     name: 'Tailwind CSS 4', label: 'Tailwind CSS', role: 'Styling', icon: Wind, packages: [['client', 'tailwindcss'], ['client', '@tailwindcss/vite']],
     why: [
-      'Utility classes keep spacing, colour and type consistent; short ones stay in the markup.',
-      'Longer combinations become named classes with @apply: shared ones in styles/components.css, the rest in each feature’s CSS Module.',
-      'No large UI component framework to learn, theme or override.',
+      'Kept only for its base reset while the migration to SCSS Modules finishes.',
+      'Every component and page now styles itself with an SCSS Module on the shared design tokens.',
     ],
-    tradeoff: 'A style can live in two places, the markup or a CSS Module; consistency relies on shared classes rather than a component library.',
-    files: ['client/src/index.css', 'client/src/styles/components.css'],
+    tradeoff: 'Two styling tools during the migration; Tailwind and its Vite plugin are removed in the next step.',
+    files: ['client/src/index.css'],
   },
   {
     name: 'Fastify 5', label: 'Fastify 5', role: 'API', icon: Server, packages: [['server', 'fastify'], ['server', '@fastify/multipart']],
