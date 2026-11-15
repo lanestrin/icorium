@@ -101,7 +101,7 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 ## Layout
 
 ```
-client/        React + Vite + Tailwind UI
+client/        React + Vite UI, styled with SCSS Modules on design tokens (Tailwind until M13 removes it)
   src/App.tsx      picks the page from the URL
   src/pages/       FilesPage (the file workspace), GeneratorPage (/generator), ArchitecturePage (/architecture)
   src/components/  Banner (shared message box), and one folder per feature, one component per file:
@@ -110,8 +110,8 @@ client/        React + Vite + Tailwind UI
     modals/        the dialog shell, the run confirmations and the file preview
     generator/     the CSV Generator's options, generated file list and preview
     architecture/  the Architecture page's sections, and content.ts with the text they show
-    Each feature folder has a CSS Module (*.module.css) with its longer Tailwind class combinations.
-  src/styles/      tokens, base page styles and shared classes (card, btn, nav-link, table rows)
+    Each feature folder has a CSS Module: *.module.scss once migrated, *.module.css (Tailwind) until then.
+  src/styles/      tokens.css (design tokens), _mixins.scss, base page styles and shared classes (card, btn, nav-link, table rows)
   src/hooks/       the workspace state, one hook per file: file list, selection, filters, archiving, processing
   src/lib/         api (the typed API client), file-status (file rules), compare-view (comparison rules), format
 server/        Fastify API
@@ -122,6 +122,18 @@ server/        Fastify API
 shared/        types and the processor list used by both sides
 sample-data/   the five synthetic partner CSVs (never edited)
 ```
+
+## Styling
+
+The client is moving from Tailwind to SCSS Modules, one area at a time (build-plan M13). New and migrated code follows these rules and adds no Tailwind classes, `@apply` or `@reference`.
+
+- **Tokens** live in `client/src/styles/tokens.css` as `--app-*` CSS custom properties: palette, semantic colours, type, spacing, radii, shadows, motion and z-index layers. `tokens.test.ts` checks that every token exists, that palette values match Tailwind's, and that each text/background pair meets WCAG AA contrast.
+- **Use semantic tokens only** in components (`--app-color-text`, `--app-color-surface`, `--app-color-danger-text`, `--app-space-4`, `--app-radius-xl`), never palette steps such as `--app-color-slate-600`, so a future theme only overrides the aliases. If no semantic token fits, add one to `tokens.css` and its test instead of hardcoding a value.
+- **Mixins** live in `client/src/styles/_mixins.scss`: `up(sm|md|lg|xl)` for min-width breakpoints (media queries can't read CSS variables, so breakpoints live only here), `focus-ring`, `reduced-motion` and `visually-hidden`. Every interactive element gets `focus-ring`.
+- **Writing a module:** put `Component.module.scss` next to its component, start it with `@use '../styles/mixins' as *;` (relative path), import it as `styles`, and combine classes with `classNames` from `client/src/lib/class-names.ts`. `client/src/components/Banner.module.scss` is the reference example.
+- **Naming:** camelCase class names that say what an element is (`.message`, `.dismiss`), not how it looks (`.greenText`); variants are separate classes (`.success`, `.error`).
+- **When to make a `ui/` component:** when the same control or container (button, card, dialog, menu) appears in more than one area. It goes in `client/src/components/ui/` with its own module and tests (and a Storybook story from 13.2). Layout specific to one area stays in that area's module.
+- **Motion:** `base.css` shortens every animation and transition for people who ask their system for reduced motion; use `reduced-motion` for anything that needs more.
 
 ## Settings
 

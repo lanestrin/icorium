@@ -1,0 +1,50 @@
+// Shared Sass helpers for *.module.scss files. Import with: @use '../styles/mixins' as *;
+// (adjust the relative path). Colours, spacing and the rest come from the --app-* tokens in tokens.css.
+
+@use 'sass:map';
+
+// Tailwind's breakpoints. They live here, not in tokens.css, because media queries can't read CSS variables.
+$breakpoints: (
+  sm: 40rem,
+  md: 48rem,
+  lg: 64rem,
+  xl: 80rem,
+);
+
+// Styles for screens at least as wide as the named breakpoint: @include up(md) { ... }
+@mixin up($bp) {
+  @if not map.has-key($breakpoints, $bp) {
+    @error "Unknown breakpoint `#{$bp}`. Use one of: #{map.keys($breakpoints)}.";
+  }
+  @media (min-width: map.get($breakpoints, $bp)) {
+    @content;
+  }
+}
+
+// The visible keyboard-focus outline. Shown only for keyboard focus, not mouse clicks.
+@mixin focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--app-color-focus);
+    outline-offset: 2px;
+  }
+}
+
+// Styles for people who ask their system for less motion: @include reduced-motion { animation: none; }
+@mixin reduced-motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+}
+
+// Hidden on screen but still read by screen readers.
+@mixin visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
