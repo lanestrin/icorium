@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/lanestrin/icorium/compare/v1.7.0...v1.8.0) (2026-11-15)
+
+
+### Features
+
+* remove Tailwind and guard against its return (13.7) ([#81](https://github.com/lanestrin/icorium/issues/81)) ([c992c79](https://github.com/lanestrin/icorium/commit/c992c79bc4430bd553cc253b7dfd35f5a05b7a26))
+
 ## [1.7.0](https://github.com/lanestrin/icorium/compare/v1.6.0...v1.7.0) (2026-11-15)
 
 
