@@ -14,6 +14,7 @@ Requires Node.js 24 (the version CI uses).
 npm install
 npm run dev       # API on :3001, UI on http://localhost:5173 (Vite picks the next free port if 5173 is taken)
 npm run verify    # every test + the production build
+npm run storybook # the shared ui/ components in Storybook on http://localhost:6006 (npm run build-storybook for a static copy)
 ```
 
 The five synthetic sample CSVs in `sample-data/` (described in `sample-data/README.txt`) are loaded the first time the server starts, as File IDs `100001`–`100005`. To reset the demo, stop the servers, delete `server/data/` and start again. Data saved before File IDs is not migrated: the server stops at startup with a message asking you to delete `server/data/` (it never deletes it itself).
@@ -132,7 +133,11 @@ The client is moving from Tailwind to SCSS Modules, one area at a time (build-pl
 - **Mixins** live in `client/src/styles/_mixins.scss`: `up(sm|md|lg|xl)` for min-width breakpoints (media queries can't read CSS variables, so breakpoints live only here), `focus-ring`, `reduced-motion` and `visually-hidden`. Every interactive element gets `focus-ring`.
 - **Writing a module:** put `Component.module.scss` next to its component, start it with `@use '../styles/mixins' as *;` (relative path), import it as `styles`, and combine classes with `classNames` from `client/src/lib/class-names.ts`. `client/src/components/Banner.module.scss` is the reference example.
 - **Naming:** camelCase class names that say what an element is (`.message`, `.dismiss`), not how it looks (`.greenText`); variants are separate classes (`.success`, `.error`).
-- **When to make a `ui/` component:** when the same control or container (button, card, dialog, menu) appears in more than one area. It goes in `client/src/components/ui/` with its own module and tests (and a Storybook story from 13.2). Layout specific to one area stays in that area's module.
+- **Shared components** live in `client/src/components/ui/`, each with its module, tests and a Storybook story (`npm run storybook`). Use them instead of styling a raw `<button>` or panel:
+  - `Button`: `variant` is `primary` (the main action in a place), `secondary` (the others beside it), `success` (start or confirm a safe run), `danger` (confirm a destructive one), `outline` (a light action in a panel or toast), `ghost` (icon buttons such as Close) or `link` (a text action in a sentence or toolbar); `size` is `sm`, `md` or `lg`; `loading` disables it and shows a spinner; an icon-only button needs an `aria-label`. A link that navigates stays an `<a>`.
+  - `Card`: the white panel; `as` picks `div`, `section`, `article` or `form`.
+  - Pass `className` for layout only (`w-full`, `ml-auto`), never for colour, padding or shape.
+- **When to make a `ui/` component:** when the same control or container (button, card, dialog, menu) appears in more than one area. Add it to `client/src/components/ui/` with its module, tests and a `*.stories.tsx`; `ui/stories.test.tsx` renders every story, so a stale story fails `npm run verify`. Layout specific to one area stays in that area's module.
 - **Motion:** `base.css` shortens every animation and transition for people who ask their system for reduced motion; use `reduced-motion` for anything that needs more.
 
 ## Settings

@@ -20,9 +20,6 @@
 .dropZoneActive {
   @apply border-blue-500 bg-blue-50;
 }
-.browseButton {
-  @apply font-semibold text-blue-600 hover:underline;
-}
 .processorOption {
   @apply flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 transition hover:bg-slate-50;
 }
@@ -34,10 +31,6 @@
 }
 .selectedInputs {
   @apply mb-3 max-h-28 space-y-1 overflow-auto text-xs text-slate-600;
-}
-.runButton {
-  @apply flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 py-3.5 font-semibold text-white shadow-sm transition;
-  @apply hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 /* Filter card */
@@ -149,9 +142,6 @@
 .selectionBar {
   @apply mb-2 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl bg-blue-50/70 px-4 py-2.5;
 }
-.textButton {
-  @apply text-sm font-medium text-blue-700 hover:underline;
-}
 
 /* Archive toast */
 .toast {
@@ -160,8 +150,4 @@
 }
 .toastIcon {
   @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-600 text-white;
-}
-.undoButton {
-  @apply rounded-xl border border-blue-200 bg-white px-4 py-1.5 font-medium text-blue-700 transition hover:bg-blue-50;
-  @apply disabled:cursor-not-allowed disabled:opacity-50;
 }

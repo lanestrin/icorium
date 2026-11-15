@@ -1,0 +1,8 @@
+// A white panel with a soft border and shadow, as the old global .card.
+.card {
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-2xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-5);
+  box-shadow: var(--app-shadow-sm);
+}

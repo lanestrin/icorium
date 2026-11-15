@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { classNames } from '../../lib/class-names';
+import { Card } from '../ui/Card';
 import { TECH, type Tech } from './content';
 import { Path, Section } from './Section';
 import styles from './architecture.module.css';
@@ -7,7 +8,7 @@ import styles from './architecture.module.css';
 /** Why a technology is here, the trade-off accepted with it, and where the code uses it. */
 function TechDetails({ tech }: { tech: Tech }) {
   return (
-    <section aria-label="Selected technology" aria-live="polite" className="card mt-4">
+    <Card as="section" aria-label="Selected technology" aria-live="polite" className="mt-4">
       <div className="flex items-start gap-3">
         <span className={styles.iconBadge}><tech.icon className="h-5 w-5 text-blue-600" aria-hidden /></span>
         <div className="min-w-0">
@@ -20,7 +21,7 @@ function TechDetails({ tech }: { tech: Tech }) {
       </ul>
       <p className={styles.tradeoff}><span className="font-semibold">Trade-off: </span>{tech.tradeoff}</p>
       <p className="mt-3 flex flex-wrap gap-1.5">{tech.files.map((file) => <Path key={file}>{file}</Path>)}</p>
-    </section>
+    </Card>
   );
 }
 

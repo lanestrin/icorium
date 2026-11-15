@@ -82,10 +82,10 @@ const PALETTE_TOKENS = [
 ];
 
 const SEMANTIC_COLORS = [
-  'page', 'surface', 'surface-subtle', 'text', 'text-secondary', 'text-muted', 'icon', 'border', 'border-strong',
-  'primary', 'primary-hover', 'on-primary', 'link', 'primary-surface',
+  'page', 'surface', 'surface-subtle', 'surface-hover', 'text', 'text-secondary', 'text-muted', 'icon', 'border', 'border-strong',
+  'primary', 'primary-hover', 'on-primary', 'link', 'primary-surface', 'primary-border',
   'success', 'success-hover', 'on-success', 'success-surface', 'success-border', 'success-text',
-  'danger', 'danger-surface', 'danger-border', 'danger-text',
+  'danger', 'danger-hover', 'on-danger', 'danger-surface', 'danger-border', 'danger-text',
   'warning-surface', 'warning-border', 'warning-text', 'focus',
 ];
 
@@ -151,6 +151,7 @@ describe('design tokens', () => {
       ...['text', 'text-secondary', 'text-muted', 'link'].flatMap((text): [string, string][] => [[text, 'surface'], [text, 'page']]),
       ['on-primary', 'primary'],
       ['on-success', 'success'],
+      ['on-danger', 'danger'],
       ['success-text', 'success-surface'],
       ['danger-text', 'danger-surface'],
       ['warning-text', 'warning-surface'],

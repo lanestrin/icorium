@@ -1,29 +1,12 @@
 /*
- * Shared UI classes for patterns used across several pages. Feature-specific styles live in a CSS
- * Module next to their component. These sit in the components layer, so an inline utility can
+ * Shared UI classes for patterns used across several pages. Buttons and cards are the ui/Button and
+ * ui/Card components. Feature-specific styles live in a CSS Module next to their component. These sit in the components layer, so an inline utility can
  * still adjust one of them (for example padding on a button).
  */
 @layer components {
   /* The outer frame of a page: full height, no sideways scroll. Pages add their own padding. */
   .page-shell {
     @apply min-h-screen overflow-x-clip text-slate-900;
-  }
-
-  /* White card with a soft border and shadow. */
-  .card {
-    @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm;
-  }
-
-  /* Buttons: .btn sets shape and states; add one colour variant and padding. */
-  .btn {
-    @apply flex items-center justify-center gap-2 rounded-xl font-medium shadow-sm transition;
-    @apply disabled:cursor-not-allowed disabled:opacity-50;
-  }
-  .btn-primary {
-    @apply bg-blue-600 text-white hover:bg-blue-700;
-  }
-  .btn-secondary {
-    @apply border border-slate-200 bg-white text-slate-800 hover:bg-slate-50;
   }
 
   /* Blue text link with an icon, as in the page navigation. */

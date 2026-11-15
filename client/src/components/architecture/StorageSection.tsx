@@ -1,5 +1,6 @@
 import { ArrowRight, Cloud, Laptop } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
+import { Card } from '../ui/Card';
 import { STORAGE_OPTIONS } from './content';
 import { Checks, Path, Section } from './Section';
 import styles from './architecture.module.css';
@@ -45,14 +46,14 @@ export function StorageSection() {
     <Section id="storage" eyebrow="5 · Storage and deployment" title="Hosting and storage" side
       intro="Separate concerns, one storage interface. Routes and processing never touch persistence; the backend is chosen at startup.">
       <div className={styles.storageGrid}>
-        <article className="card">
+        <Card as="article">
           <h3 className={styles.cardHeading}><Laptop className="h-5 w-5 text-blue-600" aria-hidden /> Local development</h3>
           <Checks label="Local development" items={[
             'Node.js API with filesystem storage',
             <>Originals, results and metadata under <Path>server/data</Path></>,
           ]} />
-        </article>
-        <article className="card">
+        </Card>
+        <Card as="article">
           <h3 className={styles.cardHeading}><Cloud className="h-5 w-5 text-blue-600" aria-hidden /> Optional Vercel deployment</h3>
           <Checks label="Optional Vercel deployment" items={[
             'Separate frontend and API services',
@@ -60,7 +61,7 @@ export function StorageSection() {
             'Test site: deploys main',
             <>Each release also ships as a deployable zip (<Path>scripts/build-release.mjs</Path>); Production host not chosen yet</>,
           ]} />
-        </article>
+        </Card>
         <StorageOptions />
       </div>
     </Section>

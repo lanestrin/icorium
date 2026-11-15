@@ -3,6 +3,7 @@ import { ArrowLeftRight, ChevronRight, Layers, TriangleAlert, type LucideIcon } 
 import type { CompareColumn, CompareResult } from '../../../../shared/types';
 import { classNames } from '../../lib/class-names';
 import { metricLabel, topDifferences, type TopDifference } from '../../lib/compare-view';
+import { Button } from '../ui/Button';
 import { CategoryChart } from './CategoryChart';
 import { Dot } from './fileColors';
 import { RowChart } from './RowChart';
@@ -91,9 +92,9 @@ export function Overview({ col, result, labels, refIndex, deviation, setDeviatio
             <h3 className={styles.panelTitle}>
               Top differences <span className="text-sm font-normal text-slate-500">({top.length} {top.length === 1 ? 'row' : 'rows'})</span>
             </h3>
-            <button onClick={showRows} className={styles.viewAllButton}>
-              View all row details <ChevronRight className="h-4 w-4" />
-            </button>
+            <Button variant="outline" size="sm" className="ml-auto" onClick={showRows}>
+              View all row details <ChevronRight />
+            </Button>
           </div>
           {top.length
             ? <TopDifferencesTable top={top} labels={labels} byBatchId={result.rowMatch === 'batch_id'} />

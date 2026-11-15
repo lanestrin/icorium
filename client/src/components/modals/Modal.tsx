@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
+import { Button } from '../ui/Button';
 import styles from './modals.module.css';
 
 // Disabled fields cannot take focus, so they are left out of the Tab cycle.
@@ -63,7 +64,7 @@ export function Modal({ title, subtitle, actions, narrow, full, onClose, childre
             {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
           </div>
           {actions}
-          <button onClick={onClose} className={styles.closeButton} aria-label="Close"><X className="h-5 w-5" /></button>
+          <Button variant="ghost" onClick={onClose} aria-label="Close" icon={<X />} />
         </div>
         <div className={styles.body}>{children}</div>
       </div>

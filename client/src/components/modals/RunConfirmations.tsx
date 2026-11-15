@@ -3,6 +3,7 @@ import { PROCESSORS, type ProcessorId } from '../../../../shared/types';
 import { classNames } from '../../lib/class-names';
 import type { QualityWarning, Replacement } from '../../lib/file-status';
 import { rowsWord } from '../../lib/format';
+import { Button } from '../ui/Button';
 import { Modal } from './Modal';
 import styles from './modals.module.css';
 
@@ -40,8 +41,8 @@ function QualityDetails({ warning }: { warning: QualityWarning }) {
 function ConfirmButtons({ label, danger, onCancel, onConfirm }: { label: string; danger?: boolean; onCancel: () => void; onConfirm: () => void }) {
   return (
     <div className={styles.confirmButtons}>
-      <button onClick={onCancel} className={styles.cancelButton}>Cancel</button>
-      <button onClick={onConfirm} className={classNames(styles.confirmButton, danger ? styles.confirmDanger : styles.confirmSafe)}>{label}</button>
+      <Button variant="secondary" onClick={onCancel}>Cancel</Button>
+      <Button variant={danger ? 'danger' : 'success'} onClick={onConfirm}>{label}</Button>
     </div>
   );
 }
