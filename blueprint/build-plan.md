@@ -6,7 +6,7 @@
 
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 
-**Stack:** React + TypeScript + Vite + Tailwind CSS + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
+**Stack:** React + TypeScript + Vite + Sass (SCSS Modules) + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
 
 **Status (as reported in the supplied plan, not independently verified against the repository):** M8–M9 and 10.1–10.3 are recorded as merged; 11.1–11.2 are recorded as merged; 11.3 is implemented and awaiting review/PR; 11.4–11.5 and the remaining M10 items are pending. This revision records the agreed filename/ID contract and additional correctness work. Historical completion records are retained as records, not fresh verification.
 
@@ -888,7 +888,7 @@ Added on 2026-11-14 at the person's request. The client moves from Tailwind util
 
   **Depends on:** 13.5.
 
-- [ ] **13.7** `feature/13.7-remove-tailwind` · **P2** — Remove Tailwind: `tailwindcss` and `@tailwindcss/vite`, the Vite plugin and `@import "tailwindcss"`. A test fails on any `@apply` or `@reference` and on Tailwind-like `className` strings. The Architecture page swaps the Tailwind tile for Sass and adds Radix and Storybook; `blueprint/stack.md`, `blueprint/project-plan.md` and the README are updated.
+- [x] **13.7** `feature/13.7-remove-tailwind` · **P2** — Remove Tailwind: `tailwindcss` and `@tailwindcss/vite`, the Vite plugin and `@import "tailwindcss"`; its base reset (Preflight) is ported to `styles/reset.css` with its MIT notice, so nothing looks different. `no-tailwind.test.ts` fails on `@apply`, `@reference` or the word Tailwind in a stylesheet (except the reset's notice), on a class name written as a string (only `menu-select` is allowed), and on a Tailwind package or plugin. The Architecture page swaps the Tailwind tile for Sass and adds Radix and Storybook; `blueprint/stack.md`, `blueprint/project-plan.md` and the README are updated.
 
   **Depends on:** 13.6.
 

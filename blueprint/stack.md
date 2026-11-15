@@ -19,7 +19,7 @@ This project is an interview exercise, **not** an industrial production system o
 | Frontend | React | User interface, file list, controls, preview and comparison modals |
 | Language | TypeScript | Type safety across frontend and backend |
 | Frontend tooling | Vite | Local development and frontend builds |
-| Styling | SCSS Modules and design tokens (Tailwind CSS until M13 removes it) | Responsive, clean Apple-inspired visual styling |
+| Styling | SCSS Modules (Sass) on design tokens, Radix for the dialog and row menu, Storybook for the `ui/` components | Responsive, clean Apple-inspired visual styling |
 | Icons | Lucide React | Consistent interface icons |
 | Backend runtime | Node.js | Run server-side code |
 | Backend framework | Fastify | HTTP API, file uploads and processing endpoints |
@@ -87,7 +87,7 @@ Base CSV parsing and schema checks run on upload regardless of the processing fu
 
 **Approved exception:** browser-side file conversion with SheetJS (`xlsx`), `pdfjs-dist` and `tesseract.js`, so partners' Excel files, text PDFs and scanned PDFs or images can be imported (build-plan 9.14, confirmed by the person on 2026-11-13). Conversion runs in the browser; the server stays CSV-only. No account, server-side service or AI service is involved: OCR runs locally, and only Tesseract's language data is downloaded from a CDN.
 
-**Approved change:** styling moves from Tailwind CSS to SCSS Modules with central design tokens, a shared `ui/` component library documented in Storybook, and Radix primitives (`@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`) for the dialog and row menu (build-plan M13, confirmed by the person on 2026-11-14). Tailwind stays only until 13.7 removes it; new styling uses SCSS Modules and the tokens.
+**Approved change:** styling moves from Tailwind CSS to SCSS Modules with central design tokens, a shared `ui/` component library documented in Storybook, and Radix primitives (`@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`) for the dialog and row menu (build-plan M13, confirmed by the person on 2026-11-14). Tailwind was removed in 13.7; all styling uses SCSS Modules and the tokens.
 
 ## Acceptance evidence
 

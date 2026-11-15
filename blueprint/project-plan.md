@@ -60,7 +60,7 @@ No database, accounts or user data.
 
 ## 5. Tech - What stack are we using?
 
-- **Client:** React 19, TypeScript, Vite, Tailwind CSS 4, Recharts, Lucide React
+- **Client:** React 19, TypeScript, Vite, Sass (SCSS Modules) on design tokens, Radix (dialog and menu), Storybook, Recharts, Lucide React
 - **Server:** Node.js 24, Fastify 5 (+ `@fastify/multipart`), Papa Parse, Zod, run with tsx
 - **Shared:** `shared/types.ts` for types and the processor list
 - **Storage:** local files under `server/data/`; private Vercel Blob when deployed

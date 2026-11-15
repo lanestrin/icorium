@@ -1,4 +1,4 @@
-// The page message box. Same look as the Tailwind version it replaced (rounded-xl border px-4 py-3 text-sm).
+// The page message box: a rounded, bordered box with small text, green for success and red for an error.
 @use '../styles/mixins' as *;
 
 .banner {

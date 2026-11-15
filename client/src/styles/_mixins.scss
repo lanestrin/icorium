@@ -3,7 +3,7 @@
 
 @use 'sass:map';
 
-// Tailwind's breakpoints. They live here, not in tokens.css, because media queries can't read CSS variables.
+// The layout breakpoints. They live here, not in tokens.css, because media queries can't read CSS variables.
 $breakpoints: (
   sm: 40rem,
   md: 48rem,

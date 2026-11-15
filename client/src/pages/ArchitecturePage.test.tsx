@@ -45,8 +45,8 @@ describe('Architecture & Tech Stack page', () => {
     render(<ArchitecturePage />);
     const tiles = within(screen.getByRole('group', { name: 'Technology stack' })).getAllByRole('button');
     expect(tiles.map((t) => t.textContent)).toEqual([
-      'React 19UI', 'TypeScriptType safety', 'ViteBuild & dev', 'Tailwind CSSStyling', 'Fastify 5API', 'ZodValidation', 'Papa ParseCSV parsing',
-      'RechartsCharts', 'LucideIcons', 'VitestTesting', 'Files / BlobFile storage',
+      'React 19UI', 'TypeScriptType safety', 'ViteBuild & dev', 'SassStyling', 'RadixDialog & menu', 'Fastify 5API', 'ZodValidation',
+      'Papa ParseCSV parsing', 'RechartsCharts', 'LucideIcons', 'VitestTesting', 'StorybookComponent docs', 'Files / BlobFile storage',
     ]);
     const detail = () => screen.getByRole('region', { name: 'Selected technology' });
     expect(tiles[0]).toHaveAttribute('aria-pressed', 'true');
@@ -62,7 +62,7 @@ describe('Architecture & Tech Stack page', () => {
     expect(tiles.filter((t) => t.getAttribute('aria-pressed') === 'true')).toHaveLength(1);
 
     // Keyboard: Tab to a tile and press Enter.
-    tiles[5].focus();
+    tiles[TECH.findIndex((t) => t.name === 'Zod')].focus();
     await user.keyboard('{Enter}');
     expect(within(detail()).getByRole('heading', { level: 3 })).toHaveTextContent('Zod');
   });

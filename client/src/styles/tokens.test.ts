@@ -1,9 +1,8 @@
-// Keeps the design tokens complete, accessible and pixel-identical to Tailwind while Tailwind remains.
-// tokens.css and Tailwind's theme.css are read as raw text (vitest.config.ts lets these two through),
-// parsed with a small regex and their colours converted to sRGB here, so the test needs no extra dependency.
+// Keeps the design tokens complete and accessible. tokens.css is read as raw text (vitest.config.ts lets
+// stylesheets through), parsed with a small regex and its colours converted to sRGB here, so the test
+// needs no extra dependency.
 import { describe, expect, it } from 'vitest';
 import tokensCss from './tokens.css?raw';
-import tailwindThemeCss from 'tailwindcss/theme.css?raw';
 
 /** Every `--name: value;` declaration in a stylesheet, comments removed and whitespace collapsed. */
 function declarations(css: string) {
@@ -16,7 +15,6 @@ function declarations(css: string) {
 }
 
 const TOKENS = declarations(tokensCss);
-const TAILWIND = declarations(tailwindThemeCss);
 
 /** A token's final value, following var(--other) references. */
 function resolve(name: string, seen: string[] = []): string {
@@ -91,7 +89,7 @@ const SEMANTIC_COLORS = [
   'generated-surface', 'generated-text', 'generated-cell', 'backdrop', 'focus', 'connector',
 ];
 
-/** A palette step, or a palette step mixed with transparent (Tailwind's `/N` opacity form). */
+/** A palette step, or a palette step mixed with transparent (`color-mix(in oklab, ... N%, transparent)`). */
 const FROM_PALETTE = /^(var\(--app-color-[\w-]+\)|color-mix\(in oklab, var\(--app-color-[\w-]+\) \d+%, transparent\))$/;
 
 const SIZES = ['xs', 'sm', 'base', 'lg', '2xl', '3xl', '4xl'];
@@ -116,31 +114,6 @@ describe('design tokens', () => {
       ...OTHER_TOKENS,
     ];
     expect(required.filter((name) => !TOKENS.has(name))).toEqual([]);
-  });
-
-  it('copies each palette step exactly from Tailwind', () => {
-    for (const name of PALETTE_TOKENS) {
-      expect(TOKENS.get(`--app-color-${name}`), name).toBe(TAILWIND.get(`--color-${name}`));
-    }
-  });
-
-  it('copies type sizes, weights, radii, shadows and motion from Tailwind', () => {
-    for (const size of SIZES) {
-      expect(TOKENS.get(`--app-text-${size}`), size).toBe(TAILWIND.get(`--text-${size}`));
-      expect(TOKENS.get(`--app-leading-${size}`), size).toBe(TAILWIND.get(`--text-${size}--line-height`));
-    }
-    for (const weight of ['normal', 'medium', 'semibold', 'bold']) {
-      expect(TOKENS.get(`--app-weight-${weight}`), weight).toBe(TAILWIND.get(`--font-weight-${weight}`));
-    }
-    for (const name of ['radius-sm', 'radius-md', 'radius-lg', 'radius-xl', 'radius-2xl', 'shadow-sm', 'shadow-md', 'shadow-lg', 'shadow-2xl']) {
-      expect(TOKENS.get(`--app-${name}`), name).toBe(TAILWIND.get(`--${name}`));
-    }
-    expect(TOKENS.get('--app-leading-tight')).toBe(TAILWIND.get('--leading-tight'));
-    expect(TOKENS.get('--app-tracking-tight')).toBe(TAILWIND.get('--tracking-tight'));
-    expect(TOKENS.get('--app-tracking-wide')).toBe(TAILWIND.get('--tracking-wide'));
-    expect(TOKENS.get('--app-space-unit')).toBe(TAILWIND.get('--spacing'));
-    expect(TOKENS.get('--app-duration-fast')).toBe(TAILWIND.get('--default-transition-duration'));
-    expect(TOKENS.get('--app-ease')).toBe(TAILWIND.get('--default-transition-timing-function'));
   });
 
   it('builds semantic colours from palette steps, so a theme can override only the aliases', () => {
@@ -188,7 +161,7 @@ describe('design tokens', () => {
       expect(contrast(`--app-color-${foreground}`, `--app-color-${background}`)).toBeGreaterThanOrEqual(3);
     });
 
-    it('converts colours correctly (black on white is 21:1, Tailwind slate-500 on white about 4.76:1)', () => {
+    it('converts colours correctly (black on white is 21:1, slate-500 on white about 4.76:1)', () => {
       expect(contrast('--app-color-black', '--app-color-white')).toBeCloseTo(21, 5);
       expect(contrast('--app-color-slate-500', '--app-color-white')).toBeCloseTo(4.76, 1);
     });
