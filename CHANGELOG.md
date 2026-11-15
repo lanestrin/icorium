@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/lanestrin/icorium/compare/v1.3.0...v1.4.0) (2026-11-15)
+
+
+### Features
+
+* move dialogs to Radix and the modals area to SCSS (13.3) ([#73](https://github.com/lanestrin/icorium/issues/73)) ([634a373](https://github.com/lanestrin/icorium/commit/634a373fedbb25e00837e29c8bb65801c3c44eb7))
+
 ## [1.3.0](https://github.com/lanestrin/icorium/compare/v1.2.0...v1.3.0) (2026-11-15)
 
 
