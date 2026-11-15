@@ -1,68 +1,58 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useRef } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Download, Eye, MoreHorizontal, RotateCcw } from 'lucide-react';
 import type { FileMeta } from '../../../../shared/types';
 import { api } from '../../lib/api';
-import styles from './files.module.css';
+import styles from './files.module.scss';
 
 /**
- * The ⋯ Actions menu on every row: Preview and Download, plus Restore in the Archived tab.
- * Arrow keys move between items; Escape or a click outside closes it.
+ * The ⋯ Actions menu on every row: Preview and Download, plus Restore in the Archived tab. Built on Radix
+ * DropdownMenu: arrow keys move between items and wrap, Escape or a click outside closes it, and focus
+ * returns to ⋯. It is non-modal, so the page stays usable and a click outside also reaches what was clicked.
  */
 export function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onPreview: () => void; onRestore?: () => void; disabled?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  // The action chosen from the menu, run once the menu has closed (see runAfterClose).
+  const chosen = useRef<() => void>(undefined);
   const label = `Actions for ${file.id} ${file.name}`;
-  const menuItems = () => [...(box.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
 
-  // While open: focus the first item, and close on a click outside the menu.
-  useEffect(() => {
-    if (!open) return;
-    menuItems()[0]?.focus();
-    const closeOnOutsideClick = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
-  }, [open]);
-
-  function close() {
-    setOpen(false);
+  // Focus goes back to ⋯ before the action runs, so a dialog the action opens remembers ⋯ as its opener
+  // and returns focus there when it closes.
+  function runAfterClose(event: Event) {
+    const action = chosen.current;
+    if (!action) return; // nothing chosen: Radix returns focus as usual
+    chosen.current = undefined;
+    event.preventDefault();
     trigger.current?.focus();
-  }
-  // Focus goes back to the trigger first, so a dialog the action opens returns focus there when it closes.
-  function choose(action: () => void) {
-    close();
     action();
-  }
-  function onKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    e.preventDefault();
-    const items = menuItems();
-    const current = items.indexOf(document.activeElement as HTMLElement);
-    const step = e.key === 'ArrowDown' ? 1 : items.length - 1;
-    items[(current + step) % items.length]?.focus();
   }
 
   return (
-    <div ref={box} className="relative inline-block" onClick={(e) => e.stopPropagation()} onKeyDown={onKeyDown}>
-      <button ref={trigger} aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={styles.menuTrigger}>
-        <MoreHorizontal className="h-4 w-4" />
-      </button>
-      {open && (
-        <div role="menu" aria-label={label} className={styles.menu}>
-          <button role="menuitem" tabIndex={-1} className={styles.menuItem} onClick={() => choose(onPreview)}>
-            <Eye className="h-4 w-4" /> Preview file
-          </button>
-          <a role="menuitem" tabIndex={-1} className={styles.menuItem} href={api.downloadUrl(file.id)} onClick={() => setOpen(false)}>
-            <Download className="h-4 w-4" /> Download file
-          </a>
-          {onRestore && (
-            <button role="menuitem" tabIndex={-1} className={styles.menuItem} disabled={disabled} onClick={() => choose(onRestore)}>
-              <RotateCcw className="h-4 w-4" /> Restore file
-            </button>
-          )}
-        </div>
-      )}
+    // React passes events from the menu's portal up through this element, so clicks in the menu
+    // stop here instead of toggling the row.
+    <div className={styles.menuWrapper} onClick={(e) => e.stopPropagation()}>
+      <DropdownMenu.Root modal={false}>
+        <DropdownMenu.Trigger ref={trigger} aria-label={label} className={styles.menuTrigger}>
+          <MoreHorizontal aria-hidden />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content aria-label={label} align="end" sideOffset={4} loop className={styles.menu} onCloseAutoFocus={runAfterClose}>
+            <DropdownMenu.Item className={styles.menuItem} onSelect={() => { chosen.current = onPreview; }}>
+              <Eye aria-hidden /> Preview file
+            </DropdownMenu.Item>
+            <DropdownMenu.Item asChild className={styles.menuItem}>
+              <a href={api.downloadUrl(file.id)}>
+                <Download aria-hidden /> Download file
+              </a>
+            </DropdownMenu.Item>
+            {onRestore && (
+              <DropdownMenu.Item className={styles.menuItem} disabled={disabled} onSelect={() => { chosen.current = onRestore; }}>
+                <RotateCcw aria-hidden /> Restore file
+              </DropdownMenu.Item>
+            )}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
     </div>
   );
 }

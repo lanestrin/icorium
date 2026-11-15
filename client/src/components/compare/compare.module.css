@@ -1,6 +1,6 @@
 @reference "tailwindcss";
 
-/* Styles for the comparison dialog and its pieces. Shared table rows use .table-head-row and .table-row. */
+/* Styles for the comparison dialog and its pieces. Shared table rows come from styles/tables.module.scss. */
 
 /* A white panel; the dialog's sections sit in these. */
 .panel {

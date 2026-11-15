@@ -75,17 +75,25 @@
   --app-color-surface: var(--app-color-white);
   --app-color-surface-subtle: var(--app-color-slate-50);
   --app-color-surface-hover: var(--app-color-slate-100);
+  /* See-through white panels over the page: the filter card (80%) and the upload drop zone (50%). */
+  --app-color-surface-frosted: color-mix(in oklab, var(--app-color-white) 80%, transparent);
+  --app-color-surface-soft: color-mix(in oklab, var(--app-color-white) 50%, transparent);
   --app-color-text: var(--app-color-slate-900);
   --app-color-text-secondary: var(--app-color-slate-700);
   --app-color-text-muted: var(--app-color-slate-600);
   --app-color-icon: var(--app-color-slate-500);
   --app-color-border: var(--app-color-slate-200);
   --app-color-border-strong: var(--app-color-slate-300);
+  /* The hairline between table rows. */
+  --app-color-border-subtle: var(--app-color-slate-100);
   --app-color-primary: var(--app-color-blue-600);
   --app-color-primary-hover: var(--app-color-blue-700);
   --app-color-on-primary: var(--app-color-white);
   --app-color-link: var(--app-color-blue-700);
   --app-color-primary-surface: var(--app-color-blue-50);
+  --app-color-primary-text: var(--app-color-blue-700);
+  /* Selected rows in the file list (Tailwind's bg-blue-50/70). */
+  --app-color-selection-surface: color-mix(in oklab, var(--app-color-blue-50) 70%, transparent);
   --app-color-primary-border: var(--app-color-blue-200);
   --app-color-success: var(--app-color-green-700);
   --app-color-success-hover: var(--app-color-green-800);
@@ -103,6 +111,9 @@
   --app-color-warning-border: var(--app-color-amber-200);
   --app-color-warning-text: var(--app-color-amber-900);
   --app-color-warning-icon: var(--app-color-amber-600);
+  /* The Processed status badge. */
+  --app-color-processed-surface: var(--app-color-violet-50);
+  --app-color-processed-text: var(--app-color-violet-700);
   /* Columns a processing function added, in the file preview. */
   --app-color-generated-surface: var(--app-color-blue-50);
   --app-color-generated-text: var(--app-color-blue-800);

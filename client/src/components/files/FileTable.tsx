@@ -5,7 +5,7 @@ import { classNames } from '../../lib/class-names';
 import { displayStatus, importedLineage, processingFunction, type SortKey } from '../../lib/file-status';
 import { RowMenu } from './RowMenu';
 import { StatusBadge } from './StatusBadge';
-import styles from './files.module.css';
+import styles from './files.module.scss';
 
 /** The table columns a sort can be on: each SortKey starts with one of these. */
 type SortColumn = 'id' | 'name' | 'uploaded' | 'archived';
@@ -20,7 +20,7 @@ function SortableHeader({ label, column, sort, className }: { label: string; col
   const Arrow = isDescending ? ArrowDown : ArrowUp;
   return (
     <th className={className} aria-sort={isSorted ? (isDescending ? 'descending' : 'ascending') : undefined}>
-      <span className="inline-flex items-center gap-1">{label}{isSorted && <Arrow className="h-3.5 w-3.5" aria-hidden />}</span>
+      <span className={styles.headerLabel}>{label}{isSorted && <Arrow aria-hidden />}</span>
     </th>
   );
 }
@@ -56,10 +56,10 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
       {selectionBar}
       {/* A labelled, focusable region lets keyboard users scroll the list too. */}
       <div role="region" aria-label="CSV files" tabIndex={0} className={styles.scrollArea}>
-        <table className={classNames('w-full text-sm', archived ? 'min-w-[1160px]' : 'min-w-[1000px]')}>
+        <table className={classNames(styles.table, archived && styles.tableArchived)}>
           <thead>
             <tr className={styles.headRow}>
-              <th className="w-14 rounded-l-xl pl-6">
+              <th className={styles.checkboxHead}>
                 <input
                   type="checkbox"
                   className={styles.checkbox}
@@ -70,19 +70,19 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   onChange={() => onToggleAll(ids, !allChecked)}
                 />
               </th>
-              <SortableHeader label="File ID" column="id" sort={sort} className="pl-1 pr-4" />
+              <SortableHeader label="File ID" column="id" sort={sort} className={styles.idColumn} />
               <SortableHeader label="File Name" column="name" sort={sort} />
               {archived ? (
                 <>
-                  <SortableHeader label="Archived On" column="archived" sort={sort} className="pl-4 pr-3" />
-                  <SortableHeader label="Original Upload" column="uploaded" sort={sort} className="pr-3" />
+                  <SortableHeader label="Archived On" column="archived" sort={sort} className={classNames(styles.leadDate, styles.gapRight)} />
+                  <SortableHeader label="Original Upload" column="uploaded" sort={sort} className={styles.gapRight} />
                 </>
               ) : (
-                <SortableHeader label="Uploaded" column="uploaded" sort={sort} className="pl-4 pr-3" />
+                <SortableHeader label="Uploaded" column="uploaded" sort={sort} className={classNames(styles.leadDate, styles.gapRight)} />
               )}
-              <th className="pr-3">Processing function</th>
+              <th className={styles.gapRight}>Processing function</th>
               <th>Status</th>
-              <th className="rounded-r-xl pr-4 text-center">Actions</th>
+              <th className={styles.actionsHead}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -94,7 +94,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   onClick={() => canSelect && onToggle(file.id)}
                   className={classNames(styles.row, canSelect && styles.rowSelectable, isChecked && styles.rowChecked)}
                 >
-                  <td className="py-2.5 pl-6">
+                  <td className={styles.checkboxCell}>
                     <input
                       type="checkbox"
                       className={styles.checkbox}
@@ -105,26 +105,26 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                       onChange={() => onToggle(file.id)}
                     />
                   </td>
-                  <td className={styles.idCell}>
-                    <span className="flex items-center gap-2">
+                  <td className={classNames(styles.idCell, styles.idColumn)}>
+                    <span className={styles.idContent}>
                       {file.id}
                       {file.imported && <span title={importedLineage(file).note} className={styles.importedTag}>Imported</span>}
                     </span>
                   </td>
-                  <td className="py-2.5 pr-4 font-semibold">
-                    <span className="flex items-center gap-3">
-                      <FileSpreadsheet className="h-5 w-5 shrink-0 text-green-600" strokeWidth={1.5} aria-hidden />
+                  <td className={styles.nameCell}>
+                    <span className={styles.nameContent}>
+                      <FileSpreadsheet className={styles.fileIcon} strokeWidth={1.5} aria-hidden />
                       {file.name}
                     </span>
                   </td>
-                  {archived && <td className="whitespace-nowrap pl-4 pr-3">{file.archivedAt ? formatDate(file.archivedAt) : '—'}</td>}
-                  <td className={classNames('whitespace-nowrap pr-3', !archived && 'pl-4')}>{formatDate(file.uploadedAt)}</td>
-                  <td className="whitespace-nowrap pr-3 text-slate-500">{processingFunction(file)}</td>
+                  {archived && <td className={classNames(styles.nowrap, styles.leadDate, styles.gapRight)}>{file.archivedAt ? formatDate(file.archivedAt) : '—'}</td>}
+                  <td className={classNames(styles.nowrap, styles.gapRight, !archived && styles.leadDate)}>{formatDate(file.uploadedAt)}</td>
+                  <td className={classNames(styles.nowrap, styles.gapRight, styles.functionCell)}>{processingFunction(file)}</td>
                   <td>
-                    <div className="whitespace-nowrap pr-3"><StatusBadge status={displayStatus(file, processingId, failedIds)} /></div>
+                    <div className={classNames(styles.nowrap, styles.gapRight)}><StatusBadge status={displayStatus(file, processingId, failedIds)} /></div>
                   </td>
                   <td>
-                    <div className="pr-4 text-center">
+                    <div className={styles.actionsCell}>
                       <RowMenu file={file} onPreview={() => onPreview(file)} onRestore={archived && onRestore ? () => onRestore(file) : undefined} disabled={restoreDisabled} />
                     </div>
                   </td>

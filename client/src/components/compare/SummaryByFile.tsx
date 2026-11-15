@@ -2,6 +2,7 @@ import type { CompareColumn, CompareResult } from '../../../../shared/types';
 import { classNames } from '../../lib/class-names';
 import { deltas, deltaUnit, differsFromRef, fmtDelta, fmtValue } from '../../lib/compare-view';
 import { Dot } from './fileColors';
+import tables from '../../styles/tables.module.scss';
 import styles from './compare.module.css';
 
 /** A file's flagged-row count: red when there are any, green when there are none. */
@@ -26,7 +27,7 @@ export function SummaryByFile({ col, result, labels, refIndex }: { col: CompareC
       <div className="overflow-x-auto">
         <table aria-label="Summary by file" className="w-full text-sm">
           <thead>
-            <tr className="table-head-row">
+            <tr className={tables.headRow}>
               <th>File</th>
               {isNumeric
                 ? <><th className="text-right">{valueHeader}</th><th className="text-right">Δ vs ref.</th></>
@@ -36,7 +37,7 @@ export function SummaryByFile({ col, result, labels, refIndex }: { col: CompareC
           </thead>
           <tbody>
             {files.map((file, k) => (
-              <tr key={file.id} className={classNames('table-row', k === refIndex && styles.referenceRow)}>
+              <tr key={file.id} className={classNames(tables.row, k === refIndex && styles.referenceRow)}>
                 <td className="font-medium">
                   <span className="flex items-center gap-2" title={file.name}>
                     <Dot k={k} />{labels[k]}{k === refIndex && <span className="font-normal text-slate-500">(ref)</span>}

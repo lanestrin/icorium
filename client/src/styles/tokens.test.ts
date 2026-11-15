@@ -82,11 +82,12 @@ const PALETTE_TOKENS = [
 ];
 
 const SEMANTIC_COLORS = [
-  'page', 'surface', 'surface-subtle', 'surface-hover', 'text', 'text-secondary', 'text-muted', 'icon', 'border', 'border-strong',
-  'primary', 'primary-hover', 'on-primary', 'link', 'primary-surface', 'primary-border',
+  'page', 'surface', 'surface-subtle', 'surface-hover', 'surface-frosted', 'surface-soft',
+  'text', 'text-secondary', 'text-muted', 'icon', 'border', 'border-strong', 'border-subtle',
+  'primary', 'primary-hover', 'on-primary', 'link', 'primary-surface', 'primary-text', 'primary-border', 'selection-surface',
   'success', 'success-hover', 'on-success', 'success-surface', 'success-border', 'success-text',
   'danger', 'danger-hover', 'on-danger', 'danger-surface', 'danger-border', 'danger-text',
-  'warning-surface', 'warning-border', 'warning-text', 'warning-icon',
+  'warning-surface', 'warning-border', 'warning-text', 'warning-icon', 'processed-surface', 'processed-text',
   'generated-surface', 'generated-text', 'generated-cell', 'backdrop', 'focus',
 ];
 
@@ -160,6 +161,8 @@ describe('design tokens', () => {
       ['danger-text', 'danger-surface'],
       ['warning-text', 'warning-surface'],
       ['generated-text', 'generated-surface'],
+      ['primary-text', 'primary-surface'],
+      ['processed-text', 'processed-surface'],
       ['link', 'primary-surface'],
     ];
     const uiPairs: [string, string][] = [

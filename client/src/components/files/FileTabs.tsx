@@ -1,7 +1,7 @@
 import type { KeyboardEvent, ReactNode } from 'react';
 import { classNames } from '../../lib/class-names';
 import type { Tab } from '../../lib/file-status';
-import styles from './files.module.css';
+import styles from './files.module.scss';
 
 const TABS: { id: Tab; label: string }[] = [{ id: 'active', label: 'Active Files' }, { id: 'archived', label: 'Archived' }];
 
@@ -19,7 +19,7 @@ export function FileTabs({ tab, setTab, counts, extra }: { tab: Tab; setTab: (ta
 
   return (
     <div className={styles.tabsRow}>
-      <div role="tablist" aria-label="File list" onKeyDown={moveWithArrowKeys} className="flex gap-1">
+      <div role="tablist" aria-label="File list" onKeyDown={moveWithArrowKeys} className={styles.tabList}>
         {TABS.map((t) => {
           const isActive = t.id === tab;
           return (
@@ -34,12 +34,12 @@ export function FileTabs({ tab, setTab, counts, extra }: { tab: Tab; setTab: (ta
               className={classNames(styles.tab, isActive && styles.tabActive)}
             >
               {t.label}
-              <span className={classNames('text-sm', isActive ? 'text-blue-700' : 'text-slate-500')}>{counts[t.id]}</span>
+              <span className={classNames(styles.tabCount, isActive && styles.tabCountActive)}>{counts[t.id]}</span>
             </button>
           );
         })}
       </div>
-      {extra && <div className="mb-2 ml-auto">{extra}</div>}
+      {extra && <div className={styles.tabsExtra}>{extra}</div>}
     </div>
   );
 }

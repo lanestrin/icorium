@@ -1,6 +1,7 @@
 import type { GeneratedFile } from '../../../../shared/types';
 import { classNames } from '../../lib/class-names';
 import { splitCsv } from '../../lib/generated-files';
+import tables from '../../styles/tables.module.scss';
 import styles from './generator.module.css';
 
 const PREVIEW_ROWS = 10;
@@ -27,7 +28,7 @@ export function GeneratedFilePreview({ file, name }: { file: GeneratedFile; name
       <div className="mt-2 overflow-x-auto">
         <table aria-label="Preview" className="w-full text-sm">
           <thead>
-            <tr className="table-head-row">
+            <tr className={tables.headRow}>
               <th>Row</th>{headers?.map((h) => <th key={h}>{h}</th>)}
             </tr>
           </thead>

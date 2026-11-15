@@ -1,0 +1,724 @@
+// Styles for the CSV Files workspace: sidebar, filter card, tabs, file table, row menu and toolbars.
+@use '../../styles/mixins' as *;
+
+@mixin text-xs {
+  font-size: var(--app-text-xs);
+  line-height: var(--app-leading-xs);
+}
+@mixin text-sm {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
+@mixin icon($size) {
+  flex-shrink: 0;
+  width: $size;
+  height: $size;
+}
+@mixin colour-transition {
+  transition-property: color, background-color, border-color;
+  transition-duration: var(--app-duration-fast);
+  transition-timing-function: var(--app-ease);
+}
+
+// Page layout: sidebar beside the main column on large screens. Used by FilesPage.
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-6);
+  padding: var(--app-space-8) var(--app-space-4) var(--app-space-4);
+  @include up(sm) {
+    padding: var(--app-space-10) var(--app-space-6) var(--app-space-6);
+  }
+  @include up(lg) {
+    flex-direction: row;
+  }
+}
+.headerNav {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: var(--app-space-5);
+  margin-left: auto;
+  @include text-sm;
+  font-weight: var(--app-weight-medium);
+}
+
+// Sidebar
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: var(--app-space-8);
+  width: 100%;
+  @include up(lg) {
+    width: 22rem;
+  }
+}
+.dropZone {
+  border: 2px dashed var(--app-color-border-strong);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-surface-soft);
+  padding: var(--app-space-6);
+  text-align: center;
+  @include colour-transition;
+}
+.dropZoneActive {
+  border-color: var(--app-color-primary);
+  background: var(--app-color-primary-surface);
+}
+.dropIcon {
+  display: block;
+  @include icon(calc(var(--app-space-unit) * 9));
+  margin: 0 auto var(--app-space-2);
+  color: var(--app-color-text-muted);
+}
+.dropText {
+  color: var(--app-color-text-secondary);
+}
+.uploading {
+  margin-top: var(--app-space-2);
+  @include text-xs;
+  color: var(--app-color-text-muted);
+}
+.sectionTitle {
+  margin-bottom: var(--app-space-3);
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-semibold);
+}
+.processorList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-2);
+}
+.processorOption {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-3) var(--app-space-4);
+  cursor: pointer;
+  @include colour-transition;
+
+  &:hover {
+    background: var(--app-color-surface-subtle);
+  }
+}
+.processorOptionSelected,
+.processorOptionSelected:hover {
+  border-color: var(--app-color-primary-border);
+  background: var(--app-color-primary-surface);
+}
+.processorRadio {
+  @include icon(var(--app-space-5));
+  accent-color: var(--app-color-primary);
+}
+.processorName {
+  display: block;
+  font-weight: var(--app-weight-semibold);
+}
+.processorDescription {
+  display: block;
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.selectedSummary {
+  margin-bottom: var(--app-space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.inputId {
+  font-weight: var(--app-weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--app-color-text-secondary);
+}
+.inputName {
+  font-weight: var(--app-weight-medium);
+  color: var(--app-color-text-secondary);
+}
+.selectedInputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-1);
+  max-height: 7rem;
+  margin-bottom: var(--app-space-3);
+  overflow: auto;
+  @include text-xs;
+  color: var(--app-color-text-muted);
+}
+.selectedInput {
+  word-break: break-all;
+}
+.runButton {
+  width: 100%;
+}
+
+// Filter card
+.filterCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--app-space-3);
+  margin-top: var(--app-space-5);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-2xl);
+  background: var(--app-color-surface-frosted);
+  padding: var(--app-space-3);
+  box-shadow: var(--app-shadow-sm);
+}
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  width: 100%;
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-2) var(--app-space-4);
+  box-shadow: var(--app-shadow-sm);
+  @include up(sm) {
+    width: auto;
+  }
+}
+.searchField {
+  min-width: 0;
+  @include up(sm) {
+    flex: 1;
+    min-width: 16rem;
+  }
+}
+.selectField {
+  position: relative;
+  @include up(sm) {
+    min-width: 14rem;
+  }
+}
+.searchIcon {
+  @include icon(var(--app-space-5));
+  color: var(--app-color-icon);
+}
+.searchInput {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  padding: var(--app-space-1-5) 0;
+  outline: none;
+}
+.fieldIcon {
+  @include icon(var(--app-space-5));
+  color: var(--app-color-text-muted);
+}
+// The label above a filter's value.
+.fieldText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.fieldLabel {
+  @include text-sm;
+  font-weight: var(--app-weight-semibold);
+}
+.dateInputs {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  min-width: 0;
+}
+.dateDash {
+  color: var(--app-color-text-muted);
+}
+.fieldInput {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  @include text-sm;
+  color: var(--app-color-text-muted);
+  outline: none;
+}
+.fieldSelect {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  padding-right: calc(var(--app-space-unit) * 7); // room for the chevron
+  @include text-sm;
+  color: var(--app-color-text-muted);
+  outline: none;
+  cursor: pointer;
+}
+.fieldChevron {
+  position: absolute;
+  right: var(--app-space-4);
+  @include icon(var(--app-space-4));
+  color: var(--app-color-text-muted);
+  pointer-events: none;
+}
+.divider {
+  display: none;
+  align-self: stretch;
+  width: 1px;
+  background: var(--app-color-border);
+  @include up(xl) {
+    display: block;
+  }
+}
+.clearFilters {
+  padding: var(--app-space-2) var(--app-space-3);
+  @include text-sm;
+  font-weight: var(--app-weight-medium);
+  color: var(--app-color-text-secondary);
+  cursor: pointer;
+
+  &:hover:enabled {
+    color: var(--app-color-text);
+  }
+
+  &:disabled {
+    color: var(--app-color-text-muted);
+    opacity: var(--app-disabled-opacity);
+    cursor: default;
+  }
+}
+
+// Sort by
+.sortLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  color: var(--app-color-text-secondary);
+}
+.sortIcon {
+  @include icon(var(--app-space-5));
+}
+.sortControl {
+  position: relative;
+}
+.sortSelect {
+  appearance: none;
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-2) var(--app-space-10) var(--app-space-2) var(--app-space-4);
+  box-shadow: var(--app-shadow-sm);
+  outline: none;
+  cursor: pointer;
+
+  &:focus {
+    border-color: var(--app-color-focus);
+  }
+}
+.sortChevron {
+  position: absolute;
+  top: 50%;
+  right: var(--app-space-3);
+  @include icon(var(--app-space-4));
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+// Tabs
+.tabsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--app-space-2) var(--app-space-4);
+  margin-top: var(--app-space-5);
+  border-bottom: var(--app-border-width) solid var(--app-color-border);
+}
+.tabList {
+  display: flex;
+  gap: var(--app-space-1);
+}
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  margin-bottom: -1px; // the active tab's border sits on the row's border
+  border-bottom: 2px solid transparent;
+  border-radius: var(--app-radius-lg) var(--app-radius-lg) 0 0;
+  padding: var(--app-space-2-5) var(--app-space-5);
+  font-weight: var(--app-weight-medium);
+  color: var(--app-color-text-muted);
+  cursor: pointer;
+  @include colour-transition;
+
+  &:hover {
+    color: var(--app-color-text);
+  }
+}
+.tabActive,
+.tabActive:hover {
+  border-bottom-color: var(--app-color-primary);
+  background: var(--app-color-primary-surface);
+  color: var(--app-color-primary-text);
+}
+.tabCount {
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.tabCountActive {
+  color: var(--app-color-primary-text);
+}
+.tabsExtra {
+  margin-bottom: var(--app-space-2);
+  margin-left: auto;
+}
+.archivedNote {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  margin-bottom: var(--app-space-4);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-3) var(--app-space-4);
+  @include text-sm;
+  color: var(--app-color-text-muted);
+  box-shadow: var(--app-shadow-sm);
+}
+
+// File table
+.tableCard {
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-2xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-2);
+  box-shadow: var(--app-shadow-sm);
+}
+// On desktop the list scrolls inside this box with its header pinned, so the page stays put.
+.scrollArea {
+  overflow: auto;
+  border-radius: var(--app-radius-xl);
+  outline: none;
+  @include focus-ring;
+  @include up(lg) {
+    max-height: calc(100vh - 17rem);
+  }
+}
+// Wide enough that no column wraps; the scroll area scrolls sideways on narrow screens.
+.table {
+  width: 100%;
+  min-width: 1000px;
+  border-collapse: collapse;
+  @include text-sm;
+}
+.tableArchived {
+  min-width: 1160px;
+}
+.headRow {
+  text-align: left;
+  color: var(--app-color-text-secondary);
+
+  & > th {
+    position: sticky;
+    top: 0;
+    z-index: var(--app-z-base);
+    background: var(--app-color-surface-subtle);
+    padding-top: var(--app-space-3);
+    padding-bottom: var(--app-space-3);
+    font-weight: var(--app-weight-semibold);
+  }
+}
+.headerLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-space-1);
+
+  svg {
+    @include icon(var(--app-space-3-5));
+  }
+}
+// Column spacing, shared by a column's header and cells.
+.checkboxHead {
+  width: calc(var(--app-space-unit) * 14);
+  border-radius: var(--app-radius-xl) 0 0 var(--app-radius-xl);
+  padding-left: var(--app-space-6);
+}
+.idColumn {
+  padding-right: var(--app-space-4);
+  padding-left: var(--app-space-1);
+}
+.leadDate {
+  padding-left: var(--app-space-4);
+}
+.gapRight {
+  padding-right: var(--app-space-3);
+}
+.actionsHead {
+  border-radius: 0 var(--app-radius-xl) var(--app-radius-xl) 0;
+  padding-right: var(--app-space-4);
+  text-align: center;
+}
+.checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--app-radius-sm);
+  accent-color: var(--app-color-primary);
+  cursor: pointer;
+
+  &:disabled {
+    opacity: var(--app-disabled-opacity);
+    cursor: not-allowed;
+  }
+}
+.row {
+  border-bottom: var(--app-border-width) solid var(--app-color-border-subtle);
+  @include colour-transition;
+
+  &:hover {
+    background: var(--app-color-surface-subtle);
+  }
+}
+.rowSelectable {
+  cursor: pointer;
+}
+.rowChecked,
+.rowChecked:hover {
+  background: var(--app-color-primary-surface);
+}
+.checkboxCell {
+  padding-top: var(--app-space-2-5);
+  padding-bottom: var(--app-space-2-5);
+  padding-left: var(--app-space-6);
+}
+.idCell {
+  white-space: nowrap;
+  padding-top: var(--app-space-2-5);
+  padding-bottom: var(--app-space-2-5);
+  font-variant-numeric: tabular-nums;
+}
+.idContent {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+}
+.importedTag {
+  border-radius: var(--app-radius-full);
+  background: var(--app-color-surface-hover);
+  padding: var(--app-space-0-5) var(--app-space-2-5);
+  @include text-xs;
+  font-weight: var(--app-weight-medium);
+  color: var(--app-color-text-muted);
+}
+.nameCell {
+  padding-top: var(--app-space-2-5);
+  padding-right: var(--app-space-4);
+  padding-bottom: var(--app-space-2-5);
+  font-weight: var(--app-weight-semibold);
+}
+.nameContent {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+}
+.fileIcon {
+  @include icon(var(--app-space-5));
+  color: var(--app-color-success);
+}
+.nowrap {
+  white-space: nowrap;
+}
+.functionCell {
+  color: var(--app-color-text-muted);
+}
+.actionsCell {
+  padding-right: var(--app-space-4);
+  text-align: center;
+}
+.emptyRow {
+  padding: var(--app-space-12) 0;
+  text-align: center;
+  color: var(--app-color-text-muted);
+}
+
+// Status badge: one class per status.
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-space-1-5);
+  border-radius: var(--app-radius-full);
+  padding: var(--app-space-1) var(--app-space-3);
+  font-weight: var(--app-weight-medium);
+}
+.badgeReady {
+  background: var(--app-color-success-surface);
+  color: var(--app-color-success-text);
+}
+.badgeNeedsReview {
+  background: var(--app-color-warning-surface);
+  color: var(--app-color-warning-text);
+}
+.badgeProcessed {
+  background: var(--app-color-processed-surface);
+  color: var(--app-color-processed-text);
+}
+.badgeProcessing {
+  background: var(--app-color-primary-surface);
+  color: var(--app-color-primary-text);
+}
+.badgeError {
+  background: var(--app-color-danger-surface);
+  color: var(--app-color-danger-text);
+}
+.badgeIcon {
+  @include icon(var(--app-space-4));
+}
+.spinning {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Row actions menu. The menu renders at the end of <body>, so it sets its own text size.
+.menuWrapper {
+  display: inline-block;
+}
+.menuTrigger {
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-lg);
+  background: transparent;
+  padding: var(--app-space-1) var(--app-space-2-5);
+  color: inherit;
+  cursor: pointer;
+  @include focus-ring;
+
+  &:hover {
+    background: var(--app-color-surface-subtle);
+  }
+
+  svg {
+    @include icon(var(--app-space-4));
+  }
+}
+.menu {
+  z-index: var(--app-z-menu);
+  width: 11rem;
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-1);
+  @include text-sm;
+  box-shadow: var(--app-shadow-lg);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  width: 100%;
+  border-radius: var(--app-radius-lg);
+  padding: var(--app-space-2) var(--app-space-3);
+  text-align: left;
+  color: var(--app-color-text);
+  text-decoration: none;
+  outline: none;
+  cursor: pointer;
+
+  &[data-highlighted] {
+    background: var(--app-color-primary-surface);
+  }
+
+  &[data-disabled] {
+    opacity: var(--app-disabled-opacity);
+    cursor: not-allowed;
+  }
+
+  svg {
+    @include icon(var(--app-space-4));
+  }
+}
+
+// Selected-files toolbar
+.selectionBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-2) var(--app-space-5);
+  margin-bottom: var(--app-space-2);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-selection-surface);
+  padding: var(--app-space-2-5) var(--app-space-4);
+}
+.selectionCount {
+  font-weight: var(--app-weight-semibold);
+  color: var(--app-color-text);
+}
+.selectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--app-space-2);
+  margin-left: auto;
+}
+.compareReason {
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+
+// Archive toast: full width at the top on phones, a card at the top right from sm.
+.toast {
+  position: fixed;
+  top: var(--app-space-4);
+  right: var(--app-space-4);
+  left: var(--app-space-4);
+  z-index: var(--app-z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-4);
+  border: var(--app-border-width) solid var(--app-color-success-border);
+  border-radius: var(--app-radius-2xl);
+  background: var(--app-color-success-surface);
+  padding: var(--app-space-3) var(--app-space-4);
+  box-shadow: var(--app-shadow-lg);
+  @include up(sm) {
+    right: var(--app-space-6);
+    left: auto;
+    width: 26rem;
+  }
+}
+.toastIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @include icon(var(--app-space-8));
+  border-radius: var(--app-radius-full);
+  background: var(--app-color-success);
+  color: var(--app-color-on-success);
+
+  svg {
+    @include icon(var(--app-space-5));
+  }
+}
+.toastText {
+  flex: 1;
+  min-width: 0;
+}
+.toastTitle {
+  font-weight: var(--app-weight-semibold);
+  color: var(--app-color-text);
+}
+.toastDetail {
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.toastActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--app-space-1);
+}
+.undoWait {
+  @include text-xs;
+  color: var(--app-color-text-muted);
+}
+.dismissIcon {
+  @include icon(var(--app-space-5));
+}

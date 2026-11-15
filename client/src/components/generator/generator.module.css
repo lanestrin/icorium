@@ -1,6 +1,6 @@
 @reference "tailwindcss";
 
-/* Styles for the CSV Generator page and its pieces. Tables use the shared .table-head-row and .table-row. */
+/* Styles for the CSV Generator page and its pieces. Tables use the shared rows in styles/tables.module.scss. */
 
 .layout {
   @apply mt-6 flex flex-col gap-6 lg:flex-row lg:items-start;

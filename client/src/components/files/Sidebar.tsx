@@ -3,7 +3,7 @@ import { CloudUpload, Play } from 'lucide-react';
 import { PROCESSORS, type ProcessorId } from '../../../../shared/types';
 import { classNames } from '../../lib/class-names';
 import { Button } from '../ui/Button';
-import styles from './files.module.css';
+import styles from './files.module.scss';
 
 type SelectedInput = { id: string; name: string };
 const describe = (file: SelectedInput) => `${file.id} · ${file.name}`;
@@ -27,14 +27,14 @@ function DropZone({ uploading, onUpload }: { uploading: boolean; onUpload: (file
       onDrop={onDrop}
       className={classNames(styles.dropZone, isDragOver && styles.dropZoneActive)}
     >
-      <CloudUpload className="mx-auto mb-2 h-9 w-9 text-slate-600" strokeWidth={1.5} />
-      <p className="text-slate-700">
+      <CloudUpload className={styles.dropIcon} strokeWidth={1.5} aria-hidden />
+      <p className={styles.dropText}>
         Drop CSV files here
         <br />
         or{' '}
         <Button variant="link" onClick={() => input.current?.click()}>browse files</Button>
       </p>
-      {uploading && <p className="mt-2 text-xs text-slate-500">Uploading…</p>}
+      {uploading && <p className={styles.uploading}>Uploading…</p>}
       <input ref={input} type="file" accept=".csv,text/csv" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
     </div>
   );
@@ -45,9 +45,9 @@ function SelectedInputSummary({ selected }: { selected: SelectedInput[] }) {
   const count = selected.length;
   if (count === 0) return <>Check one or more input files in the list</>;
   if (count === 1) {
-    return <>Input: <span className="font-medium tabular-nums text-slate-700">{selected[0].id}</span> · <span className="font-medium text-slate-700">{selected[0].name}</span></>;
+    return <>Input: <span className={styles.inputId}>{selected[0].id}</span> · <span className={styles.inputName}>{selected[0].name}</span></>;
   }
-  return <>Input: <span className="font-medium text-slate-700">{count} files selected</span></>;
+  return <>Input: <span className={styles.inputName}>{count} files selected</span></>;
 }
 
 interface SidebarProps {
@@ -71,16 +71,16 @@ export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, runn
       <DropZone uploading={uploading} onUpload={onUpload} />
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Processing Function</h2>
-        <div className="space-y-2">
+        <h2 className={styles.sectionTitle}>Processing Function</h2>
+        <div className={styles.processorList}>
           {PROCESSORS.map((option) => {
             const isChosen = option.id === processor;
             return (
               <label key={option.id} className={classNames(styles.processorOption, isChosen && styles.processorOptionSelected)}>
                 <input type="radio" name="processor" className={styles.processorRadio} checked={isChosen} onChange={() => setProcessor(option.id)} />
                 <span>
-                  <span className="block font-semibold">{option.label}</span>
-                  <span className="block text-sm text-slate-500">{option.description}</span>
+                  <span className={styles.processorName}>{option.label}</span>
+                  <span className={styles.processorDescription}>{option.description}</span>
                 </span>
               </label>
             );
@@ -89,15 +89,15 @@ export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, runn
       </section>
 
       <div>
-        <p className="mb-2 truncate text-sm text-slate-500" title={selected.map(describe).join(', ')}>
+        <p className={styles.selectedSummary} title={selected.map(describe).join(', ')}>
           <SelectedInputSummary selected={selected} />
         </p>
         {count > 1 && (
           <ul aria-label="Selected input files" className={styles.selectedInputs}>
-            {selected.map((file) => <li key={file.id} className="break-all">{describe(file)}</li>)}
+            {selected.map((file) => <li key={file.id} className={styles.selectedInput}>{describe(file)}</li>)}
           </ul>
         )}
-        <Button variant="success" size="lg" className="w-full" disabled={!canRun} loading={running} onClick={onRun} icon={<Play />}>
+        <Button variant="success" size="lg" className={styles.runButton} disabled={!canRun} loading={running} onClick={onRun} icon={<Play />}>
           {runLabel}
         </Button>
       </div>

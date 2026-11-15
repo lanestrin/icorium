@@ -1,15 +1,15 @@
 import { Check, CircleAlert, Layers, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
 import type { Status } from '../../lib/file-status';
-import styles from './files.module.css';
+import styles from './files.module.scss';
 
 /** Each status's colours and icon. */
 const BADGES: Record<Status, { colors: string; icon: LucideIcon }> = {
-  Ready: { colors: 'bg-green-50 text-green-700', icon: Check },
-  'Needs Review': { colors: 'bg-amber-50 text-amber-800', icon: TriangleAlert },
-  Processed: { colors: 'bg-violet-50 text-violet-700', icon: Layers },
-  Processing: { colors: 'bg-blue-50 text-blue-700', icon: LoaderCircle },
-  Error: { colors: 'bg-red-50 text-red-700', icon: CircleAlert },
+  Ready: { colors: styles.badgeReady, icon: Check },
+  'Needs Review': { colors: styles.badgeNeedsReview, icon: TriangleAlert },
+  Processed: { colors: styles.badgeProcessed, icon: Layers },
+  Processing: { colors: styles.badgeProcessing, icon: LoaderCircle },
+  Error: { colors: styles.badgeError, icon: CircleAlert },
 };
 
 /** A file's status as a coloured pill with an icon; Processing spins. */
@@ -18,7 +18,7 @@ export function StatusBadge({ status }: { status: Status }) {
   const isProcessing = status === 'Processing';
   return (
     <span className={classNames(styles.badge, colors)}>
-      <Icon className={classNames('h-4 w-4', isProcessing && 'animate-spin')} />
+      <Icon className={classNames(styles.badgeIcon, isProcessing && styles.spinning)} aria-hidden />
       {isProcessing ? 'Processing…' : status}
     </span>
   );
