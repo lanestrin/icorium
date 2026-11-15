@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/lanestrin/icorium/compare/v1.5.0...v1.6.0) (2026-11-15)
+
+
+### Features
+
+* move the Compare and CSV Generator areas to SCSS (13.5) ([#77](https://github.com/lanestrin/icorium/issues/77)) ([a1bd157](https://github.com/lanestrin/icorium/commit/a1bd157dc1569dcb5f7be9f3aebe9d03d07bf599))
+
 ## [1.5.0](https://github.com/lanestrin/icorium/compare/v1.4.0...v1.5.0) (2026-11-15)
 
 
