@@ -5,8 +5,9 @@ import { api } from '../../lib/api';
 import { classNames } from '../../lib/class-names';
 import { importedLineage } from '../../lib/file-status';
 import { errorMessage, rowsWord } from '../../lib/format';
+import { Button } from '../ui/Button';
 import { Modal } from './Modal';
-import styles from './modals.module.css';
+import styles from './modals.module.scss';
 
 const PAGE = 100; // rows loaded per "Show more"
 
@@ -29,16 +30,16 @@ function ProblemRows({ list }: { list: ProblemList }) {
   return (
     <section aria-label="Rows with problems" className={styles.problems}>
       <h3 className={styles.problemsTitle}>
-        <TriangleAlert className="h-4 w-4" /> {rowsWord(list.total)} with problems in this file
+        <TriangleAlert aria-hidden /> {rowsWord(list.total)} with problems in this file
       </h3>
       <ul className={styles.problemList}>
         {list.items.map((p) => (
           <li key={p.row}>
-            <span className="font-semibold">Row {p.row}</span>
+            <span className={styles.problemRow}>Row {p.row}</span>
             {p.batchId && <span> · {p.batchId}</span>}: {p.message}
           </li>
         ))}
-        {hidden > 0 && <li className="opacity-75">…and {rowsWord(hidden)} more</li>}
+        {hidden > 0 && <li className={styles.moreProblems}>…and {rowsWord(hidden)} more</li>}
       </ul>
     </section>
   );
@@ -50,8 +51,8 @@ function RowsTable({ data }: { data: FileRows }) {
   const problemByRow = new Map(data.problems.items.map((p) => [p.row, p.message]));
 
   return (
-    <table className="w-full text-sm">
-      <thead className="sticky top-0">
+    <table className={styles.table}>
+      <thead className={styles.tableHead}>
         <tr>
           <th className={styles.rowNumberHead}>#</th>
           {data.headers.map((h) => (
@@ -66,7 +67,7 @@ function RowsTable({ data }: { data: FileRows }) {
           return (
             <tr key={i} title={problemByRow.get(rowNumber)} className={classNames(styles.row, isFlagged && styles.flaggedRow)}>
               <td className={classNames(styles.rowNumber, isFlagged && styles.rowNumberFlagged)}>
-                {isFlagged && <TriangleAlert className="mr-1 inline h-3.5 w-3.5" aria-label="Problem row" />}
+                {isFlagged && <TriangleAlert className={styles.problemIcon} aria-label="Problem row" />}
                 {rowNumber}
               </td>
               {data.headers.map((h) => (
@@ -117,23 +118,23 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
   const remaining = data ? data.totalRows - data.rows.length : 0;
   const downloadButton = (
     <a href={api.downloadUrl(file.id)} className={styles.downloadLink}>
-      <Download className="h-4 w-4" /> Download CSV
+      <Download aria-hidden /> Download CSV
     </a>
   );
 
   return (
     <Modal title={file.name} subtitle={previewSubtitle(file)} onClose={onClose} actions={downloadButton}>
-      {error && <p className="pt-6 text-red-600">{error}</p>}
-      {!data && !error && <p className="pt-6 text-slate-500">Loading…</p>}
+      {error && <p className={classNames(styles.message, styles.error)}>{error}</p>}
+      {!data && !error && <p className={classNames(styles.message, styles.loading)}>Loading…</p>}
       {data && data.problems.total > 0 && <ProblemRows list={data.problems} />}
       {data && <RowsTable data={data} />}
       {data && (
         <div className={styles.footer}>
           <span>Showing {data.rows.length.toLocaleString()} of {data.totalRows.toLocaleString()} rows</span>
           {remaining > 0 && (
-            <button onClick={showMore} disabled={loadingMore} className={styles.showMore}>
+            <Button variant="secondary" size="sm" onClick={showMore} disabled={loadingMore}>
               {loadingMore ? 'Loading…' : `Show ${Math.min(PAGE, remaining)} more`}
-            </button>
+            </Button>
           )}
         </div>
       )}

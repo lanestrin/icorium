@@ -96,7 +96,7 @@
 .headRow {
   @apply text-left text-slate-700;
   & > th {
-    @apply sticky top-0 z-[1] bg-slate-50 py-3 font-semibold;
+    @apply sticky top-0 z-1 bg-slate-50 py-3 font-semibold;
   }
 }
 .checkbox {

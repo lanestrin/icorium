@@ -5,7 +5,7 @@ import type { QualityWarning, Replacement } from '../../lib/file-status';
 import { rowsWord } from '../../lib/format';
 import { Button } from '../ui/Button';
 import { Modal } from './Modal';
-import styles from './modals.module.css';
+import styles from './modals.module.scss';
 
 const processorLabel = (id: ProcessorId) => PROCESSORS.find((p) => p.id === id)?.label ?? '';
 const ARCHIVED_NOTE = 'Archived: replacing it returns it to Active Files.';
@@ -15,16 +15,16 @@ function QualityDetails({ warning }: { warning: QualityWarning }) {
   const others = warning.cleanCount;
   return (
     <>
-      <div className={classNames(styles.notice, 'text-amber-900')}>
-        <TriangleAlert className={classNames(styles.noticeIcon, 'text-amber-600')} aria-hidden />
+      <div className={classNames(styles.notice, styles.warningNotice)}>
+        <TriangleAlert className={styles.noticeIcon} aria-hidden />
         <p>Valid rows will be calculated. Invalid rows will remain in the output with error details and no calculated values.</p>
       </div>
       <ul aria-label="Files with invalid rows" className={styles.fileList}>
         {warning.affected.map((file) => (
           <li key={file.id} className={styles.warningItem}>
-            <span className="block break-all font-semibold text-slate-900">{file.name}</span>
-            <span className="text-slate-700">{rowsWord(file.valid, 'valid')} · </span>
-            <span className="font-medium text-amber-800">{rowsWord(file.invalid, 'invalid')}</span>
+            <span className={styles.fileName}>{file.name}</span>
+            <span className={styles.secondaryText}>{rowsWord(file.valid, 'valid')} · </span>
+            <span className={styles.invalidCount}>{rowsWord(file.invalid, 'invalid')}</span>
           </li>
         ))}
       </ul>
@@ -65,9 +65,9 @@ function ReplacedResults({ items }: { items: Replacement[] }) {
     <ul aria-label="Results to replace" className={styles.fileList}>
       {items.map((item) => (
         <li key={item.resultId} className={styles.replaceItem}>
-          <span className="font-semibold text-slate-900">{item.resultId}</span>
-          <span className="block break-all text-slate-700">{item.resultName}</span>
-          {item.archived && <span className="block text-slate-700">{ARCHIVED_NOTE}</span>}
+          <span className={styles.resultId}>{item.resultId}</span>
+          <span className={styles.resultName}>{item.resultName}</span>
+          {item.archived && <span className={styles.archivedNote}>{ARCHIVED_NOTE}</span>}
         </li>
       ))}
     </ul>
@@ -87,15 +87,15 @@ export function ReplaceResultModal({ items, otherCount, warning, processor, onCa
 
   return (
     <Modal title="Replace existing result?" subtitle={label} narrow onClose={onCancel}>
-      <div className={classNames(styles.notice, 'text-red-900')}>
-        <TriangleAlert className={classNames(styles.noticeIcon, 'text-red-600')} aria-hidden />
+      <div className={classNames(styles.notice, styles.dangerNotice)}>
+        <TriangleAlert className={styles.noticeIcon} aria-hidden />
         {isSingle ? (
           <div>
             <p>
               {label} has already been run for file <strong>{only.inputId}</strong>. Running it again will replace the
               existing result <strong>{only.resultId}</strong>. This action cannot be undone.
             </p>
-            {only.archived && <p className="mt-2 text-sm text-slate-700">{ARCHIVED_NOTE}</p>}
+            {only.archived && <p className={styles.archivedText}>{ARCHIVED_NOTE}</p>}
           </div>
         ) : (
           <p>{label} has already been run for {items.length} selected files. Running it again will replace these existing results. This action cannot be undone.</p>
