@@ -8,6 +8,7 @@ import { CategoryChart } from './CategoryChart';
 import { Dot } from './fileColors';
 import { RowChart } from './RowChart';
 import { SummaryByFile } from './SummaryByFile';
+import tables from '../../styles/tables.module.scss';
 import styles from './compare.module.css';
 
 /** One figure in "Comparison at a glance": an icon and label above its value. */
@@ -28,11 +29,11 @@ function TopDifferencesTable({ top, labels, byBatchId }: { top: TopDifference[];
     <div className="overflow-x-auto">
       <table aria-label="Top differences" className="w-full text-sm">
         <thead>
-          <tr className="table-head-row"><th>{byBatchId ? 'Batch ID' : 'Row'}</th><th>Key difference</th><th>Files affected</th></tr>
+          <tr className={tables.headRow}><th>{byBatchId ? 'Batch ID' : 'Row'}</th><th>Key difference</th><th>Files affected</th></tr>
         </thead>
         <tbody>
           {top.map((difference) => (
-            <tr key={difference.key} className="table-row">
+            <tr key={difference.key} className={tables.row}>
               <td className="whitespace-nowrap font-medium">{difference.label}</td>
               <td><span className={styles.differenceText}>{difference.text}</span></td>
               <td>

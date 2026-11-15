@@ -1,7 +1,7 @@
 import { Archive, ArrowLeftRight, RotateCcw } from 'lucide-react';
 import { plural } from '../../lib/format';
 import { Button } from '../ui/Button';
-import styles from './files.module.css';
+import styles from './files.module.scss';
 
 /**
  * The toolbar shown above the file list while files are selected: the count, Clear selection, Compare
@@ -23,10 +23,10 @@ export function SelectionBar({ count, onClear, showCompare, compareReason, compa
 
   return (
     <div role="toolbar" aria-label="Selected files" className={styles.selectionBar}>
-      <span className="font-semibold text-slate-900">{count} selected</span>
+      <span className={styles.selectionCount}>{count} selected</span>
       <Button variant="link" size="sm" onClick={onClear}>Clear selection</Button>
-      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-        {showCompare && compareReason && <span id="compare-reason" className="text-sm text-slate-600">{compareReason}</span>}
+      <div className={styles.selectionActions}>
+        {showCompare && compareReason && <span id="compare-reason" className={styles.compareReason}>{compareReason}</span>}
         {showCompare && (
           <Button onClick={onCompare} disabled={!!compareReason || comparing} aria-describedby={compareReason ? 'compare-reason' : undefined}
             icon={<ArrowLeftRight />}>

@@ -1,7 +1,7 @@
 import { Check, X } from 'lucide-react';
 import type { Toast } from '../../hooks/useArchive';
 import { Button } from '../ui/Button';
-import styles from './files.module.css';
+import styles from './files.module.scss';
 
 /**
  * The confirmation shown after archiving or restoring, with Undo. While a processing batch runs, Undo
@@ -16,21 +16,21 @@ export function ArchiveToast({ toast, archiving, processing, onUndo, onDismiss }
 }) {
   return (
     <div role="status" className={styles.toast}>
-      <span className={styles.toastIcon}><Check className="h-5 w-5" /></span>
-      <div className="min-w-0 flex-1">
-        <p className="font-semibold text-slate-900">{toast.title}</p>
-        <p className="text-sm text-slate-600">{toast.detail}</p>
+      <span className={styles.toastIcon}><Check aria-hidden /></span>
+      <div className={styles.toastText}>
+        <p className={styles.toastTitle}>{toast.title}</p>
+        <p className={styles.toastDetail}>{toast.detail}</p>
       </div>
       {toast.undo && (
-        <div className="flex flex-col items-end gap-1">
+        <div className={styles.toastActions}>
           {/* Archiving waits for a processing batch to finish, so Undo says so instead of doing nothing. */}
           <Button variant="outline" size="sm" onClick={onUndo} disabled={archiving || processing} aria-describedby={processing ? 'undo-wait' : undefined}>
             Undo
           </Button>
-          {processing && <span id="undo-wait" className="text-xs text-slate-500">Available when processing finishes</span>}
+          {processing && <span id="undo-wait" className={styles.undoWait}>Available when processing finishes</span>}
         </div>
       )}
-      <button onClick={onDismiss} aria-label="Dismiss notification" className="dismiss-button"><X className="h-5 w-5" /></button>
+      <button onClick={onDismiss} aria-label="Dismiss notification" className="dismiss-button"><X className={styles.dismissIcon} /></button>
     </div>
   );
 }

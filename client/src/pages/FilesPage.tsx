@@ -12,7 +12,7 @@ import { FileTabs } from '../components/files/FileTabs';
 import { SelectionBar } from '../components/files/SelectionBar';
 import { Sidebar } from '../components/files/Sidebar';
 import { SortMenu } from '../components/files/SortMenu';
-import styles from '../components/files/files.module.css';
+import styles from '../components/files/files.module.scss';
 import { useArchive } from '../hooks/useArchive';
 import { useFileList } from '../hooks/useFileList';
 import { useFilters } from '../hooks/useFilters';

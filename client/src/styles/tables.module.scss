@@ -1,0 +1,21 @@
+// Shared data-table rows for the Compare and CSV Generator tables: a grey header row and bordered
+// body rows. Use on the <tr>: <tr className={tables.headRow}> and <tr className={tables.row}>.
+
+.headRow {
+  background: var(--app-color-surface-subtle);
+  text-align: left;
+
+  & > th {
+    white-space: nowrap;
+    padding: var(--app-space-2) var(--app-space-3);
+    font-weight: var(--app-weight-semibold);
+  }
+}
+
+.row {
+  border-top: var(--app-border-width) solid var(--app-color-border-subtle);
+
+  & > td {
+    padding: var(--app-space-2) var(--app-space-3);
+  }
+}

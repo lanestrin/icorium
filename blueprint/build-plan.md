@@ -876,7 +876,7 @@ Added on 2026-11-14 at the person's request. The client moves from Tailwind util
 
   **Depends on:** 13.2.
 
-- [ ] **13.4** `feature/13.4-radix-row-menu-file-workspace` · **P2** — Row menu on Radix, plus the file workspace: `files/RowMenu.tsx` on `@radix-ui/react-dropdown-menu`; `files.module.css` and the `files/*.tsx` inline utilities become SCSS; shared table styles replace `.table-head-row` and `.table-row`. The native filter and Sort by dropdowns stay native (`menu-select.css` stays plain CSS). jsdom polyfills go in `test-setup.ts` only if Radix needs them.
+- [x] **13.4** `feature/13.4-radix-row-menu-file-workspace` · **P2** — Row menu on Radix, plus the file workspace: `files/RowMenu.tsx` on `@radix-ui/react-dropdown-menu`, non-modal so a click outside still reaches the page; `files.module.css` and the `files/*.tsx` inline utilities become SCSS; a shared `styles/tables.module.scss` replaces `.table-head-row` and `.table-row` in the Compare and Generator tables. The native filter and Sort by dropdowns stay native (`menu-select.css` stays plain CSS). jsdom polyfills go in `test-setup.ts` only if Radix needs them.
 
   **Depends on:** 13.3.
 

@@ -27,20 +27,6 @@
     @apply rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700;
   }
 
-  /* Data tables: grey header row and bordered body rows. */
-  .table-head-row {
-    @apply bg-slate-50 text-left;
-    & > th {
-      @apply whitespace-nowrap px-3 py-2 font-semibold;
-    }
-  }
-  .table-row {
-    @apply border-t border-slate-100;
-    & > td {
-      @apply px-3 py-2;
-    }
-  }
-
   /* Small close button with an icon, in banners and toasts. */
   .dismiss-button {
     @apply text-slate-500 hover:text-slate-800;

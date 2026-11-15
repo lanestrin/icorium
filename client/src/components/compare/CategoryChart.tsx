@@ -2,6 +2,7 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import type { CompareColumn, CompareFile } from '../../../../shared/types';
 import { metricLabel } from '../../lib/compare-view';
 import { FILE_COLORS } from './fileColors';
+import tables from '../../styles/tables.module.scss';
 import styles from './compare.module.css';
 
 /** Bar chart and table of how many rows in each file fall in each category. */
@@ -31,14 +32,14 @@ export function CategoryChart({ col, files, labels }: { col: CompareColumn; file
       <div className="overflow-x-auto">
         <table aria-label="Rows per category" className="w-full text-sm">
           <thead>
-            <tr className="table-head-row">
+            <tr className={tables.headRow}>
               <th>Category</th>
               {files.map((file, k) => <th key={file.id} className="text-right">{labels[k]}</th>)}
             </tr>
           </thead>
           <tbody>
             {categories.map((c) => (
-              <tr key={c.label} className="table-row">
+              <tr key={c.label} className={tables.row}>
                 <td className="font-medium">{c.label}</td>
                 {c.counts.map((count, k) => <td key={files[k].id} className="text-right">{count}</td>)}
               </tr>

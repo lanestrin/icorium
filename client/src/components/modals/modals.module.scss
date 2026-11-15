@@ -274,8 +274,7 @@
   color: var(--app-color-generated-text);
 }
 .row {
-  // A light hairline between rows (slate-100, the same value as surface-hover).
-  border-top: var(--app-border-width) solid var(--app-color-surface-hover);
+  border-top: var(--app-border-width) solid var(--app-color-border-subtle);
 }
 // A row with a problem is amber across, including over generated columns.
 .flaggedRow {
