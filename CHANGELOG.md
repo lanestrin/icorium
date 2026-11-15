@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/lanestrin/icorium/compare/v1.2.0...v1.3.0) (2026-11-15)
+
+
+### Features
+
+* add design tokens and the SCSS foundation (13.1) ([#70](https://github.com/lanestrin/icorium/issues/70)) ([a911a14](https://github.com/lanestrin/icorium/commit/a911a1474470a166a279c57717d4eb948f0f7ae4))
+* add shared Button and Card components with Storybook (13.2) ([#72](https://github.com/lanestrin/icorium/issues/72)) ([9524738](https://github.com/lanestrin/icorium/commit/95247389f66a9a8c01c758faafbe385796a51a12))
+
 ## [1.2.0](https://github.com/lanestrin/icorium/compare/v1.1.0...v1.2.0) (2026-11-15)
 
 
