@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/lanestrin/icorium/compare/v1.4.0...v1.5.0) (2026-11-15)
+
+
+### Features
+
+* move the row menu to Radix and the file workspace to SCSS (13.4) ([#75](https://github.com/lanestrin/icorium/issues/75)) ([7ba2266](https://github.com/lanestrin/icorium/commit/7ba2266261bb357bb63b0cbb8022fcb3e52d58d2))
+
 ## [1.4.0](https://github.com/lanestrin/icorium/compare/v1.3.0...v1.4.0) (2026-11-15)
 
 
