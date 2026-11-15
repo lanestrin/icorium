@@ -872,7 +872,7 @@ Added on 2026-11-14 at the person's request. The client moves from Tailwind util
 
   **Done when:** `npm run verify` passes with Button and Card tests and the story test; `npm run build-storybook` succeeds locally; no `.btn`, `.card` or duplicate button class remains.
 
-- [ ] **13.3** `feature/13.3-radix-dialog` · **P2** — Dialog on Radix, plus the modals area: `modals/Modal.tsx` on `@radix-ui/react-dialog`, replacing the hand-written focus trap; `modals.module.css` becomes SCSS. Escape, the focus trap, focus returning to the trigger, and the dialog's label and description keep working; the existing modal and FilesPage focus tests are the contract.
+- [x] **13.3** `feature/13.3-radix-dialog` · **P2** — Dialog on Radix, plus the modals area: `modals/Modal.tsx` on `@radix-ui/react-dialog`, replacing the hand-written focus trap; `modals.module.css` becomes SCSS and the preview's Show more becomes a shared `Button`. Escape, the focus trap, focus returning to the trigger, and the dialog's label keep working, and a subtitle now also describes the dialog (`Dialog.Description`); the existing modal and FilesPage focus tests are the contract.
 
   **Depends on:** 13.2.
 

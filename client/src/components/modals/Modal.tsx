@@ -1,73 +1,64 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
 import { Button } from '../ui/Button';
-import styles from './modals.module.css';
-
-// Disabled fields cannot take focus, so they are left out of the Tab cycle.
-const FOCUSABLE = 'a[href],button:not([disabled]),select:not([disabled]),input:not([disabled]),[tabindex]:not([tabindex="-1"])';
+import styles from './modals.module.scss';
 
 /**
- * Keeps keyboard focus inside the dialog while it is open: focus moves in, Tab and Shift+Tab wrap around,
- * Escape closes, and focus returns to where it was when the dialog closes.
- */
-function useDialogFocus(panel: React.RefObject<HTMLDivElement | null>, onClose: () => void) {
-  const close = useRef(onClose);
-  close.current = onClose;
-
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    panel.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') return close.current();
-      if (e.key !== 'Tab' || !panel.current) return;
-      const items = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
-      if (!items.length) return;
-      const [first, last] = [items[0], items[items.length - 1]];
-      const active = document.activeElement;
-      if (e.shiftKey && (active === first || active === panel.current)) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('keydown', onKey); previous?.focus(); };
-  }, [panel]);
-}
-
-/**
- * Dialog shell with a title bar and a close button. full fills the screen on phones and nearly fills it on
- * larger screens; narrow is a small confirmation dialog; otherwise it is a wide dialog (up to 1400px, the
- * same width as full) for wide content such as a CSV preview.
+ * Dialog shell with a title bar and a close button, built on Radix Dialog. Parents mount it only while it
+ * is open. Radix keeps Tab and Shift+Tab inside, hides the page behind it from screen readers, closes on
+ * Escape or a click on the backdrop, and returns focus to the element that opened it.
+ *
+ * full fills the screen on phones and nearly fills it on larger screens; narrow is a small confirmation
+ * dialog; otherwise it is a wide dialog (up to 1400px, the same width as full) for wide content such as a
+ * CSV preview.
  */
 export function Modal({ title, subtitle, actions, narrow, full, onClose, children }: {
   title: string; subtitle?: string; actions?: ReactNode; narrow?: boolean; full?: boolean; onClose: () => void; children: ReactNode;
 }) {
   const panel = useRef<HTMLDivElement>(null);
-  const titleId = useId();
-  useDialogFocus(panel, onClose);
+  // The element that had focus when the dialog opened (the button that opened it). Radix returns focus only
+  // to a Dialog.Trigger, and the parents open dialogs from their own buttons, so the dialog remembers it.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null);
+
+  // Focus the panel itself on open (not its first button), so screen readers start at the title.
+  function focusPanel(event: Event) {
+    event.preventDefault();
+    panel.current?.focus();
+  }
+
+  function returnFocus(event: Event) {
+    event.preventDefault();
+    opener?.focus();
+  }
 
   const size = full ? styles.panelFull : classNames(styles.panelDialog, narrow ? styles.panelNarrow : styles.panelWide);
 
   return (
-    <div className={classNames(styles.backdrop, full ? styles.backdropFull : styles.backdropPadded)} onClick={onClose}>
-      <div
-        ref={panel}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className={classNames(styles.panel, size)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.header}>
-          <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="truncate text-lg font-semibold">{title}</h2>
-            {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
-          </div>
-          {actions}
-          <Button variant="ghost" onClick={onClose} aria-label="Close" icon={<X />} />
-        </div>
-        <div className={styles.body}>{children}</div>
-      </div>
-    </div>
+    <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+        {/* The panel sits inside the backdrop so the backdrop can centre it; a click on the backdrop closes. */}
+        <Dialog.Overlay className={classNames(styles.backdrop, full ? styles.backdropFull : styles.backdropPadded)}>
+          <Dialog.Content
+            ref={panel}
+            className={classNames(styles.panel, size)}
+            onOpenAutoFocus={focusPanel}
+            onCloseAutoFocus={returnFocus}
+            {...(subtitle ? {} : { 'aria-describedby': undefined })}
+          >
+            <div className={styles.header}>
+              <div className={styles.heading}>
+                <Dialog.Title className={styles.title}>{title}</Dialog.Title>
+                {subtitle && <Dialog.Description className={styles.subtitle}>{subtitle}</Dialog.Description>}
+              </div>
+              {actions}
+              <Button variant="ghost" onClick={onClose} aria-label="Close" icon={<X />} />
+            </div>
+            <div className={styles.body}>{children}</div>
+          </Dialog.Content>
+        </Dialog.Overlay>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

@@ -86,8 +86,12 @@ const SEMANTIC_COLORS = [
   'primary', 'primary-hover', 'on-primary', 'link', 'primary-surface', 'primary-border',
   'success', 'success-hover', 'on-success', 'success-surface', 'success-border', 'success-text',
   'danger', 'danger-hover', 'on-danger', 'danger-surface', 'danger-border', 'danger-text',
-  'warning-surface', 'warning-border', 'warning-text', 'focus',
+  'warning-surface', 'warning-border', 'warning-text', 'warning-icon',
+  'generated-surface', 'generated-text', 'generated-cell', 'backdrop', 'focus',
 ];
+
+/** A palette step, or a palette step mixed with transparent (Tailwind's `/N` opacity form). */
+const FROM_PALETTE = /^(var\(--app-color-[\w-]+\)|color-mix\(in oklab, var\(--app-color-[\w-]+\) \d+%, transparent\))$/;
 
 const SIZES = ['xs', 'sm', 'base', 'lg', '2xl', '3xl', '4xl'];
 const OTHER_TOKENS = [
@@ -136,7 +140,7 @@ describe('design tokens', () => {
   });
 
   it('builds semantic colours from palette steps, so a theme can override only the aliases', () => {
-    const literal = SEMANTIC_COLORS.filter((name) => name !== 'page' && !/^var\(--app-color-[\w-]+\)$/.test(TOKENS.get(`--app-color-${name}`) ?? ''));
+    const literal = SEMANTIC_COLORS.filter((name) => name !== 'page' && !FROM_PALETTE.test(TOKENS.get(`--app-color-${name}`) ?? ''));
     expect(literal).toEqual([]);
   });
 
@@ -155,6 +159,7 @@ describe('design tokens', () => {
       ['success-text', 'success-surface'],
       ['danger-text', 'danger-surface'],
       ['warning-text', 'warning-surface'],
+      ['generated-text', 'generated-surface'],
       ['link', 'primary-surface'],
     ];
     const uiPairs: [string, string][] = [
@@ -162,6 +167,7 @@ describe('design tokens', () => {
       ['icon', 'page'],
       ['focus', 'surface'],
       ['danger', 'surface'],
+      ['warning-icon', 'surface'],
     ];
 
     it.each(textPairs)('%s on %s is at least 4.5:1', (foreground, background) => {

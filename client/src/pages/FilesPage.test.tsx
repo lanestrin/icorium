@@ -5,7 +5,7 @@ import type { CompareResult, FileMeta, FileRows } from '../../../shared/types';
 import { FilesPage } from './FilesPage';
 import { Modal } from '../components/modals/Modal';
 import { PreviewModal } from '../components/modals/PreviewModal';
-import modalStyles from '../components/modals/modals.module.css';
+import modalStyles from '../components/modals/modals.module.scss';
 import { api } from '../lib/api';
 
 vi.mock('../lib/api', () => ({ api: {
@@ -17,11 +17,13 @@ const base = { rows: 25, columns: 7, uploadedAt: '2026-11-06T12:00:00Z' };
 const clean: FileMeta = { ...base, id: 'clean', name: 'clean.csv', status: 'Ready', problemRows: 0 };
 const invalid: FileMeta = { ...base, id: 'invalid', name: 'invalid.csv', status: 'Needs Review', problemRows: 2 };
 const result: FileMeta = { ...base, id: 'result', name: 'result.csv', status: 'Processed', problemRows: 2, processor: 'mass' };
-const row = (name: string) => screen.getByRole('row', { name: new RegExp(name) });
+/** For a query of the page while a dialog is open: Radix hides the page behind it from assistive technology. */
+const behindDialog = { hidden: true };
+const row = (name: string, options = {}) => screen.getByRole('row', { name: new RegExp(name), ...options });
 const statusFilter = () => screen.getByRole('combobox', { name: /Status/ });
 /** Row controls are labelled with the File ID, then the filename: "Select 101010 data.csv". */
 const withId = (prefix: string, name: string) => new RegExp(`^${prefix} \\S+ ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
-const check = (name: string) => screen.getByRole('checkbox', { name: withId('Select', name) });
+const check = (name: string, options = {}) => screen.getByRole('checkbox', { name: withId('Select', name), ...options });
 /** Opens a row's ⋯ Actions menu (rows are found by any text they contain) and returns the menu. */
 async function rowMenu(user: ReturnType<typeof userEvent.setup>, rowName: string | RegExp) {
   const target = screen.getByRole('row', { name: typeof rowName === 'string' ? new RegExp(rowName) : rowName });
@@ -232,8 +234,8 @@ describe('input selection and status filtering', () => {
       await waitFor(() => expect(api.process).toHaveBeenCalledWith('invalid', processor));
       expect(api.process).toHaveBeenCalledTimes(1);
       await screen.findByRole('dialog');
-      expect(check('invalid.csv')).not.toBeChecked();
-      expect(within(row('invalid.csv')).getByText('Needs Review')).toBeInTheDocument();
+      expect(check('invalid.csv', behindDialog)).not.toBeChecked();
+      expect(within(row('invalid.csv', behindDialog)).getByText('Needs Review')).toBeInTheDocument();
     },
   );
 
@@ -260,9 +262,9 @@ describe('input selection and status filtering', () => {
     expect(api.process).toHaveBeenCalledTimes(2);
     expect(api.process).toHaveBeenNthCalledWith(1, 'clean', 'validation');
     expect(api.process).toHaveBeenNthCalledWith(2, 'invalid', 'validation');
-    expect(check('clean.csv')).not.toBeChecked();
-    expect(check('invalid.csv')).toBeChecked();
-    expect(screen.getByRole('alert')).toHaveTextContent('Retry invalid');
+    expect(check('clean.csv', behindDialog)).not.toBeChecked();
+    expect(check('invalid.csv', behindDialog)).toBeChecked();
+    expect(screen.getByRole('alert', behindDialog)).toHaveTextContent('Retry invalid');
   });
 
   it('locks selection while processing, displays failure, and retains failed inputs for retry', async () => {
@@ -465,8 +467,8 @@ describe('replacing an existing result', () => {
     await screen.findByRole('dialog', { name: 'Replace existing result?' });
     expect(dialog()).toHaveTextContent('Composition Validation has already been run for file clean. Running it again will replace the existing result clean-V.');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Processed 1 file.');
-    expect(check('clean.csv')).toBeChecked();
+    expect(screen.getByRole('status', behindDialog)).toHaveTextContent('Processed 1 file.');
+    expect(check('clean.csv', behindDialog)).toBeChecked();
     expect(api.process).toHaveBeenNthCalledWith(1, 'clean', 'validation');
     await user.dblClick(replaceButton());
     await waitFor(() => expect(api.process).toHaveBeenCalledTimes(3));
@@ -954,7 +956,7 @@ describe('row actions menu', () => {
     expect(check('clean.csv')).not.toBeChecked(); // opening the menu is not a row click
     await user.click(within(menu).getByRole('menuitem', { name: 'Preview file' }));
     expect(await screen.findByRole('dialog', { name: 'clean.csv' })).toBeInTheDocument();
-    expect(check('clean.csv')).not.toBeChecked();
+    expect(check('clean.csv', behindDialog)).not.toBeChecked();
   });
 
   it('keeps Restore in the archived menu only', async () => {
@@ -1366,7 +1368,7 @@ describe('request ordering', () => {
     expect(undo()).toHaveAccessibleDescription('Available when processing finishes');
 
     await act(async () => finish(result));
-    expect(undo()).toBeEnabled();
+    expect(within(toast).getByRole('button', { name: 'Undo', ...behindDialog })).toBeEnabled(); // the result opens in a dialog
     expect(within(toast).queryByText('Available when processing finishes')).not.toBeInTheDocument();
   });
 });

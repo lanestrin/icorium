@@ -1,0 +1,325 @@
+// Styles for the dialogs: the shell, the run confirmations and the file preview.
+@use '../../styles/mixins' as *;
+
+// Dialog shell
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--app-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--app-color-backdrop);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px); // Tailwind's backdrop-blur-sm
+}
+.backdropPadded {
+  padding: var(--app-space-4);
+}
+// full fills a phone's screen edge to edge.
+.backdropFull {
+  @include up(sm) {
+    padding: var(--app-space-4);
+  }
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: var(--app-color-surface);
+  box-shadow: var(--app-shadow-2xl);
+  outline: none;
+}
+.panelFull {
+  height: 100%;
+  max-width: 1400px;
+  @include up(sm) {
+    border-radius: var(--app-radius-2xl);
+  }
+}
+.panelDialog {
+  max-height: 88vh;
+  border-radius: var(--app-radius-2xl);
+}
+.panelNarrow {
+  max-width: 32rem;
+}
+.panelWide {
+  max-width: 1400px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-4);
+  border-bottom: var(--app-border-width) solid var(--app-color-border);
+  padding: var(--app-space-4) var(--app-space-6);
+}
+.heading {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-semibold);
+}
+.subtitle {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: var(--app-color-text-muted);
+}
+.body {
+  overflow: auto;
+  padding: 0 var(--app-space-6) var(--app-space-6);
+}
+
+// Run confirmations
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--app-space-3);
+  padding-top: var(--app-space-5);
+}
+.noticeIcon {
+  flex-shrink: 0;
+  width: var(--app-space-5);
+  height: var(--app-space-5);
+  margin-top: var(--app-space-0-5);
+}
+.warningNotice {
+  color: var(--app-color-warning-text);
+
+  .noticeIcon {
+    color: var(--app-color-warning-icon);
+  }
+}
+.dangerNotice {
+  color: var(--app-color-danger-text);
+
+  .noticeIcon {
+    color: var(--app-color-danger);
+  }
+}
+.fileList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-2);
+  max-height: 15rem;
+  margin-top: var(--app-space-4);
+  overflow: auto;
+}
+.warningItem,
+.replaceItem {
+  border: var(--app-border-width) solid;
+  border-radius: var(--app-radius-xl);
+  padding: var(--app-space-2-5) var(--app-space-4);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
+.warningItem {
+  border-color: var(--app-color-warning-border);
+  background: var(--app-color-warning-surface);
+}
+.replaceItem {
+  border-color: var(--app-color-danger-border);
+  background: var(--app-color-danger-surface);
+}
+.fileName {
+  display: block;
+  word-break: break-all;
+  font-weight: var(--app-weight-semibold);
+  color: var(--app-color-text);
+}
+.resultId {
+  font-weight: var(--app-weight-semibold);
+  color: var(--app-color-text);
+}
+.resultName {
+  display: block;
+  word-break: break-all;
+  color: var(--app-color-text-secondary);
+}
+.secondaryText {
+  color: var(--app-color-text-secondary);
+}
+.archivedNote {
+  display: block;
+  color: var(--app-color-text-secondary);
+}
+// The archived note under a single replaced result, inside the danger notice.
+.archivedText {
+  margin-top: var(--app-space-2);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: var(--app-color-text-secondary);
+}
+.invalidCount {
+  font-weight: var(--app-weight-medium);
+  color: var(--app-color-warning-text);
+}
+.note {
+  margin-top: var(--app-space-3);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: var(--app-color-text-muted);
+}
+.confirmButtons {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--app-space-2);
+  margin-top: var(--app-space-6);
+  @include up(sm) {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+// File preview
+// Download stays a link (it downloads the file) styled like a small secondary button.
+.downloadLink {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-lg);
+  padding: var(--app-space-1-5) var(--app-space-3);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: inherit;
+  text-decoration: none;
+  @include focus-ring;
+
+  &:hover {
+    background: var(--app-color-surface-subtle);
+  }
+
+  svg {
+    width: var(--app-space-4);
+    height: var(--app-space-4);
+  }
+}
+.message {
+  padding-top: var(--app-space-6);
+}
+.loading {
+  color: var(--app-color-text-muted);
+}
+.error {
+  color: var(--app-color-danger-text);
+}
+.problems {
+  margin-top: var(--app-space-5);
+  border: var(--app-border-width) solid var(--app-color-warning-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-warning-surface);
+  padding: var(--app-space-3) var(--app-space-4);
+  color: var(--app-color-warning-text);
+}
+.problemsTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  margin-bottom: var(--app-space-1);
+  font-weight: var(--app-weight-semibold);
+
+  svg {
+    width: var(--app-space-4);
+    height: var(--app-space-4);
+  }
+}
+.problemList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-1);
+  max-height: 8rem;
+  overflow: auto;
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
+.problemRow {
+  font-weight: var(--app-weight-semibold);
+}
+.moreProblems {
+  opacity: 0.75;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
+.tableHead {
+  position: sticky;
+  top: 0;
+}
+.rowNumberHead,
+.columnHead {
+  background: var(--app-color-surface);
+  padding: var(--app-space-6) var(--app-space-3) var(--app-space-2);
+  font-weight: var(--app-weight-semibold);
+}
+.rowNumberHead {
+  text-align: right;
+  color: var(--app-color-text-muted);
+}
+.columnHead {
+  white-space: nowrap;
+  text-align: left;
+}
+.generatedHead {
+  background: var(--app-color-generated-surface);
+  color: var(--app-color-generated-text);
+}
+.row {
+  // A light hairline between rows (slate-100, the same value as surface-hover).
+  border-top: var(--app-border-width) solid var(--app-color-surface-hover);
+}
+// A row with a problem is amber across, including over generated columns.
+.flaggedRow {
+  background: var(--app-color-warning-surface);
+
+  & > td {
+    background: transparent;
+  }
+}
+.rowNumber {
+  padding: var(--app-space-1-5) var(--app-space-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--app-color-text-muted);
+}
+.rowNumberFlagged {
+  font-weight: var(--app-weight-semibold);
+  color: var(--app-color-warning-text);
+}
+.problemIcon {
+  display: inline;
+  vertical-align: middle;
+  width: var(--app-space-3-5);
+  height: var(--app-space-3-5);
+  margin-right: var(--app-space-1);
+}
+.cell {
+  white-space: nowrap;
+  padding: var(--app-space-1-5) var(--app-space-3);
+}
+.generatedCell {
+  background: var(--app-color-generated-cell);
+}
+.errorCell {
+  font-weight: var(--app-weight-semibold);
+  color: var(--app-color-danger-text);
+}
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-4);
+  margin-top: var(--app-space-4);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: var(--app-color-text-muted);
+}

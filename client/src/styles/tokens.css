@@ -102,6 +102,13 @@
   --app-color-warning-surface: var(--app-color-amber-50);
   --app-color-warning-border: var(--app-color-amber-200);
   --app-color-warning-text: var(--app-color-amber-900);
+  --app-color-warning-icon: var(--app-color-amber-600);
+  /* Columns a processing function added, in the file preview. */
+  --app-color-generated-surface: var(--app-color-blue-50);
+  --app-color-generated-text: var(--app-color-blue-800);
+  --app-color-generated-cell: color-mix(in oklab, var(--app-color-blue-50) 50%, transparent);
+  /* The dimmed page behind a dialog (Tailwind's bg-slate-900/30). */
+  --app-color-backdrop: color-mix(in oklab, var(--app-color-slate-900) 30%, transparent);
   --app-color-focus: var(--app-color-blue-500);
   --app-disabled-opacity: 0.5;
 
