@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/lanestrin/icorium/compare/v1.6.0...v1.7.0) (2026-11-15)
+
+
+### Features
+
+* move the pages and the remaining globals to SCSS (13.6) ([#79](https://github.com/lanestrin/icorium/issues/79)) ([e1ed31d](https://github.com/lanestrin/icorium/commit/e1ed31d46104a3ff92b24f967b427b58e93288d1))
+
 ## [1.6.0](https://github.com/lanestrin/icorium/compare/v1.5.0...v1.6.0) (2026-11-15)
 
 
