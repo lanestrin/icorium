@@ -1,0 +1,7 @@
+// The running version at the end of a page's navigation.
+.version {
+  font-size: var(--app-text-xs);
+  line-height: var(--app-leading-xs);
+  font-weight: var(--app-weight-normal);
+  color: var(--app-color-text-muted);
+}

@@ -3,7 +3,7 @@ import { classNames } from '../../lib/class-names';
 import { Card } from '../ui/Card';
 import { DECISIONS, PROCESSING_LOCATION } from './content';
 import { Checks, Section } from './Section';
-import styles from './architecture.module.css';
+import styles from './architecture.module.scss';
 
 type Decision = (typeof DECISIONS)[number];
 
@@ -11,19 +11,19 @@ type Decision = (typeof DECISIONS)[number];
 function ProcessingLocation() {
   return (
     <Card as="article" aria-label={PROCESSING_LOCATION.title} className={styles.featuredDecision}>
-      <div className="flex gap-4">
-        <span className={styles.largeIconBadge}><Server className="h-8 w-8 text-blue-600" aria-hidden /></span>
-        <div className="min-w-0">
-          <h3 className="text-lg font-semibold">{PROCESSING_LOCATION.title}</h3>
-          <p className="mt-1 text-sm text-slate-600">{PROCESSING_LOCATION.text}</p>
+      <div className={styles.decision}>
+        <span className={styles.largeIconBadge}><Server className={styles.largeBadgeIcon} aria-hidden /></span>
+        <div className={styles.textColumn}>
+          <h3 className={styles.featuredTitle}>{PROCESSING_LOCATION.title}</h3>
+          <p className={styles.decisionSummary}>{PROCESSING_LOCATION.text}</p>
         </div>
       </div>
       <div className={styles.benefits}><Checks label="Benefits" items={PROCESSING_LOCATION.benefits} /></div>
       <div className={styles.tradeoffBox}>
-        <p className="flex items-center gap-2 font-semibold">
-          <TriangleAlert className="h-5 w-5 shrink-0 text-amber-600" aria-hidden /> Trade-off: server dependency
+        <p className={styles.tradeoffTitle}>
+          <TriangleAlert className={styles.tradeoffIcon} aria-hidden /> Trade-off: server dependency
         </p>
-        <p className="mt-1 text-sm">{PROCESSING_LOCATION.tradeoff}</p>
+        <p className={styles.tradeoffText}>{PROCESSING_LOCATION.tradeoff}</p>
       </div>
     </Card>
   );
@@ -33,13 +33,13 @@ function ProcessingLocation() {
 function DecisionCard({ decision, wide }: { decision: Decision; wide: boolean }) {
   return (
     <Card as="article" className={classNames(styles.decision, wide ? styles.decisionWide : styles.decisionNarrow)}>
-      <span className={styles.largeIconBadge}><decision.icon className="h-6 w-6 text-blue-600" aria-hidden /></span>
-      <div className="min-w-0">
-        <h3 className="font-semibold">{decision.question}</h3>
-        <p className="mt-1 text-sm text-slate-600">{decision.summary}</p>
-        <details className="mt-2 text-sm">
+      <span className={styles.largeIconBadge}><decision.icon className={styles.decisionIcon} aria-hidden /></span>
+      <div className={styles.textColumn}>
+        <h3 className={styles.itemTitle}>{decision.question}</h3>
+        <p className={styles.decisionSummary}>{decision.summary}</p>
+        <details className={styles.reasoning}>
           <summary className={styles.reasoningToggle}>The full reasoning</summary>
-          <div className="mt-2 space-y-2 text-slate-700">{decision.answer.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div>
+          <div className={styles.reasoningText}>{decision.answer.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div>
         </details>
       </div>
     </Card>

@@ -88,7 +88,7 @@ const SEMANTIC_COLORS = [
   'success', 'success-hover', 'on-success', 'success-surface', 'success-border', 'success-text',
   'danger', 'danger-hover', 'on-danger', 'danger-surface', 'danger-border', 'danger-text',
   'warning-surface', 'warning-border', 'warning-text', 'warning-icon', 'processed-surface', 'processed-text',
-  'generated-surface', 'generated-text', 'generated-cell', 'backdrop', 'focus',
+  'generated-surface', 'generated-text', 'generated-cell', 'backdrop', 'focus', 'connector',
 ];
 
 /** A palette step, or a palette step mixed with transparent (Tailwind's `/N` opacity form). */
@@ -98,6 +98,7 @@ const SIZES = ['xs', 'sm', 'base', 'lg', '2xl', '3xl', '4xl'];
 const OTHER_TOKENS = [
   '--app-disabled-opacity', '--app-font-sans', '--app-font-mono',
   ...SIZES.flatMap((size) => [`--app-text-${size}`, `--app-leading-${size}`]), '--app-leading-tight',
+  '--app-tracking-tight', '--app-tracking-wide',
   ...['normal', 'medium', 'semibold', 'bold'].map((weight) => `--app-weight-${weight}`),
   '--app-space-unit',
   ...['0-5', '1', '1-5', '2', '2-5', '3', '3-5', '4', '5', '6', '8', '10', '12'].map((step) => `--app-space-${step}`),
@@ -135,6 +136,8 @@ describe('design tokens', () => {
       expect(TOKENS.get(`--app-${name}`), name).toBe(TAILWIND.get(`--${name}`));
     }
     expect(TOKENS.get('--app-leading-tight')).toBe(TAILWIND.get('--leading-tight'));
+    expect(TOKENS.get('--app-tracking-tight')).toBe(TAILWIND.get('--tracking-tight'));
+    expect(TOKENS.get('--app-tracking-wide')).toBe(TAILWIND.get('--tracking-wide'));
     expect(TOKENS.get('--app-space-unit')).toBe(TAILWIND.get('--spacing'));
     expect(TOKENS.get('--app-duration-fast')).toBe(TAILWIND.get('--default-transition-duration'));
     expect(TOKENS.get('--app-ease')).toBe(TAILWIND.get('--default-transition-timing-function'));
@@ -173,6 +176,8 @@ describe('design tokens', () => {
       ['focus', 'surface'],
       ['danger', 'surface'],
       ['warning-icon', 'surface'],
+      ['connector', 'surface'],
+      ['connector', 'page'],
     ];
 
     it.each(textPairs)('%s on %s is at least 4.5:1', (foreground, background) => {

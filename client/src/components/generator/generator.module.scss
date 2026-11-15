@@ -204,3 +204,81 @@
 .previewRowNumber {
   color: var(--app-color-text-muted);
 }
+
+// The page (GeneratorPage): padding, header, the form's groups and the results card.
+.page {
+  padding: var(--app-space-8) var(--app-space-4) var(--app-space-10);
+  @include up(sm) {
+    padding: var(--app-space-10) var(--app-space-6) var(--app-space-10);
+  }
+}
+.header {
+  margin-top: var(--app-space-3);
+}
+.choiceList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-2);
+}
+.choiceTitle {
+  display: block;
+  font-weight: var(--app-weight-semibold);
+}
+.choiceDescription {
+  display: block;
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+// Rows and Number of files side by side on small screens, stacked again in the narrow desktop form.
+.numberFields {
+  display: grid;
+  gap: var(--app-space-4);
+  @include up(sm) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @include up(lg) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+}
+.errorRowsField {
+  margin-top: var(--app-space-4);
+}
+.generateButton {
+  width: 100%;
+}
+.banner {
+  margin-bottom: var(--app-space-4);
+}
+.bannerLink {
+  font-weight: var(--app-weight-semibold);
+  color: inherit;
+  text-decoration: underline;
+}
+.empty {
+  padding: calc(var(--app-space-unit) * 16) 0;
+  text-align: center;
+  color: var(--app-color-text-muted);
+}
+.resultsHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-3);
+}
+.resultsTitle {
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-semibold);
+}
+.resultsSummary {
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.addButton {
+  margin-left: auto;
+}

@@ -1,0 +1,658 @@
+// Styles for the Architecture page's sections. Panels are ui/Card; tiles, diagram steps and storage
+// boxes are smaller boxes used only here.
+@use '../../styles/mixins' as *;
+
+@mixin text-xs {
+  font-size: var(--app-text-xs);
+  line-height: var(--app-leading-xs);
+}
+@mixin text-sm {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
+@mixin icon($size) {
+  flex-shrink: 0;
+  width: $size;
+  height: $size;
+}
+
+// Section frame: a divider line above every section except the first.
+.section {
+  margin-top: var(--app-space-12);
+  border-top: var(--app-border-width) solid var(--app-color-border);
+  padding-top: var(--app-space-12);
+  scroll-margin-top: var(--app-space-6);
+
+  &:first-of-type {
+    margin-top: var(--app-space-8);
+    border-top: 0;
+    padding-top: 0;
+  }
+}
+// Heading on the left, content on the right, on wide screens.
+.sideBySide {
+  @include up(xl) {
+    display: grid;
+    grid-template-columns: 16rem minmax(0, 1fr);
+    align-items: start;
+    gap: var(--app-space-8);
+  }
+}
+// Small uppercase label above a heading.
+.eyebrow {
+  @include text-sm;
+  font-weight: var(--app-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--app-tracking-wide);
+  color: var(--app-color-link);
+}
+.sectionTitle {
+  margin-top: var(--app-space-1);
+  font-size: var(--app-text-2xl);
+  line-height: var(--app-leading-2xl);
+  font-weight: var(--app-weight-bold);
+  letter-spacing: var(--app-tracking-tight);
+}
+.sectionIntro {
+  max-width: 48rem; // Tailwind's max-w-3xl
+  margin-top: var(--app-space-2);
+  color: var(--app-color-text-muted);
+}
+.sectionBody {
+  margin-top: var(--app-space-6);
+}
+.sideBody {
+  min-width: 0;
+  margin-top: var(--app-space-6);
+  @include up(xl) {
+    margin-top: 0;
+  }
+}
+
+// Small shared pieces
+// A repository path or other code-like value.
+.codeChip {
+  border-radius: var(--app-radius-md);
+  background: var(--app-color-surface-hover);
+  padding: var(--app-space-0-5) var(--app-space-1-5);
+  font-family: var(--app-font-mono);
+  @include text-xs;
+  color: var(--app-color-text-secondary);
+}
+.checkList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-1-5);
+  margin-top: var(--app-space-3);
+  @include text-sm;
+  color: var(--app-color-text-secondary);
+}
+.checkItem {
+  display: flex;
+  gap: var(--app-space-2);
+}
+.checkIcon {
+  @include icon(var(--app-space-4));
+  margin-top: var(--app-space-0-5);
+  color: var(--app-color-success);
+}
+.iconBadge {
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-primary-surface);
+  padding: var(--app-space-2);
+}
+.largeIconBadge {
+  height: fit-content;
+  border-radius: var(--app-radius-2xl);
+  background: var(--app-color-primary-surface);
+  padding: var(--app-space-3);
+}
+.headingIcon {
+  @include icon(var(--app-space-5));
+  color: var(--app-color-primary);
+}
+.cardHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  font-weight: var(--app-weight-semibold);
+}
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-semibold);
+}
+// Lets wide text shrink beside an icon instead of overflowing.
+.textColumn {
+  min-width: 0;
+}
+.itemTitle {
+  font-weight: var(--app-weight-semibold);
+}
+
+// Centred icon tiles: the overview and the evolution ideas
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-2xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-4) var(--app-space-3);
+  text-align: center;
+  box-shadow: var(--app-shadow-sm);
+}
+.tileIcon {
+  @include icon(calc(var(--app-space-unit) * 7));
+  color: var(--app-color-primary);
+}
+.tileTitle {
+  margin-top: var(--app-space-2);
+  font-weight: var(--app-weight-semibold);
+}
+.tileText {
+  margin-top: var(--app-space-1);
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--app-space-3);
+  @include up(sm) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  @include up(xl) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.evolutionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--app-space-3);
+  @include up(sm) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  @include up(lg) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+.principle {
+  margin-top: var(--app-space-4);
+  border: var(--app-border-width) solid var(--app-color-primary-border);
+  border-radius: var(--app-radius-2xl);
+  background: var(--app-color-primary-surface);
+  padding: var(--app-space-5);
+}
+.principleStatement {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--app-space-3);
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-semibold);
+  color: var(--app-color-text);
+}
+.principleIcon {
+  @include icon(var(--app-space-5));
+  margin-top: var(--app-space-1);
+  color: var(--app-color-primary);
+}
+.principleNote {
+  margin-top: var(--app-space-2);
+  padding-left: var(--app-space-8);
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.testedNote {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  margin-top: var(--app-space-8);
+  @include text-sm;
+  color: var(--app-color-text-muted);
+
+  svg {
+    @include icon(var(--app-space-4));
+  }
+}
+
+// Technology tiles
+.techGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: var(--app-space-2);
+}
+.techTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-2xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-3) var(--app-space-2);
+  text-align: center;
+  color: inherit;
+  box-shadow: var(--app-shadow-sm);
+  cursor: pointer;
+  transition-property: color, background-color, border-color, box-shadow;
+  transition-duration: var(--app-duration-fast);
+  transition-timing-function: var(--app-ease);
+  @include focus-ring;
+
+  &:hover {
+    border-color: var(--app-color-primary-border);
+  }
+}
+.techTileSelected,
+.techTileSelected:hover {
+  border-color: var(--app-color-primary);
+  background: var(--app-color-primary-surface);
+  box-shadow: 0 0 0 1px var(--app-color-primary), var(--app-shadow-sm); // a 1px ring inside the shadow
+}
+.techIcon {
+  @include icon(var(--app-space-6));
+  color: var(--app-color-primary);
+}
+.techLabel {
+  margin-top: var(--app-space-2);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-tight);
+  font-weight: var(--app-weight-semibold);
+}
+.techTileRole {
+  margin-top: var(--app-space-0-5);
+  @include text-xs;
+  color: var(--app-color-text-muted);
+}
+.techDetails {
+  margin-top: var(--app-space-4);
+}
+.techHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--app-space-3);
+}
+.techRole {
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.reasons {
+  margin-top: var(--app-space-3);
+  padding-left: var(--app-space-5);
+  list-style: disc;
+  @include text-sm;
+  color: var(--app-color-text-secondary);
+
+  & > li + li {
+    margin-top: var(--app-space-1);
+  }
+}
+.tradeoff {
+  margin-top: var(--app-space-3);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-color-warning-surface);
+  padding: var(--app-space-2) var(--app-space-3);
+  @include text-sm;
+  color: var(--app-color-warning-text);
+}
+.tradeoffLabel {
+  font-weight: var(--app-weight-semibold);
+}
+.techFiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-1-5);
+  margin-top: var(--app-space-3);
+}
+
+// Architecture diagram: the person, then two rows of four steps
+.diagramLayout {
+  display: grid;
+  gap: var(--app-space-4);
+  @include up(lg) {
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  }
+}
+.pipeline {
+  display: grid;
+  @include up(md) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: var(--app-space-8);
+  }
+}
+.personItem {
+  @include up(md) {
+    grid-column: span 4 / span 4;
+  }
+}
+.person {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  border: var(--app-border-width) solid var(--app-color-primary-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-primary-surface);
+  padding: var(--app-space-3) var(--app-space-4);
+  @include up(md) {
+    width: calc(50% - 1rem);
+  }
+}
+.personTitle {
+  display: block;
+  font-weight: var(--app-weight-semibold);
+}
+.personSub {
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+// The arrow from the person to the first step: centred on phones, over the first column from md.
+.personArrow {
+  display: block;
+  @include icon(var(--app-space-5));
+  margin: var(--app-space-1) auto;
+  color: var(--app-color-connector);
+  @include up(md) {
+    margin: var(--app-space-2) 0 var(--app-space-2) calc((100% - 6rem) / 8 - 0.625rem);
+  }
+}
+.stepItem {
+  position: relative;
+}
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-4) var(--app-space-2);
+  text-align: center;
+  box-shadow: var(--app-shadow-sm);
+}
+.lastStep {
+  border-color: var(--app-color-primary-border);
+  background: var(--app-color-primary-surface);
+}
+.stepIcon {
+  @include icon(var(--app-space-6));
+  color: var(--app-color-primary);
+}
+.stepTitle {
+  margin-top: var(--app-space-2);
+  font-weight: var(--app-weight-semibold);
+}
+.stepSub {
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+// The arrow to the next step in a row (md and up), centred in the column gap.
+.rightArrow {
+  position: absolute;
+  top: 50%;
+  right: -1.625rem;
+  display: none;
+  @include icon(var(--app-space-5));
+  transform: translateY(-50%);
+  color: var(--app-color-connector);
+  @include up(md) {
+    display: block;
+  }
+}
+// The arrow down to the next step (phones only).
+.downArrow {
+  display: block;
+  @include icon(var(--app-space-5));
+  margin: var(--app-space-1) auto;
+  color: var(--app-color-connector);
+  @include up(md) {
+    display: none;
+  }
+}
+.turn {
+  position: relative;
+  display: none;
+  height: var(--app-space-10);
+  @include up(md) {
+    display: block;
+    grid-column: span 4 / span 4;
+  }
+}
+// Spans from the centre of the last column to the centre of the first.
+.turnLine {
+  position: absolute;
+  top: 0;
+  right: calc((100% - 6rem) / 8);
+  bottom: 0;
+  left: calc((100% - 6rem) / 8);
+}
+.turnSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.turnPath {
+  stroke: var(--app-color-connector);
+}
+.howList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-3);
+  margin-top: var(--app-space-4);
+  @include text-sm;
+  color: var(--app-color-text-secondary);
+}
+.howItem {
+  display: flex;
+  gap: var(--app-space-3);
+}
+.howText {
+  padding-top: var(--app-space-0-5);
+}
+.stepNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  @include icon(var(--app-space-6));
+  border-radius: var(--app-radius-full);
+  background: var(--app-color-primary);
+  @include text-xs;
+  font-weight: var(--app-weight-semibold);
+  color: var(--app-color-on-primary);
+}
+
+// Decisions
+.featuredDecision {
+  display: grid;
+  gap: var(--app-space-5);
+  @include up(lg) {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+  }
+}
+.featuredTitle {
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-semibold);
+}
+.largeBadgeIcon {
+  @include icon(var(--app-space-8));
+  color: var(--app-color-primary);
+}
+.decisionIcon {
+  @include icon(var(--app-space-6));
+  color: var(--app-color-primary);
+}
+.decisionSummary {
+  margin-top: var(--app-space-1);
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.benefits {
+  @include up(lg) {
+    border-left: var(--app-border-width) solid var(--app-color-border);
+    padding-left: var(--app-space-6);
+  }
+}
+.tradeoffBox {
+  border: var(--app-border-width) solid var(--app-color-warning-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-warning-surface);
+  padding: var(--app-space-4);
+  color: var(--app-color-warning-text);
+}
+.tradeoffTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  font-weight: var(--app-weight-semibold);
+}
+.tradeoffIcon {
+  @include icon(var(--app-space-5));
+  color: var(--app-color-warning-icon);
+}
+.tradeoffText {
+  margin-top: var(--app-space-1);
+  @include text-sm;
+}
+.decisionGrid {
+  display: grid;
+  gap: var(--app-space-4);
+  margin-top: var(--app-space-4);
+  @include up(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @include up(lg) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.decision {
+  display: flex;
+  gap: var(--app-space-4);
+}
+.decisionNarrow {
+  @include up(lg) {
+    grid-column: span 2 / span 2;
+  }
+}
+.decisionWide {
+  @include up(lg) {
+    grid-column: span 3 / span 3;
+  }
+}
+.reasoning {
+  margin-top: var(--app-space-2);
+  @include text-sm;
+}
+.reasoningToggle {
+  border-radius: var(--app-radius-sm);
+  font-weight: var(--app-weight-medium);
+  color: var(--app-color-link);
+  cursor: pointer;
+  @include focus-ring;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+.reasoningText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-2);
+  margin-top: var(--app-space-2);
+  color: var(--app-color-text-secondary);
+}
+
+// Storage
+.storageGrid {
+  display: grid;
+  gap: var(--app-space-4);
+  @include up(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @include up(xl) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
+  }
+}
+.storageOptions {
+  @include up(md) {
+    grid-column: span 2 / span 2;
+  }
+  @include up(xl) {
+    grid-column: span 1 / span 1;
+  }
+}
+.storageHeading {
+  @include text-sm;
+  font-weight: var(--app-weight-semibold);
+}
+.storageRow {
+  display: flex;
+  align-items: stretch;
+  gap: var(--app-space-1);
+  margin-top: var(--app-space-3);
+}
+.storageStep {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--app-space-1);
+  min-width: 0;
+}
+.storageArrow {
+  @include icon(var(--app-space-4));
+  color: var(--app-color-connector);
+}
+.storageOption {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-3) var(--app-space-2);
+  text-align: center;
+}
+.storageOptionDefault {
+  border-color: var(--app-color-primary-border);
+  background: var(--app-color-primary-surface);
+}
+.storageOptionPlanned {
+  border-style: dashed;
+  border-color: var(--app-color-border-strong);
+  background: var(--app-color-surface-subtle);
+  color: var(--app-color-text-muted);
+}
+.storageIcon {
+  @include icon(var(--app-space-5));
+  color: var(--app-color-primary);
+}
+.storageIconPlanned {
+  color: var(--app-color-text-muted);
+}
+.storageOptionName {
+  margin-top: var(--app-space-1);
+  @include text-xs;
+  font-weight: var(--app-weight-semibold);
+}
+.storageOptionBuilt {
+  color: var(--app-color-text);
+}
+.storageOptionNote {
+  font-size: 0.6875rem; // 11px: smaller than text-xs so three notes fit side by side
+  color: var(--app-color-text-muted);
+}
+.storageNote {
+  margin-top: var(--app-space-3);
+  @include text-xs;
+  color: var(--app-color-text-muted);
+}
