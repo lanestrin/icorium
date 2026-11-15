@@ -1,0 +1,165 @@
+// The app's one button: shared shape and states, one class per variant and per size.
+@use '../../styles/mixins' as *;
+
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--app-space-2);
+  border: var(--app-border-width) solid transparent;
+  border-radius: var(--app-radius-xl);
+  background: transparent;
+  font-weight: var(--app-weight-medium);
+  cursor: pointer;
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: var(--app-duration-fast);
+  transition-timing-function: var(--app-ease);
+  @include focus-ring;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: var(--app-disabled-opacity);
+  }
+}
+
+// Variants. Hover colours apply only while the button is enabled.
+.primary {
+  background: var(--app-color-primary);
+  color: var(--app-color-on-primary);
+  box-shadow: var(--app-shadow-sm);
+
+  &:hover:enabled {
+    background: var(--app-color-primary-hover);
+  }
+}
+
+.success {
+  background: var(--app-color-success);
+  color: var(--app-color-on-success);
+  box-shadow: var(--app-shadow-sm);
+
+  &:hover:enabled {
+    background: var(--app-color-success-hover);
+  }
+}
+
+.danger {
+  background: var(--app-color-danger);
+  color: var(--app-color-on-danger);
+  box-shadow: var(--app-shadow-sm);
+
+  &:hover:enabled {
+    background: var(--app-color-danger-hover);
+  }
+}
+
+.secondary {
+  border-color: var(--app-color-border);
+  background: var(--app-color-surface);
+  color: var(--app-color-text-secondary);
+  box-shadow: var(--app-shadow-sm);
+
+  &:hover:enabled {
+    background: var(--app-color-surface-subtle);
+  }
+}
+
+.outline {
+  border-color: var(--app-color-primary-border);
+  background: var(--app-color-surface);
+  color: var(--app-color-link);
+
+  &:hover:enabled {
+    background: var(--app-color-primary-surface);
+  }
+}
+
+.ghost {
+  color: var(--app-color-text-secondary);
+
+  &:hover:enabled {
+    background: var(--app-color-surface-hover);
+  }
+}
+
+// Sizes: padding, text size and icon size.
+.sm {
+  padding: var(--app-space-1-5) var(--app-space-3);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+
+  svg {
+    width: var(--app-space-4);
+    height: var(--app-space-4);
+  }
+}
+
+.md {
+  padding: var(--app-space-2-5) var(--app-space-4);
+  font-size: var(--app-text-base);
+  line-height: var(--app-leading-base);
+
+  svg {
+    width: var(--app-space-4);
+    height: var(--app-space-4);
+  }
+}
+
+.lg {
+  padding: var(--app-space-3) var(--app-space-6);
+  font-size: var(--app-text-base);
+  line-height: var(--app-leading-base);
+
+  svg {
+    width: var(--app-space-5);
+    height: var(--app-space-5);
+  }
+}
+
+// Icon-only: square, the size's vertical padding on every side.
+.iconOnly {
+  &.sm {
+    padding: var(--app-space-1-5);
+  }
+  &.md {
+    padding: var(--app-space-2-5);
+  }
+  &.lg {
+    padding: var(--app-space-3);
+  }
+}
+
+// An inline text link that behaves as a button. Declared after the sizes so it drops their padding;
+// at md it keeps the surrounding text size, at sm it is small text.
+.link {
+  display: inline-flex;
+  gap: var(--app-space-1);
+  border: 0;
+  border-radius: var(--app-radius-sm);
+  padding: 0;
+  color: var(--app-color-link);
+
+  &.md,
+  &.lg {
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  &:hover:enabled {
+    text-decoration: underline;
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

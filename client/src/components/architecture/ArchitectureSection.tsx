@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowRight, Layers } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
+import { Card } from '../ui/Card';
 import { HOW_IT_WORKS, PIPELINE } from './content';
 import { Section } from './Section';
 import styles from './architecture.module.css';
@@ -42,7 +43,7 @@ function Turn() {
 /** The diagram: the person, then two rows of four components joined by arrows. */
 function Diagram() {
   return (
-    <div className="card">
+    <Card>
       <ol aria-label="Architecture diagram" className={styles.pipeline}>
         <li className="md:col-span-4">
           <div className={styles.person}>
@@ -55,14 +56,14 @@ function Diagram() {
         <Turn />
         {SECOND_ROW.map((_, i) => <Step key={i + 4} index={i + 4} />)}
       </ol>
-    </div>
+    </Card>
   );
 }
 
 /** The same path in numbered words, beside the diagram. */
 function HowItWorks() {
   return (
-    <section aria-labelledby="how-it-works" className="card">
+    <Card as="section" aria-labelledby="how-it-works">
       <h3 id="how-it-works" className={styles.cardTitle}>
         <span className={styles.iconBadge}><Layers className="h-5 w-5 text-blue-600" aria-hidden /></span> How it works
       </h3>
@@ -74,7 +75,7 @@ function HowItWorks() {
           </li>
         ))}
       </ol>
-    </section>
+    </Card>
   );
 }
 

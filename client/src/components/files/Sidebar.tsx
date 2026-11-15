@@ -1,7 +1,8 @@
 import { useRef, useState, type DragEvent } from 'react';
-import { CloudUpload, LoaderCircle, Play } from 'lucide-react';
+import { CloudUpload, Play } from 'lucide-react';
 import { PROCESSORS, type ProcessorId } from '../../../../shared/types';
 import { classNames } from '../../lib/class-names';
+import { Button } from '../ui/Button';
 import styles from './files.module.css';
 
 type SelectedInput = { id: string; name: string };
@@ -31,7 +32,7 @@ function DropZone({ uploading, onUpload }: { uploading: boolean; onUpload: (file
         Drop CSV files here
         <br />
         or{' '}
-        <button className={styles.browseButton} onClick={() => input.current?.click()}>browse files</button>
+        <Button variant="link" onClick={() => input.current?.click()}>browse files</Button>
       </p>
       {uploading && <p className="mt-2 text-xs text-slate-500">Uploading…</p>}
       <input ref={input} type="file" accept=".csv,text/csv" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
@@ -96,10 +97,9 @@ export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, runn
             {selected.map((file) => <li key={file.id} className="break-all">{describe(file)}</li>)}
           </ul>
         )}
-        <button disabled={!canRun} onClick={onRun} className={styles.runButton}>
-          {running ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Play className="h-5 w-5" />}
+        <Button variant="success" size="lg" className="w-full" disabled={!canRun} loading={running} onClick={onRun} icon={<Play />}>
           {runLabel}
-        </button>
+        </Button>
       </div>
     </aside>
   );

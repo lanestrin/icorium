@@ -1,14 +1,15 @@
 import { useId, useState, type FormEvent } from 'react';
-import { ArrowLeft, FilePlus2, LoaderCircle, Network, Wand2 } from 'lucide-react';
+import { ArrowLeft, FilePlus2, Network, Wand2 } from 'lucide-react';
 import { ADAPTERS, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
 import { Banner } from '../components/Banner';
 import { ChoiceOption } from '../components/generator/ChoiceOption';
 import { GeneratedFileList } from '../components/generator/GeneratedFileList';
 import { GeneratedFilePreview } from '../components/generator/GeneratedFilePreview';
 import { NumberField } from '../components/generator/NumberField';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
 import styles from '../components/generator/generator.module.css';
 import { api } from '../lib/api';
-import { classNames } from '../lib/class-names';
 import { errorMessage, plural } from '../lib/format';
 import { flaggedRows, withCsv } from '../lib/generated-files';
 import { AppVersion } from '../components/AppVersion';
@@ -99,7 +100,7 @@ export function GeneratorPage() {
       </div>
 
       <div className={styles.layout}>
-        <form onSubmit={generate} className={classNames('card', styles.form)} aria-label="Generate CSV files">
+        <Card as="form" onSubmit={generate} className={styles.form} aria-label="Generate CSV files">
           <fieldset>
             <legend className={styles.legend}>Partner</legend>
             <div className="space-y-2">
@@ -135,13 +136,12 @@ export function GeneratorPage() {
             )}
           </fieldset>
 
-          <button type="submit" disabled={!!busy} className="btn btn-primary w-full px-6 py-3">
-            {busy === 'generate' ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Wand2 className="h-5 w-5" />}
+          <Button type="submit" size="lg" className="w-full" disabled={!!busy} loading={busy === 'generate'} icon={<Wand2 />}>
             {generateLabel}
-          </button>
-        </form>
+          </Button>
+        </Card>
 
-        <section aria-label="Generated files" className={classNames('card', styles.results)}>
+        <Card as="section" aria-label="Generated files" className={styles.results}>
           {error && <Banner tone="error" className="mb-4" onDismiss={() => setError(undefined)}>{error}</Banner>}
           {added && <Banner tone="success" className="mb-4">{added} <a href="/" className="font-semibold underline">Open CSV Files</a></Banner>}
 
@@ -154,16 +154,15 @@ export function GeneratorPage() {
                   <h2 className="text-lg font-semibold">Generated files</h2>
                   <p className="text-sm text-slate-600">{batchSummary(files)}</p>
                 </div>
-                <button onClick={addAll} disabled={!!busy} className="btn btn-primary ml-auto px-4 py-2.5">
-                  {busy === 'add' ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <FilePlus2 className="h-4 w-4" />}
+                <Button onClick={addAll} className="ml-auto" disabled={!!busy} loading={busy === 'add'} icon={<FilePlus2 />}>
                   {files.length > 1 ? `Add all ${files.length} to CSV Files` : 'Add to CSV Files'}
-                </button>
+                </Button>
               </div>
               <GeneratedFileList files={files} names={names} nameOf={nameOf} onRename={rename} shown={shown} onShow={setShown} />
               <GeneratedFilePreview file={file} name={nameOf(shown)} />
             </>
           )}
-        </section>
+        </Card>
       </div>
     </div>
   );

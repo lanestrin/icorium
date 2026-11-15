@@ -74,6 +74,7 @@
   --app-color-page: #f3f6fb;
   --app-color-surface: var(--app-color-white);
   --app-color-surface-subtle: var(--app-color-slate-50);
+  --app-color-surface-hover: var(--app-color-slate-100);
   --app-color-text: var(--app-color-slate-900);
   --app-color-text-secondary: var(--app-color-slate-700);
   --app-color-text-muted: var(--app-color-slate-600);
@@ -85,6 +86,7 @@
   --app-color-on-primary: var(--app-color-white);
   --app-color-link: var(--app-color-blue-700);
   --app-color-primary-surface: var(--app-color-blue-50);
+  --app-color-primary-border: var(--app-color-blue-200);
   --app-color-success: var(--app-color-green-700);
   --app-color-success-hover: var(--app-color-green-800);
   --app-color-on-success: var(--app-color-white);
@@ -92,6 +94,8 @@
   --app-color-success-border: var(--app-color-green-200);
   --app-color-success-text: var(--app-color-green-800);
   --app-color-danger: var(--app-color-red-600);
+  --app-color-danger-hover: var(--app-color-red-700);
+  --app-color-on-danger: var(--app-color-white);
   --app-color-danger-surface: var(--app-color-red-50);
   --app-color-danger-border: var(--app-color-red-200);
   --app-color-danger-text: var(--app-color-red-700);

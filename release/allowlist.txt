@@ -1,6 +1,6 @@
 # Files that ship in a release zip (scripts/build-release.mjs).
 # One glob per line: * matches within a folder, ** across folders.
-# A line starting with ! removes matches (used only for test files).
+# A line starting with ! removes matches (used only for test and story files).
 # A file ships only if it is tracked at the release tag AND matches this list.
 # The build also refuses planning, tooling, workflow, script and secret paths
 # whatever this list says, so never widen it to make a build pass.
@@ -32,3 +32,6 @@ CHANGELOG.md
 !**/*.test.ts
 !**/*.test.tsx
 !client/src/test-setup.ts
+
+# Storybook stories document components; they are development-only too
+!**/*.stories.tsx

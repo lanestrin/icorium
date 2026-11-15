@@ -1,5 +1,6 @@
 import { Check, X } from 'lucide-react';
 import type { Toast } from '../../hooks/useArchive';
+import { Button } from '../ui/Button';
 import styles from './files.module.css';
 
 /**
@@ -23,9 +24,9 @@ export function ArchiveToast({ toast, archiving, processing, onUndo, onDismiss }
       {toast.undo && (
         <div className="flex flex-col items-end gap-1">
           {/* Archiving waits for a processing batch to finish, so Undo says so instead of doing nothing. */}
-          <button onClick={onUndo} disabled={archiving || processing} aria-describedby={processing ? 'undo-wait' : undefined} className={styles.undoButton}>
+          <Button variant="outline" size="sm" onClick={onUndo} disabled={archiving || processing} aria-describedby={processing ? 'undo-wait' : undefined}>
             Undo
-          </button>
+          </Button>
           {processing && <span id="undo-wait" className="text-xs text-slate-500">Available when processing finishes</span>}
         </div>
       )}

@@ -30,9 +30,6 @@
 .header {
   @apply flex items-center gap-4 border-b border-slate-200 px-6 py-4;
 }
-.closeButton {
-  @apply rounded-lg p-2 hover:bg-slate-100;
-}
 .body {
   @apply overflow-auto px-6 pb-6;
 }
@@ -58,18 +55,6 @@
 }
 .confirmButtons {
   @apply mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end;
-}
-.cancelButton {
-  @apply rounded-xl border border-slate-200 px-4 py-2.5 font-medium text-slate-700 hover:bg-slate-50;
-}
-.confirmButton {
-  @apply rounded-xl px-4 py-2.5 font-semibold text-white shadow-sm;
-}
-.confirmSafe {
-  @apply bg-green-600 hover:bg-green-700;
-}
-.confirmDanger {
-  @apply bg-red-600 hover:bg-red-700;
 }
 
 /* File preview */

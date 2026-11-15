@@ -1,5 +1,6 @@
 import { Server, TriangleAlert } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
+import { Card } from '../ui/Card';
 import { DECISIONS, PROCESSING_LOCATION } from './content';
 import { Checks, Section } from './Section';
 import styles from './architecture.module.css';
@@ -9,7 +10,7 @@ type Decision = (typeof DECISIONS)[number];
 /** The first decision, shown in full: where processing runs, its benefits and its trade-off. */
 function ProcessingLocation() {
   return (
-    <article aria-label={PROCESSING_LOCATION.title} className={classNames('card', styles.featuredDecision)}>
+    <Card as="article" aria-label={PROCESSING_LOCATION.title} className={styles.featuredDecision}>
       <div className="flex gap-4">
         <span className={styles.largeIconBadge}><Server className="h-8 w-8 text-blue-600" aria-hidden /></span>
         <div className="min-w-0">
@@ -24,14 +25,14 @@ function ProcessingLocation() {
         </p>
         <p className="mt-1 text-sm">{PROCESSING_LOCATION.tradeoff}</p>
       </div>
-    </article>
+    </Card>
   );
 }
 
 /** One decision: its question and short answer, with the full reasoning one click away. */
 function DecisionCard({ decision, wide }: { decision: Decision; wide: boolean }) {
   return (
-    <article className={classNames('card', styles.decision, wide ? styles.decisionWide : styles.decisionNarrow)}>
+    <Card as="article" className={classNames(styles.decision, wide ? styles.decisionWide : styles.decisionNarrow)}>
       <span className={styles.largeIconBadge}><decision.icon className="h-6 w-6 text-blue-600" aria-hidden /></span>
       <div className="min-w-0">
         <h3 className="font-semibold">{decision.question}</h3>
@@ -41,7 +42,7 @@ function DecisionCard({ decision, wide }: { decision: Decision; wide: boolean })
           <div className="mt-2 space-y-2 text-slate-700">{decision.answer.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</div>
         </details>
       </div>
-    </article>
+    </Card>
   );
 }
 
