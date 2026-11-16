@@ -1,9 +1,21 @@
 import type { CompareResult, FileMeta, FileRows, GeneratedBatch, GeneratorPartner, ProcessorId, ReplaceConflict } from '../../../shared/types';
 
+/**
+ * The message for a failed response. The app's server always sends { message }, but errors from Vercel
+ * itself (a body over 4.5 MB, a timeout, a crashed function) don't, and statusText is empty over HTTP/2,
+ * so those get a message made from the status code.
+ */
+function errorMessage(status: number, body: { message?: unknown }): string {
+  if (typeof body.message === 'string' && body.message !== '') return body.message;
+  if (status === 413) return 'This file is too large to upload online. The limit is about 4.5 MB.';
+  return `The server couldn't complete the request (error ${status}).`;
+}
+
 async function json<T>(res: Response): Promise<T> {
+  // A body that isn't JSON (Vercel answers some errors as text or HTML) reads as {}.
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const error = new Error(body.message ?? res.statusText);
+    const error = new Error(errorMessage(res.status, body ?? {}));
     // A refused re-run carries the existing result, so the app can ask before replacing it.
     if (res.status === 409 && body.existing) Object.assign(error, { conflict: body as ReplaceConflict });
     throw error;

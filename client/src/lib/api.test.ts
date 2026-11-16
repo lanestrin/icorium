@@ -27,3 +27,25 @@ describe('api.process', () => {
     expect(error).not.toHaveProperty('conflict');
   });
 });
+
+describe('error messages without a server message', () => {
+  it('says an upload Vercel refused as too large is over the online limit', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('Request Entity Too Large', { status: 413 })));
+    await expect(api.upload(new File(['a'], 'big.csv'))).rejects.toThrow('This file is too large to upload online. The limit is about 4.5 MB.');
+  });
+
+  it('names the error code when a response has no message', async () => {
+    vi.stubGlobal('fetch', respond(504, {}));
+    await expect(api.list()).rejects.toThrow("The server couldn't complete the request (error 504).");
+  });
+
+  it('treats an empty message as no message', async () => {
+    vi.stubGlobal('fetch', respond(500, { message: '' }));
+    await expect(api.compare(['101010-V', '101011-V'])).rejects.toThrow("The server couldn't complete the request (error 500).");
+  });
+
+  it('keeps the server message for a 413 the app itself refused', async () => {
+    vi.stubGlobal('fetch', respond(413, { message: 'request file too large' }));
+    await expect(api.upload(new File(['a'], 'big.csv'))).rejects.toThrow('request file too large');
+  });
+});

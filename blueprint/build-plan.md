@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 10.13** `fix/blank-error-messages`. Start with a client unit test that a failed 413 response with no message body shows the too-large message.
+**Next: 10.14** `fix/file-list-loading-state`. Start with a component test that the file table shows "Loading files…" until the first list request settles.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -655,7 +655,7 @@ the Architecture page, update the page in the same item.
 
   **Verification:** API tests for a custom upload limit and the default; the Architecture content test updated to read the default; `npm run verify`.
 
-- [ ] **10.13** `fix/blank-error-messages` · **P1** — Errors that come from Vercel itself show an empty message, found in a review on 2026-11-13. Vercel rejects requests over 4.5 MB before they reach the app (the app allows 10 MB), and its timeouts and crashed functions also answer without the app's `{ message }` JSON. `client/src/lib/api.ts` then falls back to `res.statusText`, which is usually empty over HTTP/2. When a failed response has no message, show one based on the error code instead. For a 413, say the file is too large to upload online (about 4.5 MB). For anything else, say the server could not complete the request and give the error code. Add a client unit test for both cases and one where the server's own message still shows.
+- [x] **10.13** `fix/blank-error-messages` · **P1** — Errors that come from Vercel itself show an empty message, found in a review on 2026-11-13. Vercel rejects requests over 4.5 MB before they reach the app (the app allows 10 MB), and its timeouts and crashed functions also answer without the app's `{ message }` JSON. `client/src/lib/api.ts` then falls back to `res.statusText`, which is usually empty over HTTP/2. When a failed response has no message, show one based on the error code instead. For a 413, say the file is too large to upload online (about 4.5 MB). For anything else, say the server could not complete the request and give the error code. Add a client unit test for both cases and one where the server's own message still shows.
 
 - [ ] **10.14** `fix/file-list-loading-state` · **P2** — On first load, the file table says "No CSV files match your filters." until the list arrives, found in a review on 2026-11-13. Online, with a slow list (10.11), the app looks empty. `useFileList` (`client/src/hooks/useFileList.ts`) starts with `[]`. Add a `loading` state that lasts until the first `api.list()` settles, and show "Loading files…" in the table's empty row. A failure still shows the error banner. Component tests for loading → loaded and loading → error.
 
