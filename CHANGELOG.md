@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.2](https://github.com/lanestrin/icorium/compare/v1.9.1...v1.9.2) (2026-11-16)
+
+
+### Bug Fixes
+
+* show "Loading files…" until the file list arrives (10.14) ([#88](https://github.com/lanestrin/icorium/issues/88)) ([4f910e1](https://github.com/lanestrin/icorium/commit/4f910e1a6955e8f3962f25d47ea7e21576823d45))
+
 ## [1.9.1](https://github.com/lanestrin/icorium/compare/v1.9.0...v1.9.1) (2026-11-16)
 
 
