@@ -114,21 +114,18 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 9.10** `feature/9.10-row-actions-menu` (added 2026-11-11), then 10.5 `chore/dead-and-partial-code`
+**Next: 14.1** `feature/14.1-render-error-recovery`. Start with a component test that a component throwing during render shows the fallback with a **Reload** action.
 
-and 10.6 to 10.12 in order. Start 9.10 with a component test that an Active Files row has one Actions menu button and no Preview button. **Order:**
+**Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
-10.1–10.3, then M11 (11.1–11.7, including 11.3a; 11.7 before 11.6), then 10.4–10.12; M11 changes how files are
+1. **Frontend first:** 14.1 → 10.13 → 10.14 → 14.2 → 14.3 → 14.4. 10.13 and 10.14 keep their own IDs and branches. 14.2 reuses 14.1's fallback and the loading and error states from 10.13 and 10.14, and 14.4's stories show the tokens 14.3 adds.
+2. **Then:** 9.12 → 9.13 → 10.11 → 10.15 → 9.14a → 9.14b → 9.14c → 9.15. 9.14 depends on 10.13, which the frontend block finishes first.
 
-identified and stored, so the P2 refactors build on it.
+New work needs a new request: add it as a new stable ID with its scope before building, or use a `fix/` branch for a bug.
 
-New work outside M10 and M11 needs a new request: add it as a new stable
+**Selection rule:** take the first unchecked item in the order above whose dependencies are
 
-ID with its scope before building, or use a `fix/` branch for a bug.
-
-**Selection rule:** take the first unchecked item below whose dependencies are
-
-satisfied. Completed baseline capabilities are not new work. If an item is
+satisfied; once that list is finished, take the first unchecked item below whose dependencies are satisfied. Completed baseline capabilities are not new work. If an item is
 
 blocked, name the blocker and the next eligible item; do not silently skip it.
 
@@ -438,6 +435,8 @@ user confirms before Mass or Classification calculates on a file with problems.
   - [ ] **9.14a** `feature/9.14a-convert-excel-uploads` — The pipeline: choosing a reader by extension, header detection against `ADAPTERS`, the review dialog, the "`report.docx` can't be converted. Upload a CSV, Excel, PDF or image file." message, a wider drop-zone `accept` list, and the Excel reader (first sheet). Also the stack exception, and the README and Architecture page updates for the new packages.
   - [ ] **9.14b** `feature/9.14b-read-text-pdfs` — The pdf.js reader. Text items are grouped into rows by y position and into cells by x gaps. A page with no text layer is refused with "this page is a scanned image" until 9.14c.
   - [ ] **9.14c** `feature/9.14c-ocr-scanned-pdfs-and-images` — Tesseract for image-only PDF pages and `.png` / `.jpg` files, with "Reading page 2 of 5…" progress and **Cancel**, and an "Read by OCR: check the numbers" warning in the review dialog.
+
+  **Conversion lifecycle (applies to 9.14a–c, not a second conversion feature):** apply the following acceptance criteria while specifying 9.14a–c. The pipeline owns one active conversion job, with explicit reading, review, importing, cancelled and failed states. Cancel or closing the review must prevent that job from uploading and ignore any late completion; a cancelled conversion must not block the next file. For readers that support interruption, stop the active work and release it. Scope worker instances, PDF loading/render tasks, image resources and object URLs to the job and release them on completion, failure, cancellation and unmount, as applicable to each reader. Keep any expensive OCR work off the UI thread using the reader's supported worker mechanism. Explain the boundary between conversion cancellation and an upload already submitted; do not promise to undo a stored upload. Deferred-promise/component tests cover cancel-then-late-result, closing/unmounting, cleanup and continuing a multi-file batch after failure or cancellation. Tests may mock the readers, as 9.14 already specifies; real PDF/OCR reading and responsiveness require the real-file Try it now checks. These criteria must be carried into each relevant 9.14 spec before implementation.
 
   **Depends on:** 10.13 (clear upload errors).
 
@@ -893,6 +892,50 @@ Added on 2026-11-14 at the person's request. The client moves from Tailwind util
   **Depends on:** 13.6.
 
   **Done when:** `npm run verify` passes with the guard test, and Tailwind is in no `package.json`, config or stylesheet.
+
+### M14 — Frontend resilience and component coverage
+
+Added on 2026-11-15 at the person's request after reviewing the frontend architecture. This follows M13 without introducing a state-management library, query library, router, form framework or animation library. Keep the existing feature folders, focused hooks, shared types and API module. Existing request-race coverage (10.3), client structure (10.8), file-list loading (10.14) and online limits (10.15) remain their own items; do not duplicate them here. 10.13 and 10.14 are built inside this block, between 14.1 and 14.2, under their own IDs and branches (see "What to build next").
+
+- [ ] **14.1** `feature/14.1-render-error-recovery` · **P2** — Add a small React error boundary around the app with a readable fallback and a Reload action. Keep request failures in the existing error banners; the boundary handles rendering failures. Do not add telemetry or automatic retry loops.
+
+  **Done when:** a rendering failure shows the fallback instead of an empty app, Reload requests a page reload, and normal rendering and request-error banners keep working. Component tests exercise the failure and recovery action; `npm run verify` passes.
+
+- [ ] **14.2** `feature/14.2-lazy-pages-and-comparison` · **P2** — Load the Generator and Architecture pages and the comparison workspace on demand using React lazy loading and Suspense. Keep the current URL selection and normal page links. Include accessible loading feedback and recovery for a failed chunk load, using 14.1 where appropriate. Preserve comparison dialog focus behaviour, including closing while loading. Record production build chunk sizes before and after; do not claim a speed improvement without measurements.
+
+  **Depends on:** 14.1.
+
+  **Done when:** secondary pages and the comparison/chart dependency tree are outside the initial workspace dependency tree; deferred loading and failed imports have useful states; existing workflows and dialog focus tests still pass. Component tests cover loading, failure and closing before completion; `npm run verify` passes.
+
+- [ ] **14.3** `feature/14.3-chart-design-tokens` · **P2** — Finish the token boundary for charts: replace literal grid, label and reference-line colours and typography in the Recharts props, and centralize the file-series palette in chart-specific `--app-*` tokens. Reuse existing semantic tokens where their meaning fits. Keep series colours stable across charts, legends and file labels; preserve the current appearance except for explicitly approved accessibility corrections. Do not add a chart abstraction or dark theme.
+
+  - **Scope:** no raw colour literal outside `tokens.css`. Today that means `#e2e8f0`, `#64748b`, `#94a3b8` and `fontSize` 11 and 12 in `RowChart.tsx` and `CategoryChart.tsx`; the five `FILE_COLORS` in `fileColors.tsx` (also the inline dot backgrounds in `RowDifferences.tsx`); the five hex values in `client/src/styles/menu-select.css`; and `#cbd5e1` in `ui/Card.stories.tsx` (stories count as component source).
+  - **Guard:** extend `client/src/styles/no-tailwind.test.ts` (or a sibling) to fail on a hex, `rgb()` or `hsl()` colour outside `tokens.css`, in stylesheets and component source. It reads source text only.
+  - **Check at spec time:** Recharts sets colours as SVG attributes, so confirm whether `var(--app-…)` resolves there; otherwise use a class or read the token value once. Choose the simplest one that works.
+  - Merge the duplicate `@keyframes spin` (`ui/Button.module.scss` and `files/files.module.scss`) into one shared definition.
+
+  **Depends on:** 13.7.
+
+  **Done when:** chart presentation uses the central tokens, comparison values and series identities are unchanged, and existing chart/comparison coverage and `npm run verify` pass. Include desktop and phone comparison views in the Try it now list; component tests alone do not establish chart drawing or visual correctness.
+
+- [ ] **14.4** `feature/14.4-storybook-interaction-coverage` · **P2** — Make stories the shared source for reusable component scenarios. Extend the Button and Card stories with Banner, Dialog and row-menu stories, including variants and relevant loading, disabled, error and empty states. Add executable interaction assertions for clicks, keyboard navigation, focus trapping/return, Escape, outside clicks and callbacks where applicable. Run story assertions through the existing Vitest/React Testing Library setup as part of `npm run verify`; rendering a story alone is insufficient. Preserve feature-specific integration tests, including the non-modal row menu's outside-click behaviour and FilesPage dialog focus contract.
+
+  - Remove equivalent standalone component test cases only after the story-based tests execute the same assertions and cover the same behaviour. Keep hook, pure-logic, API and page-workflow tests. Do not retain two copies of the same component scenario merely because one is a story.
+  - Stories demonstrate the motion the components actually implement: colour transitions on `--app-duration-fast` and `--app-ease`, the loading spinner keyframe, and the global `prefers-reduced-motion` rule in `styles/base.css`. The dialog and row menu have no entrance or exit animation, and this item adds none. Document durations and easing through the existing motion tokens, and include reduced-motion examples.
+  - `Banner` lives at `components/Banner.tsx`, not in `ui/`, so the story discovery test (`ui/stories.test.tsx`) must widen to find its stories.
+  - **Keep Storybook maintained automatically:**
+    - The stories test finds story files by glob, not a hard-coded list.
+    - It fails when a shared component (each `ui/*.tsx` that isn't a test or story, plus `Banner.tsx`) has no sibling `*.stories.tsx`.
+    - It runs every story's `play`, so interaction assertions run in `npm run verify`.
+    - CI runs `npm run build-storybook` as its own step after Verify, so a broken config or story import fails the PR without slowing local Verify.
+    - Stories follow **Storybook** in the README, using `fn()` and `play` from `storybook/test`, which is already part of the installed `storybook` package. No new dependency is added.
+    - `@storybook/addon-a11y` or other addons are a separate decision.
+  - Bring the existing Button and Card stories to the README practices, for example wrapper layout on the spacing tokens instead of literal `rem` values. 14.3 already replaces their literal colours. Storybook displays component animations; it is not an animation engine and this item adds no animation library or new motion design.
+  - The current jsdom checks do not verify animation timing, smoothness, layout or browser focus rendering. Include a Try it now list for animation and reduced-motion inspection in Storybook. Real-browser automation or visual regression remains a separate explicit decision; do not add a browser harness, paid service or claim automated visual coverage as part of this item.
+
+  **Depends on:** 13.7.
+
+  **Done when:** interaction assertions from the stories actually run in Verify, shared scenarios have one maintained source, equivalent duplicate component tests are removed without reducing coverage, animation/reduced-motion examples are available, `npm run build-storybook` succeeds and `npm run verify` passes. The stories test finds story files by glob, fails on a shared component without stories and runs every `play`. CI runs `npm run build-storybook` on every PR.
 
 ### M7 — Final interview readiness
 
