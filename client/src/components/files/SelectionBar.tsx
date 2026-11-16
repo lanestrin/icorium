@@ -1,4 +1,4 @@
-import { Archive, ArrowLeftRight, RotateCcw } from 'lucide-react';
+import { Archive, ArrowLeftRight, LoaderCircle, RotateCcw } from 'lucide-react';
 import { plural } from '../../lib/format';
 import { Button } from '../ui/Button';
 import styles from './files.module.scss';
@@ -28,8 +28,12 @@ export function SelectionBar({ count, onClear, showCompare, compareReason, compa
       <div className={styles.selectionActions}>
         {showCompare && compareReason && <span id="compare-reason" className={styles.compareReason}>{compareReason}</span>}
         {showCompare && (
-          <Button onClick={onCompare} disabled={!!compareReason || comparing} aria-describedby={compareReason ? 'compare-reason' : undefined}
-            icon={<ArrowLeftRight />}>
+          // While the comparison loads, Compare stays focusable (aria-disabled, not disabled): a disabled button
+          // drops keyboard focus to the page, and the dialog would then return focus there instead of here.
+          // A second press is ignored by onCompare.
+          <Button onClick={onCompare} disabled={!!compareReason} aria-disabled={comparing || undefined} aria-busy={comparing || undefined}
+            aria-describedby={compareReason ? 'compare-reason' : undefined}
+            icon={comparing ? <LoaderCircle className={styles.spinning} aria-hidden /> : <ArrowLeftRight />}>
             Compare {plural(count)}
           </Button>
         )}

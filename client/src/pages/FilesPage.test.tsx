@@ -1419,11 +1419,19 @@ describe('comparing results', () => {
     vi.mocked(api.compare).mockReturnValue(new Promise((resolve) => { answer = resolve; }));
     await user.click(check(valA.name));
     await user.click(check(valB.name));
-    await user.click(compareButton());
-    expect(compareButton()).toBeDisabled();
+    compareButton().focus();
+    await user.keyboard('{Enter}');
+    // Busy but still focusable, so a keyboard user keeps their place while the comparison loads.
+    expect(compareButton()).toHaveAttribute('aria-disabled', 'true');
+    expect(compareButton()).toHaveAttribute('aria-busy', 'true');
+    expect(compareButton()).toHaveFocus();
+    await user.keyboard('{Enter}'); // a second press while loading is ignored
+    expect(api.compare).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await act(async () => answer(comparison));
     expect(await screen.findByRole('dialog', { name: 'Compare Files' })).toBeInTheDocument();
+    const bar = screen.getByRole('toolbar', { name: 'Selected files', ...behindDialog });
+    expect(within(bar).getByRole('button', { name: /^Compare/, ...behindDialog })).not.toHaveAttribute('aria-disabled');
   });
 
   it('asks for a reload when the comparison code fails to download', async () => {
