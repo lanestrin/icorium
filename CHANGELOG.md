@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/lanestrin/icorium/compare/v1.15.0...v1.16.0) (2026-11-16)
+
+
+### Features
+
+* show new results first after Run Processing (9.13) ([#105](https://github.com/lanestrin/icorium/issues/105)) ([d918435](https://github.com/lanestrin/icorium/commit/d91843559b1ebbfbb6c11e19b9891597990ce7a1))
+
 ## [1.15.0](https://github.com/lanestrin/icorium/compare/v1.14.0...v1.15.0) (2026-11-16)
 
 
