@@ -34,9 +34,9 @@ export function CategoryChart({ col, files, labels }: { col: CompareColumn; file
         <ResponsiveContainer>
           {/* Horizontal bars: long category names stay readable. */}
           <BarChart data={data} layout="vertical" margin={{ top: 10, right: 20, bottom: 10, left: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-            <YAxis type="category" dataKey="label" width={axis.width} tickFormatter={axis.tickFormatter} tick={{ fontSize: 11 }} />
+            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--app-color-chart-grid)" />
+            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 'var(--app-chart-text)' }} />
+            <YAxis type="category" dataKey="label" width={axis.width} tickFormatter={axis.tickFormatter} tick={{ fontSize: 'var(--app-chart-text)' }} />
             <Tooltip formatter={(value) => `${value} rows`} />
             <Legend verticalAlign="bottom" />
             {files.map((file, k) => <Bar key={file.id} dataKey={`f${k}`} name={labels[k]} fill={FILE_COLORS[k]} radius={[0, 4, 4, 0]} />)}

@@ -29,6 +29,18 @@ $breakpoints: (
   }
 }
 
+// A loading icon that turns continuously: @include spin; The keyframes are emitted with it, so each
+// module gets its own copy under its own scoped name. base.css slows it to one frame for reduced motion.
+@mixin spin {
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
 // Styles for people who ask their system for less motion: @include reduced-motion { animation: none; }
 @mixin reduced-motion {
   @media (prefers-reduced-motion: reduce) {

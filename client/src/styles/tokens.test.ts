@@ -87,7 +87,11 @@ const SEMANTIC_COLORS = [
   'danger', 'danger-hover', 'on-danger', 'danger-surface', 'danger-border', 'danger-text',
   'warning-surface', 'warning-border', 'warning-text', 'warning-icon', 'processed-surface', 'processed-text',
   'generated-surface', 'generated-text', 'generated-cell', 'backdrop', 'focus', 'connector',
+  'chart-grid', 'chart-axis', 'chart-reference',
 ];
+
+/** The comparison's file colours, one per compared file (up to five). */
+const CHART_SERIES = [1, 2, 3, 4, 5].map((n) => `--app-chart-series-${n}`);
 
 /** A palette step, or a palette step mixed with transparent (`color-mix(in oklab, ... N%, transparent)`). */
 const FROM_PALETTE = /^(var\(--app-color-[\w-]+\)|color-mix\(in oklab, var\(--app-color-[\w-]+\) \d+%, transparent\))$/;
@@ -104,6 +108,7 @@ const OTHER_TOKENS = [
   ...['sm', 'md', 'lg', '2xl'].map((shadow) => `--app-shadow-${shadow}`),
   '--app-duration-fast', '--app-duration-base', '--app-ease',
   ...['base', 'sticky', 'menu', 'toast', 'modal'].map((layer) => `--app-z-${layer}`),
+  '--app-chart-text', ...CHART_SERIES,
 ];
 
 describe('design tokens', () => {
@@ -151,6 +156,7 @@ describe('design tokens', () => {
       ['warning-icon', 'surface'],
       ['connector', 'surface'],
       ['connector', 'page'],
+      ['chart-axis', 'surface'],
     ];
 
     it.each(textPairs)('%s on %s is at least 4.5:1', (foreground, background) => {
@@ -159,6 +165,11 @@ describe('design tokens', () => {
 
     it.each(uiPairs)('%s on %s is at least 3:1', (foreground, background) => {
       expect(contrast(`--app-color-${foreground}`, `--app-color-${background}`)).toBeGreaterThanOrEqual(3);
+    });
+
+    // Chart lines, bars and dots are graphics, so each file colour needs 3:1 on the dialog's surface.
+    it.each(CHART_SERIES)('%s on surface is at least 3:1', (series) => {
+      expect(contrast(series, '--app-color-surface')).toBeGreaterThanOrEqual(3);
     });
 
     it('converts colours correctly (black on white is 21:1, slate-500 on white about 4.76:1)', () => {
