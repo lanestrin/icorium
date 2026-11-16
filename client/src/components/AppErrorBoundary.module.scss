@@ -1,0 +1,28 @@
+// The message shown when a page fails to render: one card, centred near the top of the page.
+@use '../styles/mixins' as *;
+
+.page {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--app-space-12) var(--app-space-4);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--app-space-4);
+  width: 100%;
+  max-width: 32rem; // a short message's reading width, as the narrow dialog
+  padding: var(--app-space-6);
+}
+
+// Focused by code so screen readers start here; no ring, as the dialog panel.
+.heading {
+  outline: none;
+}
+
+.message {
+  color: var(--app-color-text-muted);
+}
