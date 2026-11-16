@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/lanestrin/icorium/compare/v1.11.0...v1.12.0) (2026-11-16)
+
+
+### Features
+
+* wrap long Architecture file paths at phone width (14.5c) ([#95](https://github.com/lanestrin/icorium/issues/95)) ([f7d7b5d](https://github.com/lanestrin/icorium/commit/f7d7b5d9229e1bd88e828872fd033b5c07579b22))
+
 ## [1.11.0](https://github.com/lanestrin/icorium/compare/v1.10.0...v1.11.0) (2026-11-16)
 
 
