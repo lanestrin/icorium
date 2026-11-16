@@ -141,6 +141,26 @@ The client styles itself with SCSS Modules on design tokens, with no utility-cla
 - **When to make a `ui/` component:** when the same control or container (button, card, dialog, menu) appears in more than one area. Add it to `client/src/components/ui/` with its module, tests and a `*.stories.tsx`; `ui/stories.test.tsx` renders every story, so a stale story fails `npm run verify`. Layout specific to one area stays in that area's module.
 - **Motion:** `base.css` shortens every animation and transition for people who ask their system for reduced motion; use `reduced-motion` for anything that needs more.
 
+## Storybook
+
+Storybook (`npm run storybook`, http://localhost:6006) documents the shared components: everything in `client/src/components/ui/` and `components/Banner.tsx`. Feature and page components have no stories; their page tests cover them.
+
+- **Update stories with the component.** Adding a shared component, or changing its props, variants or states, updates its `*.stories.tsx` in the same change.
+- **Format:** CSF 3 in `Component.stories.tsx` beside the component, titled `UI/<Name>`:
+  ```tsx
+  const meta = { title: 'UI/Button', component: Button, args: { children: 'Save' } } satisfies Meta<typeof Button>;
+  export default meta;
+  type Story = StoryObj<typeof meta>;
+  export const Loading: Story = { args: { loading: true } };
+  ```
+  Shared defaults go in meta `args`; each story sets only what differs.
+- **One story per meaningful state**, named by the state (`Primary`, `Loading`, `Disabled`, `Error`, `Empty`). Prefer `args` to a custom `render`; use `render` only to show several instances together (`Sizes`).
+- **Docs:** `parameters.docs.description.component` says what the component is for, when not to use it, and its accessibility contract. `Button.stories.tsx` is the example.
+- **No network or app state:** stories get their data from `args` and never import the API client. Callbacks use `fn()` from `storybook/test`, so they show in the Actions panel and can be asserted.
+- **Interactions** go in a story's `play` function, using `userEvent`, `expect` and `within` from `storybook/test` and querying by role and label, as the component tests do. Each scenario lives once, in its story.
+- **Styling in stories** uses the component's props and the tokens (`var(--app-space-4)`), never literal colours or sizes.
+- **Checks:** `client/src/components/ui/stories.test.tsx` renders every story in `npm run verify`, so a story that no longer matches its component fails. `npm run build-storybook` builds the static site; run it when Storybook's config, addons or a story's imports change.
+
 ## Settings
 
 The API reads these environment variables when it starts. Each is optional; unset or empty means the default. An invalid value stops the server with a message naming the variable.
