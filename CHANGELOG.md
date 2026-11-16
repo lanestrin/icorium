@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/lanestrin/icorium/compare/v1.8.0...v1.9.0) (2026-11-16)
+
+
+### Features
+
+* show a reload message when a page fails to render (14.1) ([#84](https://github.com/lanestrin/icorium/issues/84)) ([4209b09](https://github.com/lanestrin/icorium/commit/4209b098edf8817bd64653888ab83a9d24c5263e))
+
 ## [1.8.0](https://github.com/lanestrin/icorium/compare/v1.7.0...v1.8.0) (2026-11-15)
 
 
