@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/lanestrin/icorium/compare/v1.13.0...v1.14.0) (2026-11-16)
+
+
+### Features
+
+* move chart and file colours onto design tokens (14.3) ([#100](https://github.com/lanestrin/icorium/issues/100)) ([7def107](https://github.com/lanestrin/icorium/commit/7def1078c454ee33e7eeb9be8b795d38da9ab867))
+
 ## [1.13.0](https://github.com/lanestrin/icorium/compare/v1.12.0...v1.13.0) (2026-11-16)
 
 
