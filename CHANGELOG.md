@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/lanestrin/icorium/compare/v1.9.0...v1.9.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* show a clear message when an error response has none (10.13) ([#86](https://github.com/lanestrin/icorium/issues/86)) ([7100215](https://github.com/lanestrin/icorium/commit/7100215005081793157a369713cb8fc09d384ff6))
+
 ## [1.9.0](https://github.com/lanestrin/icorium/compare/v1.8.0...v1.9.0) (2026-11-16)
 
 
