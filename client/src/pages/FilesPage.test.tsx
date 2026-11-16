@@ -239,8 +239,11 @@ describe('input selection and status filtering', () => {
       await waitFor(() => expect(api.process).toHaveBeenCalledWith('invalid', processor));
       expect(api.process).toHaveBeenCalledTimes(1);
       await screen.findByRole('dialog');
-      expect(check('invalid.csv', behindDialog)).not.toBeChecked();
-      expect(within(row('invalid.csv', behindDialog)).getByText('Needs Review')).toBeInTheDocument();
+      // The list now shows today's results of this function (9.13); close the preview and show every file to check the input.
+      await user.keyboard('{Escape}');
+      await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+      expect(check('invalid.csv')).not.toBeChecked();
+      expect(within(row('invalid.csv')).getByText('Needs Review')).toBeInTheDocument();
     },
   );
 
@@ -267,9 +270,12 @@ describe('input selection and status filtering', () => {
     expect(api.process).toHaveBeenCalledTimes(2);
     expect(api.process).toHaveBeenNthCalledWith(1, 'clean', 'validation');
     expect(api.process).toHaveBeenNthCalledWith(2, 'invalid', 'validation');
-    expect(check('clean.csv', behindDialog)).not.toBeChecked();
-    expect(check('invalid.csv', behindDialog)).toBeChecked();
     expect(screen.getByRole('alert', behindDialog)).toHaveTextContent('Retry invalid');
+    // The list now shows today's results of this function (9.13); close the preview and show every file to check the inputs.
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(check('clean.csv')).not.toBeChecked();
+    expect(check('invalid.csv')).toBeChecked();
   });
 
   it('locks selection while processing, displays failure, and retains failed inputs for retry', async () => {
@@ -473,11 +479,92 @@ describe('replacing an existing result', () => {
     expect(dialog()).toHaveTextContent('Composition Validation has already been run for file clean. Running it again will replace the existing result clean-V.');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('status', behindDialog)).toHaveTextContent('Processed 1 file.');
-    expect(check('clean.csv', behindDialog)).toBeChecked();
+    // clean stays selected for the replace. The list now shows only today's results (9.13), so read the
+    // selection from the processing panel, which names the selected input.
+    expect(screen.getByTitle('clean · clean.csv')).toHaveTextContent('Input: clean · clean.csv');
     expect(api.process).toHaveBeenNthCalledWith(1, 'clean', 'validation');
     await user.dblClick(replaceButton());
     await waitFor(() => expect(api.process).toHaveBeenCalledTimes(3));
     expect(api.process).toHaveBeenNthCalledWith(3, 'clean', 'validation', true);
+  });
+});
+
+describe('show new results first', () => {
+  // Only Date is faked, so user-event's own timers keep running.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 16, 9, 30)); // 16 Nov 2026, local time
+  });
+  afterEach(() => vi.useRealTimers());
+
+  /** clean's Validation result, made just now. */
+  const madeNow = (): FileMeta => ({ ...base, id: 'clean-V', name: 'result_clean_validation.csv', status: 'Processed', processor: 'validation', sourceId: 'clean', uploadedAt: new Date().toISOString() });
+  const filter = (name: string) => screen.getByRole('combobox', { name, hidden: true });
+  const dates = () => [screen.getByLabelText('From date'), screen.getByLabelText('To date')].map((d) => (d as HTMLInputElement).value);
+  const run = (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: /^Run Processing/ }));
+
+  it('filters to today\'s results of the function that ran, keeping search and status', async () => {
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    await user.type(screen.getByRole('textbox', { name: 'Search file ID or name' }), 'clean');
+    await user.selectOptions(filter('Status'), 'Processed');
+    const made = madeNow();
+    vi.mocked(api.process).mockResolvedValue(made);
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, made]);
+    await run(user);
+
+    // One result opens its preview; behind it the list shows today's Validation results.
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+    expect(filter('Processing Function')).toHaveDisplayValue('Validation');
+    expect(dates()).toEqual(['2026-11-16', '2026-11-16']);
+    expect(screen.getByRole('textbox', { name: 'Search file ID or name' })).toHaveValue('clean');
+    expect(filter('Status')).toHaveDisplayValue('Processed');
+    expect(check(made.name)).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: withId('Select', 'clean.csv') })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(filter('Processing Function')).toHaveDisplayValue('All functions');
+    expect(dates()).toEqual(['', '']);
+    expect(check('clean.csv')).toBeInTheDocument();
+  });
+
+  it('switches from Archived to Active Files when the run starts there', async () => {
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    const made = madeNow();
+    vi.mocked(api.process).mockResolvedValue(made);
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, made]);
+    await run(user);
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('tab', { name: /Active Files/ })).toHaveAttribute('aria-selected', 'true');
+    expect(check(made.name)).toBeInTheDocument();
+  });
+
+  it('applies the filters after a partly failed batch, as well as reporting the failure', async () => {
+    const user = await setup();
+    const made = madeNow();
+    vi.mocked(api.process).mockResolvedValueOnce(made).mockRejectedValueOnce(new Error('Retry invalid'));
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, made]);
+    await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
+    await run(user);
+    await screen.findByRole('dialog');
+    expect(screen.getByRole('alert', behindDialog)).toHaveTextContent('Retry invalid');
+    expect(filter('Processing Function')).toHaveDisplayValue('Validation');
+  });
+
+  it('leaves the filters and tab alone when no result is made', async () => {
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    vi.mocked(api.process).mockRejectedValue(new Error('Server unavailable'));
+    await run(user);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Server unavailable');
+    expect(filter('Processing Function')).toHaveDisplayValue('All functions');
+    expect(dates()).toEqual(['', '']);
+    expect(screen.getByRole('tab', { name: /Archived/ })).toHaveAttribute('aria-selected', 'true');
   });
 });
 
@@ -1332,11 +1419,19 @@ describe('comparing results', () => {
     vi.mocked(api.compare).mockReturnValue(new Promise((resolve) => { answer = resolve; }));
     await user.click(check(valA.name));
     await user.click(check(valB.name));
-    await user.click(compareButton());
-    expect(compareButton()).toBeDisabled();
+    compareButton().focus();
+    await user.keyboard('{Enter}');
+    // Busy but still focusable, so a keyboard user keeps their place while the comparison loads.
+    expect(compareButton()).toHaveAttribute('aria-disabled', 'true');
+    expect(compareButton()).toHaveAttribute('aria-busy', 'true');
+    expect(compareButton()).toHaveFocus();
+    await user.keyboard('{Enter}'); // a second press while loading is ignored
+    expect(api.compare).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await act(async () => answer(comparison));
     expect(await screen.findByRole('dialog', { name: 'Compare Files' })).toBeInTheDocument();
+    const bar = screen.getByRole('toolbar', { name: 'Selected files', ...behindDialog });
+    expect(within(bar).getByRole('button', { name: /^Compare/, ...behindDialog })).not.toHaveAttribute('aria-disabled');
   });
 
   it('asks for a reload when the comparison code fails to download', async () => {
@@ -1366,19 +1461,24 @@ describe('comparing results', () => {
   it('selects the new results after a clean batch so they can be compared', async () => {
     const inputA: FileMeta = { ...clean, id: 'in-a', name: 'a.csv' };
     const inputB: FileMeta = { ...clean, id: 'in-b', name: 'b.csv' };
-    vi.mocked(api.list).mockResolvedValue([inputA, inputB, valA, valB]);
+    // Results made just now, as a real run returns them, so the list's filter to today's results (9.13) shows them.
+    const madeA: FileMeta = { ...valA, uploadedAt: new Date().toISOString() };
+    const madeB: FileMeta = { ...valB, uploadedAt: new Date().toISOString() };
+    vi.mocked(api.list).mockResolvedValue([inputA, inputB, madeA, madeB]);
     const user = userEvent.setup();
     render(<FilesPage />);
     await screen.findByRole('checkbox', { name: 'Select in-a a.csv' });
-    vi.mocked(api.process).mockResolvedValueOnce(valA).mockResolvedValueOnce(valB);
+    vi.mocked(api.process).mockResolvedValueOnce(madeA).mockResolvedValueOnce(madeB);
     await user.click(check('a.csv'));
     await user.click(check('b.csv'));
     await user.click(screen.getByRole('button', { name: 'Run Processing (2)' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Processed 2 files. Their results are selected, so you can compare them.');
     expect(check(valA.name)).toBeChecked();
     expect(check(valB.name)).toBeChecked();
-    expect(check('a.csv')).not.toBeChecked();
     expect(compareButton()).toBeEnabled();
+    // The inputs are filtered out now; show every file to check that they were cleared.
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(check('a.csv')).not.toBeChecked();
   });
 });
 
