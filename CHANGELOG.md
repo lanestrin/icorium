@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/lanestrin/icorium/compare/v1.12.0...v1.13.0) (2026-11-16)
+
+
+### Features
+
+* load the Generator, Architecture and comparison on demand (14.2) ([#98](https://github.com/lanestrin/icorium/issues/98)) ([47d1be1](https://github.com/lanestrin/icorium/commit/47d1be11fa3fe92e8aac893ae917f021133af7f9))
+
 ## [1.12.0](https://github.com/lanestrin/icorium/compare/v1.11.0...v1.12.0) (2026-11-16)
 
 
