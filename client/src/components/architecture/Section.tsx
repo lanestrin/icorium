@@ -1,10 +1,22 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
 import styles from './architecture.module.scss';
 
-/** A repository path, in code style. */
-export const Path = ({ children }: { children: string }) => <code className={styles.codeChip}>{children}</code>;
+/**
+ * A repository path, in code style. A line break is allowed after each "/" (<wbr> adds no characters, so the
+ * text and what gets copied are unchanged), so a long path wraps at a folder instead of widening a phone screen.
+ */
+export function Path({ children }: { children: string }) {
+  const parts = children.split('/');
+  return (
+    <code className={styles.codeChip}>
+      {parts.map((part, i) => (
+        <Fragment key={i}>{part}{i < parts.length - 1 && <>/<wbr /></>}</Fragment>
+      ))}
+    </code>
+  );
+}
 
 /** A short list with a green tick before each item. */
 export function Checks({ label, items }: { label: string; items: ReactNode[] }) {

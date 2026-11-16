@@ -71,7 +71,9 @@
 
 // Small shared pieces
 // A repository path or other code-like value.
+// overflow-wrap is the backstop for a single path segment wider than the line; <wbr> in Path handles the rest.
 .codeChip {
+  overflow-wrap: anywhere;
   border-radius: var(--app-radius-md);
   background: var(--app-color-surface-hover);
   padding: var(--app-space-0-5) var(--app-space-1-5);

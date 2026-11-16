@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 14.5c** `feature/14.5c-responsive-generator-and-architecture`. Start with the audit: list what breaks on the CSV Generator and Architecture pages, the page navigation and the render-error fallback at 360, 390, 768, 1024 and 1280 px, for the person to confirm before any fix.
+**Next: 14.2** `feature/14.2-lazy-pages-and-comparison`. Start by recording the production build's chunk sizes, then a component test that /generator shows its loading state before its page chunk loads.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -937,7 +937,7 @@ Added on 2026-11-15 at the person's request after reviewing the frontend archite
 
   **Done when:** interaction assertions from the stories actually run in Verify, shared scenarios have one maintained source, equivalent duplicate component tests are removed without reducing coverage, animation/reduced-motion examples are available, `npm run build-storybook` succeeds and `npm run verify` passes. The stories test finds story files by glob, fails on a shared component without stories and runs every `play`. CI runs `npm run build-storybook` on every PR.
 
-- [ ] **14.5** Responsive layout review · **P1** — Re-check every screen at phone, tablet and desktop widths and fix what breaks, at the person's request on 2026-11-16. The trigger: at phone width the file preview dialog squeezes its title and subtitle into a narrow column beside **Download CSV** and Close (the title is cut to "result_p…" and the subtitle wraps one or two words per line; `blueprint/reference/14.5-preview-dialog-phone.png`). The project rule already requires every UI to work at phone width with no sideways page scroll, so this is a defect, not a redesign. Rules for every sub-item:
+- [x] **14.5** Responsive layout review · **P1** — Re-check every screen at phone, tablet and desktop widths and fix what breaks, at the person's request on 2026-11-16. The trigger: at phone width the file preview dialog squeezes its title and subtitle into a narrow column beside **Download CSV** and Close (the title is cut to "result_p…" and the subtitle wraps one or two words per line; `blueprint/reference/14.5-preview-dialog-phone.png`). The project rule already requires every UI to work at phone width with no sideways page scroll, so this is a defect, not a redesign. Rules for every sub-item:
 
   - **Widths:** 360 and 390 px (phones), 768 (tablet), 1024 and 1280 (desktop), using the existing breakpoints (`sm` 40rem, `md` 48rem, `lg`, `xl` in `styles/_mixins.scss`). No sideways page scroll at any width; a wide data table scrolls inside its own container instead.
   - **Text:** a heading or label is never squeezed into a column too narrow to read. When space runs out, rows stack (text on its own full-width row, actions below), rather than truncating or wrapping one word per line. A long filename may still end in an ellipsis, with the full name available (title attribute or wrapping on its own row).
@@ -948,7 +948,7 @@ Added on 2026-11-15 at the person's request after reviewing the frontend archite
 
   - [x] **14.5a** `feature/14.5a-responsive-dialogs` — The dialog shell (`components/modals/Modal.tsx`, `modals.module.scss`) and every dialog: file preview, Compare Files, Data Quality Warning and Replace existing result. Below `sm`, the header stacks: title and subtitle on a full-width row, actions and Close on the row below (or Close kept top-right). Decide at spec time whether the preview fills a phone's screen like Compare (`full`). Check the preview's problem list and table, and the Compare workspace's file chips, charts and row-differences table.
   - [x] **14.5b** `feature/14.5b-responsive-file-workspace` — The CSV Files page: title row and navigation, upload drop zone, filter card, Active/Archived tabs, the file table and its ⋯ menu, selection bar, processing controls, toasts and banners.
-  - [ ] **14.5c** `feature/14.5c-responsive-generator-and-architecture` — The CSV Generator and Architecture pages, the page navigation and the render-error fallback (14.1).
+  - [x] **14.5c** `feature/14.5c-responsive-generator-and-architecture` — The CSV Generator and Architecture pages, the page navigation and the render-error fallback (14.1).
 
   **Done when (each sub-item):** its audited issues are fixed at every listed width; component tests cover the structural changes; `npm run verify` passes; the Try it now list names each screen and width to check. Component tests do not prove the layout; the person's visual check at each width does.
 
