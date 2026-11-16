@@ -28,7 +28,7 @@ function previewSubtitle(file: FileMeta) {
 function ProblemRows({ list }: { list: ProblemList }) {
   const hidden = list.total - list.items.length;
   return (
-    <section aria-label="Rows with problems" className={styles.problems}>
+    <section aria-label="Rows with problems" className={classNames(styles.problems, styles.pinned)}>
       <h3 className={styles.problemsTitle}>
         <TriangleAlert aria-hidden /> {rowsWord(list.total)} with problems in this file
       </h3>
@@ -129,7 +129,7 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
       {data && data.problems.total > 0 && <ProblemRows list={data.problems} />}
       {data && <RowsTable data={data} />}
       {data && (
-        <div className={styles.footer}>
+        <div className={classNames(styles.footer, styles.pinned)}>
           <span>Showing {data.rows.length.toLocaleString()} of {data.totalRows.toLocaleString()} rows</span>
           {remaining > 0 && (
             <Button variant="secondary" size="sm" onClick={showMore} disabled={loadingMore}>

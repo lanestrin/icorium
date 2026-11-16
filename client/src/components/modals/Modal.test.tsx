@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Modal } from './Modal';
+import styles from './modals.module.scss';
 
 /** Opens the dialog from a button and unmounts it on close, as the app's parents do. */
 function Harness({ subtitle, onClose = () => {} }: { subtitle?: string; onClose?: () => void }) {
@@ -74,5 +75,38 @@ describe('Modal', () => {
     await user.click(screen.getByText('Body text'));
     expect(onClose).not.toHaveBeenCalled();
     expect(dialog).toBeInTheDocument();
+  });
+
+  it('puts the actions in their own group, separate from the heading, with Close last', async () => {
+    const { dialog } = await openDialog({ subtitle: '25 rows' });
+    const actions = screen.getByRole('button', { name: 'Download' }).parentElement!;
+    expect(actions).toHaveClass(styles.actions);
+    expect(actions).not.toContainElement(screen.getByRole('heading', { name: 'Preview' }));
+    const header = actions.parentElement!;
+    expect(header).toHaveClass(styles.header);
+    expect(header.lastElementChild).toBe(screen.getByRole('button', { name: 'Close' }));
+    expect(dialog).toContainElement(header);
+  });
+
+  it('gives the title its full text as a tooltip', async () => {
+    await openDialog();
+    expect(screen.getByRole('heading', { name: 'Preview' })).toHaveAttribute('title', 'Preview');
+  });
+
+  it('adds no actions group when there are no actions', async () => {
+    render(<Modal title="Replace existing result?" narrow onClose={() => {}}><p>Body</p></Modal>);
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.querySelector(`.${styles.actions}`)).toBeNull();
+  });
+
+  it.each([
+    ['a wide dialog fills a phone screen', {}, styles.panelWide, styles.backdropFull],
+    ['a narrow dialog stays a card', { narrow: true }, styles.panelNarrow, styles.backdropPadded],
+    ['a full dialog fills the screen', { full: true }, styles.panelFull, styles.backdropFull],
+  ])('%s', async (_name, size, panelClass, backdropClass) => {
+    render(<Modal title="Dialog" onClose={() => {}} {...size}><p>Body</p></Modal>);
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveClass(panelClass);
+    expect(dialog.parentElement).toHaveClass(backdropClass);
   });
 });
