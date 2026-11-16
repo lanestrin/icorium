@@ -20,39 +20,48 @@
   transition-timing-function: var(--app-ease);
 }
 
-// Page layout: sidebar beside the main column on large screens. Used by FilesPage.
+// Page layout. Below lg: the title, then the sidebar (upload and processing), then the file list.
+// From lg: the sidebar on the left spans both rows, with the title above the file list on the right.
+// The DOM order is title, sidebar, file list, so reading and keyboard order match the phone layout.
 .workspace {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'title' 'sidebar' 'main';
   gap: var(--app-space-6);
   padding: var(--app-space-8) var(--app-space-4) var(--app-space-4);
   @include up(sm) {
     padding: var(--app-space-10) var(--app-space-6) var(--app-space-6);
   }
   @include up(lg) {
-    flex-direction: row;
+    grid-template-columns: 22rem minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    grid-template-areas: 'sidebar title' 'sidebar main';
+    row-gap: 0;
   }
 }
+.titleArea {
+  grid-area: title;
+}
+// Wraps under the title on phones; from sm it sits at the right end of the title row.
 .headerNav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   align-self: center;
-  gap: var(--app-space-5);
-  margin-left: auto;
+  gap: var(--app-space-2) var(--app-space-5);
   @include text-sm;
   font-weight: var(--app-weight-medium);
+  @include up(sm) {
+    margin-left: auto;
+  }
 }
 
 // Sidebar
 .sidebar {
+  grid-area: sidebar;
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
   gap: var(--app-space-8);
-  width: 100%;
-  @include up(lg) {
-    width: 22rem;
-  }
 }
 .dropZone {
   border: 2px dashed var(--app-color-border-strong);
@@ -74,6 +83,9 @@
 }
 .dropText {
   color: var(--app-color-text-secondary);
+}
+.chooseFiles {
+  margin: 0 auto;
 }
 .uploading {
   margin-top: var(--app-space-2);
@@ -454,6 +466,33 @@
   padding-right: var(--app-space-4);
   text-align: center;
 }
+// The checkbox and Actions columns stay in view while the table scrolls sideways on narrow screens.
+// Sticky cells need their own background: the row's colour, so hover and selection still show.
+.pinnedLeft,
+.pinnedRight {
+  position: sticky;
+  z-index: var(--app-z-base);
+  background: var(--app-color-surface);
+}
+.pinnedLeft {
+  left: 0;
+}
+.pinnedRight {
+  right: 0;
+}
+.headRow > .pinnedLeft,
+.headRow > .pinnedRight {
+  z-index: var(--app-z-sticky); // above the pinned body cells when both scroll
+  background: var(--app-color-surface-subtle);
+}
+.row:hover > .pinnedLeft,
+.row:hover > .pinnedRight {
+  background: var(--app-color-surface-subtle);
+}
+.rowChecked > .pinnedLeft,
+.rowChecked > .pinnedRight {
+  background: var(--app-color-primary-surface);
+}
 .checkbox {
   width: 18px;
   height: 18px;
@@ -725,7 +764,7 @@
   padding-bottom: var(--app-space-10);
 }
 .main {
-  flex: 1;
+  grid-area: main;
   min-width: 0;
 }
 .tabPanel {
