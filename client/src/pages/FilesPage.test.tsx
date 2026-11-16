@@ -1372,3 +1372,31 @@ describe('request ordering', () => {
     expect(within(toast).queryByText('Available when processing finishes')).not.toBeInTheDocument();
   });
 });
+
+describe('first load', () => {
+  it('says the files are loading until the list arrives', async () => {
+    let answer!: (list: FileMeta[]) => void;
+    vi.mocked(api.list).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    render(<FilesPage />);
+
+    expect(screen.getByText('Loading files…')).toBeInTheDocument();
+    expect(screen.queryByText('No CSV files match your filters.')).not.toBeInTheDocument();
+
+    await act(async () => answer([clean, invalid, result]));
+
+    expect(check('clean.csv')).toBeInTheDocument();
+    expect(screen.queryByText('Loading files…')).not.toBeInTheDocument();
+  });
+
+  it('shows the error banner and stops loading when the list fails', async () => {
+    let fail!: (error: Error) => void;
+    vi.mocked(api.list).mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+    render(<FilesPage />);
+    expect(screen.getByText('Loading files…')).toBeInTheDocument();
+
+    await act(async () => fail(new Error('Server unavailable')));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Server unavailable');
+    expect(screen.queryByText('Loading files…')).not.toBeInTheDocument();
+  });
+});

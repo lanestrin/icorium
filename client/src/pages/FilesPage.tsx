@@ -35,7 +35,7 @@ export function FilesPage() {
   const [comparing, setComparing] = useState(false);
   const busy = useRef(false); // set synchronously, so a double click cannot start a second batch or archive
 
-  const { files, refresh, upload, uploading } = useFileList(setError);
+  const { files, refresh, upload, uploading, loading } = useFileList(setError);
   const { selectedIds, setSelectedIds, toggle, toggleAll } = useSelection();
   const {
     search, setSearch, from, setFrom, to, setTo, status, setStatus, fn, setFn, tab, setTab,
@@ -144,7 +144,8 @@ export function FilesPage() {
               onPreview={setPreview}
               onRestore={viewArchived ? (f) => setArchived([f.id], false) : undefined}
               restoreDisabled={archiving}
-              emptyMessage={viewArchived && !archivedCount ? 'No archived files. Select files in Active Files and click Archive to move them here.' : undefined}
+              emptyMessage={loading ? 'Loading files…'
+                : viewArchived && !archivedCount ? 'No archived files. Select files in Active Files and click Archive to move them here.' : undefined}
             />
           </div>
         </main>

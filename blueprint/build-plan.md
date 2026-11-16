@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 10.14** `fix/file-list-loading-state`. Start with a component test that the file table shows "Loading files…" until the first list request settles.
+**Next: 14.2** `feature/14.2-lazy-pages-and-comparison`. Start by recording the production build's chunk sizes, then a component test that /generator shows its loading state before its page chunk loads.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -657,7 +657,7 @@ the Architecture page, update the page in the same item.
 
 - [x] **10.13** `fix/blank-error-messages` · **P1** — Errors that come from Vercel itself show an empty message, found in a review on 2026-11-13. Vercel rejects requests over 4.5 MB before they reach the app (the app allows 10 MB), and its timeouts and crashed functions also answer without the app's `{ message }` JSON. `client/src/lib/api.ts` then falls back to `res.statusText`, which is usually empty over HTTP/2. When a failed response has no message, show one based on the error code instead. For a 413, say the file is too large to upload online (about 4.5 MB). For anything else, say the server could not complete the request and give the error code. Add a client unit test for both cases and one where the server's own message still shows.
 
-- [ ] **10.14** `fix/file-list-loading-state` · **P2** — On first load, the file table says "No CSV files match your filters." until the list arrives, found in a review on 2026-11-13. Online, with a slow list (10.11), the app looks empty. `useFileList` (`client/src/hooks/useFileList.ts`) starts with `[]`. Add a `loading` state that lasts until the first `api.list()` settles, and show "Loading files…" in the table's empty row. A failure still shows the error banner. Component tests for loading → loaded and loading → error.
+- [x] **10.14** `fix/file-list-loading-state` · **P2** — On first load, the file table says "No CSV files match your filters." until the list arrives, found in a review on 2026-11-13. Online, with a slow list (10.11), the app looks empty. `useFileList` (`client/src/hooks/useFileList.ts`) starts with `[]`. Add a `loading` state that lasts until the first `api.list()` settles, and show "Loading files…" in the table's empty row. A failure still shows the error banner. Component tests for loading → loaded and loading → error.
 
 - [ ] **10.15** `fix/online-size-limits` · **P2** — Online, Vercel can't send a response over 4.5 MB, found in a review on 2026-11-13. Measured: a result is about 2× its input (5,000 rows: 225 KB → 439 KB for Classification), so an input over about 2.3 MB uploads but its result can't be downloaded. Comparing 5 files fails above about 16,000 rows each (5 × 20,000 rows is a 5.57 MB response). Recommended: set `MAX_UPLOAD_MB=2` on the Vercel deployment and document it, so the server refuses larger CSVs with its own clear message, and have comparison return a plain "too many rows to compare online" 400 above a set row count. Confirm the approach with the person when the spec starts. Whether to add deleting or resetting files online (archive only hides them) is a separate open decision, not part of this item.
 
