@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 14.1** `feature/14.1-render-error-recovery`. Start with a component test that a component throwing during render shows the fallback with a **Reload** action.
+**Next: 10.13** `fix/blank-error-messages`. Start with a client unit test that a failed 413 response with no message body shows the too-large message.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -897,7 +897,7 @@ Added on 2026-11-14 at the person's request. The client moves from Tailwind util
 
 Added on 2026-11-15 at the person's request after reviewing the frontend architecture. This follows M13 without introducing a state-management library, query library, router, form framework or animation library. Keep the existing feature folders, focused hooks, shared types and API module. Existing request-race coverage (10.3), client structure (10.8), file-list loading (10.14) and online limits (10.15) remain their own items; do not duplicate them here. 10.13 and 10.14 are built inside this block, between 14.1 and 14.2, under their own IDs and branches (see "What to build next").
 
-- [ ] **14.1** `feature/14.1-render-error-recovery` · **P2** — Add a small React error boundary around the app with a readable fallback and a Reload action. Keep request failures in the existing error banners; the boundary handles rendering failures. Do not add telemetry or automatic retry loops.
+- [x] **14.1** `feature/14.1-render-error-recovery` · **P2** — Add a small React error boundary around the app with a readable fallback and a Reload action. Keep request failures in the existing error banners; the boundary handles rendering failures. Do not add telemetry or automatic retry loops.
 
   **Done when:** a rendering failure shows the fallback instead of an empty app, Reload requests a page reload, and normal rendering and request-error banners keep working. Component tests exercise the failure and recovery action; `npm run verify` passes.
 
