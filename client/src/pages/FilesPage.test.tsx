@@ -6,6 +6,7 @@ import { FilesPage } from './FilesPage';
 import { Modal } from '../components/modals/Modal';
 import { PreviewModal } from '../components/modals/PreviewModal';
 import modalStyles from '../components/modals/modals.module.scss';
+import fileStyles from '../components/files/files.module.scss';
 import { api } from '../lib/api';
 
 vi.mock('../lib/api', () => ({ api: {
@@ -1410,5 +1411,41 @@ describe('first load', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Server unavailable');
     expect(screen.queryByText('Loading files…')).not.toBeInTheDocument();
+  });
+});
+
+describe('layout at phone width', () => {
+  it('puts the page title before the upload and processing controls, all in the main landmark', async () => {
+    await setup();
+    const main = screen.getByRole('main');
+    const heading = within(main).getByRole('heading', { level: 1, name: 'CSV Files' });
+    const upload = within(main).getByRole('button', { name: 'browse files' });
+    // DOCUMENT_POSITION_FOLLOWING: the upload control comes after the heading, so reading and Tab order start at the title.
+    expect(heading.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(screen.getByRole('navigation', { name: 'Pages' })).getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
+  });
+
+  it('pins the checkbox and Actions columns while the table scrolls sideways', async () => {
+    await setup();
+    expect(screen.getByRole('checkbox', { name: 'Select all files' }).closest('th')).toHaveClass(fileStyles.pinnedLeft);
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toHaveClass(fileStyles.pinnedRight);
+    const cleanRow = row('clean.csv');
+    expect(check('clean.csv').closest('td')).toHaveClass(fileStyles.pinnedLeft);
+    expect(within(cleanRow).getByRole('button', { name: /^Actions for / }).closest('td')).toHaveClass(fileStyles.pinnedRight);
+  });
+
+  it('offers one Choose CSV files button on a touch screen, which opens the file picker', async () => {
+    const desktop = window.matchMedia;
+    window.matchMedia = ((media: string) => ({ ...desktop(media), matches: false })) as typeof window.matchMedia;
+    try {
+      const user = await setup();
+      expect(screen.queryByText(/Drop CSV files here/)).not.toBeInTheDocument();
+      const picker = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+      const opened = vi.spyOn(picker, 'click');
+      await user.click(screen.getByRole('button', { name: 'Choose CSV files' }));
+      expect(opened).toHaveBeenCalledTimes(1);
+    } finally {
+      window.matchMedia = desktop;
+    }
   });
 });

@@ -8,11 +8,16 @@ import styles from './files.module.scss';
 type SelectedInput = { id: string; name: string };
 const describe = (file: SelectedInput) => `${file.id} · ${file.name}`;
 
+/** A mouse or trackpad can drag files in; a touch screen can't, so it only gets the button. */
+const CAN_DRAG_FILES = '(pointer: fine)';
+
 /** The upload drop zone: drop CSV files on it, or browse for them. */
 function DropZone({ uploading, onUpload }: { uploading: boolean; onUpload: (files: File[]) => void }) {
   const input = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const upload = (list: FileList | null) => list?.length && onUpload([...list]);
+  const canDrag = window.matchMedia(CAN_DRAG_FILES).matches;
+  const browse = () => input.current?.click();
 
   function onDrop(e: DragEvent) {
     e.preventDefault();
@@ -28,12 +33,16 @@ function DropZone({ uploading, onUpload }: { uploading: boolean; onUpload: (file
       className={classNames(styles.dropZone, isDragOver && styles.dropZoneActive)}
     >
       <CloudUpload className={styles.dropIcon} strokeWidth={1.5} aria-hidden />
-      <p className={styles.dropText}>
-        Drop CSV files here
-        <br />
-        or{' '}
-        <Button variant="link" onClick={() => input.current?.click()}>browse files</Button>
-      </p>
+      {canDrag ? (
+        <p className={styles.dropText}>
+          Drop CSV files here
+          <br />
+          or{' '}
+          <Button variant="link" onClick={browse}>browse files</Button>
+        </p>
+      ) : (
+        <Button variant="secondary" className={styles.chooseFiles} onClick={browse}>Choose CSV files</Button>
+      )}
       {uploading && <p className={styles.uploading}>Uploading…</p>}
       <input ref={input} type="file" accept=".csv,text/csv" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
     </div>

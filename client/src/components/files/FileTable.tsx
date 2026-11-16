@@ -59,7 +59,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
         <table className={classNames(styles.table, archived && styles.tableArchived)}>
           <thead>
             <tr className={styles.headRow}>
-              <th className={styles.checkboxHead}>
+              <th className={classNames(styles.checkboxHead, styles.pinnedLeft)}>
                 <input
                   type="checkbox"
                   className={styles.checkbox}
@@ -82,7 +82,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
               )}
               <th className={styles.gapRight}>Processing function</th>
               <th>Status</th>
-              <th className={styles.actionsHead}>Actions</th>
+              <th className={classNames(styles.actionsHead, styles.pinnedRight)}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -94,7 +94,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   onClick={() => canSelect && onToggle(file.id)}
                   className={classNames(styles.row, canSelect && styles.rowSelectable, isChecked && styles.rowChecked)}
                 >
-                  <td className={styles.checkboxCell}>
+                  <td className={classNames(styles.checkboxCell, styles.pinnedLeft)}>
                     <input
                       type="checkbox"
                       className={styles.checkbox}
@@ -123,7 +123,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   <td>
                     <div className={classNames(styles.nowrap, styles.gapRight)}><StatusBadge status={displayStatus(file, processingId, failedIds)} /></div>
                   </td>
-                  <td>
+                  <td className={styles.pinnedRight}>
                     <div className={styles.actionsCell}>
                       <RowMenu file={file} onPreview={() => onPreview(file)} onRestore={archived && onRestore ? () => onRestore(file) : undefined} disabled={restoreDisabled} />
                     </div>

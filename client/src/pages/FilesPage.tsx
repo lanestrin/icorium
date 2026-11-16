@@ -68,7 +68,21 @@ export function FilesPage() {
 
   return (
     <div className={classNames(page.shell, styles.filesPage)}>
-      <div className={styles.workspace}>
+      <main className={styles.workspace}>
+        <div className={classNames(page.titleRow, styles.titleArea)}>
+          <h1 className={page.title}>CSV Files</h1>
+          <p className={page.intro}>Upload, preview, process, and compare refrigerant datasets.</p>
+          <nav aria-label="Pages" className={styles.headerNav}>
+            <a href="/generator" className={page.navLink}>
+              <Wand2 aria-hidden /> CSV Generator
+            </a>
+            <a href="/architecture" className={page.navLink}>
+              <Network aria-hidden /> Architecture
+            </a>
+            <AppVersion />
+          </nav>
+        </div>
+
         <Sidebar
           processor={processor}
           setProcessor={setProcessor}
@@ -80,21 +94,7 @@ export function FilesPage() {
           selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
         />
 
-        <main className={styles.main}>
-          <div className={page.titleRow}>
-            <h1 className={page.title}>CSV Files</h1>
-            <p className={page.intro}>Upload, preview, process, and compare refrigerant datasets.</p>
-            <nav aria-label="Pages" className={styles.headerNav}>
-              <a href="/generator" className={page.navLink}>
-                <Wand2 aria-hidden /> CSV Generator
-              </a>
-              <a href="/architecture" className={page.navLink}>
-                <Network aria-hidden /> Architecture
-              </a>
-              <AppVersion />
-            </nav>
-          </div>
-
+        <div className={styles.main}>
           <FileFilters
             search={search} setSearch={setSearch} from={from} setFrom={setFrom} to={to} setTo={setTo}
             fn={fn} setFn={setFn} status={status} setStatus={setStatus}
@@ -148,8 +148,8 @@ export function FilesPage() {
                 : viewArchived && !archivedCount ? 'No archived files. Select files in Active Files and click Archive to move them here.' : undefined}
             />
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
 
       {toast && (
         <ArchiveToast
