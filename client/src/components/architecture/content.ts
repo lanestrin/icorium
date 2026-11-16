@@ -125,11 +125,11 @@ export const TECH: Tech[] = [
     name: 'Storybook 10', label: 'Storybook', role: 'Component docs', icon: BookOpen,
     packages: [['client', 'storybook'], ['client', '@storybook/react-vite']],
     why: [
-      'Shows every shared ui/ component in each variant, size and state, with notes on when to use it.',
-      'A Vitest test renders every story, so a story that no longer matches its component fails npm run verify.',
+      'Shows every shared component (ui/, the banner, the dialog and the row menu) in each variant, size and state, with notes on when to use it.',
+      'A Vitest test renders every story and runs its play function, so a story or interaction that no longer matches its component fails npm run verify.',
     ],
-    tradeoff: 'A development-only tool with its own build (npm run build-storybook), kept out of the app and the release zip.',
-    files: ['client/.storybook/main.ts', 'client/src/components/ui/Button.stories.tsx', 'client/src/components/ui/stories.test.tsx'],
+    tradeoff: 'A development-only tool with its own build (npm run build-storybook, which CI runs on every PR), kept out of the app and the release zip.',
+    files: ['client/.storybook/main.ts', 'client/src/components/ui/Button.stories.tsx', 'client/src/components/stories.test.tsx'],
   },
   {
     name: 'Local filesystem / Vercel Blob', label: 'Files / Blob', role: 'File storage', icon: Database, packages: [['server', '@vercel/blob']],
