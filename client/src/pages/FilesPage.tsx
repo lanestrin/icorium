@@ -47,7 +47,7 @@ export function FilesPage() {
   } = useFilters();
   const { archiving, toast, dismissToast, setArchived } = useArchive({ busy, refresh, deselect: (ids) => toggleAll(ids, false), onError: setError });
   const { processor, setProcessor, processingId, failedIds, pending, cancelPending, requestRun, confirmRun } =
-    useProcessing({ files, busy, refresh, setSelectedIds, onError: setError, onNotice: setNotice, onPreview: setPreview });
+    useProcessing({ files, busy, refresh, setSelectedIds, onError: setError, onNotice: setNotice, onPreview: setPreview, onResults: showNewFiles });
 
   const selectedInputs = files.filter((f) => selectedIds.has(f.id) && isInputFile(f) && !f.archived);
   const visible = useMemo(

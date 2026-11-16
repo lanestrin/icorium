@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 9.13** `feature/9.13-show-new-results-first`. Start with a FilesPage test that a Run Processing batch which makes at least one result calls 9.12's `showNewFiles` with the function that was run.
+**Next: 10.11** `perf/blob-storage-lookups`. Start with a blob-storage unit test that `list()` reads only file metadata and never downloads a stored file's CSV text.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -426,7 +426,7 @@ user confirms before Mass or Classification calculates on a file with problems.
 
 - [x] **9.12** `feature/9.12-show-new-uploads-first` · **P2** — After an upload, set the file list's filters so the new files show first, at the person's request on 2026-11-13: **Processing Function** becomes **Original** and **Date Range** becomes today to today (the browser's local date). This only happens when at least one file in the upload succeeds. If the Archived tab is open, switch to Active Files, where new uploads land. Search and Status are left as they are. The person can still change any filter, and **Clear filters** shows everything again. Uploads made from the CSV Generator page are not covered. No API change: the filters work in the browser, so this shortens what is shown but not what the server sends (that is 10.11).
 
-- [ ] **9.13** `feature/9.13-show-new-results-first` · **P2** — After **Run Processing**, set the file list's filters so the new results show first, at the person's request on 2026-11-13. **Processing Function** becomes the function that was run (**Validation**, **Mass Calculation** or **Classification**), and **Date Range** becomes today to today (the browser's local date). This only happens when at least one result is made. A replaced result counts, since replacing gives it today's date. If the Archived tab is open, switch to Active Files. Search and Status are left as they are. **Clear filters** still shows everything. Reuse the 9.12 filter change rather than adding a second one. No API change.
+- [x] **9.13** `feature/9.13-show-new-results-first` · **P2** — After **Run Processing**, set the file list's filters so the new results show first, at the person's request on 2026-11-13. **Processing Function** becomes the function that was run (**Validation**, **Mass Calculation** or **Classification**), and **Date Range** becomes today to today (the browser's local date). This only happens when at least one result is made. A replaced result counts, since replacing gives it today's date. If the Archived tab is open, switch to Active Files. Search and Status are left as they are. **Clear filters** still shows everything. Reuse the 9.12 filter change rather than adding a second one. No API change.
 
   **Depends on:** 9.12.
 

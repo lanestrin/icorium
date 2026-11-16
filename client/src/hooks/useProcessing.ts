@@ -8,7 +8,7 @@ import { errorMessage, plural, type Report } from '../lib/format';
 export interface PendingRun { batch: FileMeta[]; processor: ProcessorId; warning?: QualityWarning; items?: Replacement[] }
 
 /** Running a processing function over input files, one at a time, with its confirmation dialogs. */
-export function useProcessing({ files, busy, refresh, setSelectedIds, onError, onNotice, onPreview }: {
+export function useProcessing({ files, busy, refresh, setSelectedIds, onError, onNotice, onPreview, onResults }: {
   files: FileMeta[];
   busy: MutableRefObject<boolean>;
   refresh: () => Promise<void>;
@@ -16,6 +16,8 @@ export function useProcessing({ files, busy, refresh, setSelectedIds, onError, o
   onError: Report;
   onNotice: Report;
   onPreview: (file: FileMeta) => void;
+  /** Called once after a batch that made at least one result, with the function that was run. */
+  onResults: (processor: ProcessorId) => void;
 }) {
   const [processor, setProcessor] = useState<ProcessorId>('validation');
   const [processingId, setProcessingId] = useState<string>(); // batches run one file at a time
@@ -76,6 +78,8 @@ export function useProcessing({ files, busy, refresh, setSelectedIds, onError, o
     const comparable = !failed.size && !conflicts.length && made.length >= 2;
     setSelectedIds(comparable ? new Set(made.map((m) => m.id)) : new Set([...failed, ...conflicts.map((c) => c.input.id)]));
     if (errors.length) onError(`Processing failed\n${errors.join('\n')}`);
+    // Show what was just made (today's results of this function), before any preview or dialog opens over the list.
+    if (made.length) onResults(processor);
 
     if (conflicts.length) {
       await refresh(); // show the result that appeared
