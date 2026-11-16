@@ -114,11 +114,11 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 14.2** `feature/14.2-lazy-pages-and-comparison`. Start by recording the production build's chunk sizes, then a component test that /generator shows its loading state before its page chunk loads.
+**Next: 14.5a** `feature/14.5a-responsive-dialogs`. Start with the file preview dialog at 375 px wide (`blueprint/reference/14.5-preview-dialog-phone.png`): a component test that the dialog header puts the title and subtitle on their own full-width row above the actions.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
-1. **Frontend first:** 14.1 → 10.13 → 10.14 → 14.2 → 14.3 → 14.4. 10.13 and 10.14 keep their own IDs and branches. 14.2 reuses 14.1's fallback and the loading and error states from 10.13 and 10.14, and 14.4's stories show the tokens 14.3 adds.
+1. **Frontend first:** 14.1 → 10.13 → 10.14 → 14.5a → 14.5b → 14.5c → 14.2 → 14.3 → 14.4. 10.13 and 10.14 keep their own IDs and branches. 14.5 comes before the rest of M14 (added 2026-11-16): it fixes layouts that break the project's phone-width rule now, and 14.2's loading states and 14.4's stories should be built on the corrected layouts. 14.2 reuses 14.1's fallback and the loading and error states from 10.13 and 10.14, and 14.4's stories show the tokens 14.3 adds.
 2. **Then:** 9.12 → 9.13 → 10.11 → 10.15 → 9.14a → 9.14b → 9.14c → 9.15. 9.14 depends on 10.13, which the frontend block finishes first.
 
 New work needs a new request: add it as a new stable ID with its scope before building, or use a `fix/` branch for a bug.
@@ -936,6 +936,21 @@ Added on 2026-11-15 at the person's request after reviewing the frontend archite
   **Depends on:** 13.7.
 
   **Done when:** interaction assertions from the stories actually run in Verify, shared scenarios have one maintained source, equivalent duplicate component tests are removed without reducing coverage, animation/reduced-motion examples are available, `npm run build-storybook` succeeds and `npm run verify` passes. The stories test finds story files by glob, fails on a shared component without stories and runs every `play`. CI runs `npm run build-storybook` on every PR.
+
+- [ ] **14.5** Responsive layout review · **P1** — Re-check every screen at phone, tablet and desktop widths and fix what breaks, at the person's request on 2026-11-16. The trigger: at phone width the file preview dialog squeezes its title and subtitle into a narrow column beside **Download CSV** and Close (the title is cut to "result_p…" and the subtitle wraps one or two words per line; `blueprint/reference/14.5-preview-dialog-phone.png`). The project rule already requires every UI to work at phone width with no sideways page scroll, so this is a defect, not a redesign. Rules for every sub-item:
+
+  - **Widths:** 360 and 390 px (phones), 768 (tablet), 1024 and 1280 (desktop), using the existing breakpoints (`sm` 40rem, `md` 48rem, `lg`, `xl` in `styles/_mixins.scss`). No sideways page scroll at any width; a wide data table scrolls inside its own container instead.
+  - **Text:** a heading or label is never squeezed into a column too narrow to read. When space runs out, rows stack (text on its own full-width row, actions below), rather than truncating or wrapping one word per line. A long filename may still end in an ellipsis, with the full name available (title attribute or wrapping on its own row).
+  - **Touch:** every control stays at least 24×24 CSS px with room between targets (WCAG 2.5.8), and nothing needs hover to be reachable.
+  - **Look:** desktop layouts don't change except where a fix requires it. Tokens and mixins only, per the README's Styling rules.
+  - **Audit first:** each sub-item starts with a written list of what breaks at each width in its area, from reading the styles plus the person's screenshots. The person confirms the list before fixes start. There is no browser test harness, and jsdom can't measure layout, so tests cover structure (which element holds the actions, classes through the imported module), and each item ends with a Try it now list for every width.
+  - **Storybook:** a shared component whose layout changes gets its stories updated in the same item.
+
+  - [ ] **14.5a** `feature/14.5a-responsive-dialogs` — The dialog shell (`components/modals/Modal.tsx`, `modals.module.scss`) and every dialog: file preview, Compare Files, Data Quality Warning and Replace existing result. Below `sm`, the header stacks: title and subtitle on a full-width row, actions and Close on the row below (or Close kept top-right). Decide at spec time whether the preview fills a phone's screen like Compare (`full`). Check the preview's problem list and table, and the Compare workspace's file chips, charts and row-differences table.
+  - [ ] **14.5b** `feature/14.5b-responsive-file-workspace` — The CSV Files page: title row and navigation, upload drop zone, filter card, Active/Archived tabs, the file table and its ⋯ menu, selection bar, processing controls, toasts and banners.
+  - [ ] **14.5c** `feature/14.5c-responsive-generator-and-architecture` — The CSV Generator and Architecture pages, the page navigation and the render-error fallback (14.1).
+
+  **Done when (each sub-item):** its audited issues are fixed at every listed width; component tests cover the structural changes; `npm run verify` passes; the Try it now list names each screen and width to check. Component tests do not prove the layout; the person's visual check at each width does.
 
 ### M7 — Final interview readiness
 
