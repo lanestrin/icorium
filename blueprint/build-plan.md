@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 14.4** `feature/14.4-storybook-interaction-coverage`. Start by listing each Button, Card, Banner, Dialog and row-menu behaviour that standalone component tests cover today, then make `ui/stories.test.tsx` run one story's `play` assertions under `npm run verify`.
+**Next: 9.12** `feature/9.12-show-new-uploads-first`. The frontend-first block is finished. Start with a FilesPage test that a successful upload sets Processing Function to Original and the date range to today, and switches from Archived to Active Files.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -918,7 +918,7 @@ Added on 2026-11-15 at the person's request after reviewing the frontend archite
 
   **Done when:** chart presentation uses the central tokens, comparison values and series identities are unchanged, and existing chart/comparison coverage and `npm run verify` pass. Include desktop and phone comparison views in the Try it now list; component tests alone do not establish chart drawing or visual correctness.
 
-- [ ] **14.4** `feature/14.4-storybook-interaction-coverage` · **P2** — Make stories the shared source for reusable component scenarios. Extend the Button and Card stories with Banner, Dialog and row-menu stories, including variants and relevant loading, disabled, error and empty states. Add executable interaction assertions for clicks, keyboard navigation, focus trapping/return, Escape, outside clicks and callbacks where applicable. Run story assertions through the existing Vitest/React Testing Library setup as part of `npm run verify`; rendering a story alone is insufficient. Preserve feature-specific integration tests, including the non-modal row menu's outside-click behaviour and FilesPage dialog focus contract.
+- [x] **14.4** `feature/14.4-storybook-interaction-coverage` · **P2** — Make stories the shared source for reusable component scenarios. Extend the Button and Card stories with Banner, Dialog and row-menu stories, including variants and relevant loading, disabled, error and empty states. Add executable interaction assertions for clicks, keyboard navigation, focus trapping/return, Escape, outside clicks and callbacks where applicable. Run story assertions through the existing Vitest/React Testing Library setup as part of `npm run verify`; rendering a story alone is insufficient. Preserve feature-specific integration tests, including the non-modal row menu's outside-click behaviour and FilesPage dialog focus contract.
 
   - Remove equivalent standalone component test cases only after the story-based tests execute the same assertions and cover the same behaviour. Keep hook, pure-logic, API and page-workflow tests. Do not retain two copies of the same component scenario merely because one is a story.
   - Stories demonstrate the motion the components actually implement: colour transitions on `--app-duration-fast` and `--app-ease`, the loading spinner keyframe, and the global `prefers-reduced-motion` rule in `styles/base.css`. The dialog and row menu have no entrance or exit animation, and this item adds none. Document durations and easing through the existing motion tokens, and include reduced-motion examples.

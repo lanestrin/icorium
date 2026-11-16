@@ -29,3 +29,6 @@ jobs:
 
       # Unit + API tests, client type-check and build
       - run: npm run verify
+
+      # Builds Storybook, so a broken config or story import fails the PR (kept out of local verify)
+      - run: npm run build-storybook

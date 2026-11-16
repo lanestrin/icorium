@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { Card } from './Card';
 
 const meta = {
@@ -7,7 +8,7 @@ const meta = {
   args: {
     children: (
       <>
-        <h3 style={{ fontWeight: 600 }}>Local development</h3>
+        <h3 style={{ fontWeight: 'var(--app-weight-semibold)' }}>Local development</h3>
         <p>Node.js API with filesystem storage.</p>
       </>
     ),
@@ -28,18 +29,47 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
-export const Section: Story = { args: { as: 'section', 'aria-label': 'Selected technology' } };
-export const Article: Story = { args: { as: 'article' } };
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    // The card is the only element the story renders.
+    await expect(canvasElement.firstElementChild?.tagName).toBe('DIV');
+  },
+};
+
+export const Section: Story = {
+  args: { as: 'section', 'aria-label': 'Selected technology', 'aria-live': 'polite' },
+  play: async ({ canvasElement }) => {
+    // Attributes pass through, so a labelled section is a named region.
+    const region = within(canvasElement).getByRole('region', { name: 'Selected technology' });
+    await expect(region).toHaveAttribute('aria-live', 'polite');
+  },
+};
+
+export const Article: Story = {
+  args: { as: 'article' },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByRole('article')).toBeInTheDocument();
+  },
+};
+
 export const Form: Story = {
   args: {
     as: 'form',
     'aria-label': 'Generate CSV files',
-    onSubmit: (event) => event.preventDefault(),
+    onSubmit: fn((event: { preventDefault: () => void }) => event.preventDefault()),
     children: (
-      <label>
-        Rows <input type="number" defaultValue={20} style={{ marginLeft: '0.5rem', border: 'var(--app-border-width) solid var(--app-color-border-strong)' }} />
-      </label>
+      <>
+        <label>
+          Rows <input type="number" defaultValue={20} style={{ marginLeft: 'var(--app-space-2)', border: 'var(--app-border-width) solid var(--app-color-border-strong)' }} />
+        </label>
+        <button type="submit">Generate</button>
+      </>
     ),
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole('form', { name: 'Generate CSV files' })).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: 'Generate' }));
+    await expect(args.onSubmit).toHaveBeenCalledTimes(1);
   },
 };
