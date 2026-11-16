@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/lanestrin/icorium/compare/v1.9.2...v1.10.0) (2026-11-16)
+
+
+### Features
+
+* make the dialogs work at phone width (14.5a) ([#91](https://github.com/lanestrin/icorium/issues/91)) ([2156f9c](https://github.com/lanestrin/icorium/commit/2156f9c5181b65c40345a254d8c153a519ef977a))
+
 ## [1.9.2](https://github.com/lanestrin/icorium/compare/v1.9.1...v1.9.2) (2026-11-16)
 
 
