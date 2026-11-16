@@ -125,6 +125,10 @@
   --app-color-focus: var(--app-color-blue-500);
   /* Arrows and lines that join boxes in a diagram (3:1 on the page and on white). */
   --app-color-connector: var(--app-color-blue-500);
+  /* Comparison charts: grid lines, axis labels (4.76:1 on white) and the zero line of a deviation chart. */
+  --app-color-chart-grid: var(--app-color-border);
+  --app-color-chart-axis: var(--app-color-slate-500);
+  --app-color-chart-reference: var(--app-color-slate-400);
   --app-disabled-opacity: 0.5;
 
   /* Type */
@@ -178,6 +182,16 @@
   --app-radius-2xl: 1rem;
   --app-radius-full: 9999px;
   --app-border-width: 1px;
+
+  /* Charts. Tick labels are 11px; axis titles use --app-text-xs. One colour per compared file, in
+     order: a file keeps it in every chip, dot, chart line, bar and legend. These are fixed data colours,
+     not palette aliases, and each is at least 3:1 on the surface (WCAG non-text contrast). */
+  --app-chart-text: 0.6875rem;
+  --app-chart-series-1: #2563eb;
+  --app-chart-series-2: #d97706;
+  --app-chart-series-3: #16a34a;
+  --app-chart-series-4: #9333ea;
+  --app-chart-series-5: #ec4899;
 
   /* Shadows */
   --app-shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);

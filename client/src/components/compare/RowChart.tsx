@@ -35,11 +35,11 @@ export function RowChart({ col, result, labels, deviation, setDeviation }: {
       <div className={styles.chartArea}>
         <ResponsiveContainer>
           <LineChart data={data} margin={{ top: 10, right: 10, bottom: 10, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd"
-              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5, fontSize: 12, fill: '#64748b' }} />
-            <YAxis tick={{ fontSize: 11 }} domain={domain ?? ['auto', 'auto']} allowDataOverflow={false} tickFormatter={formatTick} />
-            {deviation && <ReferenceLine y={0} stroke="#94a3b8" />}
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--app-color-chart-grid)" />
+            <XAxis dataKey="label" tick={{ fontSize: 'var(--app-chart-text)' }} interval="preserveStartEnd"
+              label={{ value: xAxisLabel, position: 'insideBottom', offset: -5, fontSize: 'var(--app-text-xs)', fill: 'var(--app-color-chart-axis)' }} />
+            <YAxis tick={{ fontSize: 'var(--app-chart-text)' }} domain={domain ?? ['auto', 'auto']} allowDataOverflow={false} tickFormatter={formatTick} />
+            {deviation && <ReferenceLine y={0} stroke="var(--app-color-chart-reference)" />}
             <Tooltip formatter={formatTooltip} />
             <Legend verticalAlign="bottom" wrapperStyle={{ paddingTop: 12 }} />
             {files.map((file, k) => (

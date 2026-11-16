@@ -1159,6 +1159,9 @@ describe('comparing results', () => {
     // Each chip shows the short label and, separately, the File ID, so files with the same name stay distinct.
     expect(chips.map((c) => c.textContent)).toEqual(['Partner A · Baselineval-a', 'Partner B · Followupval-b', 'Partner C · Baselineval-c']);
     expect(within(chips[0]).getByText('val-a')).toBeInTheDocument();
+    // Each file's dot takes its series colour from tokens.css, in order.
+    expect(chips.map((c) => (c.querySelector('[aria-hidden]') as HTMLElement).style.background))
+      .toEqual(['var(--app-chart-series-1)', 'var(--app-chart-series-2)', 'var(--app-chart-series-3)']);
     expect(within(within(dialog).getByRole('combobox', { name: 'Reference file' })).getAllByRole('option').map((o) => o.textContent))
       .toEqual(['Partner A · Baseline · val-a', 'Partner B · Followup · val-b', 'Partner C · Baseline · val-c']);
     expect(within(chips[0]).getByLabelText('1 flagged')).toBeInTheDocument();

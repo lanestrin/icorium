@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 14.3** `feature/14.3-chart-design-tokens`. Start by listing every raw colour literal outside `tokens.css` (chart props, `fileColors.tsx`, `menu-select.css`, `Card.stories.tsx`), then extend the style guard test so it fails on one.
+**Next: 14.4** `feature/14.4-storybook-interaction-coverage`. Start by listing each Button, Card, Banner, Dialog and row-menu behaviour that standalone component tests cover today, then make `ui/stories.test.tsx` run one story's `play` assertions under `npm run verify`.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -907,7 +907,7 @@ Added on 2026-11-15 at the person's request after reviewing the frontend archite
 
   **Done when:** secondary pages and the comparison/chart dependency tree are outside the initial workspace dependency tree; deferred loading and failed imports have useful states; existing workflows and dialog focus tests still pass. Component tests cover loading, failure and closing before completion; `npm run verify` passes.
 
-- [ ] **14.3** `feature/14.3-chart-design-tokens` · **P2** — Finish the token boundary for charts: replace literal grid, label and reference-line colours and typography in the Recharts props, and centralize the file-series palette in chart-specific `--app-*` tokens. Reuse existing semantic tokens where their meaning fits. Keep series colours stable across charts, legends and file labels; preserve the current appearance except for explicitly approved accessibility corrections. Do not add a chart abstraction or dark theme.
+- [x] **14.3** `feature/14.3-chart-design-tokens` · **P2** — Finish the token boundary for charts: replace literal grid, label and reference-line colours and typography in the Recharts props, and centralize the file-series palette in chart-specific `--app-*` tokens. Reuse existing semantic tokens where their meaning fits. Keep series colours stable across charts, legends and file labels; preserve the current appearance except for explicitly approved accessibility corrections. Do not add a chart abstraction or dark theme.
 
   - **Scope:** no raw colour literal outside `tokens.css`. Today that means `#e2e8f0`, `#64748b`, `#94a3b8` and `fontSize` 11 and 12 in `RowChart.tsx` and `CategoryChart.tsx`; the five `FILE_COLORS` in `fileColors.tsx` (also the inline dot backgrounds in `RowDifferences.tsx`); the five hex values in `client/src/styles/menu-select.css`; and `#cbd5e1` in `ui/Card.stories.tsx` (stories count as component source).
   - **Guard:** extend `client/src/styles/no-tailwind.test.ts` (or a sibling) to fail on a hex, `rgb()` or `hsl()` colour outside `tokens.css`, in stylesheets and component source. It reads source text only.

@@ -38,7 +38,7 @@ export const Form: Story = {
     onSubmit: (event) => event.preventDefault(),
     children: (
       <label>
-        Rows <input type="number" defaultValue={20} style={{ marginLeft: '0.5rem', border: '1px solid #cbd5e1' }} />
+        Rows <input type="number" defaultValue={20} style={{ marginLeft: '0.5rem', border: 'var(--app-border-width) solid var(--app-color-border-strong)' }} />
       </label>
     ),
   },
