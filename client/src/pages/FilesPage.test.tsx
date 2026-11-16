@@ -251,7 +251,7 @@ describe('input selection and status filtering', () => {
     expect(dialog).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(trigger).toHaveFocus(); // back on the row's ⋯ button
+    await waitFor(() => expect(trigger).toHaveFocus()); // Radix returns focus on a timer; back on the row's ⋯ button
   });
 
   it('processes mixed selections once and retains only failed inputs', async () => {
@@ -601,7 +601,7 @@ describe('archive and restore', () => {
     expect(within(menu).getByRole('menuitem', { name: 'Preview file' })).toHaveFocus(); // wraps around
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    expect(trigger).toHaveFocus();
+    await waitFor(() => expect(trigger).toHaveFocus()); // Radix returns focus on a timer
     expect(check('invalid.csv')).not.toBeChecked(); // menu clicks never toggle the row
 
     await user.click(trigger);
@@ -981,7 +981,7 @@ describe('row actions menu', () => {
     expect(await screen.findByRole('dialog', { name })).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(trigger).toHaveFocus();
+    await waitFor(() => expect(trigger).toHaveFocus()); // Radix returns focus on a timer
   });
 });
 
@@ -1249,7 +1249,7 @@ describe('comparing results', () => {
     expect(await screen.findByRole('dialog', { name: 'Compare Files' })).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(compareButton()).toHaveFocus();
+    await waitFor(() => expect(compareButton()).toHaveFocus()); // Radix returns focus on a timer
   });
 
   it('explains a failed comparison', async () => {
