@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 14.2** `feature/14.2-lazy-pages-and-comparison`. Start by recording the production build's chunk sizes, then a component test that /generator shows its loading state before its page chunk loads.
+**Next: 14.3** `feature/14.3-chart-design-tokens`. Start by listing every raw colour literal outside `tokens.css` (chart props, `fileColors.tsx`, `menu-select.css`, `Card.stories.tsx`), then extend the style guard test so it fails on one.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -901,7 +901,7 @@ Added on 2026-11-15 at the person's request after reviewing the frontend archite
 
   **Done when:** a rendering failure shows the fallback instead of an empty app, Reload requests a page reload, and normal rendering and request-error banners keep working. Component tests exercise the failure and recovery action; `npm run verify` passes.
 
-- [ ] **14.2** `feature/14.2-lazy-pages-and-comparison` · **P2** — Load the Generator and Architecture pages and the comparison workspace on demand using React lazy loading and Suspense. Keep the current URL selection and normal page links. Include accessible loading feedback and recovery for a failed chunk load, using 14.1 where appropriate. Preserve comparison dialog focus behaviour, including closing while loading. Record production build chunk sizes before and after; do not claim a speed improvement without measurements.
+- [x] **14.2** `feature/14.2-lazy-pages-and-comparison` · **P2** — Load the Generator and Architecture pages and the comparison workspace on demand using React lazy loading and Suspense. Keep the current URL selection and normal page links. Include accessible loading feedback and recovery for a failed chunk load, using 14.1 where appropriate. Preserve comparison dialog focus behaviour, including closing while loading. Record production build chunk sizes before and after; do not claim a speed improvement without measurements.
 
   **Depends on:** 14.1.
 

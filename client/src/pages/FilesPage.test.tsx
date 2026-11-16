@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CompareResult, FileMeta, FileRows } from '../../../shared/types';
 import { FilesPage } from './FilesPage';
 import { Modal } from '../components/modals/Modal';
@@ -14,7 +14,11 @@ vi.mock('../lib/api', () => ({ api: {
   downloadUrl: (id: string) => `/api/files/${id}/download`,
 } }));
 
-const base = { rows: 25, columns: 7, uploadedAt: '2026-11-06T12:00:00Z' };
+// The comparison dialog is loaded on demand. Transforming its chart code takes over a second in jsdom
+// the first time, so load it once here rather than in whichever test happens to compare first.
+beforeAll(() => import('../components/compare/CompareWorkspace'));
+
+const base ={ rows: 25, columns: 7, uploadedAt: '2026-11-06T12:00:00Z' };
 const clean: FileMeta = { ...base, id: 'clean', name: 'clean.csv', status: 'Ready', problemRows: 0 };
 const invalid: FileMeta = { ...base, id: 'invalid', name: 'invalid.csv', status: 'Needs Review', problemRows: 2 };
 const result: FileMeta = { ...base, id: 'result', name: 'result.csv', status: 'Processed', problemRows: 2, processor: 'mass' };
@@ -1261,6 +1265,43 @@ describe('comparing results', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent("Comparison failed: These files can't be compared");
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(compareButton()).toBeEnabled();
+  });
+
+  it('keeps Compare busy and the dialog closed until the comparison is ready', async () => {
+    const user = await setup();
+    let answer!: (r: CompareResult) => void;
+    vi.mocked(api.compare).mockReturnValue(new Promise((resolve) => { answer = resolve; }));
+    await user.click(check(valA.name));
+    await user.click(check(valB.name));
+    await user.click(compareButton());
+    expect(compareButton()).toBeDisabled();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await act(async () => answer(comparison));
+    expect(await screen.findByRole('dialog', { name: 'Compare Files' })).toBeInTheDocument();
+  });
+
+  it('asks for a reload when the comparison code fails to download', async () => {
+    // A fresh Files page whose comparison import rejects, as when the browser can't fetch that chunk.
+    vi.resetModules();
+    vi.doMock('../components/compare/CompareWorkspace', () => {
+      throw new Error('Failed to fetch dynamically imported module');
+    });
+    try {
+      const { FilesPage: FreshFilesPage } = await import('./FilesPage');
+      const { api: freshApi } = await import('../lib/api');
+      vi.mocked(freshApi.list).mockResolvedValue([clean, invalid, result, valA, valB]);
+      vi.mocked(freshApi.compare).mockResolvedValue(comparison);
+      const user = userEvent.setup();
+      render(<FreshFilesPage />);
+      await user.click(await screen.findByRole('checkbox', { name: withId('Select', valA.name) }));
+      await user.click(check(valB.name));
+      await user.click(compareButton());
+      expect(await screen.findByRole('alert')).toHaveTextContent("Comparison failed: The comparison couldn't be loaded. Reload the page to try again.");
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(compareButton()).toBeEnabled();
+    } finally {
+      vi.doUnmock('../components/compare/CompareWorkspace');
+    }
   });
 
   it('selects the new results after a clean batch so they can be compared', async () => {

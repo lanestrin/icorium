@@ -131,7 +131,8 @@ describe('navigation to the Architecture page', () => {
     vi.mocked(api.list).mockResolvedValue([]);
     window.history.pushState({}, '', '/architecture');
     const page = render(<App />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Architecture & Tech Stack' })).toBeInTheDocument();
+    // The page is loaded on demand, so it appears after a moment.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Architecture & Tech Stack' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Back to CSV Files/ })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
     page.unmount();
@@ -144,6 +145,6 @@ describe('navigation to the Architecture page', () => {
 
     window.history.pushState({}, '', '/generator');
     render(<App />);
-    expect(screen.getByRole('link', { name: /Architecture/ })).toHaveAttribute('href', '/architecture');
+    expect(await screen.findByRole('link', { name: /Architecture/ })).toHaveAttribute('href', '/architecture');
   });
 });
