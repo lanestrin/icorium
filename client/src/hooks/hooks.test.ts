@@ -4,9 +4,10 @@ import type { FileMeta } from '../../../shared/types';
 import { api } from '../lib/api';
 import { TOAST_MS, useArchive } from './useArchive';
 import { useFileList } from './useFileList';
+import { useFilters } from './useFilters';
 import { useSelection } from './useSelection';
 
-vi.mock('../lib/api', () => ({ api: { list: vi.fn(), archive: vi.fn() } }));
+vi.mock('../lib/api', () => ({ api: { list: vi.fn(), archive: vi.fn(), upload: vi.fn() } }));
 
 const file = (id: string): FileMeta => ({ id, name: `${id}.csv`, rows: 1, columns: 6, uploadedAt: '2026-11-06T12:00:00Z', status: 'Ready' });
 
@@ -78,6 +79,46 @@ describe('useFileList', () => {
     expect(result.current.loading).toBe(false);
     await act(async () => { later.resolve([file('b')]); await refreshing; });
     expect(result.current.loading).toBe(false);
+  });
+
+  it.each([
+    ['both succeed', [true, true], 2],
+    ['one fails', [true, false], 1],
+    ['both fail', [false, false], 0],
+  ])('returns how many files the server accepted when %s', async (_name, outcomes, accepted) => {
+    const onError = vi.fn();
+    for (const ok of outcomes) {
+      if (ok) vi.mocked(api.upload).mockResolvedValueOnce(file('x'));
+      else vi.mocked(api.upload).mockRejectedValueOnce(new Error('Unrecognized CSV schema'));
+    }
+    const { result } = renderHook(() => useFileList(onError));
+    await act(async () => {}); // the first load
+    let count!: number;
+    await act(async () => { count = await result.current.upload([new File(['a'], 'a.csv'), new File(['b'], 'b.csv')]); });
+    expect(count).toBe(accepted);
+    expect(onError).toHaveBeenLastCalledWith(accepted === 2 ? undefined : expect.stringContaining('Upload failed'));
+  });
+});
+
+describe('useFilters', () => {
+  it('shows new files: one function, today to today, Active Files; search, status and sort stay', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 16, 9, 30)); // 16 Nov 2026, local time
+    const { result } = renderHook(() => useFilters());
+    act(() => {
+      result.current.setSearch('partner');
+      result.current.setStatus('Ready');
+      result.current.setTab('archived');
+    });
+    act(() => result.current.setSort('name-asc'));
+    act(() => result.current.showNewFiles('original'));
+    expect(result.current).toMatchObject({
+      fn: 'original', from: '2026-11-16', to: '2026-11-16', tab: 'active', viewArchived: false,
+      search: 'partner', status: 'Ready', filtersActive: true,
+    });
+    // The archived tab's own sort order is kept for when the person goes back to it.
+    act(() => result.current.setTab('archived'));
+    expect(result.current.sort).toBe('name-asc');
   });
 });
 

@@ -707,11 +707,22 @@ describe('archive and restore', () => {
 
 describe('upload', () => {
   const fileInput = () => document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  // Only Date is faked, so user-event's own timers keep running.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 16, 9, 30)); // 16 Nov 2026, local time
+  });
+  afterEach(() => vi.useRealTimers());
+
+  /** A file the server stored just now, as an upload returns it. */
+  const uploadedNow = (id: string): FileMeta => ({ ...clean, id, name: `${id}.csv`, uploadedAt: new Date().toISOString() });
+  const filter = (name: string) => screen.getByRole('combobox', { name });
+  const dates = () => [screen.getByLabelText('From date'), screen.getByLabelText('To date')].map((d) => (d as HTMLInputElement).value);
 
   it('uploads each chosen file and refreshes the list', async () => {
     const user = await setup();
     vi.mocked(api.upload).mockResolvedValue(clean);
-    const added: FileMeta = { ...clean, id: 'added', name: 'added.csv' };
+    const added = uploadedNow('added');
     vi.mocked(api.list).mockResolvedValue([clean, invalid, result, added]);
     await user.upload(fileInput(), [new File(['a'], 'added.csv', { type: 'text/csv' })]);
     expect(api.upload).toHaveBeenCalledTimes(1);
@@ -729,6 +740,51 @@ describe('upload', () => {
     expect(alert).toHaveTextContent('bad.csv: Unrecognized CSV schema');
     expect(alert).not.toHaveTextContent('good.csv');
     expect(api.list).toHaveBeenCalledTimes(2); // initial load + refresh after upload
+    // One file was added, so the list still moves to today's originals.
+    expect(filter('Processing Function')).toHaveDisplayValue('Original');
+    expect(dates()).toEqual(['2026-11-16', '2026-11-16']);
+  });
+
+  it('shows the new upload first: today\'s originals, keeping search and status', async () => {
+    const user = await setup();
+    await user.type(screen.getByRole('textbox', { name: 'Search file ID or name' }), 'new');
+    await user.selectOptions(filter('Status'), 'Ready');
+    vi.mocked(api.upload).mockResolvedValue(clean);
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, uploadedNow('new')]);
+    await user.upload(fileInput(), [new File(['a'], 'new.csv', { type: 'text/csv' })]);
+
+    expect(await screen.findByRole('checkbox', { name: 'Select new new.csv' })).toBeInTheDocument();
+    expect(filter('Processing Function')).toHaveDisplayValue('Original');
+    expect(dates()).toEqual(['2026-11-16', '2026-11-16']);
+    expect(screen.getByRole('textbox', { name: 'Search file ID or name' })).toHaveValue('new');
+    expect(filter('Status')).toHaveDisplayValue('Ready');
+    // Older files are filtered out, and Clear filters shows everything again.
+    expect(screen.queryByRole('checkbox', { name: 'Select clean clean.csv' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(filter('Processing Function')).toHaveDisplayValue('All functions');
+    expect(dates()).toEqual(['', '']);
+    expect(screen.getByRole('checkbox', { name: 'Select clean clean.csv' })).toBeInTheDocument();
+  });
+
+  it('switches from Archived to Active Files, where the new upload lands', async () => {
+    const user = await setup();
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    vi.mocked(api.upload).mockResolvedValue(clean);
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, result, uploadedNow('new')]);
+    await user.upload(fileInput(), [new File(['a'], 'new.csv', { type: 'text/csv' })]);
+    expect(await screen.findByRole('checkbox', { name: 'Select new new.csv' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Active Files/ })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('leaves the filters and tab alone when every file fails', async () => {
+    const user = await setup();
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    vi.mocked(api.upload).mockRejectedValue(new Error('Unrecognized CSV schema'));
+    await user.upload(fileInput(), [new File(['a'], 'bad.csv')]);
+    expect(await screen.findByRole('alert')).toHaveTextContent('bad.csv: Unrecognized CSV schema');
+    expect(filter('Processing Function')).toHaveDisplayValue('All functions');
+    expect(dates()).toEqual(['', '']);
+    expect(screen.getByRole('tab', { name: /Archived/ })).toHaveAttribute('aria-selected', 'true');
   });
 });
 
@@ -1342,7 +1398,8 @@ describe('request ordering', () => {
     const second = deferred<FileMeta[]>();
     vi.mocked(api.list).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
     vi.mocked(api.upload).mockResolvedValue(clean);
-    const added: FileMeta = { ...clean, id: 'added', name: 'added.csv' };
+    // Uploaded just now, so the list's filter to today's originals after an upload (9.12) shows it.
+    const added: FileMeta = { ...clean, id: 'added', name: 'added.csv', uploadedAt: new Date().toISOString() };
     const user = userEvent.setup();
     render(<FilesPage />);
     await user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, [new File(['a'], 'added.csv')]);
@@ -1356,7 +1413,8 @@ describe('request ordering', () => {
 
   it('ignores a failure from an older list request', async () => {
     const first = deferred<FileMeta[]>();
-    vi.mocked(api.list).mockReturnValueOnce(first.promise).mockResolvedValueOnce([clean]);
+    // Uploaded just now, so the list's filter to today's originals after an upload (9.12) shows it.
+    vi.mocked(api.list).mockReturnValueOnce(first.promise).mockResolvedValueOnce([{ ...clean, uploadedAt: new Date().toISOString() }]);
     vi.mocked(api.upload).mockResolvedValue(clean);
     const user = userEvent.setup();
     render(<FilesPage />);

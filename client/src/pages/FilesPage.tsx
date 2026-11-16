@@ -43,7 +43,7 @@ export function FilesPage() {
   const { selectedIds, setSelectedIds, toggle, toggleAll } = useSelection();
   const {
     search, setSearch, from, setFrom, to, setTo, status, setStatus, fn, setFn, tab, setTab,
-    viewArchived, sort, setSort, filtersActive, clearFilters,
+    viewArchived, sort, setSort, filtersActive, clearFilters, showNewFiles,
   } = useFilters();
   const { archiving, toast, dismissToast, setArchived } = useArchive({ busy, refresh, deselect: (ids) => toggleAll(ids, false), onError: setError });
   const { processor, setProcessor, processingId, failedIds, pending, cancelPending, requestRun, confirmRun } =
@@ -61,6 +61,11 @@ export function FilesPage() {
   // Compare is offered once the selection in view includes a result; it explains when it can't run.
   const showCompare = !viewArchived && selectedInView.some((f) => f.status === 'Processed');
   const compareReason = compareBlocker(selectedInView);
+
+  // After an upload that added at least one file, filter to today's originals so the new files show first.
+  async function uploadFiles(list: File[]) {
+    if (await upload(list) > 0) showNewFiles('original');
+  }
 
   async function compare() {
     if (compareReason || comparing) return;
@@ -100,7 +105,7 @@ export function FilesPage() {
         <Sidebar
           processor={processor}
           setProcessor={setProcessor}
-          onUpload={upload}
+          onUpload={uploadFiles}
           onRun={() => requestRun(selectedInputs)}
           canRun={selectedInputs.length > 0 && !processingId && !archiving}
           running={!!processingId}

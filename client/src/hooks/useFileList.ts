@@ -22,16 +22,19 @@ export function useFileList(onError: Report) {
   // refresh never rejects (failures go to onError), so this ends even after an error.
   useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
 
+  /** Uploads each file in turn, reports the ones that failed, and returns how many the server accepted. */
   async function upload(list: File[]) {
     setUploading(true);
     onError(undefined);
     const errors: string[] = [];
+    let accepted = 0;
     for (const f of list) {
-      try { await api.upload(f); } catch (e) { errors.push(`${f.name}: ${errorMessage(e)}`); }
+      try { await api.upload(f); accepted++; } catch (e) { errors.push(`${f.name}: ${errorMessage(e)}`); }
     }
     setUploading(false);
     if (errors.length) onError(`Upload failed\n${errors.join('\n')}`);
     await refresh();
+    return accepted;
   }
 
   return { files, refresh, upload, uploading, loading };
