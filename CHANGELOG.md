@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0](https://github.com/lanestrin/icorium/compare/v1.14.0...v1.15.0) (2026-11-16)
+
+
+### Features
+
+* show new uploads first after uploading (9.12) ([#103](https://github.com/lanestrin/icorium/issues/103)) ([71a4580](https://github.com/lanestrin/icorium/commit/71a45804f09481aed7f92999201c9ab276bf1612))
+
 ## [1.14.0](https://github.com/lanestrin/icorium/compare/v1.13.0...v1.14.0) (2026-11-16)
 
 
