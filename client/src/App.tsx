@@ -1,8 +1,13 @@
+import { lazy, Suspense } from 'react';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
-import { ArchitecturePage } from './pages/ArchitecturePage';
 import { FilesPage } from './pages/FilesPage';
-import { GeneratorPage } from './pages/GeneratorPage';
 import { PAGES } from './lib/pages';
+import page from './styles/page.module.scss';
+
+// The CSV Generator and Architecture pages download only when opened; the file workspace is the
+// default page, so it stays in the main bundle.
+const GeneratorPage = lazy(() => import('./pages/GeneratorPage').then((m) => ({ default: m.GeneratorPage })));
+const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage').then((m) => ({ default: m.ArchitecturePage })));
 
 /** Picks the page from the URL: /generator and /architecture have their own pages; anything else is the file workspace. */
 function CurrentPage() {
@@ -12,11 +17,25 @@ function CurrentPage() {
   return <FilesPage />;
 }
 
-/** The app: the current page, with a readable message instead of a blank screen if it fails to render. */
+/** Shown while a page's code downloads; screen readers announce it politely. */
+function PageLoading() {
+  return (
+    <main className={page.shell}>
+      <p role="status" className={page.intro}>Loading page…</p>
+    </main>
+  );
+}
+
+/**
+ * The app: the current page, with a readable message instead of a blank screen if it fails to render
+ * or its code fails to download (Reload page fetches it again).
+ */
 export default function App() {
   return (
     <AppErrorBoundary>
-      <CurrentPage />
+      <Suspense fallback={<PageLoading />}>
+        <CurrentPage />
+      </Suspense>
     </AppErrorBoundary>
   );
 }

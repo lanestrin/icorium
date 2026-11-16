@@ -1,8 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { Archive, Network, Wand2 } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta } from '../../../shared/types';
 import { Banner } from '../components/Banner';
-import { CompareWorkspace } from '../components/compare/CompareWorkspace';
 import { PreviewModal } from '../components/modals/PreviewModal';
 import { QualityWarningModal, ReplaceResultModal } from '../components/modals/RunConfirmations';
 import { ArchiveToast } from '../components/files/ArchiveToast';
@@ -25,6 +24,11 @@ import { compareBlocker } from '../lib/compare-view';
 import { filterFiles } from '../lib/file-status';
 import { errorMessage } from '../lib/format';
 import { AppVersion } from '../components/AppVersion';
+
+// The comparison dialog and its charts download the first time Compare is used, alongside the request.
+const loadCompareWorkspace = () => import('../components/compare/CompareWorkspace');
+const CompareWorkspace = lazy(() => loadCompareWorkspace().then((m) => ({ default: m.CompareWorkspace })));
+const COMPARE_CODE_FAILED = "The comparison couldn't be loaded. Reload the page to try again.";
 
 /** The file workspace: upload, filter, process, preview, archive and compare files. */
 export function FilesPage() {
@@ -62,7 +66,17 @@ export function FilesPage() {
     if (compareReason || comparing) return;
     setError(undefined);
     setComparing(true);
-    try { setComparison(await api.compare(selectedInView.map((f) => f.id))); } catch (e) { setError(`Comparison failed: ${errorMessage(e)}`); }
+    // The dialog opens only once both its code and the data are ready, so it is never half-open.
+    const code = loadCompareWorkspace().then(
+      () => undefined,
+      () => { throw new Error(COMPARE_CODE_FAILED); },
+    );
+    try {
+      const [result] = await Promise.all([api.compare(selectedInView.map((f) => f.id)), code]);
+      setComparison(result);
+    } catch (e) {
+      setError(`Comparison failed: ${errorMessage(e)}`);
+    }
     setComparing(false);
   }
 
@@ -168,7 +182,11 @@ export function FilesPage() {
       ) : pending?.warning && (
         <QualityWarningModal warning={pending.warning} processor={pending.processor} onCancel={cancelPending} onConfirm={confirmRun} />
       )}
-      {comparison && <CompareWorkspace result={comparison} onClose={() => setComparison(undefined)} />}
+      {comparison && (
+        <Suspense fallback={null}>
+          <CompareWorkspace result={comparison} onClose={() => setComparison(undefined)} />
+        </Suspense>
+      )}
     </div>
   );
 }

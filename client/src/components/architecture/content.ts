@@ -101,7 +101,7 @@ export const TECH: Tech[] = [
       'React chart components for the comparison dashboard: one line per file, grouped bars for categories.',
       'Enough for comparing 2–5 results without a complex visualization framework.',
     ],
-    tradeoff: 'Another sizeable dependency in a client that ships as one bundle; the production build already warns that it is over 500 kB.',
+    tradeoff: 'The largest dependency in the client, so the comparison dialog and its charts are downloaded only when Compare is first used, not when the file page opens.',
     files: ['client/src/components/compare/RowChart.tsx', 'client/src/components/compare/CategoryChart.tsx'],
   },
   {

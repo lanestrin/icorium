@@ -178,7 +178,8 @@ describe('page routing', () => {
     vi.mocked(api.list).mockResolvedValue([]);
     window.history.pushState({}, '', '/generator');
     const { unmount } = render(<App />);
-    expect(screen.getByRole('heading', { name: 'CSV Generator' })).toBeInTheDocument();
+    // The page is loaded on demand, so it appears after a moment.
+    expect(await screen.findByRole('heading', { name: 'CSV Generator' })).toBeInTheDocument();
     unmount();
 
     window.history.pushState({}, '', '/');

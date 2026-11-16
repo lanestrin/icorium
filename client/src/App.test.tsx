@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import App from './App';
 
 // The CSV Generator page fails to render, standing in for any page with a rendering bug.
@@ -9,28 +9,53 @@ vi.mock('./pages/GeneratorPage', () => ({
   },
 }));
 
+
 describe('App', () => {
+  // Transforming the Architecture page takes over a second in jsdom the first time; do it once here so
+  // the loading test measures the app, not the test runner. The page still loads lazily in each test.
+  beforeAll(() => import('./pages/ArchitecturePage'));
+
   afterEach(() => {
     window.history.replaceState(null, '', '/');
+    vi.doUnmock('./pages/ArchitecturePage');
     vi.restoreAllMocks();
   });
 
-  it('shows the error message instead of a blank screen when a page fails to render', () => {
+  it('shows a loading message while a page downloads, then the page', async () => {
+    window.history.replaceState(null, '', '/architecture');
+
+    render(<App />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading page…');
+    expect(await screen.findByRole('heading', { level: 1, name: /Architecture/ })).toBeInTheDocument();
+    expect(screen.queryByText('Loading page…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Something went wrong' })).not.toBeInTheDocument();
+  });
+
+  it('shows the error message instead of a blank screen when a page fails to render', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     window.history.replaceState(null, '', '/generator');
 
     render(<App />);
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Something went wrong' })).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading page…');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Something went wrong' })).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Reload page' })).toBeInTheDocument();
   });
 
-  it('renders a working page normally', () => {
+  it('offers Reload page when a page’s code fails to download', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // A fresh App whose Architecture page import rejects, as when the browser can't fetch its chunk.
+    vi.resetModules();
+    vi.doMock('./pages/ArchitecturePage', () => {
+      throw new Error('Failed to fetch dynamically imported module');
+    });
+    const { default: FreshApp } = await import('./App');
     window.history.replaceState(null, '', '/architecture');
 
-    render(<App />);
+    render(<FreshApp />);
 
-    expect(screen.getByRole('heading', { level: 1, name: /Architecture/ })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Something went wrong' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Something went wrong' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Reload page' })).toBeInTheDocument();
   });
 });
