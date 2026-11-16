@@ -48,6 +48,37 @@ describe('useFileList', () => {
     expect(result.current.files.map((f) => f.id)).toEqual(['new']);
     expect(onError).not.toHaveBeenCalledWith(expect.any(String));
   });
+
+  it('is loading until the first list arrives', async () => {
+    const first = deferred<FileMeta[]>();
+    vi.mocked(api.list).mockReturnValueOnce(first.promise);
+    const { result } = renderHook(() => useFileList(vi.fn()));
+    expect(result.current.loading).toBe(true);
+    await act(async () => { first.resolve([file('a')]); });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.files.map((f) => f.id)).toEqual(['a']);
+  });
+
+  it('stops loading and reports the error when the first list fails', async () => {
+    const onError = vi.fn();
+    vi.mocked(api.list).mockRejectedValueOnce(new Error('Server unavailable'));
+    const { result } = renderHook(() => useFileList(onError));
+    await act(async () => {});
+    expect(result.current.loading).toBe(false);
+    expect(onError).toHaveBeenCalledWith('Server unavailable');
+  });
+
+  it('does not show loading again on a later refresh', async () => {
+    const { result } = renderHook(() => useFileList(vi.fn()));
+    await act(async () => {}); // the first load
+    const later = deferred<FileMeta[]>();
+    vi.mocked(api.list).mockReturnValueOnce(later.promise);
+    let refreshing!: Promise<void>;
+    act(() => { refreshing = result.current.refresh(); });
+    expect(result.current.loading).toBe(false);
+    await act(async () => { later.resolve([file('b')]); await refreshing; });
+    expect(result.current.loading).toBe(false);
+  });
 });
 
 describe('useArchive', () => {
