@@ -11,8 +11,8 @@ import styles from './modals.module.scss';
  * Escape or a click on the backdrop, and returns focus to the element that opened it.
  *
  * full fills the screen on phones and nearly fills it on larger screens; narrow is a small confirmation
- * dialog; otherwise it is a wide dialog (up to 1400px, the same width as full) for wide content such as a
- * CSV preview.
+ * card; otherwise it is a wide dialog (up to 1400px, the same width as full) for wide content such as a
+ * CSV preview, which also fills a phone's screen. On phones the actions get their own row under the title.
  */
 export function Modal({ title, subtitle, actions, narrow, full, onClose, children }: {
   title: string; subtitle?: string; actions?: ReactNode; narrow?: boolean; full?: boolean; onClose: () => void; children: ReactNode;
@@ -34,12 +34,13 @@ export function Modal({ title, subtitle, actions, narrow, full, onClose, childre
   }
 
   const size = full ? styles.panelFull : classNames(styles.panelDialog, narrow ? styles.panelNarrow : styles.panelWide);
+  const backdrop = narrow && !full ? styles.backdropPadded : styles.backdropFull;
 
   return (
     <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
       <Dialog.Portal>
         {/* The panel sits inside the backdrop so the backdrop can centre it; a click on the backdrop closes. */}
-        <Dialog.Overlay className={classNames(styles.backdrop, full ? styles.backdropFull : styles.backdropPadded)}>
+        <Dialog.Overlay className={classNames(styles.backdrop, backdrop)}>
           <Dialog.Content
             ref={panel}
             className={classNames(styles.panel, size)}
@@ -49,10 +50,10 @@ export function Modal({ title, subtitle, actions, narrow, full, onClose, childre
           >
             <div className={styles.header}>
               <div className={styles.heading}>
-                <Dialog.Title className={styles.title}>{title}</Dialog.Title>
+                <Dialog.Title className={styles.title} title={title}>{title}</Dialog.Title>
                 {subtitle && <Dialog.Description className={styles.subtitle}>{subtitle}</Dialog.Description>}
               </div>
-              {actions}
+              {actions && <div className={styles.actions}>{actions}</div>}
               <Button variant="ghost" onClick={onClose} aria-label="Close" icon={<X />} />
             </div>
             <div className={styles.body}>{children}</div>

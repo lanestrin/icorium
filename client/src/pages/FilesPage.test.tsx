@@ -1034,6 +1034,18 @@ describe('preview', () => {
     offset, totalRows: 150, generatedColumns: [], problems: { total: 0, items: [] },
   });
 
+  it('keeps the problems and the row count in view while the wide table scrolls sideways', async () => {
+    const user = await setup();
+    vi.mocked(api.rows).mockResolvedValueOnce({ ...page(0, 100), problems: { total: 1, items: [{ row: 2, batchId: 'A-2', message: 'mass missing' }] } });
+    await previewRow(user, 'clean.csv');
+    const dialog = await screen.findByRole('dialog', { name: 'clean.csv' });
+    const footer = (await within(dialog).findByText('Showing 100 of 150 rows')).parentElement!;
+    expect(footer).toHaveClass(modalStyles.footer, modalStyles.pinned);
+    expect(within(dialog).getByRole('region', { name: 'Rows with problems' })).toHaveClass(modalStyles.pinned);
+    // The column headers still stick to the top while scrolling down.
+    expect(within(dialog).getByRole('table').querySelector('thead')).toHaveClass(modalStyles.tableHead);
+  });
+
   it('loads further pages on request and offers the download', async () => {
     const user = await setup();
     vi.mocked(api.rows).mockResolvedValueOnce(page(0, 100)).mockResolvedValueOnce(page(100, 50));

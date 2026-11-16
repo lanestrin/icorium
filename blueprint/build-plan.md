@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 14.5a** `feature/14.5a-responsive-dialogs`. Start with the file preview dialog at 375 px wide (`blueprint/reference/14.5-preview-dialog-phone.png`): a component test that the dialog header puts the title and subtitle on their own full-width row above the actions.
+**Next: 14.5b** `feature/14.5b-responsive-file-workspace`. Start with the audit: list what breaks on the CSV Files page at 360, 390, 768, 1024 and 1280 px, for the person to confirm before any fix.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -946,7 +946,7 @@ Added on 2026-11-15 at the person's request after reviewing the frontend archite
   - **Audit first:** each sub-item starts with a written list of what breaks at each width in its area, from reading the styles plus the person's screenshots. The person confirms the list before fixes start. There is no browser test harness, and jsdom can't measure layout, so tests cover structure (which element holds the actions, classes through the imported module), and each item ends with a Try it now list for every width.
   - **Storybook:** a shared component whose layout changes gets its stories updated in the same item.
 
-  - [ ] **14.5a** `feature/14.5a-responsive-dialogs` — The dialog shell (`components/modals/Modal.tsx`, `modals.module.scss`) and every dialog: file preview, Compare Files, Data Quality Warning and Replace existing result. Below `sm`, the header stacks: title and subtitle on a full-width row, actions and Close on the row below (or Close kept top-right). Decide at spec time whether the preview fills a phone's screen like Compare (`full`). Check the preview's problem list and table, and the Compare workspace's file chips, charts and row-differences table.
+  - [x] **14.5a** `feature/14.5a-responsive-dialogs` — The dialog shell (`components/modals/Modal.tsx`, `modals.module.scss`) and every dialog: file preview, Compare Files, Data Quality Warning and Replace existing result. Below `sm`, the header stacks: title and subtitle on a full-width row, actions and Close on the row below (or Close kept top-right). Decide at spec time whether the preview fills a phone's screen like Compare (`full`). Check the preview's problem list and table, and the Compare workspace's file chips, charts and row-differences table.
   - [ ] **14.5b** `feature/14.5b-responsive-file-workspace` — The CSV Files page: title row and navigation, upload drop zone, filter card, Active/Archived tabs, the file table and its ⋯ menu, selection bar, processing controls, toasts and banners.
   - [ ] **14.5c** `feature/14.5c-responsive-generator-and-architecture` — The CSV Generator and Architecture pages, the page navigation and the render-error fallback (14.1).
 
