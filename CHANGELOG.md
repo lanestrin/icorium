@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/lanestrin/icorium/compare/v1.10.0...v1.11.0) (2026-11-16)
+
+
+### Features
+
+* make the CSV Files page work at phone width (14.5b) ([#93](https://github.com/lanestrin/icorium/issues/93)) ([9e8374e](https://github.com/lanestrin/icorium/commit/9e8374e50b8ea6aa9b69d7a99c3c14012a17dd0c))
+
 ## [1.10.0](https://github.com/lanestrin/icorium/compare/v1.9.2...v1.10.0) (2026-11-16)
 
 
