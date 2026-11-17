@@ -5,18 +5,22 @@ import { CONVERT_MAX_MB, ConvertError, csvName, fileKind, findTable, toCsvFile, 
 const [A, B, C] = ADAPTERS.map((a) => [...a.columns]);
 
 describe('fileKind', () => {
-  it.each([['data.csv', 'csv'], ['DATA.CSV', 'csv'], ['report.xlsx', 'excel'], ['Old.XLS', 'excel']])('%s is %s', (name, kind) => {
+  it.each([['data.csv', 'csv'], ['DATA.CSV', 'csv'], ['report.xlsx', 'excel'], ['Old.XLS', 'excel'], ['scan.pdf', 'pdf'], ['SCAN.PDF', 'pdf']])('%s is %s', (name, kind) => {
     expect(fileKind({ name, size: 10 })).toBe(kind);
   });
 
-  it.each(['report.docx', 'scan.pdf', 'photo.png', 'noextension'])('refuses %s, naming what can be uploaded', (name) => {
-    expect(() => fileKind({ name, size: 10 })).toThrow(new ConvertError("This file type can't be converted. Upload a CSV or Excel file."));
+  it.each(['report.docx', 'photo.png', 'noextension'])('refuses %s, naming what can be uploaded', (name) => {
+    expect(() => fileKind({ name, size: 10 })).toThrow(new ConvertError("This file type can't be converted. Upload a CSV, Excel or PDF file."));
   });
 
   it('refuses an Excel file over the conversion limit before reading it', () => {
     const limit = CONVERT_MAX_MB * 1024 * 1024;
     expect(fileKind({ name: 'big.xlsx', size: limit })).toBe('excel');
     expect(() => fileKind({ name: 'big.xlsx', size: limit + 1 })).toThrow('It is larger than the 20 MB conversion limit.');
+  });
+
+  it('refuses a PDF over the conversion limit before reading it', () => {
+    expect(() => fileKind({ name: 'big.pdf', size: CONVERT_MAX_MB * 1024 * 1024 + 1 })).toThrow('It is larger than the 20 MB conversion limit.');
   });
 
   it('never applies the conversion limit to a CSV, which the server limits instead', () => {
@@ -52,6 +56,18 @@ describe('findTable', () => {
     const table = findTable([[...A, 'notes', '', ''], ['X-1', 'd', '1', '2', '3', '4', 'ok', '', '']]);
     expect(table.headers).toEqual([...A, 'notes']);
     expect(table.rows[0].cells).toEqual(['X-1', 'd', '1', '2', '3', '4', 'ok']);
+    expect(table.flags).toEqual([]);
+  });
+
+  it('leaves out a repeated header row and flags it, keeping the source numbers of other rows', () => {
+    const table = findTable([A, ['X-1', 'd', '1', '2', '3', '4'], [...A, ''], ['X-2', 'd', '1', '2', '3', '4']]);
+    expect(table.rows.map((r) => r.sourceRow)).toEqual([2, 4]);
+    expect(table.flags).toEqual([{ row: 3, reason: 'repeated header, left out' }]);
+  });
+
+  it('keeps a row that only partly repeats the header', () => {
+    const table = findTable([A, [...A.slice(0, 5), 'X']]);
+    expect(table.rows).toEqual([{ sourceRow: 2, cells: [...A.slice(0, 5), 'X'] }]);
     expect(table.flags).toEqual([]);
   });
 

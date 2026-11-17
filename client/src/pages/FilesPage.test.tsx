@@ -1636,15 +1636,15 @@ describe('layout at phone width', () => {
     expect(within(cleanRow).getByRole('button', { name: /^Actions for / }).closest('td')).toHaveClass(fileStyles.pinnedRight);
   });
 
-  it('offers one Choose CSV or Excel files button on a touch screen, which opens the file picker', async () => {
+  it('offers one Choose CSV, Excel or PDF files button on a touch screen, which opens the file picker', async () => {
     const desktop = window.matchMedia;
     window.matchMedia = ((media: string) => ({ ...desktop(media), matches: false })) as typeof window.matchMedia;
     try {
       const user = await setup();
-      expect(screen.queryByText(/Drop CSV or Excel files here/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Drop CSV, Excel or PDF files here/)).not.toBeInTheDocument();
       const picker = document.querySelector<HTMLInputElement>('input[type="file"]')!;
       const opened = vi.spyOn(picker, 'click');
-      await user.click(screen.getByRole('button', { name: 'Choose CSV or Excel files' }));
+      await user.click(screen.getByRole('button', { name: 'Choose CSV, Excel or PDF files' }));
       expect(opened).toHaveBeenCalledTimes(1);
     } finally {
       window.matchMedia = desktop;
