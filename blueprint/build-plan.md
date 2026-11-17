@@ -74,10 +74,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 **Next: 10.15** `fix/online-size-limits`. Start with an API test that a comparison whose response would be too large to send online returns a clear "too many rows to compare" error instead of failing.
 
-**Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
+**Order:** 10.15 → 9.14a → 9.14b → 9.14c → 9.15. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
 
-1. **Frontend first:** 14.1 → 10.13 → 10.14 → 14.5a → 14.5b → 14.5c → 14.2 → 14.3 → 14.4. 10.13 and 10.14 keep their own IDs and branches. 14.5 comes before the rest of M14 (added 2026-11-16): it fixes layouts that break the project's phone-width rule now, and 14.2's loading states and 14.4's stories should be built on the corrected layouts. 14.2 reuses 14.1's fallback and the loading and error states from 10.13 and 10.14, and 14.4's stories show the tokens 14.3 adds.
-2. **Then:** 9.12 → 9.13 → 10.11 → 15.1 → 10.15 → 9.14a → 9.14b → 9.14c → 9.15. 9.14 depends on 10.13, which the frontend block finishes first.
+**After the demo:** once 9.15 is done, the project moves toward a production platform. That direction is [Proposed — Not Yet Implemented](project-plan.md#10-future-direction--proposed-not-yet-implemented); no production items are planned yet, and none may be built until they are added here as approved items.
 
 New work needs a new request: add it as a new stable ID with its scope before building, or use a `fix/` branch for a bug.
 
@@ -142,6 +141,7 @@ Completed milestones and items are in [build-plan-archive.md](build-plan-archive
 - [M12 — Releases and environments](build-plan-archive.md#m12--releases-and-environments): done (2 items, 12.1–12.2).
 - [M13 — Styling architecture and design system](build-plan-archive.md#m13--styling-architecture-and-design-system): done (7 items, 13.1–13.7).
 - [M14 — Frontend resilience and component coverage](build-plan-archive.md#m14--frontend-resilience-and-component-coverage): done (8 items, 14.1–14.5c).
+- [M15 — Planning documents](build-plan-archive.md#m15--planning-documents): done (1 item, 15.1).
 - [M7 — Final interview readiness](build-plan-archive.md#m7--final-interview-readiness): done (1 item, 7.1).
 
 ### M9 — UI refinements
@@ -202,14 +202,6 @@ reaches a path. If an item changes a route, limit, file or dependency named on
 the Architecture page, update the page in the same item.
 
 - [ ] **10.15** `fix/online-size-limits` · **P2** — Online, Vercel can't send a response over 4.5 MB, found in a review on 2026-11-13. Measured: a result is about 2× its input (5,000 rows: 225 KB → 439 KB for Classification), so an input over about 2.3 MB uploads but its result can't be downloaded. Comparing 5 files fails above about 16,000 rows each (5 × 20,000 rows is a 5.57 MB response). Recommended: set `MAX_UPLOAD_MB=2` on the Vercel deployment and document it, so the server refuses larger CSVs with its own clear message, and have comparison return a plain "too many rows to compare online" 400 above a set row count. Confirm the approach with the person when the spec starts. Whether to add deleting or resetting files online (archive only hides them) is a separate open decision, not part of this item.
-
-### M15 — Planning documents
-
-Added on 2026-11-17 at the person’s request.
-
-- [x] **15.1** `feature/15.1-archive-completed-build-plan-items` · **P2** — The build plan is 1,061 lines; 58 items are done and 6 are open, so the active plan is hard to read and costly for AI tools to load. Move the text of completed milestones and items into one tracked `blueprint/build-plan-archive.md`, keeping their IDs, checkboxes and PR references, and leave a one-line pointer per milestone in the plan. Open items (10.15, 9.14a–c, 9.15) keep their full text beside their checkbox, because `/feature` reads only the target line and nearby text. Keep the identity contract (section 1) in the plan and have CLAUDE.md point to it rather than repeat it. Move demo-era sections that no longer guide work (for example "Priority order if time is tight") to the archive. Docs only; no code change.
-
-  **Done when:** every stable ID appears exactly once across the plan and the archive, with no item text lost; the "What to build next" item is unchanged; links resolve; `/overview` is rerun for the new plan fingerprint; `npm run verify` passes.
 
 ## 5. Minimal API outline (suggested, not prescribed)
 

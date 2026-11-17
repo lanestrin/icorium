@@ -8,6 +8,15 @@
 
 **Status (as reported in the supplied plan, not independently verified against the repository):** M8–M9 and 10.1–10.3 are recorded as merged; 11.1–11.2 are recorded as merged; 11.3 is implemented and awaiting review/PR; 11.4–11.5 and the remaining M10 items are pending. This revision records the agreed filename/ID contract and additional correctness work. Historical completion records are retained as records, not fresh verification.
 
+## Build order history
+
+The "What to build next" order as it stood before it was trimmed to open items on 2026-11-17. Every item in it was completed except 10.15, 9.14a–c and 9.15.
+
+**Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
+
+1. **Frontend first:** 14.1 → 10.13 → 10.14 → 14.5a → 14.5b → 14.5c → 14.2 → 14.3 → 14.4. 10.13 and 10.14 keep their own IDs and branches. 14.5 comes before the rest of M14 (added 2026-11-16): it fixes layouts that break the project's phone-width rule now, and 14.2's loading states and 14.4's stories should be built on the corrected layouts. 14.2 reuses 14.1's fallback and the loading and error states from 10.13 and 10.14, and 14.4's stories show the tokens 14.3 adds.
+2. **Then:** 9.12 → 9.13 → 10.11 → 15.1 → 10.15 → 9.14a → 9.14b → 9.14c → 9.15. 9.14 depends on 10.13, which the frontend block finishes first.
+
 ## 3. Repository layout
 
 ```text
@@ -782,6 +791,14 @@ Added on 2026-11-15 at the person's request after reviewing the frontend archite
   - [x] **14.5c** `feature/14.5c-responsive-generator-and-architecture` — The CSV Generator and Architecture pages, the page navigation and the render-error fallback (14.1).
 
   **Done when (each sub-item):** its audited issues are fixed at every listed width; component tests cover the structural changes; `npm run verify` passes; the Try it now list names each screen and width to check. Component tests do not prove the layout; the person's visual check at each width does.
+
+### M15 — Planning documents
+
+Added on 2026-11-17 at the person’s request.
+
+- [x] **15.1** `feature/15.1-archive-completed-build-plan-items` · **P2** — The build plan is 1,061 lines; 58 items are done and 6 are open, so the active plan is hard to read and costly for AI tools to load. Move the text of completed milestones and items into one tracked `blueprint/build-plan-archive.md`, keeping their IDs, checkboxes and PR references, and leave a one-line pointer per milestone in the plan. Open items (10.15, 9.14a–c, 9.15) keep their full text beside their checkbox, because `/feature` reads only the target line and nearby text. Keep the identity contract (section 1) in the plan and have CLAUDE.md point to it rather than repeat it. Move demo-era sections that no longer guide work (for example "Priority order if time is tight") to the archive. Docs only; no code change.
+
+  **Done when:** every stable ID appears exactly once across the plan and the archive, with no item text lost; the "What to build next" item is unchanged; links resolve; `/overview` is rerun for the new plan fingerprint; `npm run verify` passes.
 
 ### M7 — Final interview readiness
 

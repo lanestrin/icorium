@@ -97,3 +97,32 @@ by the person on 2026-11-06; any further cloud addition needs a new decision.
 - Explicit non-requirements: user accounts, database (PostgreSQL, Convex),
   queues, microservices, notifications, AI features, an analytics dashboard,
   inferring purity or separation recovery from blend composition.
+
+## 10. Future direction — Proposed, Not Yet Implemented
+
+> **Proposed — Not Yet Implemented.** Nothing in this section is a current
+> requirement. Sections 1–9 above and the "Do not add" list in
+> `blueprint/stack.md` govern all current work. No part of this direction may
+> be built until it is added to `blueprint/build-plan.md` as approved items.
+
+Decided by the person on 2026-11-16: finish the demonstration first (the open
+items in `build-plan.md`, ending with 9.15), then evolve Reclaim Studio into a
+production engineering analytics platform. Detailed production planning is kept
+outside this repository.
+
+The proposed future scope:
+
+- Multi-tenant organizations and user authentication
+- Datasets private to the engineer who uploads them by default
+- Explicit engineer-to-engineer sharing
+- Contractually authorized internal access to partner datasets
+- Cross-partner comparisons
+- PostgreSQL and object storage
+- Background processing workers
+- Scalable cloud infrastructure
+- Licensing and resource quotas
+- Expanded document ingestion and engineering analytics
+
+The demo's browser-based file conversion (build-plan 9.14) keeps its approved
+scope; server-side or large-scale ingestion belongs to this future direction and
+needs its own approved items.
