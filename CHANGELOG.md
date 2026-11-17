@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.1](https://github.com/lanestrin/icorium/compare/v1.17.0...v1.17.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* refuse uploads and comparisons too large to send online (10.15) ([#111](https://github.com/lanestrin/icorium/issues/111)) ([19e8fa1](https://github.com/lanestrin/icorium/commit/19e8fa18a0dc4c4d17007bd4d7601b5219db2022))
+
 ## [1.17.0](https://github.com/lanestrin/icorium/compare/v1.16.0...v1.17.0) (2026-11-17)
 
 
