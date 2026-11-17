@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/lanestrin/icorium/compare/v1.17.1...v1.18.0) (2026-11-17)
+
+
+### Features
+
+* import partner Excel files after a review (9.14a) ([#113](https://github.com/lanestrin/icorium/issues/113)) ([e11f496](https://github.com/lanestrin/icorium/commit/e11f4961e4e3dbae3026464e7f025c0502aa8754))
+
 ## [1.17.1](https://github.com/lanestrin/icorium/compare/v1.17.0...v1.17.1) (2026-11-17)
 
 
