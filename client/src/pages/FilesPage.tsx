@@ -75,8 +75,13 @@ export function FilesPage() {
   }, []);
 
   // Clear my data: every upload and result in this browser is deleted and the five samples come back.
+  // It holds busy like a run or archive, so nothing else starts meanwhile, and it closes the archive toast
+  // first: its Undo names File IDs that a re-added sample or a new upload may reuse after the clear.
   async function clearData() {
     setConfirmClear(false);
+    if (busy.current) return;
+    busy.current = true;
+    dismissToast();
     setClearing(true);
     setError(undefined);
     setNotice(undefined);
@@ -88,6 +93,7 @@ export function FilesPage() {
     } catch (e) {
       setError(`Clear my data failed: ${errorMessage(e)}`);
     } finally {
+      busy.current = false;
       setClearing(false);
     }
   }
@@ -138,9 +144,10 @@ export function FilesPage() {
           setProcessor={setProcessor}
           onUpload={uploadFiles}
           onRun={() => requestRun(selectedInputs)}
-          canRun={selectedInputs.length > 0 && !processingId && !archiving}
+          canRun={selectedInputs.length > 0 && !processingId && !archiving && !clearing}
           running={!!processingId}
           uploading={uploading && !conversion.review}
+          uploadDisabled={clearing}
           reading={conversion.reading ?? undefined}
           selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
           storageMode={storageMode}
@@ -182,7 +189,7 @@ export function FilesPage() {
                   comparing={comparing}
                   onCompare={compare}
                   viewArchived={viewArchived}
-                  archiveDisabled={!!processingId || archiving}
+                  archiveDisabled={!!processingId || archiving || clearing}
                   onArchive={() => setArchived(selectedInView.map((f) => f.id), !viewArchived)}
                 />
               )}
@@ -198,7 +205,7 @@ export function FilesPage() {
               onPreview={setPreview}
               onDownload={(f) => api.download(f.id).catch((e) => setError(`Download failed: ${errorMessage(e)}`))}
               onRestore={viewArchived ? (f) => setArchived([f.id], false) : undefined}
-              restoreDisabled={archiving}
+              restoreDisabled={archiving || clearing}
               emptyMessage={loading ? 'Loading files…'
                 : viewArchived && !archivedCount ? 'No archived files. Select files in Active Files and click Archive to move them here.' : undefined}
             />

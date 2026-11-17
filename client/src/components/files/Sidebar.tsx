@@ -12,11 +12,14 @@ const describe = (file: SelectedInput) => `${file.id} · ${file.name}`;
 /** A mouse or trackpad can drag files in; a touch screen can't, so it only gets the button. */
 const CAN_DRAG_FILES = '(pointer: fine)';
 
-/** The upload drop zone: drop CSV, Excel or PDF files on it, or browse for them. reading names a file being converted. */
-function DropZone({ uploading, reading, onUpload }: { uploading: boolean; reading?: string; onUpload: (files: File[]) => void }) {
+/**
+ * The upload drop zone: drop CSV, Excel or PDF files on it, or browse for them. reading names a file being
+ * converted. disabled (while Clear my data runs) disables the buttons and ignores dropped files.
+ */
+function DropZone({ uploading, reading, disabled, onUpload }: { uploading: boolean; reading?: string; disabled: boolean; onUpload: (files: File[]) => void }) {
   const input = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const upload = (list: FileList | null) => list?.length && onUpload([...list]);
+  const upload = (list: FileList | null) => !disabled && list?.length && onUpload([...list]);
   const canDrag = window.matchMedia(CAN_DRAG_FILES).matches;
   const browse = () => input.current?.click();
 
@@ -39,10 +42,10 @@ function DropZone({ uploading, reading, onUpload }: { uploading: boolean; readin
           Drop CSV, Excel or PDF files here
           <br />
           or{' '}
-          <Button variant="link" onClick={browse}>browse files</Button>
+          <Button variant="link" disabled={disabled} onClick={browse}>browse files</Button>
         </p>
       ) : (
-        <Button variant="secondary" className={styles.chooseFiles} onClick={browse}>Choose CSV, Excel or PDF files</Button>
+        <Button variant="secondary" className={styles.chooseFiles} disabled={disabled} onClick={browse}>Choose CSV, Excel or PDF files</Button>
       )}
       {reading ? <p className={styles.uploading}>Reading {reading}…</p> : uploading && <p className={styles.uploading}>Uploading…</p>}
       <input ref={input} type="file" accept=".csv,text/csv,.xlsx,.xls,.pdf,application/pdf" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
@@ -69,6 +72,7 @@ interface SidebarProps {
   running: boolean;
   uploading: boolean;
   reading?: string; // a file being converted before upload
+  uploadDisabled: boolean; // true while Clear my data runs
   selected: SelectedInput[]; // the checked inputs, File ID and filename shown separately
   storageMode?: StorageMode; // where files are kept; unknown until storage has opened
   onClearData: () => void;
@@ -81,14 +85,14 @@ const STORAGE_NOTES: Record<StorageMode, string> = {
 };
 
 /** The left column: upload, where files are kept, the processing function, the selected inputs and Run Processing. */
-export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, running, uploading, reading, selected, storageMode, onClearData, clearDisabled }: SidebarProps) {
+export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, running, uploading, reading, uploadDisabled, selected, storageMode, onClearData, clearDisabled }: SidebarProps) {
   const count = selected.length;
   const runLabel = running ? 'Processing…' : `Run Processing${count > 1 ? ` (${count})` : ''}`;
 
   return (
     <aside className={styles.sidebar}>
       <div className={styles.storage}>
-        <DropZone uploading={uploading} reading={reading} onUpload={onUpload} />
+        <DropZone uploading={uploading} reading={reading} disabled={uploadDisabled} onUpload={onUpload} />
         {storageMode && <p className={styles.storageNote}>{STORAGE_NOTES[storageMode]}</p>}
         <Button variant="secondary" className={styles.clearData} disabled={clearDisabled} onClick={onClearData} icon={<Trash2 />}>
           Clear my data

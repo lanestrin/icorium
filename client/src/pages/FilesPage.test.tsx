@@ -1291,6 +1291,46 @@ describe('browser storage notice and Clear my data', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Clear my data failed: The browser stopped saving this file.');
   });
 
+  it('closes the archive Undo toast before clearing, so Undo cannot act on a reused File ID', async () => {
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    vi.mocked(api.archive).mockResolvedValueOnce([{ ...clean, archived: true }]);
+    await user.click(within(screen.getByRole('toolbar', { name: 'Selected files' })).getByRole('button', { name: /^Archive 1 file$/ }));
+    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
+
+    vi.mocked(api.clearData).mockResolvedValueOnce();
+    await user.click(clearButton());
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clear my data' }));
+    expect(await screen.findByText('Your data was cleared. The five sample files are back.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
+    expect(api.archive).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks Run Processing, uploading, Archive and Restore until the clear has finished', async () => {
+    const old: FileMeta = { ...clean, id: 'old', name: 'old.csv', archived: true, archivedAt: '2026-11-08T10:00:00Z' };
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, old]);
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    let finish!: () => void;
+    vi.mocked(api.clearData).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    await user.click(clearButton());
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clear my data' }));
+
+    expect(screen.getByRole('button', { name: /Run Processing/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'browse files' })).toBeDisabled();
+    expect(within(screen.getByRole('toolbar', { name: 'Selected files' })).getByRole('button', { name: /^Archive 1 file$/ })).toBeDisabled();
+    expect(clearButton()).toBeDisabled();
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    await user.click(screen.getByRole('button', { name: withId('Actions for', 'old.csv') }));
+    expect(screen.getByRole('menuitem', { name: 'Restore file' })).toHaveAttribute('aria-disabled', 'true');
+    await user.keyboard('{Escape}');
+
+    await act(async () => finish());
+    expect(await screen.findByText('Your data was cleared. The five sample files are back.')).toBeInTheDocument();
+    expect(clearButton()).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'browse files' })).toBeEnabled();
+  });
+
   it('cannot be used while a run is in progress', async () => {
     const user = await setup();
     vi.mocked(api.process).mockImplementationOnce(() => new Promise(() => {}));
