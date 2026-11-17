@@ -1,6 +1,6 @@
 import { BlobPreconditionFailedError, del, get, list, put } from '@vercel/blob';
 import { nextBaseId, parseFileId, type FileMeta, type ProcessorCode } from '../../../shared/types';
-import { httpError } from './csv';
+import { httpError } from '../../../shared/csv';
 import type { NewFile, NewUpload, Storage } from './storage';
 
 /** Most objects one Blob listing request returns; longer listings are read page by page. */

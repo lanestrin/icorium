@@ -1,10 +1,11 @@
-import { randomInt } from 'node:crypto';
 import { httpError, toCsv } from './csv';
-import { ADAPTERS, type GeneratedError, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
+import { ADAPTERS, type GeneratedError, type GeneratedFile, type GeneratorPartner } from './types';
 
 /** The first generated row's sample date (2026-09-01, UTC); each later row is one day after. */
 const GENERATOR_FIRST_DAY = Date.UTC(2026, 8, 1);
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** A random seed from 0 to 2³¹ − 1. The global crypto exists in Node and in browsers. */
+const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0] >>> 1;
 /** Ranges clean generated rows are drawn from: feed mass in kg, R-32 and R-125 in %. R-134a makes up the rest. */
 const GENERATOR_RANGES = { massKg: [110, 140], r32Pct: [33, 43], r125Pct: [26, 33] } as const;
 /** Tries allowed in one generateFiles call before it gives up on making distinct files. */
@@ -36,7 +37,7 @@ const SINGLE_ERRORS: GeneratedError['kind'][] = ['mass missing', 'mass not a num
  * Validation; with errorRows > 0, exactly that many rows fail it. A duplicate batch ID makes two rows
  * fail, so it is only planted when at least two error rows remain.
  */
-export function generateCsv(partner: GeneratorPartner, rows: number, errorRows: number, seed = randomInt(2 ** 31), name = generatedName(partner, 1, new Date())): GeneratedFile {
+export function generateCsv(partner: GeneratorPartner, rows: number, errorRows: number, seed = randomSeed(), name = generatedName(partner, 1, new Date())): GeneratedFile {
   const adapter = ADAPTERS.find((a) => a.id === partner);
   if (!adapter) throw httpError(400, `Unknown partner ${partner}.`);
 
@@ -97,7 +98,7 @@ export function generateCsv(partner: GeneratorPartner, rows: number, errorRows: 
  * seed, so no two files in a batch are the same. After GENERATE_MAX_ATTEMPTS tries in total it stops with
  * a clear error instead of retrying forever. `make` is the file generator; tests can replace it.
  */
-export function generateFiles(partner: GeneratorPartner, rows: number, errorRows: number, count: number, seed = randomInt(2 ** 31), made = new Date(), make = generateCsv): GeneratedFile[] {
+export function generateFiles(partner: GeneratorPartner, rows: number, errorRows: number, count: number, seed = randomSeed(), made = new Date(), make = generateCsv): GeneratedFile[] {
   const files: GeneratedFile[] = [];
   const seen = new Set<string>();
   let next = seed;

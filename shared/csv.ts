@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import type { Row } from '../../../shared/types';
+import type { Row } from './types';
 
 export const httpError = (statusCode: number, message: string) => Object.assign(new Error(message), { statusCode });
 

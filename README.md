@@ -96,7 +96,7 @@ Every result ends with `processing_status` (`Valid`/`Invalid`) and `validation_e
 
 Older exported results remain readable and downloadable unchanged. Compare results from the same function and output schema (with or without `result_id`). Classification results made before `r32_r125_over_50` existed still compare with new ones; that column is then left out of the comparison. If one uses the much older pre-`processing_status` columns, regenerate it from its original input before comparing it with a new result. No data reset or migration is required. Processing rejects source-column names that would be overwritten by generated columns.
 
-Composition totals within ±0.5 percentage points of 100% count as valid. Batch Classification uses demo-only thresholds (`DEMO_CLASS_RULES` in `server/src/processing/index.ts`): R-32 ≥ 40% is *R-32-rich*, otherwise R-134a ≥ 34% is *R-134a-rich*, otherwise *Balanced*. It also adds `r32_r125_over_50`: `Yes` when R-32 + R-125 is above 50% (exactly 50% is `No`), `No` otherwise. On the sample files every valid row reads `Yes`, since R-32 + R-125 is 62–77% there.
+Composition totals within ±0.5 percentage points of 100% count as valid. Batch Classification uses demo-only thresholds (`DEMO_CLASS_RULES` in `shared/processing.ts`): R-32 ≥ 40% is *R-32-rich*, otherwise R-134a ≥ 34% is *R-134a-rich*, otherwise *Balanced*. It also adds `r32_r125_over_50`: `Yes` when R-32 + R-125 is above 50% (exactly 50% is `No`), `No` otherwise. On the sample files every valid row reads `Yes`, since R-32 + R-125 is 62–77% there.
 
 ## Known limitations
 
@@ -129,11 +129,16 @@ client/        React + Vite UI, styled with SCSS Modules on design tokens
   src/hooks/       the workspace state, one hook per file: file list, selection, filters, archiving, processing
   src/lib/         api (the typed API client), file-status (file rules), compare-view (comparison rules), format
 server/        Fastify API
-  src/adapters/    partner header and unit mappings -> one normalized record
-  src/processing/  the three processing functions
-  src/lib/         csv parse/export, storage (local files, or private Blob via blob-storage.ts), compare, generate
+  src/lib/         storage (local files, or private Blob via blob-storage.ts)
   src/routes/      files.ts: /api/files, /api/files/archive, /api/process, /api/compare, /api/generate
-shared/        types and the processor list used by both sides
+shared/        code with no Node imports, used by the server and, from 16.2, the browser
+  types.ts         types and the processor list used by both sides
+  csv.ts           CSV parse/export
+  adapters.ts      partner header and unit mappings -> one normalized record
+  processing.ts    the three processing functions
+  compare.ts, generate.ts   comparison and the CSV generator
+  storage.ts       the Storage interface both storage backends implement
+  file-service.ts  the file actions (upload, rows, download, archive, process, compare, generate) over a Storage
 sample-data/   the five synthetic partner CSVs (never edited)
 ```
 
@@ -192,13 +197,13 @@ These limits are fixed in code, each as one named constant:
 
 | Constant | Value | File |
 | --- | --- | --- |
-| `PREVIEW_MAX_ROWS` | 1,000 rows per preview page (100 by default) | `server/src/routes/files.ts` |
-| `PARSED_CACHE_FILES` | 10 parsed files kept for previews and comparisons | `server/src/routes/files.ts` |
+| `PREVIEW_MAX_ROWS` | 1,000 rows per preview page (100 by default) | `shared/file-service.ts` |
+| `PARSED_CACHE_FILES` | 10 parsed files kept for previews and comparisons | `shared/file-service.ts` |
 | `BLOB_LIST_PAGE` | 1,000 objects per Blob listing request | `server/src/lib/blob-storage.ts` |
 | `GENERATOR_MAX_ROWS`, `GENERATOR_MAX_FILES` | 5,000 rows per generated file, 10 files per request | `shared/types.ts` |
-| `GENERATOR_FIRST_DAY`, `GENERATOR_RANGES` | Generated rows start on 2026-09-01; mass 110–140 kg, R-32 33–43 %, R-125 26–33 % | `server/src/lib/generate.ts` |
-| `DEMO_CLASS_RULES` | Demo classification thresholds: R-32-rich from 40 %, R-134a-rich from 34 % | `server/src/processing/index.ts` |
-| `R32_R125_FLAG_ABOVE` | `r32_r125_over_50` reads Yes when R-32 + R-125 is above 50 % | `server/src/processing/index.ts` |
+| `GENERATOR_FIRST_DAY`, `GENERATOR_RANGES` | Generated rows start on 2026-09-01; mass 110–140 kg, R-32 33–43 %, R-125 26–33 % | `shared/generate.ts` |
+| `DEMO_CLASS_RULES` | Demo classification thresholds: R-32-rich from 40 %, R-134a-rich from 34 % | `shared/processing.ts` |
+| `R32_R125_FLAG_ABOVE` | `r32_r125_over_50` reads Yes when R-32 + R-125 is above 50 % | `shared/processing.ts` |
 | `TOAST_MS` | The archive/restore toast stays 8 seconds | `client/src/hooks/useArchive.ts` |
 
 ## Deploy
@@ -212,5 +217,5 @@ Local development needs no account or cloud service. An optional Vercel deployme
 ## Extending
 
 - **New partner CSV schema:** add one entry to `ADAPTERS` in `shared/types.ts`, listing its id, name, description, column names, unit factors and number formats. Uploads, processing and the CSV generator all read it.
-- **New processing function:** add an entry to `processors` in `server/src/processing/index.ts`, plus its id, code and labels in `PROCESSORS` in `shared/types.ts`. The API's accepted functions and the file table's label follow from `PROCESSORS`.
+- **New processing function:** add an entry to `processors` in `shared/processing.ts`, plus its id, code and labels in `PROCESSORS` in `shared/types.ts`. The API's accepted functions and the file table's label follow from `PROCESSORS`.
 - **Storage:** `server/src/lib/storage.ts` owns local files and selects the private Blob adapter in `server/src/lib/blob-storage.ts` when a server-side Blob token is configured. Deployed instances share durable objects; local development keeps file storage.

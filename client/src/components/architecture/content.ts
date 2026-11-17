@@ -73,7 +73,7 @@ export const TECH: Tech[] = [
       'One error handler turns validation and processing errors into clear messages with the right status code.',
     ],
     tradeoff: 'A second service to run and deploy alongside the frontend; locally, npm run dev starts both.',
-    files: ['server/src/app.ts', 'server/src/routes/files.ts'],
+    files: ['server/src/app.ts', 'server/src/routes/files.ts', 'shared/file-service.ts'],
   },
   {
     name: 'Zod', label: 'Zod', role: 'Validation', icon: ShieldCheck, packages: [['server', 'zod']],
@@ -83,7 +83,7 @@ export const TECH: Tech[] = [
       'Covers what TypeScript cannot: data arriving from outside the program.',
     ],
     tradeoff: 'Request schemas are a second definition beside the TypeScript types. The allowed functions and partners come from the shared lists, but field rules such as limits and messages are written in the schemas.',
-    files: ['server/src/routes/files.ts'],
+    files: ['shared/file-service.ts'],
   },
   {
     name: 'Papa Parse', label: 'Papa Parse', role: 'CSV parsing', icon: FileSpreadsheet, packages: [['server', 'papaparse']],
@@ -93,7 +93,7 @@ export const TECH: Tech[] = [
       'Avoids writing and maintaining a custom CSV parser.',
     ],
     tradeoff: 'Each file is parsed in memory, which suits interview-sized files rather than very large ones.',
-    files: ['server/src/lib/csv.ts'],
+    files: ['shared/csv.ts'],
   },
   {
     name: 'SheetJS', label: 'SheetJS', role: 'Excel import', icon: FileSpreadsheet, packages: [['client', 'xlsx']],
@@ -157,7 +157,7 @@ export const TECH: Tech[] = [
       'One storage module is the only code that touches disk; processing never does.',
     ],
     tradeoff: 'Listing reads one small metadata object per file and never the CSVs: fine for a small catalogue, not for thousands of files or relational queries.',
-    files: ['server/src/lib/storage.ts', 'server/src/lib/blob-storage.ts'],
+    files: ['shared/storage.ts', 'server/src/lib/storage.ts', 'server/src/lib/blob-storage.ts'],
   },
 ];
 

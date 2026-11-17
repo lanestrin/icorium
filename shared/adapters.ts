@@ -1,5 +1,5 @@
-import { ADAPTERS, type Row } from '../../../shared/types';
-import { httpError } from '../lib/csv';
+import { ADAPTERS, type Row } from './types';
+import { httpError } from './csv';
 
 /** Canonical record every processor works on. null = missing, NaN = not a number. Percentages 0–100. */
 export interface Normalized {

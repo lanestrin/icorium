@@ -1,6 +1,6 @@
-import { FILE_ID_COLUMN, parseFileId, RESULT_ID_COLUMN, type Problem, type ProblemList, type ProcessorId, type Row } from '../../../shared/types';
-import { getAdapter, type Normalized } from '../adapters';
-import { httpError } from '../lib/csv';
+import { FILE_ID_COLUMN, parseFileId, RESULT_ID_COLUMN, type Problem, type ProblemList, type ProcessorId, type Row } from './types';
+import { getAdapter, type Normalized } from './adapters';
+import { httpError } from './csv';
 
 const COMPONENTS = ['r32', 'r125', 'r134a'] as const;
 type Component = (typeof COMPONENTS)[number];

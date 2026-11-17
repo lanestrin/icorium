@@ -1,7 +1,7 @@
-import { COMPARE_MAX, COMPARE_MIN, PROCESSORS, RESULT_ID_COLUMN, type CompareColumn, type CompareResult, type FileMeta, type MatchedRow, type Row, type RowMatch } from '../../../shared/types';
-import { getAdapter } from '../adapters';
+import { COMPARE_MAX, COMPARE_MIN, PROCESSORS, RESULT_ID_COLUMN, type CompareColumn, type CompareResult, type FileMeta, type MatchedRow, type Row, type RowMatch } from './types';
+import { getAdapter } from './adapters';
 import { httpError } from './csv';
-import { R32_R125_FLAG_COLUMN } from '../processing';
+import { R32_R125_FLAG_COLUMN } from './processing';
 
 interface Loaded { meta: FileMeta; headers: string[]; rows: Row[] }
 
