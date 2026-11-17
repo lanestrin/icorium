@@ -134,20 +134,33 @@ export function createBlobStorage(prefix: string): Storage {
      * Saves a file under exactly this ID only if no file has it yet: the metadata object is claimed with
      * "fail if it exists" first, and the CSV is written only by the server that claimed it, so a request
      * on another server can never overwrite it. Returns undefined, changing nothing, when it exists.
+     * If the CSV can't be written, the claim is removed again, so no file is listed without its CSV.
      */
     async createAt(id: string, input: NewFile) {
       const { meta, text } = newMeta(id, input);
-      if (!(await createOnce(pathsOf(id).meta, JSON.stringify(meta), JSON_TYPE))) return undefined;
-      await writeText(id, text);
+      const paths = pathsOf(id);
+      if (!(await createOnce(paths.meta, JSON.stringify(meta), JSON_TYPE))) return undefined;
+      try {
+        await writeText(id, text);
+      } catch (error) {
+        await del(paths.meta).catch(() => {}); // best effort; the write error is the one to report
+        throw error;
+      }
       return meta;
     },
-    /** Saves a sample under its fixed ID once; another server starting at the same time never overwrites it. */
+    /**
+     * Saves a sample under its fixed ID once; another server starting at the same time never overwrites
+     * it. Its CSV is written whenever it is missing, so a start that failed after claiming the sample is
+     * repaired by the next one.
+     */
     async seed(id: string, input: NewFile) {
       const parsed = parseFileId(id);
       if (!parsed) throw new Error(`Not a File ID: ${id}`);
       await createOnce(`${folders.claims}${parsed.base}.json`, '{}', JSON_TYPE);
       const { meta, text } = newMeta(id, input);
-      if (await createOnce(pathsOf(id).meta, JSON.stringify(meta), JSON_TYPE)) await writeText(id, text);
+      const paths = pathsOf(id);
+      await createOnce(paths.meta, JSON.stringify(meta), JSON_TYPE);
+      if (!(await fetchObject(paths.text))) await createOnce(paths.text, text, CSV_TYPE);
     },
   };
   return store;
@@ -155,11 +168,14 @@ export function createBlobStorage(prefix: string): Storage {
 
 /**
  * Converts files saved in the older one-object layout (`files/<id>.json` holding `{ meta, text }`) to
- * the two-object layout, once, at startup. For each old object: write its CSV, create its metadata
- * with "fail if it exists" (metadata already in the new layout wins), check both new objects exist,
- * then delete the old object. A file that can't be converted is left in place and named in `skipped`.
- * Safe when two servers start together: the CSV is the same, the metadata create can't overwrite, and
- * deleting an object that is already gone is harmless.
+ * the two-object layout, once, at startup. For each old object:
+ * - No metadata in the new layout yet: write the CSV, create the metadata ("fail if it exists"), check
+ *   both exist, then delete the old object.
+ * - Metadata already in the new layout (it wins): never overwrite its CSV. Write the old CSV only when
+ *   the new one is missing; delete the old object only when the stored CSV then equals it. A different
+ *   CSV means both layouts were written to separately, so the old object is kept and reported.
+ * A file that can't be converted is left in place and named in `skipped`. Safe when two servers start
+ * together: the CSV is the same, creates can't overwrite, and deleting a missing object is harmless.
  */
 export async function migrateCombinedFiles(prefix: string) {
   const folders = roots(prefix);
@@ -175,9 +191,15 @@ export async function migrateCombinedFiles(prefix: string) {
       if (meta?.id !== id || typeof text !== 'string') throw new Error('not a stored file');
       const metaPath = `${folders.meta}${id}.json`;
       const textPath = `${folders.text}${id}.csv`;
-      await put(textPath, text, { access: 'private', contentType: CSV_TYPE, addRandomSuffix: false, allowOverwrite: true });
-      await createOnce(metaPath, JSON.stringify(meta), JSON_TYPE);
-      if (!(await fetchObject(metaPath)) || !(await fetchObject(textPath))) throw new Error('new objects not found after writing');
+      if (await fetchObject(metaPath)) {
+        // Already in the new layout: keep its CSV, filling it in only if it is missing.
+        if (!(await fetchObject(textPath))) await createOnce(textPath, text, CSV_TYPE);
+        if ((await fetchObject(textPath))?.body !== text) throw new Error('both layouts hold different CSVs');
+      } else {
+        await put(textPath, text, { access: 'private', contentType: CSV_TYPE, addRandomSuffix: false, allowOverwrite: true });
+        await createOnce(metaPath, JSON.stringify(meta), JSON_TYPE);
+        if (!(await fetchObject(metaPath)) || !(await fetchObject(textPath))) throw new Error('new objects not found after writing');
+      }
       await del(oldPath);
       converted.push(id);
     } catch {

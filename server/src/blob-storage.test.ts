@@ -119,6 +119,32 @@ describe('durable Blob storage', () => {
       await expect(storage.get(id)).rejects.toMatchObject({ statusCode: 404 });
   });
 
+  it('removes its claim when createAt cannot write the CSV, so no file is listed without one (F-08)', async () => {
+    const storage = createBlobStorage('test/create-text-fail');
+    const putMock = vi.mocked(put);
+    const original = putMock.getMockImplementation()!;
+    putMock.mockImplementation(async (pathname, ...rest) => {
+      if (String(pathname).includes('/text/')) throw new Error('Store unavailable');
+      return original(pathname, ...rest);
+    });
+    try {
+      await expect(storage.createAt('100001-V', { ...input('r.csv'), status: 'Processed' })).rejects.toThrow('Store unavailable');
+    } finally { putMock.mockImplementation(original); }
+    expect(await storage.list()).toEqual([]);
+    // The ID is free again, so the run can be retried.
+    expect(await storage.createAt('100001-V', { ...input('r.csv'), text: 'retried', status: 'Processed' })).toMatchObject({ id: '100001-V' });
+    expect(await storage.read('100001-V')).toBe('retried');
+  });
+
+  it('repairs a sample left without its CSV on the next start (F-08)', async () => {
+    const storage = createBlobStorage('test/seed-repair');
+    await storage.seed('100001', input('sample.csv'));
+    blobs.files.delete('test/seed-repair/text/100001.csv'); // a start that failed after claiming the sample
+    await expect(storage.read('100001')).rejects.toMatchObject({ statusCode: 404 });
+    await createBlobStorage('test/seed-repair').seed('100001', input('sample.csv'));
+    expect(await storage.read('100001')).toBe(input('sample.csv').text);
+  });
+
   it('seeds samples idempotently even when two instances start together', async () => {
     const a = createBlobStorage('test/seed');
     const b = createBlobStorage('test/seed');
@@ -326,14 +352,33 @@ describe('converting the older one-object layout at startup', () => {
     expect((await createBlobStorage('test/convert-twice').list()).map((f) => f.id)).toEqual(['100001', '100002']);
   });
 
-  it('keeps metadata already in the new layout', async () => {
+  it('keeps metadata already in the new layout and never overwrites its CSV (F-07)', async () => {
     const storage = createBlobStorage('test/convert-newer');
     const current = await storage.create(input('current.csv'));
     await storage.patch(current.id, { archived: true });
-    storeOld('test/convert-newer', current.id); // an older copy of the same file
-    await migrateCombinedFiles('test/convert-newer');
+    storeOld('test/convert-newer', current.id); // an older copy of the same file, with a different CSV
+    expect(await migrateCombinedFiles('test/convert-newer')).toEqual({ converted: [], skipped: [current.id] });
     expect(await storage.get(current.id)).toMatchObject({ name: 'current.csv', archived: true });
-    expect(oldObjects('test/convert-newer')).toEqual([]);
+    expect(await storage.read(current.id)).toBe(input('current.csv').text);
+    // The two layouts disagree, so the old copy is kept for someone to look at, not deleted.
+    expect(oldObjects('test/convert-newer')).toEqual([`test/convert-newer/files/${current.id}.json`]);
+  });
+
+  it('deletes the old copy when the new layout already holds the same CSV', async () => {
+    const storage = createBlobStorage('test/convert-same');
+    const current = await storage.create(input('same.csv'));
+    storeOld('test/convert-same', current.id, input('same.csv').text);
+    expect(await migrateCombinedFiles('test/convert-same')).toEqual({ converted: [current.id], skipped: [] });
+    expect(await storage.read(current.id)).toBe(input('same.csv').text);
+    expect(oldObjects('test/convert-same')).toEqual([]);
+  });
+
+  it('fills in a missing CSV from the old copy when only the metadata was converted', async () => {
+    const meta = storeOld('test/convert-resume', '100001', 'batch_id,value\nA,resumed');
+    blobs.files.set('test/convert-resume/meta/100001.json', { text: JSON.stringify(meta), etag: 'm' }); // an earlier run stopped here
+    expect(await migrateCombinedFiles('test/convert-resume')).toEqual({ converted: ['100001'], skipped: [] });
+    expect(await createBlobStorage('test/convert-resume').read('100001')).toBe('batch_id,value\nA,resumed');
+    expect(oldObjects('test/convert-resume')).toEqual([]);
   });
 
   it('leaves an unreadable old object in place and reports it, converting the rest', async () => {

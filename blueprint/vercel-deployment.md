@@ -58,8 +58,11 @@ storage resource, not another named service or a service binding.
 - Files saved in the older one-object layout (`<namespace>/files/<id>.json`,
   metadata and CSV together) are converted once at startup: the CSV and
   metadata objects are written, checked, and only then is the old object
-  deleted. A file that can't be converted is left in place and logged. Two
-  servers starting together convert safely.
+  deleted. A file already in the new layout keeps its metadata and its CSV:
+  a missing CSV is filled in from the old copy, and the old copy is deleted
+  only when the CSVs match. A differing old copy, or any file that can't be
+  converted, is left in place and logged. Two servers starting together convert
+  safely.
 - Objects saved before File IDs (under `<namespace>/records/`) are not read;
   that demo data is reset, not migrated.
 - Sample creation is idempotent across cold starts (samples take IDs
