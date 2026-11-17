@@ -105,6 +105,15 @@ export const TECH: Tech[] = [
     files: ['client/src/lib/convert/excel.ts', 'client/src/lib/convert/table.ts'],
   },
   {
+    name: 'pdf.js', label: 'pdf.js', role: 'PDF import', icon: FileText, packages: [['client', 'pdfjs-dist']],
+    why: [
+      'Reads the text of a partner\x27s PDF in the browser; text is grouped into rows by its height on the page and into cells by the gaps between it, then reviewed and uploaded as a CSV.',
+      'Loaded only when a PDF is chosen, and parses in its own worker so the page stays responsive.',
+    ],
+    tradeoff: 'Rows and cells are inferred from where the text sits, so unusual layouts need the review; it reads text only, so a scanned page is refused until OCR is added.',
+    files: ['client/src/lib/convert/pdf.ts'],
+  },
+  {
     name: 'Recharts', label: 'Recharts', role: 'Charts', icon: ChartColumn, packages: [['client', 'recharts']],
     why: [
       'React chart components for the comparison dashboard: one line per file, grouped bars for categories.',

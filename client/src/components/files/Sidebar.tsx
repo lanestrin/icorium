@@ -11,7 +11,7 @@ const describe = (file: SelectedInput) => `${file.id} · ${file.name}`;
 /** A mouse or trackpad can drag files in; a touch screen can't, so it only gets the button. */
 const CAN_DRAG_FILES = '(pointer: fine)';
 
-/** The upload drop zone: drop CSV or Excel files on it, or browse for them. reading names a file being converted. */
+/** The upload drop zone: drop CSV, Excel or PDF files on it, or browse for them. reading names a file being converted. */
 function DropZone({ uploading, reading, onUpload }: { uploading: boolean; reading?: string; onUpload: (files: File[]) => void }) {
   const input = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -35,16 +35,16 @@ function DropZone({ uploading, reading, onUpload }: { uploading: boolean; readin
       <CloudUpload className={styles.dropIcon} strokeWidth={1.5} aria-hidden />
       {canDrag ? (
         <p className={styles.dropText}>
-          Drop CSV or Excel files here
+          Drop CSV, Excel or PDF files here
           <br />
           or{' '}
           <Button variant="link" onClick={browse}>browse files</Button>
         </p>
       ) : (
-        <Button variant="secondary" className={styles.chooseFiles} onClick={browse}>Choose CSV or Excel files</Button>
+        <Button variant="secondary" className={styles.chooseFiles} onClick={browse}>Choose CSV, Excel or PDF files</Button>
       )}
       {reading ? <p className={styles.uploading}>Reading {reading}…</p> : uploading && <p className={styles.uploading}>Uploading…</p>}
-      <input ref={input} type="file" accept=".csv,text/csv,.xlsx,.xls" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
+      <input ref={input} type="file" accept=".csv,text/csv,.xlsx,.xls,.pdf,application/pdf" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
     </div>
   );
 }
