@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.0](https://github.com/lanestrin/icorium/compare/v1.18.0...v1.19.0) (2026-11-17)
+
+
+### Features
+
+* import text PDF partner files after a review (9.14b) ([#115](https://github.com/lanestrin/icorium/issues/115)) ([fd8da17](https://github.com/lanestrin/icorium/commit/fd8da17de28727e606291d5d804dbb68212ca35e))
+
 ## [1.18.0](https://github.com/lanestrin/icorium/compare/v1.17.1...v1.18.0) (2026-11-17)
 
 
