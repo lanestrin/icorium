@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';import path from 'node:path';
 import { DEFAULT_LOG_LEVEL, DEFAULT_MAX_UPLOAD_MB, serverSettings } from './app';
 import { describe, expect, it } from 'vitest';
-import { parseCsv, toCsv } from './lib/csv';
-import { getAdapter } from './adapters';
-import { detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from './processing';
-import { compareResults, matchRows } from './lib/compare';
-import { GENERATE_MAX_ATTEMPTS, generateCsv, generatedName, generateFiles } from './lib/generate';
+import { parseCsv, toCsv } from '../../shared/csv';
+import { getAdapter } from '../../shared/adapters';
+import { detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from '../../shared/processing';
+import { compareResults, matchRows } from '../../shared/compare';
+import { GENERATE_MAX_ATTEMPTS, generateCsv, generatedName, generateFiles } from '../../shared/generate';
 import { ADAPTERS, GENERATOR_PARTNERS, nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../../shared/types';
 
 const A_HEADERS = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
@@ -573,5 +574,21 @@ describe('server settings', () => {
   it('refuses an unknown LOG_LEVEL, listing the valid ones', () => {
     expect(() => serverSettings({ LOG_LEVEL: 'loud' }))
       .toThrow('LOG_LEVEL must be one of fatal, error, warn, info, debug, trace, silent, got "loud".');
+  });
+});
+
+describe('shared code', () => {
+  // 16.2 runs shared/ in the browser, so it must not import Node or server-only packages.
+  const sharedDir = path.resolve(import.meta.dirname, '../../shared');
+  const files = readdirSync(sharedDir).filter((name) => name.endsWith('.ts'));
+  const serverOnly = /from '(node:[^']*|fastify|@fastify\/[^']*|@vercel\/blob|fs|fs\/promises|path|os|crypto)'/;
+
+  it.each(files)('%s imports nothing from Node or the server', (name) => {
+    const imports = readFileSync(path.join(sharedDir, name), 'utf8').split('\n').filter((line) => line.startsWith('import '));
+    expect(imports.filter((line) => serverOnly.test(line))).toEqual([]);
+  });
+
+  it('finds the shared modules', () => {
+    expect(files).toEqual(expect.arrayContaining(['csv.ts', 'adapters.ts', 'processing.ts', 'compare.ts', 'generate.ts', 'types.ts']));
   });
 });

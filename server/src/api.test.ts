@@ -5,10 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { codeOf, isInputFile, PROCESSORS, type CompareResult, type FileMeta, type ReplaceConflict, type FileRows, type GeneratedBatch, type ProcessorId } from '../../shared/types';
-import { parseCsv, toCsv } from './lib/csv';
-import { processors } from './processing';
+import { parseCsv, toCsv } from '../../shared/csv';
+import { processors } from '../../shared/processing';
 import { buildApp, serverSettings } from './app';
-import { PARSED_CACHE_FILES } from './routes/files';
+import { PARSED_CACHE_FILES } from '../../shared/file-service';
 import { openLocalStorage, reconcileMetadata } from './lib/storage';
 
 // Each test run uses its own throwaway data folder, opened as the app's storage.

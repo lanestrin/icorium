@@ -72,7 +72,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 16.1** `feature/16.1-shared-processing-core`. Start by moving one pure module (the processors in `server/src/processing/`) into shared code and confirming that the existing server tests pass unchanged against it.
+**Next: 16.2** `feature/16.2-browser-storage-and-local-api`. Decide the persistence question below first (IndexedDB is recommended), then write a browser `Storage` adapter and call `createFileService` from `shared/file-service.ts` in the browser.
 
 **Order:** 9.14a → 9.14b → 16.1 → 16.2 → 16.3 → 16.4 → 9.14c → 9.15. M16 comes before 9.14c because the live site's API is down while its Blob store is over the Hobby limit, and 9.14c and 9.15 would otherwise describe a server that M16 retires. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
 
@@ -202,7 +202,7 @@ Added at the person's request on 2026-11-17. The private Vercel Blob store reach
 - The only Node-only parts are Fastify, the disk and Blob storage backends, and one `randomInt` call in the generator.
 - The client reaches the server only through the 8 functions in `client/src/lib/api.ts`.
 
-- [ ] **16.1** `feature/16.1-shared-processing-core` · **P1** — Move processing, adapters, CSV handling, comparison and the generator out of `server/src` into shared code with no Node imports. Turn the route bodies in `server/src/routes/files.ts` into plain functions over the existing `Storage` interface: upload, process, archive, rows, compare and generate. No behavior change: the existing server unit and API tests keep passing against the shared code.
+- [x] **16.1** `feature/16.1-shared-processing-core` · **P1** — Move processing, adapters, CSV handling, comparison and the generator out of `server/src` into shared code with no Node imports. Turn the route bodies in `server/src/routes/files.ts` into plain functions over the existing `Storage` interface: upload, process, archive, rows, compare and generate. No behavior change: the existing server unit and API tests keep passing against the shared code.
 - [ ] **16.2** `feature/16.2-browser-storage-and-local-api` · **P1** — Store files in the browser and run the app's logic there.
   - A browser storage adapter implements `Storage`: File IDs counting up from `100001`, archive flags and metadata.
   - The five samples are bundled and seeded under their fixed IDs.

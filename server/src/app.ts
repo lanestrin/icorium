@@ -1,7 +1,7 @@
 import Fastify, { type FastifyServerOptions } from 'fastify';
 import multipart from '@fastify/multipart';
-import { ZodError } from 'zod';
 import { fileRoutes } from './routes/files';
+import { createFileService } from '../../shared/file-service';
 import { createStorage, reconcileMetadata, seedSamples, type Storage } from './lib/storage';
 
 /** Largest CSV upload, in megabytes, unless MAX_UPLOAD_MB says otherwise. */
@@ -49,7 +49,6 @@ export async function buildApp(logger?: FastifyServerOptions['logger'], store?: 
   await app.register(multipart, { limits: { fileSize: settings.maxUploadMb * 1024 * 1024 } });
 
   app.setErrorHandler((err: Error & { statusCode?: number; code?: string }, _req, reply) => {
-    if (err instanceof ZodError) return reply.code(400).send({ message: err.issues.map((i) => i.message).join('; ') });
     // Multipart's own text ("request file too large") doesn't say what the limit is.
     if (err.code === 'FST_REQ_FILE_TOO_LARGE')
       return reply.code(413).send({ message: `This file is larger than the ${settings.maxUploadMb} MB upload limit.` });
@@ -62,6 +61,6 @@ export async function buildApp(logger?: FastifyServerOptions['logger'], store?: 
   // Older metadata is corrected once here, so GET /api/files is a pure read.
   const { skipped } = await reconcileMetadata(storage);
   if (skipped.length) app.log.warn(`Could not read ${skipped.length} stored file(s) to update their metadata: ${skipped.join(', ')}`);
-  await app.register(fileRoutes, { prefix: '/api', storage });
+  await app.register(fileRoutes, { prefix: '/api', files: createFileService(storage) });
   return app;
 }
