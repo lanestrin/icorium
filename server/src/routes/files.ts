@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { codeOf, COMPARE_MAX, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ProcessorId, type ReplaceConflict, type Row } from '../../../shared/types';
+import { codeOf, COMPARE_MAX, COMPARE_MAX_ROWS, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ProcessorId, type ReplaceConflict, type Row } from '../../../shared/types';
 import { getAdapter } from '../adapters';
 import { detectResult, embeddedSourceId, findProblems, matchesInput, processRows, stampFileIds } from '../processing';
 import { compareResults } from '../lib/compare';
@@ -213,15 +213,21 @@ export async function fileRoutes(app: FastifyInstance, { storage }: { storage: S
 
   app.get('/compare', async (req) => {
     const ids = compareQuery.parse(req.query);
-    const load = async (id: string) => {
-      const meta = await storage.get(id);
+    const metas = await Promise.all(ids.map((id) => storage.get(id)));
+    // Checked from the stored row counts, before any CSV is read.
+    const totalRows = metas.reduce((sum, m) => sum + m.rows, 0);
+    if (totalRows > COMPARE_MAX_ROWS) {
+      const n = (x: number) => x.toLocaleString('en-US');
+      throw httpError(400, `Too many rows to compare: these files have ${n(totalRows)} rows in total, and the limit is ${n(COMPARE_MAX_ROWS)}. Compare fewer or smaller files.`);
+    }
+    const load = async (meta: FileMeta) => {
       const { headers, rows, problems } = await parsedFile(meta);
       if (meta.status !== 'Processed') return { meta, headers, rows, problems };
       const result = detectResult(headers);
       if (!result) throw httpError(400, `${meta.name} has an unrecognized result schema. Regenerate it from its original input.`);
       return { meta: { ...meta, ...result }, headers, rows, problems };
     };
-    const loaded = await Promise.all(ids.map(load));
+    const loaded = await Promise.all(metas.map(load));
     const result = compareResults(loaded);
     // Which rows in each file have problems, so the comparison can say which file an error is in.
     return { ...result, files: result.files.map((f, k) => ({ ...f, problems: loaded[k].problems })) };

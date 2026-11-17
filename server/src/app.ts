@@ -48,8 +48,11 @@ export async function buildApp(logger?: FastifyServerOptions['logger'], store?: 
   const app = Fastify({ logger: logger ?? { level: settings.logLevel } });
   await app.register(multipart, { limits: { fileSize: settings.maxUploadMb * 1024 * 1024 } });
 
-  app.setErrorHandler((err: Error & { statusCode?: number }, _req, reply) => {
+  app.setErrorHandler((err: Error & { statusCode?: number; code?: string }, _req, reply) => {
     if (err instanceof ZodError) return reply.code(400).send({ message: err.issues.map((i) => i.message).join('; ') });
+    // Multipart's own text ("request file too large") doesn't say what the limit is.
+    if (err.code === 'FST_REQ_FILE_TOO_LARGE')
+      return reply.code(413).send({ message: `This file is larger than the ${settings.maxUploadMb} MB upload limit.` });
     const code = err.statusCode ?? 500;
     if (code >= 500) app.log.error(err);
     return reply.code(code).send({ message: err.message });

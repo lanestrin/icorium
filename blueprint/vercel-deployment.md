@@ -104,10 +104,23 @@ Check `/` for HTML; `/api/files` for JSON; process a sample and download/compare
 results. An unknown `/api/...` path must return an API 404, not HTML. Run
 `npm run verify` and `npx tsc -p server/tsconfig.json --noEmit` before publication.
 
-Vercel's function request/response size limits also apply. The app's local 10 MiB
-upload limit does not override Vercel's 4.5 MB body limit; use small demo CSVs.
+Vercel's function request/response size limits also apply: a request or
+response body over 4.5 MB fails with Vercel's own error. Added in 10.15
+(2026-11-17), the app refuses both cases itself first:
+
+- **Uploads:** set `MAX_UPLOAD_MB=2` in both the Production (Test site) and
+  Preview environments. A result is about 2× its input (5,000 rows: 225 KB →
+  439 KB for Classification), so a larger CSV would upload but its result
+  could not be downloaded. A larger file is refused with 413 "This file is
+  larger than the 2 MB upload limit." The default stays 10 MB locally.
+- **Comparisons:** a comparison may hold at most 50,000 rows across its files
+  (`COMPARE_MAX_ROWS`), locally and online; 5 files of 20,000 rows made a
+  5.57 MB response. Above it the API answers 400 "Too many rows to compare",
+  with the total and the limit, before reading any CSV.
+
 Larger-file support would need direct Blob uploads/downloads and is not part
-of this change. Do not raise the local limit expecting to bypass the platform.
+of this change. Do not raise the upload limit online expecting to bypass the
+platform.
 
 ## Releases and environments
 
