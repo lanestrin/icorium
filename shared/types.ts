@@ -98,6 +98,11 @@ export interface FileRows {
 /** Compare 2 to 5 results at a time. */
 export const COMPARE_MIN = 2;
 export const COMPARE_MAX = 5;
+/**
+ * Most data rows one comparison may hold across its files. Online, Vercel can't send a response over
+ * 4.5 MB, and 5 files of 20,000 rows each made a 5.57 MB comparison.
+ */
+export const COMPARE_MAX_ROWS = 50_000;
 
 /** Largest file the generator makes; enough for demos without slowing the synchronous API. */
 export const GENERATOR_MAX_ROWS = 5000;

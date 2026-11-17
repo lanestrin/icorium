@@ -72,7 +72,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 10.15** `fix/online-size-limits`. Start with an API test that a comparison whose response would be too large to send online returns a clear "too many rows to compare" error instead of failing.
+**Next: 9.14a** `feature/9.14a-convert-excel-uploads`. Before the spec, confirm the browser-only conversion is still wanted for the demo; then start with a component test that choosing an `.xlsx` file opens the review dialog with the rows found under a partner adapter's header.
 
 **Order:** 10.15 → 9.14a → 9.14b → 9.14c → 9.15. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
 
@@ -201,7 +201,7 @@ reaches a path. If an item changes a route, limit, file or dependency named on
 
 the Architecture page, update the page in the same item.
 
-- [ ] **10.15** `fix/online-size-limits` · **P2** — Online, Vercel can't send a response over 4.5 MB, found in a review on 2026-11-13. Measured: a result is about 2× its input (5,000 rows: 225 KB → 439 KB for Classification), so an input over about 2.3 MB uploads but its result can't be downloaded. Comparing 5 files fails above about 16,000 rows each (5 × 20,000 rows is a 5.57 MB response). Recommended: set `MAX_UPLOAD_MB=2` on the Vercel deployment and document it, so the server refuses larger CSVs with its own clear message, and have comparison return a plain "too many rows to compare online" 400 above a set row count. Confirm the approach with the person when the spec starts. Whether to add deleting or resetting files online (archive only hides them) is a separate open decision, not part of this item.
+- [x] **10.15** `fix/online-size-limits` · **P2** — Online, Vercel can't send a response over 4.5 MB, found in a review on 2026-11-13. Measured: a result is about 2× its input (5,000 rows: 225 KB → 439 KB for Classification), so an input over about 2.3 MB uploads but its result can't be downloaded. Comparing 5 files fails above about 16,000 rows each (5 × 20,000 rows is a 5.57 MB response). Recommended: set `MAX_UPLOAD_MB=2` on the Vercel deployment and document it, so the server refuses larger CSVs with its own clear message, and have comparison return a plain "too many rows to compare online" 400 above a set row count. Confirm the approach with the person when the spec starts. Whether to add deleting or resetting files online (archive only hides them) is a separate open decision, not part of this item.
 
 ## 5. Minimal API outline (suggested, not prescribed)
 

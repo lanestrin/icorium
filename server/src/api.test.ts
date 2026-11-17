@@ -99,12 +99,13 @@ describe('upload size limit', () => {
     expect((await upload('big_default.csv', big)).statusCode).toBe(200);
   });
 
-  it('refuses the same CSV when MAX_UPLOAD_MB is 1', async () => {
+  it.each([['1'], ['0.5']])('refuses the same CSV when MAX_UPLOAD_MB is %s, naming the limit', async (mb) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reclaim-limit-'));
-    const small = await buildApp(false, await openLocalStorage(dir), serverSettings({ MAX_UPLOAD_MB: '1' }));
+    const small = await buildApp(false, await openLocalStorage(dir), serverSettings({ MAX_UPLOAD_MB: mb }));
     try {
       const res = await upload('big_limited.csv', big, small);
-      expect({ status: res.statusCode, message: res.json().message }).toEqual({ status: 413, message: 'request file too large' });
+      expect({ status: res.statusCode, message: res.json().message })
+        .toEqual({ status: 413, message: `This file is larger than the ${mb} MB upload limit.` });
     } finally {
       await small.close();
       fs.rmSync(dir, { recursive: true, force: true });
@@ -324,6 +325,37 @@ describe('comparing results', () => {
     const res = await compare(...Array.from({ length: n }, (_, i) => (i === 0 ? result.id : `other-${i}`)));
     expect(res.statusCode).toBe(400);
     expect(res.json().message).toBe(message);
+  });
+
+  it('refuses a comparison over 50,000 rows in total, from the stored row counts, before reading any CSV', async () => {
+    const a = await processSample('partner_a_baseline.csv', 'validation');
+    const b = await processSample('partner_a_followup.csv', 'validation');
+    await storage.patch(a.id, { rows: 30000 });
+    await storage.patch(b.id, { rows: 32000 });
+    const read = vi.spyOn(storage, 'read');
+    try {
+      const res = await compare(a.id, b.id);
+      expect(res.statusCode).toBe(400);
+      expect(res.json().message).toBe('Too many rows to compare: these files have 62,000 rows in total, and the limit is 50,000. Compare fewer or smaller files.');
+      expect(read).not.toHaveBeenCalled();
+    } finally {
+      read.mockRestore();
+    }
+  });
+
+  it('compares files with exactly 50,000 rows in total', async () => {
+    const a = await processSample('partner_a_baseline.csv', 'mass');
+    const b = await processSample('partner_a_followup.csv', 'mass');
+    await storage.patch(a.id, { rows: 25000 });
+    await storage.patch(b.id, { rows: 25000 });
+    expect((await compare(a.id, b.id)).statusCode).toBe(200);
+  });
+
+  it('still answers 404 for an unknown file before counting rows', async () => {
+    const a = await processSample('partner_c_baseline.csv', 'validation');
+    const res = await compare(a.id, '999999-V');
+    expect(res.statusCode).toBe(404);
+    expect(res.json().message).toBe('File not found');
   });
 
   it('accepts result CSVs uploaded from disk, even when renamed', async () => {
