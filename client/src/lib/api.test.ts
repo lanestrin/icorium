@@ -1,51 +1,122 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from './api';
+import 'fake-indexeddb/auto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FileMeta, ReplaceConflict } from '../../../shared/types';
+import { createApi, DOWNLOAD_URL_LIFETIME_MS, openWorkspace } from './api';
+import { SAMPLE_FILES } from './samples';
 
-const respond = (status: number, body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status }));
-afterEach(() => { vi.unstubAllGlobals(); });
+// The real file service over a simulated IndexedDB (fake-indexeddb) and the real sample CSVs: nothing is mocked
+// except the browser's download plumbing, which jsdom lacks.
 
-describe('api.process', () => {
-  it('sends replace: true only when asked', async () => {
-    const fetch = respond(200, { id: '101010-V' });
-    vi.stubGlobal('fetch', fetch);
-    await api.process('101010', 'validation');
-    await api.process('101010', 'validation', true);
-    const bodies = fetch.mock.calls.map((call) => JSON.parse((call as unknown as [string, RequestInit])[1].body as string));
-    expect(bodies).toEqual([{ fileId: '101010', processor: 'validation' }, { fileId: '101010', processor: 'validation', replace: true }]);
+let databases = 0;
+const freshApi = () => createApi(() => openWorkspace(`api-test-${++databases}`));
+const sample = (name: string) => SAMPLE_FILES.find((f) => f.name === name)!.text;
+const csvFile = (name: string, text: string) => new File([text], name, { type: 'text/csv' });
+
+let api: ReturnType<typeof createApi>;
+beforeEach(() => { api = freshApi(); });
+afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+
+describe('browser API', () => {
+  it('starts with the five samples as 100001 to 100005, in name order', async () => {
+    const files = await api.list();
+    expect(files.map((f) => [f.id, f.name])).toEqual([
+      ['100001', 'partner_a_baseline.csv'],
+      ['100002', 'partner_a_followup.csv'],
+      ['100003', 'partner_b_baseline.csv'],
+      ['100004', 'partner_b_followup.csv'],
+      ['100005', 'partner_c_baseline.csv'],
+    ]);
+    expect(await api.storageMode()).toBe('saved');
   });
 
-  it('rejects a refused re-run with the server message and the existing result', async () => {
-    const conflict = { message: 'Composition Validation has already been run for file 101010.', existing: { id: '101010-V', name: 'r.csv', archived: true } };
-    vi.stubGlobal('fetch', respond(409, conflict));
-    await expect(api.process('101010', 'validation')).rejects.toMatchObject({ message: conflict.message, conflict });
+  it('uploads a CSV as the next File ID, and refuses a large or non-CSV file', async () => {
+    expect(await api.upload(csvFile('mine.csv', sample('partner_a_baseline.csv')))).toMatchObject({ id: '100006', name: 'mine.csv' });
+    await expect(api.upload(csvFile('notes.txt', 'x'))).rejects.toThrow('Only .csv files are supported');
+    const big = csvFile('big.csv', 'x');
+    Object.defineProperty(big, 'size', { value: 10 * 1024 * 1024 + 1 });
+    await expect(api.upload(big)).rejects.toThrow('This file is larger than the 10 MB upload limit.');
   });
 
-  it('rejects other errors with their message only', async () => {
-    vi.stubGlobal('fetch', respond(400, { message: 'Select an input file, not a result file' }));
-    const error = await api.process('101010-V', 'validation').catch((e: unknown) => e);
+  it('refuses a second run without replace, naming the existing result, and replaces it when confirmed', async () => {
+    const result = await api.process('100001', 'mass');
+    expect(result).toMatchObject({ id: '100001-M', name: 'result_partner_a_baseline_mass.csv', status: 'Processed' });
+
+    const refused = await api.process('100001', 'mass').catch((e: Error & { conflict?: ReplaceConflict }) => e);
+    expect(refused).toBeInstanceOf(Error);
+    expect((refused as Error).message).toBe('Component Mass Calculation has already been run for file 100001. Confirm to replace the existing result 100001-M.');
+    expect((refused as { conflict?: ReplaceConflict }).conflict?.existing).toEqual({ id: '100001-M', name: result.name, archived: result.archived });
+
+    expect((await api.process('100001', 'mass', true)).id).toBe('100001-M');
+  });
+
+  it('rejects other processing errors with their message only', async () => {
+    const result = await api.process('100001', 'validation');
+    const error = await api.process(result.id, 'validation').catch((e: unknown) => e);
     expect(error).toMatchObject({ message: 'Select an input file, not a result file' });
     expect(error).not.toHaveProperty('conflict');
   });
-});
 
-describe('error messages without a server message', () => {
-  it('says an upload Vercel refused as too large is over the online limit', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('Request Entity Too Large', { status: 413 })));
-    await expect(api.upload(new File(['a'], 'big.csv'))).rejects.toThrow('This file is too large to upload online. The limit is about 4.5 MB.');
+  it('pages a file\'s rows', async () => {
+    const page = await api.rows('100001', 2, 3);
+    expect(page).toMatchObject({ offset: 2, totalRows: 25 });
+    expect(page.rows).toHaveLength(3);
+    expect(page.rows[0].batch_id).toBe('A-003');
   });
 
-  it('names the error code when a response has no message', async () => {
-    vi.stubGlobal('fetch', respond(504, {}));
-    await expect(api.list()).rejects.toThrow("The server couldn't complete the request (error 504).");
+  it('downloads a file as a CSV Blob under its name, and releases the URL later', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    const created: Blob[] = [];
+    const createObjectURL = vi.fn((blob: Blob) => { created.push(blob); return 'blob:download'; });
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const clicked: HTMLAnchorElement[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { clicked.push(this); });
+
+    await api.download('100001');
+    expect(clicked).toHaveLength(1);
+    expect(clicked[0].download).toBe('partner_a_baseline.csv');
+    expect(clicked[0].href).toBe('blob:download');
+    expect(clicked[0].isConnected).toBe(false);
+    expect(created[0].type).toBe('text/csv;charset=utf-8');
+    expect(await created[0].text()).toMatch(/^batch_id,sample_date,.*file_id\r?\nA-001,/);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(DOWNLOAD_URL_LIFETIME_MS);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:download');
+
+    await expect(api.download('999999')).rejects.toThrow('File not found');
   });
 
-  it('treats an empty message as no message', async () => {
-    vi.stubGlobal('fetch', respond(500, { message: '' }));
-    await expect(api.compare(['101010-V', '101011-V'])).rejects.toThrow("The server couldn't complete the request (error 500).");
+  it('archives and restores, compares two results and generates files', async () => {
+    const [archived] = await api.archive(['100002'], true);
+    expect(archived.archived).toBe(true);
+    expect((await api.archive(['100002'], false))[0].archived).toBe(false);
+
+    const a = await api.process('100001', 'mass');
+    const b = await api.process('100002', 'mass');
+    const comparison = await api.compare([a.id, b.id]);
+    expect(comparison.files.map((f) => f.id)).toEqual([a.id, b.id]);
+    await expect(api.compare([a.id])).rejects.toThrow('Choose 2 to 5 results to compare');
+
+    expect((await api.generate({ partner: 'B', rows: 4, errorRows: 1, files: 2 })).files).toHaveLength(2);
   });
 
-  it('keeps the server message for a 413 the app itself refused', async () => {
-    vi.stubGlobal('fetch', respond(413, { message: 'request file too large' }));
-    await expect(api.upload(new File(['a'], 'big.csv'))).rejects.toThrow('request file too large');
+  it('clears every upload and result, brings the samples back and numbers the next upload 100006 again', async () => {
+    await api.upload(csvFile('mine.csv', sample('partner_a_baseline.csv')));
+    await api.process('100001', 'validation');
+    await api.archive(['100003'], true);
+
+    await api.clearData();
+    const files = await api.list();
+    expect(files.map((f) => f.id)).toEqual(['100001', '100002', '100003', '100004', '100005']);
+    expect(files.every((f: FileMeta) => !f.archived)).toBe(true);
+    expect((await api.upload(csvFile('again.csv', sample('partner_a_baseline.csv')))).id).toBe('100006');
+  });
+
+  it('keeps files in memory, and says so, when the browser will not open IndexedDB', async () => {
+    vi.spyOn(indexedDB, 'open').mockImplementation(() => { throw new DOMException('Storage disabled', 'SecurityError'); });
+    const memoryApi = createApi(() => openWorkspace('blocked'));
+    expect(await memoryApi.storageMode()).toBe('memory');
+    expect(await memoryApi.list()).toHaveLength(5);
+    expect((await memoryApi.upload(csvFile('mine.csv', sample('partner_a_baseline.csv')))).id).toBe('100006');
   });
 });

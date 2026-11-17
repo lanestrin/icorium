@@ -10,7 +10,7 @@ import { ConvertError } from '../lib/convert/table';
 
 vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
-  downloadUrl: (id: string) => `/api/files/${id}/download`,
+  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(),
 } }));
 // The Excel reader is tested with real workbooks in lib/convert; here it is mocked to control timing.
 vi.mock('../lib/convert/excel', () => ({ readExcel: vi.fn() }));
@@ -33,6 +33,7 @@ function deferredRead() {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(api.storageMode).mockResolvedValue('saved');
   vi.mocked(api.list).mockResolvedValue([clean]);
   vi.mocked(api.upload).mockResolvedValue(clean);
 });

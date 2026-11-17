@@ -224,9 +224,12 @@
 }
 
 // File preview
-// Download stays a link (it downloads the file) styled like a small secondary button.
+// Download: a small secondary button that saves the file.
 .downloadLink {
   display: flex;
+  background: none;
+  font: inherit;
+  cursor: pointer;
   align-items: center;
   gap: var(--app-space-2);
   border: var(--app-border-width) solid var(--app-color-border);

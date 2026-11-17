@@ -48,6 +48,7 @@ describe('Architecture page content', () => {
     expect(read('server/src/app.ts')).toContain("value('MAX_UPLOAD_MB')"); // the upload limit can be changed
     expect(read('server/src/app.ts')).toContain("value('LOG_LEVEL')"); // the log level can be changed
     expect(read('shared/storage.ts')).toMatch(/interface Storage \{[\s\S]*createAt\(id: string/); // the storage operations named
+    expect(read('client/src/lib/browser-storage.ts')).toContain('indexedDB.open('); // files are kept in IndexedDB
     expect(read('shared/types.ts')).toContain('export const ADAPTERS = ['); // partner formats live in the shared file
     expect(read('shared/file-service.ts')).toContain('z.enum(PROCESSORS.map('); // allowed functions come from the shared list
     expect(read('shared/processing.ts')).toContain('TOTAL_TOLERANCE_PCT = 0.5'); // ±0.5 points

@@ -1,7 +1,8 @@
-import { lazy, Suspense, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, Network, Wand2 } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta } from '../../../shared/types';
 import { Banner } from '../components/Banner';
+import { ClearDataModal } from '../components/modals/ClearDataModal';
 import { ConvertReviewDialog } from '../components/modals/ConvertReviewDialog';
 import { PreviewModal } from '../components/modals/PreviewModal';
 import { QualityWarningModal, ReplaceResultModal } from '../components/modals/RunConfirmations';
@@ -21,7 +22,7 @@ import { useFileList } from '../hooks/useFileList';
 import { useFilters } from '../hooks/useFilters';
 import { useProcessing } from '../hooks/useProcessing';
 import { useSelection } from '../hooks/useSelection';
-import { api } from '../lib/api';
+import { api, type StorageMode } from '../lib/api';
 import { compareBlocker } from '../lib/compare-view';
 import { filterFiles } from '../lib/file-status';
 import { errorMessage } from '../lib/format';
@@ -40,6 +41,9 @@ export function FilesPage() {
   const [comparison, setComparison] = useState<CompareResult>();
   const [comparing, setComparing] = useState(false);
   const busy = useRef(false); // set synchronously, so a double click cannot start a second batch or archive
+  const [storageMode, setStorageMode] = useState<StorageMode>();
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const { files, refresh, upload, uploading, loading } = useFileList(setError);
   const conversion = useConversion();
@@ -64,6 +68,29 @@ export function FilesPage() {
   // Compare is offered once the selection in view includes a result; it explains when it can't run.
   const showCompare = !viewArchived && selectedInView.some((f) => f.status === 'Processed');
   const compareReason = compareBlocker(selectedInView);
+
+  // Where files are kept, for the note under the upload area. If storage can't open, the file list reports it.
+  useEffect(() => {
+    api.storageMode().then(setStorageMode, () => {});
+  }, []);
+
+  // Clear my data: every upload and result in this browser is deleted and the five samples come back.
+  async function clearData() {
+    setConfirmClear(false);
+    setClearing(true);
+    setError(undefined);
+    setNotice(undefined);
+    try {
+      await api.clearData();
+      setSelectedIds(new Set());
+      await refresh();
+      setNotice('Your data was cleared. The five sample files are back.');
+    } catch (e) {
+      setError(`Clear my data failed: ${errorMessage(e)}`);
+    } finally {
+      setClearing(false);
+    }
+  }
 
   // After an upload that added at least one file, filter to today's originals so the new files show first.
   // Excel files are converted and reviewed first; each is uploaded as a CSV only after Import as CSV.
@@ -116,6 +143,9 @@ export function FilesPage() {
           uploading={uploading && !conversion.review}
           reading={conversion.reading ?? undefined}
           selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
+          storageMode={storageMode}
+          onClearData={() => setConfirmClear(true)}
+          clearDisabled={uploading || !!conversion.reading || !!processingId || archiving || clearing}
         />
 
         <div className={styles.main}>
@@ -166,6 +196,7 @@ export function FilesPage() {
               onToggle={toggle}
               onToggleAll={toggleAll}
               onPreview={setPreview}
+              onDownload={(f) => api.download(f.id).catch((e) => setError(`Download failed: ${errorMessage(e)}`))}
               onRestore={viewArchived ? (f) => setArchived([f.id], false) : undefined}
               restoreDisabled={archiving}
               emptyMessage={loading ? 'Loading files…'
@@ -189,6 +220,7 @@ export function FilesPage() {
         <ConvertReviewDialog name={conversion.review.name} table={conversion.review.table} onCancel={conversion.cancel} onImport={conversion.importReviewed} />
       )}
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}
+      {confirmClear && <ClearDataModal onCancel={() => setConfirmClear(false)} onConfirm={clearData} />}
       {pending?.items ? (
         <ReplaceResultModal items={pending.items} otherCount={pending.batch.length - pending.items.length} warning={pending.warning}
           processor={pending.processor} onCancel={cancelPending} onConfirm={confirmRun} />

@@ -2,7 +2,6 @@ import { useRef } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { Download, Eye, MoreHorizontal, RotateCcw } from 'lucide-react';
 import type { FileMeta } from '../../../../shared/types';
-import { api } from '../../lib/api';
 import styles from './files.module.scss';
 
 /**
@@ -10,7 +9,7 @@ import styles from './files.module.scss';
  * DropdownMenu: arrow keys move between items and wrap, Escape or a click outside closes it, and focus
  * returns to ⋯. It is non-modal, so the page stays usable and a click outside also reaches what was clicked.
  */
-export function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMeta; onPreview: () => void; onRestore?: () => void; disabled?: boolean }) {
+export function RowMenu({ file, onPreview, onDownload, onRestore, disabled }: { file: FileMeta; onPreview: () => void; onDownload: () => void; onRestore?: () => void; disabled?: boolean }) {
   const trigger = useRef<HTMLButtonElement>(null);
   // The action chosen from the menu, run once the menu has closed (see runAfterClose).
   const chosen = useRef<() => void>(undefined);
@@ -40,10 +39,8 @@ export function RowMenu({ file, onPreview, onRestore, disabled }: { file: FileMe
             <DropdownMenu.Item className={styles.menuItem} onSelect={() => { chosen.current = onPreview; }}>
               <Eye aria-hidden /> Preview file
             </DropdownMenu.Item>
-            <DropdownMenu.Item asChild className={styles.menuItem}>
-              <a href={api.downloadUrl(file.id)}>
-                <Download aria-hidden /> Download file
-              </a>
+            <DropdownMenu.Item className={styles.menuItem} onSelect={() => { chosen.current = onDownload; }}>
+              <Download aria-hidden /> Download file
             </DropdownMenu.Item>
             {onRestore && (
               <DropdownMenu.Item className={styles.menuItem} disabled={disabled} onSelect={() => { chosen.current = onRestore; }}>

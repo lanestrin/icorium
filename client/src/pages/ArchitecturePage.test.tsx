@@ -9,10 +9,13 @@ import { api } from '../lib/api';
 
 vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
-  downloadUrl: (id: string) => `/api/files/${id}/download`,
+  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(),
 } }));
 
-beforeEach(() => { vi.resetAllMocks(); });
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(api.storageMode).mockResolvedValue('saved');
+});
 
 
 describe('Architecture & Tech Stack page', () => {
@@ -46,7 +49,7 @@ describe('Architecture & Tech Stack page', () => {
     const tiles = within(screen.getByRole('group', { name: 'Technology stack' })).getAllByRole('button');
     expect(tiles.map((t) => t.textContent)).toEqual([
       'React 19UI', 'TypeScriptType safety', 'ViteBuild & dev', 'SassStyling', 'RadixDialog & menu', 'Fastify 5API', 'ZodValidation',
-      'Papa ParseCSV parsing', 'SheetJSExcel import', 'pdf.jsPDF import', 'RechartsCharts', 'LucideIcons', 'VitestTesting', 'StorybookComponent docs', 'Files / BlobFile storage',
+      'Papa ParseCSV parsing', 'SheetJSExcel import', 'pdf.jsPDF import', 'RechartsCharts', 'LucideIcons', 'VitestTesting', 'StorybookComponent docs', 'IndexedDBFile storage',
     ]);
     const detail = () => screen.getByRole('region', { name: 'Selected technology' });
     expect(tiles[0]).toHaveAttribute('aria-pressed', 'true');
@@ -108,7 +111,7 @@ describe('Architecture & Tech Stack page', () => {
     expect(vercel).toHaveTextContent('Test site: deploys main');
     expect(vercel).toHaveTextContent('Each release also ships as a deployable zip (scripts/build-release.mjs); Production host not chosen yet');
     expect(within(storage).getByRole('img', { name: /S3 or Cloudflare R2 could be added/ })).toHaveTextContent(
-      'Local filesystemDefaultVercel BlobWhen a token is setS3 / Cloudflare R2Not built');
+      'Browser (IndexedDB)In useLocal filesystemServer, until 16.3Vercel BlobServer, when a token is setS3 / Cloudflare R2Not built');
     expect(storage).toHaveTextContent('list · get · read · patch · create · createAt · put');
   });
 

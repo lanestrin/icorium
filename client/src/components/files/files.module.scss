@@ -92,6 +92,18 @@
   @include text-xs;
   color: var(--app-color-text-muted);
 }
+.storage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-3);
+}
+.storageNote {
+  @include text-sm;
+  color: var(--app-color-text-muted);
+}
+.clearData {
+  align-self: flex-start;
+}
 .sectionTitle {
   margin-bottom: var(--app-space-3);
   font-size: var(--app-text-lg);

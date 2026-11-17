@@ -17,7 +17,7 @@ function setup() {
   render(
     <>
       <div onClick={onRowClick}>
-        <RowMenu file={file} onPreview={vi.fn()} />
+        <RowMenu file={file} onPreview={vi.fn()} onDownload={vi.fn()} />
       </div>
       <button>Outside</button>
     </>,

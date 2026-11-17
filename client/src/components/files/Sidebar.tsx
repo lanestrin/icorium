@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent } from 'react';
-import { CloudUpload, Play } from 'lucide-react';
+import { CloudUpload, Play, Trash2 } from 'lucide-react';
 import { PROCESSORS, type ProcessorId } from '../../../../shared/types';
+import type { StorageMode } from '../../lib/api';
 import { classNames } from '../../lib/class-names';
 import { Button } from '../ui/Button';
 import styles from './files.module.scss';
@@ -69,16 +70,30 @@ interface SidebarProps {
   uploading: boolean;
   reading?: string; // a file being converted before upload
   selected: SelectedInput[]; // the checked inputs, File ID and filename shown separately
+  storageMode?: StorageMode; // where files are kept; unknown until storage has opened
+  onClearData: () => void;
+  clearDisabled: boolean;
 }
 
-/** The left column: upload, the processing function, the selected inputs and Run Processing. */
-export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, running, uploading, reading, selected }: SidebarProps) {
+const STORAGE_NOTES: Record<StorageMode, string> = {
+  saved: 'Files are kept only in this browser. Clearing your browser data removes them.',
+  memory: "This browser isn't saving files. They'll be gone when you refresh or close this page.",
+};
+
+/** The left column: upload, where files are kept, the processing function, the selected inputs and Run Processing. */
+export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, running, uploading, reading, selected, storageMode, onClearData, clearDisabled }: SidebarProps) {
   const count = selected.length;
   const runLabel = running ? 'Processing…' : `Run Processing${count > 1 ? ` (${count})` : ''}`;
 
   return (
     <aside className={styles.sidebar}>
-      <DropZone uploading={uploading} reading={reading} onUpload={onUpload} />
+      <div className={styles.storage}>
+        <DropZone uploading={uploading} reading={reading} onUpload={onUpload} />
+        {storageMode && <p className={styles.storageNote}>{STORAGE_NOTES[storageMode]}</p>}
+        <Button variant="secondary" className={styles.clearData} disabled={clearDisabled} onClick={onClearData} icon={<Trash2 />}>
+          Clear my data
+        </Button>
+      </div>
 
       <section>
         <h2 className={styles.sectionTitle}>Processing Function</h2>
