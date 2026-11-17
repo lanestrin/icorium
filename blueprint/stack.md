@@ -28,6 +28,7 @@ This project is an interview exercise, **not** an industrial production system o
 | Charting | Recharts | Visualize differences between 2 to 5 result files |
 | Testing | Vitest | Unit tests for adapters, validation, processing, and export logic |
 | Storage | Local files; private Vercel Blob when deployed | Keep original/processed CSVs for the demo |
+| File conversion (browser) | SheetJS (`xlsx`, from cdn.sheetjs.com) | Read partner Excel files into a reviewed CSV before upload; PDF and OCR readers follow in 9.14b and 9.14c |
 
 All free and open source. Expected local software cost: $0.
 
@@ -85,7 +86,7 @@ Base CSV parsing and schema checks run on upload regardless of the processing fu
 
 **Approved exception:** an optional Vercel deployment with private Blob storage (PR #6, confirmed by the person on 2026-11-06; see `blueprint/vercel-deployment.md`). It is server-side only and needs no accounts. Local development still uses local files and no cloud service. Any further cloud addition needs a new decision.
 
-**Approved exception:** browser-side file conversion with SheetJS (`xlsx`), `pdfjs-dist` and `tesseract.js`, so partners' Excel files, text PDFs and scanned PDFs or images can be imported (build-plan 9.14, confirmed by the person on 2026-11-13). Conversion runs in the browser; the server stays CSV-only. No account, server-side service or AI service is involved: OCR runs locally, and only Tesseract's language data is downloaded from a CDN.
+**Approved exception:** browser-side file conversion with SheetJS (`xlsx`), `pdfjs-dist` and `tesseract.js`, so partners' Excel files, text PDFs and scanned PDFs or images can be imported (build-plan 9.14, confirmed by the person on 2026-11-13). SheetJS `xlsx` 0.20.3 is installed from the official cdn.sheetjs.com tarball for Excel (9.14a); `pdfjs-dist` and `tesseract.js` arrive with 9.14b and 9.14c. Conversion runs in the browser; the server stays CSV-only. No account, server-side service or AI service is involved: OCR runs locally, and only Tesseract's language data is downloaded from a CDN.
 
 **Approved change:** styling moves from Tailwind CSS to SCSS Modules with central design tokens, a shared `ui/` component library documented in Storybook, and Radix primitives (`@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`) for the dialog and row menu (build-plan M13, confirmed by the person on 2026-11-14). Tailwind was removed in 13.7; all styling uses SCSS Modules and the tokens.
 

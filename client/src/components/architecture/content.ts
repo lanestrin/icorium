@@ -96,6 +96,15 @@ export const TECH: Tech[] = [
     files: ['server/src/lib/csv.ts'],
   },
   {
+    name: 'SheetJS', label: 'SheetJS', role: 'Excel import', icon: FileSpreadsheet, packages: [['client', 'xlsx']],
+    why: [
+      'Reads the first sheet of a partner\x27s .xlsx or .xls file in the browser; the rows are reviewed, then uploaded as a CSV, so the server stays CSV-only.',
+      'Loaded only when an Excel file is chosen, so opening the file page does not download it.',
+    ],
+    tradeoff: 'Installed from SheetJS\x27s own download site (cdn.sheetjs.com), because the npm release is older and has security advisories; installs need that site to be reachable.',
+    files: ['client/src/lib/convert/excel.ts', 'client/src/lib/convert/table.ts'],
+  },
+  {
     name: 'Recharts', label: 'Recharts', role: 'Charts', icon: ChartColumn, packages: [['client', 'recharts']],
     why: [
       'React chart components for the comparison dashboard: one line per file, grouped bars for categories.',
@@ -158,7 +167,7 @@ export const PIPELINE: { title: string; sub?: string; icon: LucideIcon }[] = [
 
 /** The same path in words, beside the diagram. */
 export const HOW_IT_WORKS = [
-  'Upload CSVs in the browser.',
+  'Upload CSVs in the browser; an Excel file is converted to CSV there, after a review.',
   'React handles the UI and sends each request to the API.',
   'The Fastify API checks every request.',
   'Each file is parsed, normalized to one record per row and validated.',
@@ -169,7 +178,7 @@ export const HOW_IT_WORKS = [
 /** The decision shown first and in full: where the CSV work runs. */
 export const PROCESSING_LOCATION = {
   title: 'Processing location (server vs. browser)',
-  text: 'A server-side API parses, normalizes, validates and processes every CSV; the browser only uploads, shows and downloads.',
+  text: 'A server-side API parses, normalizes, validates and processes every CSV; the browser uploads, shows and downloads, and converts Excel files to CSV before upload.',
   benefits: ['Centralized, consistent processing', 'Easier to add business rules and integrations', 'Works across devices with a simple UI'],
   tradeoff: 'Uploads and processing need the API running and reachable. If it is down, or the person is offline, files cannot be processed.',
 };

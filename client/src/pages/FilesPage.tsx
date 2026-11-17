@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { Archive, Network, Wand2 } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta } from '../../../shared/types';
 import { Banner } from '../components/Banner';
+import { ConvertReviewDialog } from '../components/modals/ConvertReviewDialog';
 import { PreviewModal } from '../components/modals/PreviewModal';
 import { QualityWarningModal, ReplaceResultModal } from '../components/modals/RunConfirmations';
 import { ArchiveToast } from '../components/files/ArchiveToast';
@@ -15,6 +16,7 @@ import styles from '../components/files/files.module.scss';
 import page from '../styles/page.module.scss';
 import { classNames } from '../lib/class-names';
 import { useArchive } from '../hooks/useArchive';
+import { useConversion } from '../hooks/useConversion';
 import { useFileList } from '../hooks/useFileList';
 import { useFilters } from '../hooks/useFilters';
 import { useProcessing } from '../hooks/useProcessing';
@@ -40,6 +42,7 @@ export function FilesPage() {
   const busy = useRef(false); // set synchronously, so a double click cannot start a second batch or archive
 
   const { files, refresh, upload, uploading, loading } = useFileList(setError);
+  const conversion = useConversion();
   const { selectedIds, setSelectedIds, toggle, toggleAll } = useSelection();
   const {
     search, setSearch, from, setFrom, to, setTo, status, setStatus, fn, setFn, tab, setTab,
@@ -63,8 +66,9 @@ export function FilesPage() {
   const compareReason = compareBlocker(selectedInView);
 
   // After an upload that added at least one file, filter to today's originals so the new files show first.
+  // Excel files are converted and reviewed first; each is uploaded as a CSV only after Import as CSV.
   async function uploadFiles(list: File[]) {
-    if (await upload(list) > 0) showNewFiles('original');
+    if (await upload(list, conversion.prepare) > 0) showNewFiles('original');
   }
 
   async function compare() {
@@ -109,7 +113,8 @@ export function FilesPage() {
           onRun={() => requestRun(selectedInputs)}
           canRun={selectedInputs.length > 0 && !processingId && !archiving}
           running={!!processingId}
-          uploading={uploading}
+          uploading={uploading && !conversion.review}
+          reading={conversion.reading ?? undefined}
           selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
         />
 
@@ -180,6 +185,9 @@ export function FilesPage() {
         />
       )}
 
+      {conversion.review && (
+        <ConvertReviewDialog name={conversion.review.name} table={conversion.review.table} onCancel={conversion.cancel} onImport={conversion.importReviewed} />
+      )}
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}
       {pending?.items ? (
         <ReplaceResultModal items={pending.items} otherCount={pending.batch.length - pending.items.length} warning={pending.warning}

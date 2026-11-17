@@ -72,9 +72,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 9.14a** `feature/9.14a-convert-excel-uploads`. Before the spec, confirm the browser-only conversion is still wanted for the demo; then start with a component test that choosing an `.xlsx` file opens the review dialog with the rows found under a partner adapter's header.
+**Next: 9.14b** `feature/9.14b-read-text-pdfs`. Start with a reader test that the text items of one PDF page are grouped into rows by their y position and into cells by x gaps, then passed to the shared `findTable`.
 
-**Order:** 10.15 → 9.14a → 9.14b → 9.14c → 9.15. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
+**Order:** 9.14a → 9.14b → 9.14c → 9.15. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
 
 **After the demo:** once 9.15 is done, the project moves toward a production platform. That direction is [Proposed — Not Yet Implemented](project-plan.md#10-future-direction--proposed-not-yet-implemented); no production items are planned yet, and none may be built until they are added here as approved items.
 
@@ -136,7 +136,7 @@ Completed milestones and items are in [build-plan-archive.md](build-plan-archive
 - [Former phases 1–7](build-plan-archive.md#existing-implementation-baseline-former-phases-17): the implementation baseline.
 - [M8 — Partial processing](build-plan-archive.md#m8--partial-processing): done (4 items, 8.1–8.4).
 - [M9 — UI refinements](build-plan-archive.md#m9--ui-refinements): 14 items done (9.1–9.13); its open items are below.
-- [M10 — Code review fixes](build-plan-archive.md#m10--code-review-fixes): 14 items done (10.1–10.14); its open items are below.
+- [M10 — Code review fixes](build-plan-archive.md#m10--code-review-fixes): done (15 items, 10.1–10.15).
 - [M11 — File IDs](build-plan-archive.md#m11--file-ids): done (8 items, 11.1–11.6).
 - [M12 — Releases and environments](build-plan-archive.md#m12--releases-and-environments): done (2 items, 12.1–12.2).
 - [M13 — Styling architecture and design system](build-plan-archive.md#m13--styling-architecture-and-design-system): done (7 items, 13.1–13.7).
@@ -148,7 +148,7 @@ Completed milestones and items are in [build-plan-archive.md](build-plan-archive
 
 - [ ] **9.14** Convert non-CSV partner files · **P2** — Partners may send Excel files, text PDFs or scanned PDFs and images, added at the person's request on 2026-11-13. They chose to have all three converted, with OCR running in the browser (Tesseract), not an AI service. Conversion runs entirely in the browser before upload. A non-CSV file becomes a table, the header row is found by matching one partner adapter's columns (`ADAPTERS` in `shared/types.ts`), and the person reviews the rows in a dialog (**Cancel** or **Import as CSV**). Only then is it sent as `<name>.csv` through the existing upload. The server stays CSV-only, so validation, File IDs and **Needs Review** work unchanged, and Vercel's 4.5 MB limit applies only to the CSV. Rows with the wrong number of cells are kept and flagged, never guessed. Readers are loaded only when used (dynamic `import()`). Limits: 20 pages per PDF, 20 MB per source file, English OCR. A failed file never blocks the others in a multi-file upload. Libraries: SheetJS `xlsx` 0.20.x from the official cdn.sheetjs.com tarball (npm's 0.18.5 has advisories), `pdfjs-dist` and `tesseract.js`. Tesseract downloads its English language data (~10 MB) from a CDN on first use; no partner data leaves the browser except as the uploaded CSV. Real PDF and OCR reading can't run in jsdom, so tests mock the libraries, and each sub-item's Try it now uses a real file.
 
-  - [ ] **9.14a** `feature/9.14a-convert-excel-uploads` — The pipeline: choosing a reader by extension, header detection against `ADAPTERS`, the review dialog, the "`report.docx` can't be converted. Upload a CSV, Excel, PDF or image file." message, a wider drop-zone `accept` list, and the Excel reader (first sheet). Also the stack exception, and the README and Architecture page updates for the new packages.
+  - [x] **9.14a** `feature/9.14a-convert-excel-uploads` — The pipeline: choosing a reader by extension, header detection against `ADAPTERS`, the review dialog, the "`report.docx` can't be converted. Upload a CSV, Excel, PDF or image file." message, a wider drop-zone `accept` list, and the Excel reader (first sheet). Also the stack exception, and the README and Architecture page updates for the new packages.
   - [ ] **9.14b** `feature/9.14b-read-text-pdfs` — The pdf.js reader. Text items are grouped into rows by y position and into cells by x gaps. A page with no text layer is refused with "this page is a scanned image" until 9.14c.
   - [ ] **9.14c** `feature/9.14c-ocr-scanned-pdfs-and-images` — Tesseract for image-only PDF pages and `.png` / `.jpg` files, with "Reading page 2 of 5…" progress and **Cancel**, and an "Read by OCR: check the numbers" warning in the review dialog.
 
@@ -178,30 +178,6 @@ Completed milestones and items are in [build-plan-archive.md](build-plan-archive
   - Content stays in `client/src/components/architecture/content.ts`, reusing the existing section and card patterns, with no sideways scroll at phone width.
 
   **Done when:** section 7 is in the page and its "On this page" links; the conversion card shows **Planned** with its trade-off; the scale table shows today and at-scale values per layer; component tests cover all three and the content test checks that the planned card is labelled planned; `npm run verify` passes.
-
-### M10 — Code review fixes
-
-From a full read-only review of the code on 2026-11-10 (after 9.8), covering
-
-SOLID, DRY, performance, abstractions, race conditions, deadlocks, anti-patterns,
-
-partly implemented and dead code, and hard-coded values. The person asked for
-
-every finding to be planned. Items are in priority order; the selection rule
-
-above applies. **P1** items are user-visible bugs; **P2** items are code health
-
-and performance that matter only as usage grows or the Vercel deployment goes
-
-ahead. No deadlocks were found (nothing takes locks), and no path traversal or
-
-injection: files are stored under generated IDs and the upload name never
-
-reaches a path. If an item changes a route, limit, file or dependency named on
-
-the Architecture page, update the page in the same item.
-
-- [x] **10.15** `fix/online-size-limits` · **P2** — Online, Vercel can't send a response over 4.5 MB, found in a review on 2026-11-13. Measured: a result is about 2× its input (5,000 rows: 225 KB → 439 KB for Classification), so an input over about 2.3 MB uploads but its result can't be downloaded. Comparing 5 files fails above about 16,000 rows each (5 × 20,000 rows is a 5.57 MB response). Recommended: set `MAX_UPLOAD_MB=2` on the Vercel deployment and document it, so the server refuses larger CSVs with its own clear message, and have comparison return a plain "too many rows to compare online" 400 above a set row count. Confirm the approach with the person when the spec starts. Whether to add deleting or resetting files online (archive only hides them) is a separate open decision, not part of this item.
 
 ## 5. Minimal API outline (suggested, not prescribed)
 

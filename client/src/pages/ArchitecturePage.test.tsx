@@ -46,7 +46,7 @@ describe('Architecture & Tech Stack page', () => {
     const tiles = within(screen.getByRole('group', { name: 'Technology stack' })).getAllByRole('button');
     expect(tiles.map((t) => t.textContent)).toEqual([
       'React 19UI', 'TypeScriptType safety', 'ViteBuild & dev', 'SassStyling', 'RadixDialog & menu', 'Fastify 5API', 'ZodValidation',
-      'Papa ParseCSV parsing', 'RechartsCharts', 'LucideIcons', 'VitestTesting', 'StorybookComponent docs', 'Files / BlobFile storage',
+      'Papa ParseCSV parsing', 'SheetJSExcel import', 'RechartsCharts', 'LucideIcons', 'VitestTesting', 'StorybookComponent docs', 'Files / BlobFile storage',
     ]);
     const detail = () => screen.getByRole('region', { name: 'Selected technology' });
     expect(tiles[0]).toHaveAttribute('aria-pressed', 'true');
