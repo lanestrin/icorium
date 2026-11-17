@@ -22,14 +22,25 @@ export function useFileList(onError: Report) {
   // refresh never rejects (failures go to onError), so this ends even after an error.
   useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
 
-  /** Uploads each file in turn, reports the ones that failed, and returns how many the server accepted. */
-  async function upload(list: File[]) {
+  /**
+   * Uploads each file in turn, reports the ones that failed, and returns how many the server accepted.
+   * prepare, when given, runs first for each file: it returns the file to send (a converted CSV), or null
+   * to skip it without an error (a cancelled conversion).
+   */
+  async function upload(list: File[], prepare?: (file: File) => Promise<File | null>) {
     setUploading(true);
     onError(undefined);
     const errors: string[] = [];
     let accepted = 0;
     for (const f of list) {
-      try { await api.upload(f); accepted++; } catch (e) { errors.push(`${f.name}: ${errorMessage(e)}`); }
+      try {
+        const ready = prepare ? await prepare(f) : f;
+        if (!ready) continue;
+        await api.upload(ready);
+        accepted++;
+      } catch (e) {
+        errors.push(`${f.name}: ${errorMessage(e)}`);
+      }
     }
     setUploading(false);
     if (errors.length) onError(`Upload failed\n${errors.join('\n')}`);

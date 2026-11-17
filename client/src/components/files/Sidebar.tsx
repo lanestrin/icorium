@@ -11,8 +11,8 @@ const describe = (file: SelectedInput) => `${file.id} · ${file.name}`;
 /** A mouse or trackpad can drag files in; a touch screen can't, so it only gets the button. */
 const CAN_DRAG_FILES = '(pointer: fine)';
 
-/** The upload drop zone: drop CSV files on it, or browse for them. */
-function DropZone({ uploading, onUpload }: { uploading: boolean; onUpload: (files: File[]) => void }) {
+/** The upload drop zone: drop CSV or Excel files on it, or browse for them. reading names a file being converted. */
+function DropZone({ uploading, reading, onUpload }: { uploading: boolean; reading?: string; onUpload: (files: File[]) => void }) {
   const input = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const upload = (list: FileList | null) => list?.length && onUpload([...list]);
@@ -35,16 +35,16 @@ function DropZone({ uploading, onUpload }: { uploading: boolean; onUpload: (file
       <CloudUpload className={styles.dropIcon} strokeWidth={1.5} aria-hidden />
       {canDrag ? (
         <p className={styles.dropText}>
-          Drop CSV files here
+          Drop CSV or Excel files here
           <br />
           or{' '}
           <Button variant="link" onClick={browse}>browse files</Button>
         </p>
       ) : (
-        <Button variant="secondary" className={styles.chooseFiles} onClick={browse}>Choose CSV files</Button>
+        <Button variant="secondary" className={styles.chooseFiles} onClick={browse}>Choose CSV or Excel files</Button>
       )}
-      {uploading && <p className={styles.uploading}>Uploading…</p>}
-      <input ref={input} type="file" accept=".csv,text/csv" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
+      {reading ? <p className={styles.uploading}>Reading {reading}…</p> : uploading && <p className={styles.uploading}>Uploading…</p>}
+      <input ref={input} type="file" accept=".csv,text/csv,.xlsx,.xls" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
     </div>
   );
 }
@@ -67,17 +67,18 @@ interface SidebarProps {
   canRun: boolean;
   running: boolean;
   uploading: boolean;
+  reading?: string; // a file being converted before upload
   selected: SelectedInput[]; // the checked inputs, File ID and filename shown separately
 }
 
 /** The left column: upload, the processing function, the selected inputs and Run Processing. */
-export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, running, uploading, selected }: SidebarProps) {
+export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, running, uploading, reading, selected }: SidebarProps) {
   const count = selected.length;
   const runLabel = running ? 'Processing…' : `Run Processing${count > 1 ? ` (${count})` : ''}`;
 
   return (
     <aside className={styles.sidebar}>
-      <DropZone uploading={uploading} onUpload={onUpload} />
+      <DropZone uploading={uploading} reading={reading} onUpload={onUpload} />
 
       <section>
         <h2 className={styles.sectionTitle}>Processing Function</h2>

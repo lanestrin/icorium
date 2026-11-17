@@ -325,7 +325,25 @@ _Intro text and the open items stay in `build-plan.md`._
 
 ### M10 — Code review fixes
 
-_Intro text and the open items stay in `build-plan.md`._
+From a full read-only review of the code on 2026-11-10 (after 9.8), covering
+
+SOLID, DRY, performance, abstractions, race conditions, deadlocks, anti-patterns,
+
+partly implemented and dead code, and hard-coded values. The person asked for
+
+every finding to be planned. Items are in priority order; the selection rule
+
+above applies. **P1** items are user-visible bugs; **P2** items are code health
+
+and performance that matter only as usage grows or the Vercel deployment goes
+
+ahead. No deadlocks were found (nothing takes locks), and no path traversal or
+
+injection: files are stored under generated IDs and the upload name never
+
+reaches a path. If an item changes a route, limit, file or dependency named on
+
+the Architecture page, update the page in the same item.
 
 - [x] **10.1** `fix/download-file-names` · **P1** — Downloading a file whose name has characters outside Latin-1 returns **500 `ERR_INVALID_CHAR`**: `/api/files/:id/download` puts the raw name in `Content-Disposition` (`server/src/routes/files.ts`). Confirmed by uploading `報告.csv` (200) and downloading it (500). Send an ASCII fallback `filename="…"` plus an RFC 5987 `filename*=UTF-8''…` so any upload name downloads.
 
@@ -500,6 +518,8 @@ _Intro text and the open items stay in `build-plan.md`._
 - [x] **10.13** `fix/blank-error-messages` · **P1** — Errors that come from Vercel itself show an empty message, found in a review on 2026-11-13. Vercel rejects requests over 4.5 MB before they reach the app (the app allows 10 MB), and its timeouts and crashed functions also answer without the app's `{ message }` JSON. `client/src/lib/api.ts` then falls back to `res.statusText`, which is usually empty over HTTP/2. When a failed response has no message, show one based on the error code instead. For a 413, say the file is too large to upload online (about 4.5 MB). For anything else, say the server could not complete the request and give the error code. Add a client unit test for both cases and one where the server's own message still shows.
 
 - [x] **10.14** `fix/file-list-loading-state` · **P2** — On first load, the file table says "No CSV files match your filters." until the list arrives, found in a review on 2026-11-13. Online, with a slow list (10.11), the app looks empty. `useFileList` (`client/src/hooks/useFileList.ts`) starts with `[]`. Add a `loading` state that lasts until the first `api.list()` settles, and show "Loading files…" in the table's empty row. A failure still shows the error banner. Component tests for loading → loaded and loading → error.
+
+- [x] **10.15** `fix/online-size-limits` · **P2** — Online, Vercel can't send a response over 4.5 MB, found in a review on 2026-11-13. Measured: a result is about 2× its input (5,000 rows: 225 KB → 439 KB for Classification), so an input over about 2.3 MB uploads but its result can't be downloaded. Comparing 5 files fails above about 16,000 rows each (5 × 20,000 rows is a 5.57 MB response). Recommended: set `MAX_UPLOAD_MB=2` on the Vercel deployment and document it, so the server refuses larger CSVs with its own clear message, and have comparison return a plain "too many rows to compare online" 400 above a set row count. Confirm the approach with the person when the spec starts. Whether to add deleting or resetting files online (archive only hides them) is a separate open decision, not part of this item.
 
 ### M11 — File IDs
 
