@@ -21,18 +21,21 @@ vi.mock('@vercel/blob', async (original) => {
       const hasMore = start + 2 < paths.length;
       return { blobs: paths.slice(start, start + 2).map((pathname) => ({ pathname })), hasMore, cursor: hasMore ? String(start + 2) : undefined };
     }),
-    put: vi.fn(async (pathname: string, text: string, options: { access: string; ifMatch?: string; allowOverwrite?: boolean }) => {
+    put: vi.fn(async (pathname: string, text: string, options: { access: string; contentType?: string; ifMatch?: string; allowOverwrite?: boolean }) => {
       expect(options.access).toBe('private');
+      // A file's CSV is stored as CSV; everything else (metadata, claims) is JSON.
+      expect(options.contentType).toBe(pathname.includes('/text/') ? 'text/csv' : 'application/json');
       const previous = blobs.files.get(pathname);
       if (options.ifMatch && previous?.etag !== options.ifMatch) throw new sdk.BlobPreconditionFailedError();
       if (previous && !options.allowOverwrite) throw new Error('Already exists');
       blobs.files.set(pathname, { text, etag: String(++blobs.revision) });
     }),
+    del: vi.fn(async (pathname: string) => { blobs.files.delete(pathname); }),
   };
 });
 
-import { get, put } from '@vercel/blob';
-import { createBlobStorage } from './lib/blob-storage';
+import { del, get, list, put } from '@vercel/blob';
+import { createBlobStorage, migrateCombinedFiles } from './lib/blob-storage';
 import { createStorage, openLocalStorage, reconcileMetadata, type Storage } from './lib/storage';
 import { buildApp } from './app';
 
@@ -73,9 +76,10 @@ describe('durable Blob storage', () => {
     const id = `${source.id}-M`;
     const first = await storage.createAt(id, { ...input('result_source_mass.csv'), status: 'Processed' });
     expect(first).toMatchObject({ id, status: 'Processed' });
-    const before = blobs.files.get(`test/create-at/files/${id}.json`);
+    const before = { meta: blobs.files.get(`test/create-at/meta/${id}.json`), text: blobs.files.get(`test/create-at/text/${id}.csv`) };
+    expect(before.meta).toBeDefined();
     expect(await storage.createAt(id, { ...input('other.csv'), text: 'overwritten', status: 'Processed' })).toBeUndefined();
-    expect(blobs.files.get(`test/create-at/files/${id}.json`)).toEqual(before); // same bytes, same ETag
+    expect({ meta: blobs.files.get(`test/create-at/meta/${id}.json`), text: blobs.files.get(`test/create-at/text/${id}.csv`) }).toEqual(before); // same bytes, same ETags
     expect(await storage.get(id)).toEqual(first);
   });
 
@@ -134,7 +138,7 @@ describe('durable Blob storage', () => {
     const originalGet = vi.mocked(get).getMockImplementation()!;
     vi.mocked(get).mockImplementationOnce(async (...args) => {
       const result = await originalGet(...args);
-      const stored = [...blobs.files].find(([pathname]) => pathname.endsWith(`/files/${file.id}.json`))![1];
+      const stored = [...blobs.files].find(([pathname]) => pathname.endsWith(`/meta/${file.id}.json`))![1];
       stored.etag = 'changed-by-other-instance';
       return result;
     });
@@ -236,6 +240,125 @@ describe('durable Blob storage', () => {
   it('refuses a Vercel startup without durable storage configuration', async () => {
     await expect(createStorage({ VERCEL: '1' })).rejects.toThrow('Connect a private Vercel Blob store');
     await expect(createStorage({ VERCEL: '1', BLOB_READ_WRITE_TOKEN: '' })).rejects.toThrow('Connect a private Vercel Blob store');
+  });
+});
+
+describe('Blob transfers per operation', () => {
+  /** The pathnames each SDK call touched since the last reset. */
+  const touched = () => ({
+    get: vi.mocked(get).mock.calls.map(([p]) => String(p)),
+    put: vi.mocked(put).mock.calls.map(([p]) => String(p)),
+    list: vi.mocked(list).mock.calls.map(([o]) => (o as { prefix: string }).prefix),
+  });
+  async function seeded() {
+    const storage = createBlobStorage('test/count');
+    const files = [await storage.create(input('a.csv')), await storage.create(input('b.csv')), await storage.create(input('c.csv'))];
+    vi.clearAllMocks();
+    return { storage, files };
+  }
+
+  it('lists metadata only, never a CSV', async () => {
+    const { storage, files } = await seeded();
+    expect((await storage.list()).map((f) => f.id)).toEqual(files.map((f) => f.id));
+    const { get: gets, put: puts, list: lists } = touched();
+    expect(lists.every((p) => p === 'test/count/meta/')).toBe(true);
+    expect(gets).toEqual(files.map((f) => `test/count/meta/${f.id}.json`));
+    expect(puts).toEqual([]);
+  });
+
+  it('gets metadata with one read of that file\'s metadata object', async () => {
+    const { storage, files } = await seeded();
+    await storage.get(files[1].id);
+    expect(touched()).toEqual({ get: [`test/count/meta/${files[1].id}.json`], put: [], list: [] });
+  });
+
+  it('reads a CSV with one read of that file\'s CSV object', async () => {
+    const { storage, files } = await seeded();
+    expect(await storage.read(files[1].id)).toBe(input('b.csv').text);
+    expect(touched()).toEqual({ get: [`test/count/text/${files[1].id}.csv`], put: [], list: [] });
+  });
+
+  it('patches by rewriting that file\'s metadata only, never its CSV', async () => {
+    const { storage, files } = await seeded();
+    await storage.patch(files[1].id, { archived: true });
+    const meta = `test/count/meta/${files[1].id}.json`;
+    expect(touched()).toEqual({ get: [meta], put: [meta], list: [] });
+    expect(await storage.read(files[1].id)).toBe(input('b.csv').text);
+  });
+
+  it('writes no CSV when createAt loses to a file that already has the ID', async () => {
+    const { storage, files } = await seeded();
+    const id = `${files[0].id}-V`;
+    await storage.createAt(id, { ...input('first.csv'), text: 'first', status: 'Processed' });
+    vi.clearAllMocks();
+    expect(await storage.createAt(id, { ...input('second.csv'), text: 'second', status: 'Processed' })).toBeUndefined();
+    expect(touched().put.filter((p) => p.includes('/text/'))).toEqual([]);
+    expect(await storage.read(id)).toBe('first');
+  });
+});
+
+describe('converting the older one-object layout at startup', () => {
+  /** Stores a file the way the older layout did: one object holding its metadata and its CSV. */
+  function storeOld(prefix: string, id: string, text = 'batch_id,value\nA,old') {
+    const meta: FileMeta = { id, name: `${id}.csv`, rows: 1, columns: 2, status: 'Ready', problemRows: 0, uploadedAt: `2026-11-0${id.slice(-1)}T12:00:00Z` };
+    blobs.files.set(`${prefix}/files/${id}.json`, { text: JSON.stringify({ meta, text }), etag: String(++blobs.revision) });
+    return meta;
+  }
+  const oldObjects = (prefix: string) => [...blobs.files.keys()].filter((p) => p.startsWith(`${prefix}/files/`));
+
+  it('splits each old file into metadata and CSV, then deletes the old object', async () => {
+    const metas = [storeOld('test/convert', '100001'), storeOld('test/convert', '100002', 'batch_id,value\nB,two')];
+    expect(await migrateCombinedFiles('test/convert')).toEqual({ converted: ['100001', '100002'], skipped: [] });
+    const storage = createBlobStorage('test/convert');
+    expect(await storage.list()).toEqual(metas);
+    expect(await storage.get('100002')).toEqual(metas[1]);
+    expect(await storage.read('100002')).toBe('batch_id,value\nB,two');
+    expect(oldObjects('test/convert')).toEqual([]);
+    expect(vi.mocked(del)).toHaveBeenCalledTimes(2);
+  });
+
+  it('does nothing the second time, and two servers converting at once both succeed', async () => {
+    storeOld('test/convert-twice', '100001');
+    storeOld('test/convert-twice', '100002');
+    const [a, b] = await Promise.all([migrateCombinedFiles('test/convert-twice'), migrateCombinedFiles('test/convert-twice')]);
+    expect([...a.skipped, ...b.skipped]).toEqual([]);
+    expect(await migrateCombinedFiles('test/convert-twice')).toEqual({ converted: [], skipped: [] });
+    expect((await createBlobStorage('test/convert-twice').list()).map((f) => f.id)).toEqual(['100001', '100002']);
+  });
+
+  it('keeps metadata already in the new layout', async () => {
+    const storage = createBlobStorage('test/convert-newer');
+    const current = await storage.create(input('current.csv'));
+    await storage.patch(current.id, { archived: true });
+    storeOld('test/convert-newer', current.id); // an older copy of the same file
+    await migrateCombinedFiles('test/convert-newer');
+    expect(await storage.get(current.id)).toMatchObject({ name: 'current.csv', archived: true });
+    expect(oldObjects('test/convert-newer')).toEqual([]);
+  });
+
+  it('leaves an unreadable old object in place and reports it, converting the rest', async () => {
+    storeOld('test/convert-broken', '100001');
+    blobs.files.set('test/convert-broken/files/100002.json', { text: 'not json', etag: 'x' });
+    expect(await migrateCombinedFiles('test/convert-broken')).toEqual({ converted: ['100001'], skipped: ['100002'] });
+    expect(oldObjects('test/convert-broken')).toEqual(['test/convert-broken/files/100002.json']);
+  });
+
+  it('converts at startup when the API opens Blob storage, and logs what it could not convert', async () => {
+    const meta = storeOld('test/startup', '100001');
+    blobs.files.set('test/startup/files/100002.json', { text: 'not json', etag: 'x' });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const storage = await createStorage({ BLOB_READ_WRITE_TOKEN: 'test-only-token', RECLAIM_BLOB_PREFIX: 'test/startup' });
+    expect(await storage.list()).toEqual([meta]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('100002'));
+    warn.mockRestore();
+  });
+
+  it('does not delete the old object when a new object fails to write', async () => {
+    storeOld('test/convert-fail', '100001');
+    vi.mocked(put).mockRejectedValueOnce(new Error('Store unavailable'));
+    expect(await migrateCombinedFiles('test/convert-fail')).toEqual({ converted: [], skipped: ['100001'] });
+    expect(oldObjects('test/convert-fail')).toHaveLength(1);
+    expect(vi.mocked(del)).not.toHaveBeenCalled();
   });
 });
 
