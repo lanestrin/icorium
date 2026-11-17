@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/lanestrin/icorium/compare/v1.16.0...v1.17.0) (2026-11-17)
+
+
+### Features
+
+* store Blob file metadata apart from CSV text (10.11) ([#107](https://github.com/lanestrin/icorium/issues/107)) ([a9903cd](https://github.com/lanestrin/icorium/commit/a9903cd644425dd5835a4410d1d4c45c8dbeb34b))
+
 ## [1.16.0](https://github.com/lanestrin/icorium/compare/v1.15.0...v1.16.0) (2026-11-16)
 
 
