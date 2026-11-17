@@ -41,16 +41,28 @@ Vercel supplies `BLOB_READ_WRITE_TOKEN`. Keep this server-side and never add
 its value to the repository or a browser build. Blob is a managed external
 storage resource, not another named service or a service binding.
 
-- With the token present, uploads/results and metadata are stored together as
-  private JSON objects. No process-local metadata index is used in Blob mode.
+- With the token present, each upload or result is two private objects: its
+  metadata (`<namespace>/meta/<id>.json`) and its CSV
+  (`<namespace>/text/<id>.csv`). Listing files and changing a flag such as
+  Archived read and write metadata only; a CSV is read only to preview, process
+  or download it. No process-local metadata index is used in Blob mode.
 - Origin reads (`useCache: false`) avoid stale metadata after writes. Metadata
   updates use ETag preconditions; conflicting updates return 409 for refresh/retry.
-- Files are stored by File ID at `<namespace>/files/<id>.json`, so a file is
-  read directly by its ID. A new base number is claimed by creating
+- Files are stored by File ID, so a file is read directly by its ID. A new
+  file's CSV is written before its metadata, so a listed file always has its
+  CSV; a result created at a fixed ID claims its metadata object first. A new base number is claimed by creating
   `<namespace>/claims/<base>.json` with "fail if it exists"; a server that loses
   the race takes the next number, so concurrent uploads never share an ID. A
   confirmed re-run (`replace: true`) is written to its fixed ID (`101010-M`),
   last write wins.
+- Files saved in the older one-object layout (`<namespace>/files/<id>.json`,
+  metadata and CSV together) are converted once at startup: the CSV and
+  metadata objects are written, checked, and only then is the old object
+  deleted. A file already in the new layout keeps its metadata and its CSV:
+  a missing CSV is filled in from the old copy, and the old copy is deleted
+  only when the CSVs match. A differing old copy, or any file that can't be
+  converted, is left in place and logged. Two servers starting together convert
+  safely.
 - Objects saved before File IDs (under `<namespace>/records/`) are not read;
   that demo data is reset, not migrated.
 - Sample creation is idempotent across cold starts (samples take IDs

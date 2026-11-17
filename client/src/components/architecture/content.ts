@@ -138,7 +138,7 @@ export const TECH: Tech[] = [
       'Local folder during development; private Vercel Blob when deployed to Vercel.',
       'One storage module is the only code that touches disk; processing never does.',
     ],
-    tradeoff: 'Listing reads every file record: fine for a small catalogue, not for thousands of files or relational queries.',
+    tradeoff: 'Listing reads one small metadata object per file and never the CSVs: fine for a small catalogue, not for thousands of files or relational queries.',
     files: ['server/src/lib/storage.ts', 'server/src/lib/blob-storage.ts'],
   },
 ];

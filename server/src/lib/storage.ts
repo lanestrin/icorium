@@ -3,7 +3,7 @@ import path from 'node:path';
 import { FIRST_FILE_ID, nextBaseId, parseFileId, type FileMeta, type ProcessorCode } from '../../../shared/types';
 import { httpError, parseCsv, toCsv } from './csv';
 import { findProblems, stampFileIds } from '../processing';
-import { createBlobStorage } from './blob-storage';
+import { createBlobStorage, migrateCombinedFiles } from './blob-storage';
 
 // Storage: the only code that touches the disk (local folder) or Vercel Blob. Nothing happens when this
 // module is imported; buildApp opens storage with createStorage() at startup.
@@ -45,7 +45,13 @@ export async function createStorage(env: NodeJS.ProcessEnv = process.env): Promi
   const useBlob = !!env.BLOB_READ_WRITE_TOKEN && !env.RECLAIM_DATA_DIR;
   if (env.VERCEL && !useBlob && !env.RECLAIM_DATA_DIR)
     throw new Error('Connect a private Vercel Blob store with BLOB_READ_WRITE_TOKEN before running the API on Vercel.');
-  if (useBlob) return createBlobStorage(env.RECLAIM_BLOB_PREFIX ?? `icorium/${env.VERCEL_ENV ?? 'development'}`);
+  if (useBlob) {
+    const prefix = env.RECLAIM_BLOB_PREFIX ?? `icorium/${env.VERCEL_ENV ?? 'development'}`;
+    // Files saved in the older one-object layout are split into metadata and CSV once, before the API starts.
+    const { skipped } = await migrateCombinedFiles(prefix);
+    if (skipped.length) console.warn(`Could not convert ${skipped.length} stored file(s) to the current layout; left in place: ${skipped.join(', ')}`);
+    return createBlobStorage(prefix);
+  }
   return openLocalStorage(path.resolve(env.RECLAIM_DATA_DIR ?? DEFAULT_DATA));
 }
 

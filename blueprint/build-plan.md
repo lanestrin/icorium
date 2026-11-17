@@ -114,7 +114,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 10.11** `perf/blob-storage-lookups`. Start with a blob-storage unit test that `list()` reads only file metadata and never downloads a stored file's CSV text.
+**Next: 10.15** `fix/online-size-limits`. Start with an API test that a comparison whose response would be too large to send online returns a clear "too many rows to compare" error instead of failing.
 
 **Order** (set on 2026-11-15 at the person's request: finish the frontend architecture before anything else):
 
@@ -621,7 +621,7 @@ the Architecture page, update the page in the same item.
 
   **Verification:** API tests that page results are unchanged and that a re-run result serves its new rows; a unit test that parsing runs once per file across pages; `npm run verify`.
 
-- [ ] **10.11** `perf/blob-storage-lookups` · **P1** — The deployment went ahead, so this now applies; updated on 2026-11-13 after a review. Since 10.9, a lookup by File ID is a direct read, so `get`, `read` and `patch` no longer scan. What remains: `list()` in `server/src/lib/blob-storage.ts` downloads every stored object, CSV text included, on every file-list load, so the page slows down as files pile up. `patch` still re-uploads the whole CSV to change a flag. Store each file's metadata as its own small object, separate from its CSV text, and convert files already stored online once at startup, the way `reconcileMetadata` runs. The original notes below are kept for history; the first, second and fourth are covered by 10.9 and 11.1.
+- [x] **10.11** `perf/blob-storage-lookups` · **P1** — The deployment went ahead, so this now applies; updated on 2026-11-13 after a review. Since 10.9, a lookup by File ID is a direct read, so `get`, `read` and `patch` no longer scan. What remains: `list()` in `server/src/lib/blob-storage.ts` downloads every stored object, CSV text included, on every file-list load, so the page slows down as files pile up. `patch` still re-uploads the whole CSV to change a flag. Store each file's metadata as its own small object, separate from its CSV text, and convert files already stored online once at startup, the way `reconcileMetadata` runs. The original notes below are kept for history; the first, second and fourth are covered by 10.9 and 11.1.
 
   - Load records in parallel.
 
