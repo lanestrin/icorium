@@ -72,9 +72,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 9.14c** `feature/9.14c-ocr-scanned-pdfs-and-images`. Start with a reader test that a PDF page with no text layer is read by OCR (Tesseract mocked) instead of being refused, then passed to the shared `findTable`.
+**Next: 16.1** `feature/16.1-shared-processing-core`. Start by moving one pure module (the processors in `server/src/processing/`) into shared code and confirming that the existing server tests pass unchanged against it.
 
-**Order:** 9.14a → 9.14b → 9.14c → 9.15. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
+**Order:** 9.14a → 9.14b → 16.1 → 16.2 → 16.3 → 16.4 → 9.14c → 9.15. M16 comes before 9.14c because the live site's API is down while its Blob store is over the Hobby limit, and 9.14c and 9.15 would otherwise describe a server that M16 retires. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
 
 **After the demo:** once 9.15 is done, the project moves toward a production platform. That direction is [Proposed — Not Yet Implemented](project-plan.md#10-future-direction--proposed-not-yet-implemented); no production items are planned yet, and none may be built until they are added here as approved items.
 
@@ -178,6 +178,48 @@ Completed milestones and items are in [build-plan-archive.md](build-plan-archive
   - Content stays in `client/src/components/architecture/content.ts`, reusing the existing section and card patterns, with no sideways scroll at phone width.
 
   **Done when:** section 7 is in the page and its "On this page" links; the conversion card shows **Planned** with its trade-off; the scale table shows today and at-scale values per layer; component tests cover all three and the content test checks that the planned card is labelled planned; `npm run verify` passes.
+
+### M16 — Temporary demo storage in the browser
+
+Added at the person's request on 2026-11-17. The private Vercel Blob store reached the Hobby plan's usage limit (access resumes 12/14/26), so the live site's API stopped starting. The proof of concept must now run at **no cost**: no paid storage, database or cloud infrastructure. Icorium will later support persistent cloud storage, user accounts and file sharing, but none of that is built until it is explicitly approved.
+
+**Requirements (the person's briefs, 2026-11-17):**
+
+- Standard browser file uploads and temporary in-memory file handling, with real conversions, CSV previews and downloads. Downloads are created in the browser as `Blob` objects.
+- IndexedDB only if persistence across page refreshes is necessary. Users never choose a local folder. Vercel's filesystem is never used as persistent storage.
+- Keep server-side conversion only where it is required, and never assume temporary server files persist between requests.
+- File storage, conversion and processing, and frontend presentation are separate modules. One storage interface has a local demo adapter now, and a cloud-backed adapter can be added later.
+- Stable internal file identifiers and metadata that can later carry ownership and sharing. The File ID contract in section 1 is unchanged.
+- Uploads and results are temporary demo data. Say they can be lost when browser storage is cleared, offer a way to clear them, and promise no recovery. The five sample datasets always load.
+- No accounts, authentication, cloud storage or sharing until explicitly approved. Avoid overengineering and unnecessary dependencies.
+- File-size limits stay. Large work must not freeze the UI (a Web Worker only where needed). Unsupported files, malformed data, conversion errors and browser-storage limits are handled clearly.
+- **Architecture objective:** moving later to authenticated cloud storage means adding backend services and replacing the storage adapter, not rewriting the upload, conversion, preview or download interfaces.
+
+**Audit (2026-11-17):** nothing requires a server.
+
+- Excel and PDF conversion already runs in the browser.
+- CSV parsing (Papa Parse), the partner adapters, the three processors, File ID stamping, result linking, comparison and the generator are plain TypeScript.
+- The only Node-only parts are Fastify, the disk and Blob storage backends, and one `randomInt` call in the generator.
+- The client reaches the server only through the 8 functions in `client/src/lib/api.ts`.
+
+- [ ] **16.1** `feature/16.1-shared-processing-core` · **P1** — Move processing, adapters, CSV handling, comparison and the generator out of `server/src` into shared code with no Node imports. Turn the route bodies in `server/src/routes/files.ts` into plain functions over the existing `Storage` interface: upload, process, archive, rows, compare and generate. No behavior change: the existing server unit and API tests keep passing against the shared code.
+- [ ] **16.2** `feature/16.2-browser-storage-and-local-api` · **P1** — Store files in the browser and run the app's logic there.
+  - A browser storage adapter implements `Storage`: File IDs counting up from `100001`, archive flags and metadata.
+  - The five samples are bundled and seeded under their fixed IDs.
+  - `client/src/lib/api.ts` calls the shared functions instead of `fetch`, and downloads are browser `Blob`s.
+  - A notice that data stays on this device and can be lost, a **Clear my data** action, and clear messages when browser storage is full or unavailable.
+
+  **Depends on:** 16.1.
+- [ ] **16.3** `feature/16.3-retire-server-and-vercel-blob` · **P1** — Remove the Fastify server, the Blob adapter, `@vercel/blob` and the server service in `vercel.json`, so Vercel serves only the static client, for free. Withdraw the Blob exception in `blueprint/stack.md`. Update the Architecture page, the README, `blueprint/vercel-deployment.md`, `blueprint/project-plan.md`, this plan's header, and the 9.14 and 9.15 text that describes the server. **Depends on:** 16.2.
+- [ ] **16.4** `feature/16.4-real-file-workflow-test` · **P2** — An automated test of the whole workflow with real files and no mocked results: upload a sample CSV and a real Excel file, run each processing function, then preview, download and compare. **Depends on:** 16.2.
+
+**Open decisions (settle in each item's spec):**
+
+- **16.2, persistence:** memory only, or IndexedDB so files survive a refresh. Recommended: IndexedDB, because the File ID, archive and results workflow loses its meaning when a refresh wipes it.
+- **16.3, the Node server:** retire it entirely, or keep it as an optional local backend. Recommended: retire it, since one runtime is simpler and the audit found nothing that needs it.
+- **16.4, how to test:** Vitest with the real files and a simulated IndexedDB (`fake-indexeddb`), or a Playwright browser test as well. Recommended: Vitest, which runs inside `npm run verify`. Playwright is the only real-browser check, but it restores browser tests, which section 4 says need a request.
+
+**Done when (milestone):** anyone can open the public Vercel site without an account, upload a supported file, convert it to CSV, process, preview, compare and download it, with nothing stored outside their browser, and `npm run verify` passes.
 
 ## 5. Minimal API outline (suggested, not prescribed)
 
