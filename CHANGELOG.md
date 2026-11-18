@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.0](https://github.com/lanestrin/icorium/compare/v1.19.0...v1.20.0) (2026-11-18)
+
+
+### Features
+
+* keep files in the browser with Clear my data (16.2) ([#119](https://github.com/lanestrin/icorium/issues/119)) ([2b1f1f7](https://github.com/lanestrin/icorium/commit/2b1f1f7af07177f91a021b565eecfbdcf1643d8e))
+
 ## [1.19.0](https://github.com/lanestrin/icorium/compare/v1.18.0...v1.19.0) (2026-11-17)
 
 
