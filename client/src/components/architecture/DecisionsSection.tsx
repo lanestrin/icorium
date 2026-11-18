@@ -1,29 +1,36 @@
-import { Laptop, TriangleAlert } from 'lucide-react';
+import { TriangleAlert, type LucideIcon } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
 import { Card } from '../ui/Card';
-import { DECISIONS, PROCESSING_LOCATION } from './content';
+import { CONVERSION, DECISIONS, PROCESSING_LOCATION } from './content';
 import { Checks, Section } from './Section';
 import styles from './architecture.module.scss';
 
 type Decision = (typeof DECISIONS)[number];
 
-/** The first decision, shown in full: where processing runs, its benefits and its trade-off. */
-function ProcessingLocation() {
+/** Content shared by the two featured architecture decisions. */
+interface FeaturedDecisionContent {
+  title: string; icon: LucideIcon; text: string; benefits: string[];
+  tradeoffTitle: string; tradeoff: string; status?: string; recommendation?: string; next?: string;
+}
+
+function FeaturedDecision({ decision }: { decision: FeaturedDecisionContent }) {
   return (
-    <Card as="article" aria-label={PROCESSING_LOCATION.title} className={styles.featuredDecision}>
+    <Card as="article" aria-label={decision.title} className={styles.featuredDecision}>
       <div className={styles.decision}>
-        <span className={styles.largeIconBadge}><Laptop className={styles.largeBadgeIcon} aria-hidden /></span>
+        <span className={styles.largeIconBadge}><decision.icon className={styles.largeBadgeIcon} aria-hidden /></span>
         <div className={styles.textColumn}>
-          <h3 className={styles.featuredTitle}>{PROCESSING_LOCATION.title}</h3>
-          <p className={styles.decisionSummary}>{PROCESSING_LOCATION.text}</p>
+          <h3 className={styles.featuredTitle}>{decision.title}</h3>
+          <p className={styles.decisionSummary}>{decision.text}</p>
+          {decision.status && <p className={styles.storageHeading}>{decision.status}</p>}
         </div>
       </div>
-      <div className={styles.benefits}><Checks label="Benefits" items={PROCESSING_LOCATION.benefits} /></div>
+      <div className={styles.benefits}><Checks label="Benefits" items={decision.benefits} /></div>
       <div className={styles.tradeoffBox}>
         <p className={styles.tradeoffTitle}>
-          <TriangleAlert className={styles.tradeoffIcon} aria-hidden /> Trade-off: one device only
+          <TriangleAlert className={styles.tradeoffIcon} aria-hidden /> Trade-off: {decision.tradeoffTitle}
         </p>
-        <p className={styles.tradeoffText}>{PROCESSING_LOCATION.tradeoff}</p>
+        <p className={styles.tradeoffText}>{decision.tradeoff}</p>
+        {decision.next && <p className={styles.tradeoffText}><strong>{decision.recommendation}: </strong>{decision.next}</p>}
       </div>
     </Card>
   );
@@ -50,7 +57,10 @@ function DecisionCard({ decision, wide }: { decision: Decision; wide: boolean })
 export function DecisionsSection() {
   return (
     <Section id="decisions" eyebrow="4 · Design decisions and constraints" title="The main decisions">
-      <ProcessingLocation />
+      <div className={styles.featuredDecisions}>
+        <FeaturedDecision decision={PROCESSING_LOCATION} />
+        <FeaturedDecision decision={CONVERSION} />
+      </div>
       <div className={styles.decisionGrid}>
         {DECISIONS.map((decision, i) => <DecisionCard key={decision.question} decision={decision} wide={i >= 3} />)}
       </div>

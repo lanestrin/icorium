@@ -2,7 +2,7 @@
 // Files are read with Vite's import.meta.glob (raw text), so the client needs no Node type definitions.
 import { describe, expect, it } from 'vitest';
 import { COMPARE_MAX } from '../../../shared/types';
-import { TECH } from '../components/architecture/content';
+import { CONVERSION, CUSTOMER_SECURITY, SCALE, TECH } from '../components/architecture/content';
 
 const GLOBBED = import.meta.glob(
   ['../../../client/src/**/*', '../../../client/*.ts', '../../../client/.storybook/*.ts', '../../../client/package.json', '../../../tests/*.ts', '../../../tests/package.json', '../../../shared/*.ts', '../../../vercel.json'],
@@ -23,6 +23,16 @@ const dependencies = (workspace: string) => {
 };
 
 describe('Architecture page content', () => {
+  it('separates shipped conversion from recommended services', () => {
+    expect(CONVERSION.status).toBe('In use');
+    expect(CONVERSION.recommendation).toBe('Recommended, not built');
+    expect(CUSTOMER_SECURITY.status).toBe('Recommended, not built');
+    expect(SCALE.status).toBe('Recommended, not built');
+    expect(TECH.find((tech) => tech.name === 'Tesseract.js')?.packages).toContainEqual(['client', 'tesseract.js']);
+    const installed = TECH.flatMap((tech) => tech.packages.map(([, name]) => name));
+    for (const recommendation of ['fastify', 'pg', '@sentry/react']) expect(installed).not.toContain(recommendation);
+  });
+
   it('only names repository paths that exist', () => {
     const paths = TECH.flatMap((t) => t.files);
     expect(paths.length).toBeGreaterThan(10);

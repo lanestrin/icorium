@@ -1,4 +1,4 @@
-import { Atom, BookOpen, Boxes, Braces, ChartColumn, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Globe, ScanText, Laptop, Layers, Palette, PanelsTopLeft, Settings, Shapes, ShieldCheck, Upload, User, Users, Workflow, Zap, type LucideIcon } from 'lucide-react';
+import { Atom, BookOpen, Boxes, Braces, ChartColumn, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Globe, ScanText, Laptop, Layers, Palette, PanelsTopLeft, Settings, Shapes, ShieldCheck, Upload, User, Zap, type LucideIcon } from 'lucide-react';
 
 // Everything the Architecture page says, kept as data so the section components only lay it out.
 // pages/architecture-content.test.ts checks every path and package named here against the repository.
@@ -187,9 +187,23 @@ export const HOW_IT_WORKS = [
 /** The decision shown first and in full: where the CSV work runs. */
 export const PROCESSING_LOCATION = {
   title: 'Processing location (browser only)',
+  icon: Laptop,
+  tradeoffTitle: 'one device only',
   text: 'The browser does everything: it parses, normalizes, validates and processes every CSV, keeps the files in IndexedDB, and converts Excel and PDF files to CSV before upload. No server is involved.',
   benefits: ['Free to host: any static site works', 'No file ever leaves the person\x27s device', 'Nothing to run or maintain besides the page'],
   tradeoff: 'Files live in one browser on one device: they cannot be shared, and they are lost when the person clears their browser data. Sharing or teams would need a backend and cloud storage.',
+};
+
+export const CONVERSION = {
+  title: 'File conversion in the browser',
+  icon: ScanText,
+  status: 'In use',
+  text: 'Excel, text PDFs, scanned PDFs and images become CSV in the browser, after a review. The worker and core assets come from this site; only English language data (about 10 MB) comes from a CDN on first use.',
+  benefits: ['Free: no API key', 'Files stay in the browser', 'No server load or Vercel server limits'],
+  tradeoffTitle: 'OCR needs review',
+  tradeoff: 'Blurry, skewed, handwritten or merged-cell scans are harder to read. Many pages or weak devices make OCR slow. There are no unattended batch runs: every converted file needs review, especially digits and decimal points.',
+  recommendation: 'Recommended, not built',
+  next: 'Switch to a managed document-AI service such as AWS Textract or Azure Document Intelligence when volume or accuracy targets require it.',
 };
 
 export const DECISIONS: { question: string; icon: LucideIcon; summary: string; answer: string[] }[] = [
@@ -224,13 +238,31 @@ export const DECISIONS: { question: string; icon: LucideIcon; summary: string; a
   ] },
 ];
 
-export const EVOLVE: { title: string; icon: LucideIcon; text: string }[] = [
-  { title: 'Authentication', icon: Users, text: 'User accounts and partner permissions' },
-  { title: 'PostgreSQL', icon: Database, text: 'Searchable metadata and audit history' },
-  { title: 'Background jobs', icon: Workflow, text: 'Process large files asynchronously' },
-  { title: 'Upload hardening', icon: ShieldCheck, text: 'Rate limits, quotas and file safeguards' },
-  { title: 'Monitoring', icon: ChartColumn, text: 'Logs, error tracking and alerts' },
-];
+export const SCALE = {
+  status: 'Recommended, not built',
+  rows: [
+    { layer: 'UI', today: 'React application', future: 'Same React UI' },
+    { layer: 'API', today: 'Browser-local file service', future: 'Fastify in containers' },
+    { layer: 'Identity', today: 'No accounts', future: 'Managed OIDC provider' },
+    { layer: 'Data', today: 'IndexedDB, with memory fallback', future: 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs' },
+    { layer: 'Work', today: 'Local processing; PDF and OCR conversion workers', future: 'A queue and workers' },
+    { layer: 'OCR', today: 'Tesseract in the browser', future: 'Managed document AI when volume or accuracy requires it' },
+    { layer: 'Operations', today: 'Static hosting, automated tests and CI', future: 'Logs, Sentry, metrics, a secrets manager and backups' },
+  ],
+};
+
+export const CUSTOMER_SECURITY = {
+  status: 'Recommended, not built',
+  today: 'Today this is a static demo: no accounts, no API keys and no secrets. The following describes a future hosted product, not safeguards implemented in this demo.',
+  topics: [
+    { title: 'One hosted product', text: 'Use one hosted multi-tenant app rather than copies customers download. Offer a dedicated deployment only when a contract needs it.' },
+    { title: 'People and roles', text: 'Use a managed OIDC provider with customer organizations, SSO and MFA. Give people admin, uploader or viewer roles within their customer.' },
+    { title: 'Automated uploads', text: 'Use per-customer OAuth client credentials or scoped API keys. Store API keys hashed, show them once, and make them expiring and revocable. Rate-limit requests and log key usage, never plaintext secrets.' },
+    { title: 'IP allowlisting', text: 'Optional IP allowlisting adds a layer; it never replaces authenticated identity.' },
+    { title: 'Customer isolation', text: 'Derive the customer ID from the authenticated session or key, never an untrusted customer field. Enforce customer isolation in the storage layer, reinforced by PostgreSQL row-level security and cross-customer tests.' },
+    { title: 'Upload safeguards', text: 'Apply quotas and rate limits, content-type checks and presigned uploads to private per-customer storage. Scan stored PDFs and images for malware. Add encryption, an audit log, retention rules and formula escaping for files shared outside.' },
+  ],
+};
 
 /** Storage backends in the order they apply: built ones first, then the possible next one. */
 export const STORAGE_OPTIONS: { name: string; icon: LucideIcon; note: string; built: boolean }[] = [
@@ -251,5 +283,5 @@ export const OVERVIEW: [LucideIcon, string, string][] = [
 /** The "On this page" links: each section's id and label, in page order. */
 export const SECTIONS = [
   ['overview', 'Overview'], ['stack', 'Tech stack'], ['architecture', 'Architecture'], ['decisions', 'Decisions'],
-  ['storage', 'Storage'], ['evolve', 'Evolution'],
+  ['storage', 'Storage'], ['evolve', 'Evolution'], ['customers', 'Customers and security'],
 ] as const;

@@ -156,9 +156,9 @@ Completed milestones and items are in [build-plan-archive.md](build-plan-archive
 
   **Depends on:** 10.13 (clear upload errors).
 
-- [ ] **9.15** `feature/9.15-architecture-scaling-and-security` · **P2** — Extend the Architecture & Tech Stack page to answer three interview questions, at the person's request on 2026-11-13: the trade-offs of Tesseract OCR in the browser, the recommended stack if the product scales, and how customer uploads should be secured once the product serves several customers. Presentation only: no API, dependency or stack change. Planned and recommended items are labelled **Planned** or **Recommended, not built**, like the existing "S3 / Cloudflare R2 · Not built". No tech card names Tesseract, SheetJS or pdf.js until 9.14a installs them.
+- [x] **9.15** `feature/9.15-architecture-scaling-and-security` · **P2** — Extend the Architecture & Tech Stack page to answer three interview questions, at the person's request on 2026-11-13: the trade-offs of Tesseract OCR in the browser, the recommended stack if the product scales, and how customer uploads should be secured once the product serves several customers. Presentation only: no API, dependency or stack change. Planned and recommended items are labelled **Planned** or **Recommended, not built**, like the existing "S3 / Cloudflare R2 · Not built". No tech card names Tesseract, SheetJS or pdf.js until 9.14a installs them.
 
-  - **Decisions:** make the existing processing-location card a reusable featured card, and add **File conversion in the browser (planned, 9.14)**. It has benefits (free, no API key, files stay in the browser, no server load, avoids Vercel's limits) and a trade-off box (weaker on blurry, skewed, handwritten or merged-cell scans; ~10 MB language data on first use; slow on many pages or weak devices; no unattended batch runs; every file needs review; switch to a managed document-AI service such as AWS Textract or Azure Document Intelligence when volume or accuracy targets require it).
+  - **Decisions:** make the existing processing-location card a reusable featured card, and add **File conversion in the browser (In use, 9.14a-c)**. It has benefits (free, no API key, files stay in the browser, no server load, avoids Vercel's limits) and a trade-off box (weaker on blurry, skewed, handwritten or merged-cell scans; ~10 MB language data on first use; slow on many pages or weak devices; no unattended batch runs; every file needs review; switch to a managed document-AI service such as AWS Textract or Azure Document Intelligence when volume or accuracy targets require it).
   - **New section 7, Customers and security (recommended, not built):**
     - One hosted multi-tenant app rather than copies customers download; a dedicated deployment only for contracts that need it.
     - People sign in per customer through a managed OIDC provider with organizations, SSO and MFA, and roles (admin, uploader, viewer).
@@ -177,7 +177,7 @@ Completed milestones and items are in [build-plan-archive.md](build-plan-archive
     - Operations: logs, Sentry, metrics, a secrets manager and backups.
   - Content stays in `client/src/components/architecture/content.ts`, reusing the existing section and card patterns, with no sideways scroll at phone width.
 
-  **Done when:** section 7 is in the page and its "On this page" links; the conversion card shows **Planned** with its trade-off; the scale table shows today and at-scale values per layer; component tests cover all three and the content test checks that the planned card is labelled planned; `npm run verify` passes.
+  **Done when:** section 7 is in the page and its "On this page" links; the conversion card shows **In use** with its trade-off; the scale table shows today and at-scale values per layer; component tests cover all three and the content test checks that browser conversion is labelled In use and future recommendations are labelled not built; `npm run verify` passes.
 
 ### M16 — Temporary demo storage in the browser
 

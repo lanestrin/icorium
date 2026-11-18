@@ -2,6 +2,7 @@ import { ArrowLeft, Wand2 } from 'lucide-react';
 import { ArchitectureSection } from '../components/architecture/ArchitectureSection';
 import { SECTIONS } from '../components/architecture/content';
 import { DecisionsSection } from '../components/architecture/DecisionsSection';
+import { CustomersSecuritySection } from '../components/architecture/CustomersSecuritySection';
 import { EvolutionSection } from '../components/architecture/EvolutionSection';
 import { OverviewSection } from '../components/architecture/OverviewSection';
 import { StorageSection } from '../components/architecture/StorageSection';
@@ -44,6 +45,7 @@ export function ArchitecturePage() {
         <DecisionsSection />
         <StorageSection />
         <EvolutionSection />
+        <CustomersSecuritySection />
       </div>
     </div>
   );
