@@ -138,6 +138,22 @@ describe('preview paging', () => {
     expect((await preview()).rows.map((r) => r.processing_status)).toEqual(['Valid', 'Valid', 'Valid']);
   });
 
+  it('serves a confirmed re-run\'s new rows even when it saves within the same millisecond', async () => {
+    // Browser storage is fast, so a re-run can keep the cached copy's upload time. Freeze the clock to make
+    // every save in this test happen at the same moment.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.parse('2026-11-17T12:00:00.000Z') });
+    try {
+      const input = (await upload('same_moment.csv', bigCsv(3))).json<FileMeta>();
+      const result = (await processFile(input.id, 'validation')).json<FileMeta>();
+      // Another tab saves stale rows for the result at that same moment, and a preview caches them.
+      await storage.put(result.id, { ...result, text: (await textOf(result.id)).replace(/,Valid,/g, ',STALE,') });
+      expect((await rowsOf(result.id)).rows[0].processing_status).toBe('STALE');
+      // The confirmed re-run saves fresh rows, still at that moment; the preview must show them, not the cache.
+      expect((await processFile(input.id, 'validation', true)).json<FileMeta>().uploadedAt).toBe(result.uploadedAt);
+      expect((await rowsOf(result.id)).rows.map((r) => r.processing_status)).toEqual(['Valid', 'Valid', 'Valid']);
+    } finally { vi.useRealTimers(); }
+  });
+
   it(`keeps at most ${PARSED_CACHE_FILES} parsed files, dropping the least recently used`, async () => {
     const ids: string[] = [];
     for (let i = 0; i <= PARSED_CACHE_FILES; i++) ids.push((await upload(`cached_${i}.csv`, bigCsv(2))).json<FileMeta>().id);

@@ -121,7 +121,7 @@ export function createFileService(storage: Storage) {
   }
 
   return {
-    // A pure read: metadata from older versions is corrected once at startup (reconcileMetadata).
+    // A pure read: listing never reads a CSV or writes anything.
     list: () => storage.list(),
 
     /** Upload: parse + schema check always run here, regardless of processing function. */
