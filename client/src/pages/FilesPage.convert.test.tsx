@@ -246,7 +246,9 @@ describe('converting scanned PDFs and images with OCR', () => {
     await user.upload(fileInput(), [png('slow.png'), png('next.png')]);
     await screen.findByText('Reading slow.png…');
     expect(vi.mocked(readImage).mock.calls[0][1].aborted).toBe(false);
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    const cancel = screen.getByRole('button', { name: 'Cancel reading' });
+    expect(cancel.closest('[aria-live]')).toBeNull(); // not read out with every progress update
+    await user.click(cancel);
     expect(vi.mocked(readImage).mock.calls[0][1].aborted).toBe(true); // the OCR worker is told to stop
     const next = await screen.findByRole('dialog', { name: 'Review next.png' });
     await act(async () => late(rows)); // the cancelled image finishes late: ignored
@@ -254,6 +256,16 @@ describe('converting scanned PDFs and images with OCR', () => {
     await user.click(within(next).getByRole('button', { name: 'Import as CSV' }));
     await waitFor(() => expect(uploadedNames()).toEqual(['next.csv']));
     expect(screen.queryByText('Reading slow.png…')).not.toBeInTheDocument();
+  });
+
+  it('returns focus to choosing files after Cancel reading', async () => {
+    const user = await setup();
+    vi.mocked(readImage).mockImplementationOnce(() => new Promise(() => {}));
+    await user.upload(fileInput(), png('slow.png'));
+    await user.click(await screen.findByRole('button', { name: 'Cancel reading' }));
+    expect(screen.queryByRole('button', { name: 'Cancel reading' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'browse files' })).toHaveFocus();
+    expect(api.upload).not.toHaveBeenCalled();
   });
 
   it('names an image OCR could not read, and still converts the next file', async () => {

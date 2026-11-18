@@ -6,19 +6,24 @@ import { ConvertError } from './table';
 // language data (~10 MB) is downloaded from Tesseract's default CDN, the first time, and cached by
 // tesseract.js in the browser. Partner files never leave the browser.
 
-/** What a reader reports while it works: getting OCR ready, or which page it is reading. */
-export type ReadProgress = { stage: 'preparing' } | { stage: 'page'; page: number; pages: number };
+/** What a reader reports while it works: getting OCR ready, reading an image, or which page it is reading. */
+export type ReadProgress = { stage: 'preparing' } | { stage: 'reading' } | { stage: 'page'; page: number; pages: number };
 
 export const OCR_DOWNLOAD_FAILED = "The text-reading data couldn't be downloaded. Check your connection and try again.";
+/** Largest image read by OCR, in megapixels (a 300 DPI A4 scan is about 9). */
+export const IMAGE_MAX_MEGAPIXELS = 50;
+const NOT_AN_IMAGE = "It couldn't be read as an image.";
 
 /** Where the read happened, for the "no text" message. */
 const noText = (page?: number) => (page === undefined ? 'No text was found in the image.' : `No text was found on page ${page}.`);
 
-/** Something Tesseract can read: a canvas holding the decoded image or rendered page. */
-export type OcrImage = HTMLCanvasElement;
+/** Something Tesseract can read: an image file, or a canvas holding a rendered PDF page. */
+export type OcrImage = Blob | HTMLCanvasElement;
 
-/** One OCR worker for a conversion job. read() starts it on first use; close() always ends it. */
+/** One OCR worker for a conversion job. ready() and read() start it on first use; close() always ends it. */
 export interface OcrReader {
+  /** Resolves once the worker and its language data are loaded, so the caller can say what it reads next. */
+  ready(): Promise<void>;
   /** Rows of cell text found in the image. page names the PDF page, for messages. */
   read(image: OcrImage, page?: number): Promise<string[][]>;
   close(): Promise<void>;
@@ -44,13 +49,28 @@ async function coreUrl() {
 const absolute = (url: string) => new URL(url, document.baseURI).href;
 
 /**
+ * Waits for work, or rejects with the signal's reason as soon as the job is cancelled. tesseract.js 7 never
+ * settles a job its worker was terminated in the middle of, so every OCR wait goes through this: Cancel
+ * then settles the read at once and the callers' clean-up runs.
+ */
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  signal.throwIfAborted();
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(signal.reason);
+    signal.addEventListener('abort', abort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+  });
+}
+
+/**
  * Starts an OCR reader for one conversion job. Tesseract is imported when the first image is read.
- * Aborting the signal terminates the worker, so a read in progress stops; onPreparing is called while
- * the worker and the language data load.
+ * Aborting the signal settles any wait at once and terminates the worker, including one that finishes
+ * starting afterwards; onPreparing is called while the worker and the language data load.
  */
 export function createOcrReader(signal: AbortSignal, onPreparing?: () => void): OcrReader {
   let worker: Promise<import('tesseract.js').Worker> | undefined;
-  const stop = () => { void worker?.then((w) => w.terminate()).catch(() => {}); };
+  const terminate = (started = worker) => { void started?.then((w) => w.terminate()).catch(() => {}); };
+  const stop = () => terminate();
   signal.addEventListener('abort', stop);
 
   async function start() {
@@ -73,20 +93,25 @@ export function createOcrReader(signal: AbortSignal, onPreparing?: () => void): 
     }
   }
 
+  /** The started worker; a wait for it ends at once on Cancel, and the stop handler ends the worker itself. */
+  function started() {
+    worker ??= start();
+    return untilAborted(worker, signal);
+  }
+
   return {
+    async ready() {
+      await started();
+    },
     async read(image, page) {
-      signal.throwIfAborted();
-      worker ??= start();
-      const ocr = await worker;
-      signal.throwIfAborted();
+      const ocr = await started();
       let result: Awaited<ReturnType<typeof ocr.recognize>>;
       try {
-        result = await ocr.recognize(image, {}, { blocks: true });
+        result = await untilAborted(ocr.recognize(image, {}, { blocks: true }), signal);
       } catch (error) {
         signal.throwIfAborted();
-        throw new ConvertError(page === undefined ? "The image couldn't be read." : `Page ${page} couldn't be read.`, { cause: error });
+        throw new ConvertError(page === undefined ? NOT_AN_IMAGE : `Page ${page} couldn't be read.`, { cause: error });
       }
-      signal.throwIfAborted();
       const words: PlacedText[] = [];
       for (const block of result.data.blocks ?? [])
         for (const paragraph of block.paragraphs)
@@ -102,29 +127,30 @@ export function createOcrReader(signal: AbortSignal, onPreparing?: () => void): 
     },
     async close() {
       signal.removeEventListener('abort', stop);
-      const started = worker;
+      const last = worker;
       worker = undefined;
-      await started?.then((w) => w.terminate()).catch(() => {});
+      terminate(last);
     },
   };
 }
 
-/** Decodes an image file into a canvas Tesseract can read; a file that isn't an image is refused. */
-async function imageCanvas(file: File): Promise<HTMLCanvasElement> {
-  let bitmap: ImageBitmap;
+/**
+ * The image's size in pixels from its header, without decoding it into memory: the browser loads an image
+ * element's dimensions before it decodes the pixels. A file that isn't a readable image is refused.
+ */
+async function imageSize(file: File): Promise<{ width: number; height: number }> {
+  const url = URL.createObjectURL(file);
   try {
-    bitmap = await createImageBitmap(file);
-  } catch (error) {
-    throw new ConvertError("It couldn't be read as an image.", { cause: error });
-  }
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    canvas.getContext('2d')!.drawImage(bitmap, 0, 0);
-    return canvas;
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new ConvertError(NOT_AN_IMAGE));
+      image.src = url;
+    });
+    if (!image.naturalWidth || !image.naturalHeight) throw new ConvertError(NOT_AN_IMAGE);
+    return { width: image.naturalWidth, height: image.naturalHeight };
   } finally {
-    bitmap.close();
+    URL.revokeObjectURL(url);
   }
 }
 
@@ -135,17 +161,24 @@ export function releaseCanvas(canvas: HTMLCanvasElement) {
 }
 
 /**
- * Reads a .png or .jpg image of a table into rows of cell text with OCR. The worker is ended when the
- * read ends, however it ends.
+ * Reads a .png or .jpg image of a table into rows of cell text with OCR. An image over IMAGE_MAX_MEGAPIXELS
+ * is refused before it is decoded; otherwise the file itself goes to Tesseract, which decodes it in its
+ * worker. onProgress hears "preparing" while OCR loads, then "reading". The worker is ended when the read
+ * ends, however it ends.
  */
 export async function readImage(file: File, signal: AbortSignal, onProgress?: (progress: ReadProgress) => void): Promise<string[][]> {
-  const canvas = await imageCanvas(file);
+  const { width, height } = await imageSize(file);
+  if (width * height > IMAGE_MAX_MEGAPIXELS * 1_000_000) {
+    const n = (x: number) => x.toLocaleString('en-US');
+    throw new ConvertError(`It is ${n(width)} × ${n(height)} pixels; the image limit is ${IMAGE_MAX_MEGAPIXELS} megapixels.`);
+  }
+  signal.throwIfAborted();
   const ocr = createOcrReader(signal, () => onProgress?.({ stage: 'preparing' }));
   try {
-    signal.throwIfAborted();
-    return await ocr.read(canvas);
+    await ocr.ready();
+    onProgress?.({ stage: 'reading' });
+    return await ocr.read(file);
   } finally {
-    releaseCanvas(canvas);
     await ocr.close();
   }
 }

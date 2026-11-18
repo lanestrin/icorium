@@ -14,17 +14,24 @@ const CAN_DRAG_FILES = '(pointer: fine)';
 
 /**
  * The upload drop zone: drop CSV, Excel, PDF or image files on it, or browse for them. reading is the status
- * line while a file is converted, with Cancel (onCancelReading) beside it; screen readers hear each update.
+ * line while a file is converted, which screen readers hear as it changes; Cancel reading (onCancelReading),
+ * beside it but outside that live region, ends the conversion and returns focus to the browse button.
  * disabled (while Clear my data runs) disables the buttons and ignores dropped files.
  */
 function DropZone({ uploading, reading, disabled, onUpload, onCancelReading }: {
   uploading: boolean; reading?: string; disabled: boolean; onUpload: (files: File[]) => void; onCancelReading?: () => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const zone = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const upload = (list: FileList | null) => !disabled && list?.length && onUpload([...list]);
   const canDrag = window.matchMedia(CAN_DRAG_FILES).matches;
   const browse = () => input.current?.click();
+  const cancelReading = () => {
+    onCancelReading?.();
+    // The Cancel button disappears, so focus goes back to choosing files: the zone's first button.
+    zone.current?.querySelector<HTMLButtonElement>('button')?.focus();
+  };
 
   function onDrop(e: DragEvent) {
     e.preventDefault();
@@ -34,6 +41,7 @@ function DropZone({ uploading, reading, disabled, onUpload, onCancelReading }: {
 
   return (
     <div
+      ref={zone}
       onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={onDrop}
@@ -50,13 +58,9 @@ function DropZone({ uploading, reading, disabled, onUpload, onCancelReading }: {
       ) : (
         <Button variant="secondary" className={styles.chooseFiles} disabled={disabled} onClick={browse}>Choose CSV, Excel, PDF or image files</Button>
       )}
-      <div aria-live="polite" className={styles.uploading}>
-        {reading ? (
-          <p>
-            {reading}{' '}
-            {onCancelReading && <Button variant="link" onClick={onCancelReading}>Cancel</Button>}
-          </p>
-        ) : uploading && <p>Uploading…</p>}
+      <div className={classNames(styles.uploading, (reading || uploading) && styles.uploadingShown)}>
+        <p aria-live="polite">{reading ?? (uploading ? 'Uploading…' : '')}</p>
+        {reading && onCancelReading && <Button variant="link" aria-label="Cancel reading" onClick={cancelReading}>Cancel</Button>}
       </div>
       <input ref={input} type="file" accept=".csv,text/csv,.xlsx,.xls,.pdf,application/pdf,.png,.jpg,.jpeg,image/png,image/jpeg" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
     </div>

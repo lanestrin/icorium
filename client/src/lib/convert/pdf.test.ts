@@ -34,11 +34,25 @@ function fakePdf(pages: PlacedText[][], numPages = pages.length) {
 
 const file = () => new File(['%PDF-1.7'], 'report.pdf', { type: 'application/pdf' });
 
-/** A fake OCR reader for scanned pages: read() answers with these rows (or a pending promise). */
-function fakeOcr(read: (canvas: HTMLCanvasElement, page?: number) => Promise<string[][]>) {
-  const ocr = { read: vi.fn(read), close: vi.fn(() => Promise.resolve()) };
+/**
+ * A fake OCR reader for scanned pages: read() answers with these rows (or a pending promise). Like the real
+ * one, ready() calls the "getting ready" callback the first time, and resolves when ready (now, or when the
+ * test calls loaded()).
+ */
+function fakeOcr(read: (canvas: HTMLCanvasElement | Blob, page?: number) => Promise<string[][]>, { held = false } = {}) {
+  let loaded!: () => void;
+  const loading = held ? new Promise<void>((resolve) => { loaded = resolve; }) : Promise.resolve();
+  let started = false;
+  const ocr = {
+    ready: vi.fn(async () => {
+      if (!started) { started = true; vi.mocked(createOcrReader).mock.calls.at(-1)![1]?.(); }
+      await loading;
+    }),
+    read: vi.fn(read),
+    close: vi.fn(() => Promise.resolve()),
+  };
   vi.mocked(createOcrReader).mockReturnValue(ocr);
-  return ocr;
+  return { ...ocr, loaded: () => loaded() };
 }
 
 describe('readPdf', () => {
@@ -61,7 +75,7 @@ describe('readPdf', () => {
     const progress = vi.fn();
     expect(await readPdf(file(), undefined, progress)).toEqual({ rows: [['batch_id'], ['X-1'], ['X-2'], ['X-3']], ocrPages: [2] });
     expect(ocr.read).toHaveBeenCalledTimes(1);
-    const [canvas, page] = ocr.read.mock.calls[0];
+    const [canvas, page] = ocr.read.mock.calls[0] as [HTMLCanvasElement, number];
     expect(page).toBe(2);
     expect(render).toHaveBeenCalledWith({ canvas, viewport: { width: 612 * OCR_RENDER_SCALE, height: 792 * OCR_RENDER_SCALE } });
     expect(OCR_RENDER_SCALE).toBeCloseTo(300 / 72);
@@ -69,9 +83,20 @@ describe('readPdf', () => {
     expect(cleanup).toHaveBeenCalledTimes(3);
     expect(ocr.close).toHaveBeenCalledTimes(1);
     expect(destroy).toHaveBeenCalled();
-    // "Getting ready" goes to the caller through the OCR reader's own callback.
-    vi.mocked(createOcrReader).mock.calls[0][1]!();
-    expect(progress).toHaveBeenLastCalledWith({ stage: 'preparing' });
+  });
+
+  it('reports the scanned page only once OCR is ready, so the status never stays on "getting ready" while it reads', async () => {
+    fakePdf([[at('batch_id', 0, 700)], [at(' ', 0, 700)]]);
+    const ocr = fakeOcr(async () => [['X-2']], { held: true });
+    const progress: unknown[] = [];
+    const reading = readPdf(file(), undefined, (p) => progress.push(p));
+    await vi.waitFor(() => expect(ocr.ready).toHaveBeenCalled());
+    expect(progress).toEqual([{ stage: 'page', page: 1, pages: 2 }, { stage: 'page', page: 2, pages: 2 }, { stage: 'preparing' }]);
+    expect(ocr.read).not.toHaveBeenCalled(); // nothing is read while OCR loads
+    ocr.loaded();
+    await reading;
+    expect(progress.at(-1)).toEqual({ stage: 'page', page: 2, pages: 2 }); // back to the page once ready
+    expect(progress).toHaveLength(4);
   });
 
   it('passes on an OCR failure, still releasing the worker and the document', async () => {

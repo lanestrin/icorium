@@ -57,9 +57,10 @@ export async function readPdf(file: File, signal: AbortSignal = new AbortControl
         if (pageRows.length === 0) {
           // No text layer: a scanned page. Render it and read it with OCR.
           ocr ??= createOcrReader(signal, () => onProgress?.({ stage: 'preparing' }));
+          await ocr.ready(); // the first time, this is "getting OCR ready"
+          onProgress?.({ stage: 'page', page: number, pages: pdf.numPages }); // ready: back to this page
           const canvas = await renderPage(page, signal);
           try {
-            onProgress?.({ stage: 'page', page: number, pages: pdf.numPages }); // back from "getting ready"
             pageRows = await ocr.read(canvas, number);
           } finally {
             releaseCanvas(canvas);

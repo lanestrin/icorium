@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createOcrReader, OCR_DOWNLOAD_FAILED, readImage } from './ocr';
+import { createOcrReader, IMAGE_MAX_MEGAPIXELS, OCR_DOWNLOAD_FAILED, readImage, type ReadProgress } from './ocr';
 import { ConvertError } from './table';
 
-// Real OCR needs WebAssembly and a canvas, which jsdom lacks, so tesseract.js is mocked: these tests check
-// what the reader does with Tesseract's words, where it loads Tesseract from, and that it always ends it.
+// Real OCR needs WebAssembly, which jsdom lacks, so tesseract.js is mocked to behave as version 7 does:
+// createWorker can be held back (the language data loading), and a recognize job its worker was terminated
+// in the middle of never settles. These tests check what the reader does with Tesseract's words, where it
+// loads Tesseract from, what it reports, and that Cancel always settles the read and ends the worker.
 const tesseract = vi.hoisted(() => ({ OEM: { LSTM_ONLY: 1 }, createWorker: vi.fn() }));
 const features = vi.hoisted(() => ({ relaxedSimd: vi.fn(), simd: vi.fn() }));
 vi.mock('tesseract.js', () => tesseract);
@@ -17,6 +19,8 @@ vi.mock('tesseract.js-core/tesseract-core-lstm.wasm.js?url', () => ({ default: '
 const word = (text: string, x0: number, y0: number, x1 = x0 + 40, y1 = y0 + 12) => ({ text, bbox: { x0, y0, x1, y1 } });
 /** Tesseract's blocks output holding these lines of words. */
 const blocks = (...lines: ReturnType<typeof word>[][]) => ({ data: { blocks: [{ paragraphs: [{ lines: lines.map((words) => ({ words })) }] }] } });
+/** A promise that never settles, as tesseract.js 7 leaves a job whose worker was terminated. */
+const never = () => new Promise<never>(() => {});
 
 let worker: { recognize: ReturnType<typeof vi.fn>; terminate: ReturnType<typeof vi.fn> };
 const canvas = () => document.createElement('canvas');
@@ -39,7 +43,7 @@ describe('createOcrReader', () => {
     expect(await ocr.read(canvas())).toEqual([['batch_id', 'feed_mass_kg'], ['A-1', '100']]);
     expect(worker.recognize).toHaveBeenCalledWith(expect.any(HTMLCanvasElement), {}, { blocks: true });
     await ocr.close();
-    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(worker.terminate).toHaveBeenCalledTimes(1));
   });
 
   it('loads the worker and the core from this site, picking the core build this browser supports', async () => {
@@ -67,10 +71,19 @@ describe('createOcrReader', () => {
     expect(tesseract.createWorker.mock.calls[0][2].corePath).toBe(`${location.origin}/assets/${build}.wasm.js`);
   });
 
-  it('starts one worker for several pages, and says when it is getting ready', async () => {
+  it('starts one worker for several pages, says when it is getting ready, and ready() waits for it', async () => {
+    let loaded!: (value: typeof worker) => void;
+    tesseract.createWorker.mockReturnValue(new Promise((resolve) => { loaded = resolve; }));
     worker.recognize.mockResolvedValue(blocks([word('x', 0, 0)]));
     const preparing = vi.fn();
     const ocr = createOcrReader(new AbortController().signal, preparing);
+    let isReady = false;
+    const ready = ocr.ready().then(() => { isReady = true; });
+    await vi.waitFor(() => expect(tesseract.createWorker).toHaveBeenCalled());
+    expect(preparing).toHaveBeenCalledTimes(1);
+    expect(isReady).toBe(false); // still loading the language data
+    loaded(worker);
+    await ready;
     await ocr.read(canvas(), 1);
     await ocr.read(canvas(), 2);
     await ocr.close();
@@ -89,55 +102,101 @@ describe('createOcrReader', () => {
   it('says when the language data could not be downloaded', async () => {
     tesseract.createWorker.mockRejectedValue(new Error('network error'));
     const ocr = createOcrReader(new AbortController().signal);
-    await expect(ocr.read(canvas())).rejects.toThrow(new ConvertError(OCR_DOWNLOAD_FAILED));
+    await expect(ocr.ready()).rejects.toThrow(new ConvertError(OCR_DOWNLOAD_FAILED));
     expect(OCR_DOWNLOAD_FAILED).toBe("The text-reading data couldn't be downloaded. Check your connection and try again.");
     await ocr.close();
   });
 
-  it('terminates the worker when the job is cancelled, and the read stops', async () => {
-    let finish!: (value: unknown) => void;
-    worker.recognize.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  it('settles at once when the job is cancelled during recognition, which tesseract.js never settles itself', async () => {
+    worker.recognize.mockImplementation(never);
     const job = new AbortController();
     const ocr = createOcrReader(job.signal);
     const reading = ocr.read(canvas());
     await vi.waitFor(() => expect(worker.recognize).toHaveBeenCalled());
     job.abort();
+    await expect(reading).rejects.toMatchObject({ name: 'AbortError' });
     await vi.waitFor(() => expect(worker.terminate).toHaveBeenCalled());
-    finish(blocks([word('late', 0, 0)])); // a result that arrives after Cancel is not returned
-    await expect(reading).rejects.toThrow(/abort/i);
+    await ocr.close();
+  });
+
+  it('settles at once when cancelled while the worker loads, and ends that worker when it arrives', async () => {
+    let loaded!: (value: typeof worker) => void;
+    tesseract.createWorker.mockReturnValue(new Promise((resolve) => { loaded = resolve; }));
+    const job = new AbortController();
+    const ocr = createOcrReader(job.signal);
+    const ready = ocr.ready();
+    await vi.waitFor(() => expect(tesseract.createWorker).toHaveBeenCalled());
+    job.abort();
+    await expect(ready).rejects.toMatchObject({ name: 'AbortError' });
+    expect(worker.terminate).not.toHaveBeenCalled();
+    loaded(worker); // the language data finishes after Cancel
+    await vi.waitFor(() => expect(worker.terminate).toHaveBeenCalledTimes(1));
     await ocr.close();
   });
 });
 
 describe('readImage', () => {
-  const drawImage = vi.fn();
+  /** Stands in for the browser's image loading: an image element with these dimensions, or one that fails. */
+  function images(size: { width: number; height: number } | 'broken') {
+    vi.stubGlobal('Image', class {
+      naturalWidth = size === 'broken' ? 0 : size.width;
+      naturalHeight = size === 'broken' ? 0 : size.height;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_url: string) { queueMicrotask(() => (size === 'broken' ? this.onerror?.() : this.onload?.())); }
+    });
+  }
   beforeEach(() => {
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D);
-    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ width: 800, height: 600, close: vi.fn() }));
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:image'), revokeObjectURL: vi.fn() });
+    images({ width: 2480, height: 3508 });
   });
-  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  afterEach(() => { vi.unstubAllGlobals(); });
   const png = () => new File(['png bytes'], 'scan.png', { type: 'image/png' });
 
-  it('reads the image with OCR, reporting that it is getting ready, and ends the worker', async () => {
+  it('reads the image file itself with OCR, reporting "preparing" then "reading", and ends the worker', async () => {
+    let loaded!: (value: typeof worker) => void;
+    tesseract.createWorker.mockReturnValue(new Promise((resolve) => { loaded = resolve; }));
     worker.recognize.mockResolvedValue(blocks([word('lot_number', 0, 0)], [word('B-001', 0, 30)]));
-    const progress = vi.fn();
-    expect(await readImage(png(), new AbortController().signal, progress)).toEqual([['lot_number'], ['B-001']]);
-    expect(progress).toHaveBeenCalledWith({ stage: 'preparing' });
-    const drawn = worker.recognize.mock.calls[0][0] as HTMLCanvasElement;
-    expect(drawImage).toHaveBeenCalled();
-    expect([drawn.width, drawn.height]).toEqual([0, 0]); // the canvas is released after the read
-    expect(worker.terminate).toHaveBeenCalledTimes(1);
+    const progress: ReadProgress[] = [];
+    const file = png();
+    const reading = readImage(file, new AbortController().signal, (p) => progress.push(p));
+    await vi.waitFor(() => expect(tesseract.createWorker).toHaveBeenCalled());
+    expect(progress).toEqual([{ stage: 'preparing' }]); // only "getting ready" while the worker loads
+    loaded(worker);
+    expect(await reading).toEqual([['lot_number'], ['B-001']]);
+    expect(progress).toEqual([{ stage: 'preparing' }, { stage: 'reading' }]);
+    expect(worker.recognize.mock.calls[0][0]).toBe(file); // no full-size canvas: Tesseract decodes the file
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:image');
+    await vi.waitFor(() => expect(worker.terminate).toHaveBeenCalledTimes(1));
   });
 
-  it('ends the worker when the read fails', async () => {
-    worker.recognize.mockRejectedValue(new Error('bad image data'));
-    await expect(readImage(png(), new AbortController().signal)).rejects.toThrow(new ConvertError("The image couldn't be read."));
-    expect(worker.terminate).toHaveBeenCalledTimes(1);
+  it('refuses an image over the megapixel limit before reading it', async () => {
+    images({ width: 10_000, height: 6_000 });
+    await expect(readImage(png(), new AbortController().signal)).rejects.toThrow(new ConvertError(`It is 10,000 × 6,000 pixels; the image limit is ${IMAGE_MAX_MEGAPIXELS} megapixels.`));
+    expect(IMAGE_MAX_MEGAPIXELS).toBe(50);
+    expect(tesseract.createWorker).not.toHaveBeenCalled();
   });
 
-  it('refuses a file that is not an image, without starting OCR', async () => {
-    vi.mocked(createImageBitmap).mockRejectedValue(new DOMException('decode failed', 'InvalidStateError'));
+  it('refuses a file the browser cannot load as an image, without starting OCR', async () => {
+    images('broken');
     await expect(readImage(png(), new AbortController().signal)).rejects.toThrow(new ConvertError("It couldn't be read as an image."));
     expect(tesseract.createWorker).not.toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:image');
+  });
+
+  it('says the image could not be read when Tesseract fails on it, and ends the worker', async () => {
+    worker.recognize.mockRejectedValue(new Error('Error attempting to read image.'));
+    await expect(readImage(png(), new AbortController().signal)).rejects.toThrow(new ConvertError("It couldn't be read as an image."));
+    await vi.waitFor(() => expect(worker.terminate).toHaveBeenCalledTimes(1));
+  });
+
+  it('settles and ends the worker when cancelled during recognition', async () => {
+    worker.recognize.mockImplementation(never);
+    const job = new AbortController();
+    const reading = readImage(png(), job.signal);
+    await vi.waitFor(() => expect(worker.recognize).toHaveBeenCalled());
+    job.abort();
+    await expect(reading).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(worker.terminate).toHaveBeenCalled());
   });
 });
