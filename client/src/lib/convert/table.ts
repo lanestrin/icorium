@@ -1,6 +1,6 @@
 import { ADAPTERS } from '../../../../shared/types';
 
-// Turning a non-CSV partner file into a CSV, after a reader (Excel or PDF now, OCR in 9.14c) has
+// Turning a non-CSV partner file into a CSV, after a reader (Excel, PDF, or OCR for images and scans) has
 // produced rows of cell text. Nothing here knows which reader ran, so every reader shares these rules.
 
 /** Largest source file the browser will try to convert. */
@@ -11,8 +11,11 @@ export const HEADER_SEARCH_ROWS = 50;
 /** A conversion problem with a message ready to show; the upload list prefixes the file name. */
 export class ConvertError extends Error {}
 
-/** How a chosen file is handled: uploaded as it is, or read by the Excel or PDF reader first. */
-export type FileKind = 'csv' | 'excel' | 'pdf';
+/** How a chosen file is handled: uploaded as it is, or read by the Excel, PDF or image (OCR) reader first. */
+export type FileKind = 'csv' | 'excel' | 'pdf' | 'image';
+
+/** Image types read by OCR. */
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg'];
 
 const extensionOf = (name: string) => name.slice(name.lastIndexOf('.') + 1).toLowerCase();
 
@@ -20,8 +23,8 @@ const extensionOf = (name: string) => name.slice(name.lastIndexOf('.') + 1).toLo
 export function fileKind(file: { name: string; size: number }): FileKind {
   const ext = file.name.includes('.') ? extensionOf(file.name) : '';
   if (ext === 'csv') return 'csv';
-  const kind = ext === 'xlsx' || ext === 'xls' ? 'excel' : ext === 'pdf' ? 'pdf' : null;
-  if (!kind) throw new ConvertError("This file type can't be converted. Upload a CSV, Excel or PDF file.");
+  const kind = ext === 'xlsx' || ext === 'xls' ? 'excel' : ext === 'pdf' ? 'pdf' : IMAGE_EXTENSIONS.includes(ext) ? 'image' : null;
+  if (!kind) throw new ConvertError("This file type can't be converted. Upload a CSV, Excel, PDF or image file.");
   if (file.size > CONVERT_MAX_MB * 1024 * 1024) throw new ConvertError(`It is larger than the ${CONVERT_MAX_MB} MB conversion limit.`);
   return kind;
 }

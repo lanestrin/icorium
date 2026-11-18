@@ -72,7 +72,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 16.4** `feature/16.4-real-file-workflow-test`. Decide how to test below first (Vitest with the real files is recommended), then test the whole workflow with a sample CSV and a real Excel file.
+**Next: 9.15** `feature/9.15-architecture-scaling-and-security`. Extend the Architecture page with the OCR trade-offs, the stack at scale and customer upload security (presentation only).
 
 **Order:** 9.14a → 9.14b → 16.1 → 16.2 → 16.3 → 16.4 → 9.14c → 9.15. M16 comes before 9.14c because the live site's API is down while its Blob store is over the Hobby limit, and 9.14c and 9.15 would otherwise describe a server that M16 retires. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
 

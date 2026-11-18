@@ -87,6 +87,9 @@
 .chooseFiles {
   margin: 0 auto;
 }
+.uploading:empty {
+  display: none;
+}
 .uploading {
   margin-top: var(--app-space-2);
   @include text-xs;

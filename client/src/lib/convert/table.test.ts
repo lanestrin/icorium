@@ -5,12 +5,19 @@ import { CONVERT_MAX_MB, ConvertError, csvName, fileKind, findTable, toCsvFile, 
 const [A, B, C] = ADAPTERS.map((a) => [...a.columns]);
 
 describe('fileKind', () => {
-  it.each([['data.csv', 'csv'], ['DATA.CSV', 'csv'], ['report.xlsx', 'excel'], ['Old.XLS', 'excel'], ['scan.pdf', 'pdf'], ['SCAN.PDF', 'pdf']])('%s is %s', (name, kind) => {
+  it.each([
+    ['data.csv', 'csv'], ['DATA.CSV', 'csv'], ['report.xlsx', 'excel'], ['Old.XLS', 'excel'], ['scan.pdf', 'pdf'], ['SCAN.PDF', 'pdf'],
+    ['photo.png', 'image'], ['Photo.JPG', 'image'], ['scan.jpeg', 'image'],
+  ])('%s is %s', (name, kind) => {
     expect(fileKind({ name, size: 10 })).toBe(kind);
   });
 
-  it.each(['report.docx', 'photo.png', 'noextension'])('refuses %s, naming what can be uploaded', (name) => {
-    expect(() => fileKind({ name, size: 10 })).toThrow(new ConvertError("This file type can't be converted. Upload a CSV, Excel or PDF file."));
+  it.each(['report.docx', 'photo.heic', 'scan.tiff', 'noextension'])('refuses %s, naming what can be uploaded', (name) => {
+    expect(() => fileKind({ name, size: 10 })).toThrow(new ConvertError("This file type can't be converted. Upload a CSV, Excel, PDF or image file."));
+  });
+
+  it('refuses an image over the conversion limit before reading it', () => {
+    expect(() => fileKind({ name: 'big.png', size: CONVERT_MAX_MB * 1024 * 1024 + 1 })).toThrow('It is larger than the 20 MB conversion limit.');
   });
 
   it('refuses an Excel file over the conversion limit before reading it', () => {
