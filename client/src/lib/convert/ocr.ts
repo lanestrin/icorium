@@ -63,6 +63,23 @@ function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /**
+ * Records the Web Workers created until stop() is called, by wrapping the browser's Worker constructor for
+ * that time only. stop() puts the original back.
+ */
+function spawnedWorkers() {
+  const workers: Worker[] = [];
+  const Original = globalThis.Worker;
+  if (typeof Original !== 'function') return { workers, stop: () => {} }; // no Web Workers here (tests)
+  globalThis.Worker = class extends Original {
+    constructor(...args: ConstructorParameters<typeof Worker>) {
+      super(...args);
+      workers.push(this);
+    }
+  };
+  return { workers, stop: () => { globalThis.Worker = Original; } };
+}
+
+/**
  * Starts an OCR reader for one conversion job. Tesseract is imported when the first image is read.
  * Aborting the signal settles any wait at once and terminates the worker, including one that finishes
  * starting afterwards; onPreparing is called while the worker and the language data load.
@@ -81,13 +98,31 @@ export function createOcrReader(signal: AbortSignal, onPreparing?: () => void): 
       coreUrl(),
     ]);
     signal.throwIfAborted();
+
+    // tesseract.js 7 never settles createWorker when the language data fails to load: it only calls
+    // errorHandler. So that call fails the start, raced with createWorker.
+    let loadFailed!: (error: unknown) => void;
+    const failure = new Promise<never>((_, reject) => { loadFailed = reject; });
+    failure.catch(() => {}); // later errorHandler calls (a failed recognize) are handled by their own job
+    // It also hands back its Web Worker only once loading succeeds. It creates that worker synchronously
+    // inside createWorker, so keep a handle on it here, to end it if loading fails or is cancelled.
+    const spawned = spawnedWorkers();
+    let creating: Promise<import('tesseract.js').Worker>;
     try {
-      return await Tesseract.createWorker('eng', Tesseract.OEM.LSTM_ONLY, {
+      creating = Tesseract.createWorker('eng', Tesseract.OEM.LSTM_ONLY, {
         workerPath: absolute(workerPath),
         corePath: absolute(corePath),
         workerBlobURL: false,
+        errorHandler: (error: unknown) => loadFailed(error),
       });
+    } finally {
+      spawned.stop();
+    }
+    try {
+      return await untilAborted(Promise.race([creating, failure]), signal);
     } catch (error) {
+      for (const w of spawned.workers) w.terminate();
+      void creating.then((w) => w.terminate()).catch(() => {}); // in case it still arrives
       signal.throwIfAborted();
       throw new ConvertError(OCR_DOWNLOAD_FAILED, { cause: error });
     }

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createOcrReader } from './ocr';
 import type { PlacedText } from './layout';
-import { OCR_RENDER_SCALE, PDF_MAX_PAGES, readPdf } from './pdf';
+import { OCR_MAX_CANVAS_PIXELS, OCR_RENDER_SCALE, PDF_MAX_PAGES, readPdf } from './pdf';
 import { ConvertError } from './table';
 
 // Real PDF reading can't run in jsdom, so pdf.js is replaced by a fake that serves pages of text items.
@@ -15,7 +15,7 @@ vi.mock('./ocr', async (original) => ({ ...(await original<typeof import('./ocr'
 const at = (text: string, x: number, y: number, height = 10): PlacedText => ({ text, x, y, width: text.length * 5, height });
 
 /** A fake loaded document whose pages hold these text items, and the task getDocument returns for it. */
-function fakePdf(pages: PlacedText[][], numPages = pages.length) {
+function fakePdf(pages: PlacedText[][], numPages = pages.length, pageSize = { width: 612, height: 792 }) {
   const destroy = vi.fn(() => Promise.resolve());
   const cleanup = vi.fn();
   const render = vi.fn(() => ({ promise: Promise.resolve(), cancel: vi.fn() }));
@@ -23,7 +23,7 @@ function fakePdf(pages: PlacedText[][], numPages = pages.length) {
     getTextContent: async () => ({
       items: [{ type: 'beginMarkedContent' }, ...pages[n - 1].map((i) => ({ str: i.text, transform: [1, 0, 0, 1, i.x, i.y], width: i.width, height: i.height }))],
     }),
-    getViewport: ({ scale }: { scale: number }) => ({ width: 612 * scale, height: 792 * scale }),
+    getViewport: ({ scale }: { scale: number }) => ({ width: pageSize.width * scale, height: pageSize.height * scale }),
     render,
     cleanup,
   }));
@@ -107,8 +107,20 @@ describe('readPdf', () => {
     expect(destroy).toHaveBeenCalled();
   });
 
+  it('draws a large scanned page smaller, so its canvas stays within the browser limit', async () => {
+    // A3 (842 × 1191 points) at 300 DPI would be about 17.4 million pixels.
+    const { render } = fakePdf([[at(' ', 0, 700)]], 1, { width: 842, height: 1191 });
+    const ocr = fakeOcr(async () => [['X-1']]);
+    await readPdf(file());
+    const [{ viewport }] = render.mock.calls[0] as unknown as [{ viewport: { width: number; height: number } }];
+    expect(viewport.width * viewport.height).toBeLessThanOrEqual(OCR_MAX_CANVAS_PIXELS + 1);
+    expect(viewport.width * viewport.height).toBeGreaterThan(OCR_MAX_CANVAS_PIXELS * 0.99);
+    const [canvas] = ocr.read.mock.calls[0] as [HTMLCanvasElement, number];
+    expect(canvas).toBeInstanceOf(HTMLCanvasElement);
+  });
+
   it('stops reading when the signal is aborted during OCR, releasing everything', async () => {
-    const { destroy } = fakePdf([[at(' ', 0, 700)], [at('never read', 0, 700)]]);
+    const { destroy, cleanup } = fakePdf([[at(' ', 0, 700)], [at('never read', 0, 700)]]);
     const controller = new AbortController();
     const ocr = fakeOcr(() => new Promise((_, reject) => controller.signal.addEventListener('abort', () => reject(controller.signal.reason))));
     const reading = readPdf(file(), controller.signal);
@@ -118,6 +130,9 @@ describe('readPdf', () => {
     expect(ocr.close).toHaveBeenCalledTimes(1);
     expect(destroy).toHaveBeenCalled();
     expect(ocr.read).toHaveBeenCalledTimes(1);
+    const [canvas] = ocr.read.mock.calls[0] as [HTMLCanvasElement, number];
+    expect([canvas.width, canvas.height]).toEqual([0, 0]); // the rendered page is released
+    expect(cleanup).toHaveBeenCalledTimes(1); // and so is the page
   });
 
   it('refuses a PDF over the page limit before reading any page', async () => {

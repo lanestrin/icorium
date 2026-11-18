@@ -53,7 +53,10 @@ describe('createOcrReader', () => {
     await ocr.close();
     const [lang, oem, options] = tesseract.createWorker.mock.calls[0];
     expect([lang, oem]).toEqual(['eng', tesseract.OEM.LSTM_ONLY]);
-    expect(options).toEqual({ workerPath: `${location.origin}/assets/worker.min.js`, corePath: `${location.origin}/assets/core-simd-lstm.wasm.js`, workerBlobURL: false });
+    expect(options).toEqual({
+      workerPath: `${location.origin}/assets/worker.min.js`, corePath: `${location.origin}/assets/core-simd-lstm.wasm.js`, workerBlobURL: false,
+      errorHandler: expect.any(Function),
+    });
     expect(JSON.stringify(options)).not.toMatch(/jsdelivr|unpkg|cdn/);
   });
 
@@ -99,12 +102,76 @@ describe('createOcrReader', () => {
     await ocr.close();
   });
 
-  it('says when the language data could not be downloaded', async () => {
-    tesseract.createWorker.mockRejectedValue(new Error('network error'));
-    const ocr = createOcrReader(new AbortController().signal);
-    await expect(ocr.ready()).rejects.toThrow(new ConvertError(OCR_DOWNLOAD_FAILED));
-    expect(OCR_DOWNLOAD_FAILED).toBe("The text-reading data couldn't be downloaded. Check your connection and try again.");
-    await ocr.close();
+  describe('when loading fails, as tesseract.js 7 does it', () => {
+    /** The Web Workers created, as the browser's Worker would make them. */
+    let spawned: { url: string; terminate: ReturnType<typeof vi.fn> }[];
+    beforeEach(() => {
+      spawned = [];
+      vi.stubGlobal('Worker', class {
+        terminate = vi.fn();
+        constructor(public url: string) { spawned.push(this); }
+      });
+    });
+    afterEach(() => { vi.unstubAllGlobals(); });
+
+    /**
+     * createWorker as tesseract.js 7 runs it: it creates its Web Worker straight away; when the language data
+     * fails to load it only calls errorHandler, and its promise never settles.
+     */
+    const languageDataFails = () => tesseract.createWorker.mockImplementation((_lang, _oem, options: { workerPath: string; errorHandler: (e: unknown) => void }) => {
+      new Worker(options.workerPath);
+      queueMicrotask(() => options.errorHandler('Network error while fetching eng.traineddata'));
+      return never();
+    });
+
+    it('says the language data could not be downloaded, and ends the Web Worker tesseract.js started', async () => {
+      languageDataFails();
+      const ocr = createOcrReader(new AbortController().signal);
+      await expect(ocr.ready()).rejects.toThrow(new ConvertError(OCR_DOWNLOAD_FAILED));
+      expect(OCR_DOWNLOAD_FAILED).toBe("The text-reading data couldn't be downloaded. Check your connection and try again.");
+      expect(spawned).toHaveLength(1);
+      expect(spawned[0].url).toBe(`${location.origin}/assets/worker.min.js`);
+      expect(spawned[0].terminate).toHaveBeenCalledTimes(1);
+      expect(globalThis.Worker).toBe(Worker); // the browser's Worker is put back after the start
+      await ocr.close();
+    });
+
+    it('ends the Web Worker when cancelled while the language data loads', async () => {
+      tesseract.createWorker.mockImplementation((_lang, _oem, options: { workerPath: string }) => {
+        new Worker(options.workerPath);
+        return never();
+      });
+      const job = new AbortController();
+      const ocr = createOcrReader(job.signal);
+      const ready = ocr.ready();
+      await vi.waitFor(() => expect(spawned).toHaveLength(1));
+      job.abort();
+      await expect(ready).rejects.toMatchObject({ name: 'AbortError' });
+      await vi.waitFor(() => expect(spawned[0].terminate).toHaveBeenCalledTimes(1));
+      await ocr.close();
+    });
+
+    it('says the same when the core itself fails to load (createWorker rejects)', async () => {
+      tesseract.createWorker.mockRejectedValue('Failed to load TesseractCore');
+      const ocr = createOcrReader(new AbortController().signal);
+      await expect(ocr.ready()).rejects.toThrow(new ConvertError(OCR_DOWNLOAD_FAILED));
+      await ocr.close();
+    });
+
+    it('ignores errorHandler calls after a successful start (a failed recognize has its own error)', async () => {
+      let errorHandler!: (e: unknown) => void;
+      tesseract.createWorker.mockImplementation(async (_lang, _oem, options: { errorHandler: (e: unknown) => void }) => {
+        errorHandler = options.errorHandler;
+        return worker;
+      });
+      worker.recognize.mockRejectedValue('bad image');
+      const ocr = createOcrReader(new AbortController().signal);
+      await ocr.ready();
+      errorHandler('bad image'); // tesseract.js reports the failed job here too
+      await expect(ocr.read(canvas(), 1)).rejects.toThrow(new ConvertError("Page 1 couldn't be read."));
+      expect(worker.terminate).not.toHaveBeenCalled();
+      await ocr.close();
+    });
   });
 
   it('settles at once when the job is cancelled during recognition, which tesseract.js never settles itself', async () => {

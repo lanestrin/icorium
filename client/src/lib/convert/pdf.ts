@@ -7,6 +7,11 @@ import { ConvertError } from './table';
 export const PDF_MAX_PAGES = 20;
 /** Scanned pages are rendered at this resolution for OCR: 300 DPI, as PDF units are 1/72 inch. */
 export const OCR_RENDER_SCALE = 300 / 72;
+/**
+ * Largest canvas a scanned page is drawn on, in pixels: under mobile Safari's limit (about 16.7 million),
+ * which a large page at 300 DPI (A3 is about 17.4 million) would pass. Such a page is drawn smaller.
+ */
+export const OCR_MAX_CANVAS_PIXELS = 16_000_000;
 
 /** A PDF's rows of cell text, and which pages (1-based) were scanned images read by OCR. */
 export interface PdfText { rows: string[][]; ocrPages: number[] }
@@ -80,9 +85,11 @@ export async function readPdf(file: File, signal: AbortSignal = new AbortControl
   }
 }
 
-/** Draws one page onto a new canvas at OCR_RENDER_SCALE; aborting cancels the render. */
+/** Draws one page onto a new canvas at OCR_RENDER_SCALE, or smaller to stay within OCR_MAX_CANVAS_PIXELS; aborting cancels the render. */
 async function renderPage(page: PDFPageProxy, signal: AbortSignal): Promise<HTMLCanvasElement> {
-  const viewport = page.getViewport({ scale: OCR_RENDER_SCALE });
+  const size = page.getViewport({ scale: 1 });
+  const scale = Math.min(OCR_RENDER_SCALE, Math.sqrt(OCR_MAX_CANVAS_PIXELS / (size.width * size.height)));
+  const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil(viewport.width);
   canvas.height = Math.ceil(viewport.height);
