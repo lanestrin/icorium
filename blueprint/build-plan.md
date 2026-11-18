@@ -203,7 +203,7 @@ Added at the person's request on 2026-11-17. The private Vercel Blob store reach
 - The client reaches the server only through the 8 functions in `client/src/lib/api.ts`.
 
 - [x] **16.1** `feature/16.1-shared-processing-core` · **P1** — Move processing, adapters, CSV handling, comparison and the generator out of `server/src` into shared code with no Node imports. Turn the route bodies in `server/src/routes/files.ts` into plain functions over the existing `Storage` interface: upload, process, archive, rows, compare and generate. No behavior change: the existing server unit and API tests keep passing against the shared code.
-- [ ] **16.2** `feature/16.2-browser-storage-and-local-api` · **P1** — Store files in the browser and run the app's logic there.
+- [x] **16.2** `feature/16.2-browser-storage-and-local-api` · **P1** — Store files in the browser and run the app's logic there.
   - A browser storage adapter implements `Storage`: File IDs counting up from `100001`, archive flags and metadata.
   - The five samples are bundled and seeded under their fixed IDs.
   - `client/src/lib/api.ts` calls the shared functions instead of `fetch`, and downloads are browser `Blob`s.
