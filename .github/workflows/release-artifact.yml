@@ -1,9 +1,11 @@
 name: Release artifact
 
 # Builds the deployable zip for a published release from its exact tag, checks that
-# the unzipped copy installs, builds and starts, and attaches the zip, its .sha256 and
-# its manifest to that GitHub Release. "Run workflow" with a tag rebuilds an existing
-# release's assets. It never pushes, deploys or creates repositories.
+# the unzipped copy installs and builds the static site, and attaches the zip, its
+# .sha256 and its manifest to that GitHub Release. "Run workflow" with a tag rebuilds an
+# existing release's assets; only releases that include this workflow's release tooling
+# (scripts/build-release.mjs and release/allowlist.txt) can be built. It never pushes,
+# deploys or creates repositories.
 #
 # The build job's only output is the workflow artifact "release-icorium-vX.Y.Z"
 # (zip, .sha256, manifest). A later publish job can consume that artifact without
@@ -14,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to rebuild, for example v1.1.0
+        description: Existing release tag to rebuild (a release that includes the release tooling), for example v1.20.0
         required: true
         type: string
 
@@ -75,26 +77,24 @@ jobs:
       - name: Build the release zip
         run: node scripts/build-release.mjs "$TAG" "$RUNNER_TEMP/release"
 
-      - name: Install, build and start the unzipped release
+      # The release is a static site: it must install and build, and the build must hold
+      # every page and the bundled sample files (A-001 is the first row of partner A's sample).
+      - name: Install and build the unzipped release
         run: |
-          mkdir -p "$RUNNER_TEMP/extract" "$RUNNER_TEMP/smoke-data"
+          mkdir -p "$RUNNER_TEMP/extract"
           cd "$RUNNER_TEMP/extract"
           unzip -q "$RUNNER_TEMP/release/icorium-$TAG.zip"
           cd "icorium-$TAG"
           npm ci
           npm run build -w client
-          RECLAIM_DATA_DIR="$RUNNER_TEMP/smoke-data" PORT=3123 HOST=127.0.0.1 setsid npm start -w server > "$RUNNER_TEMP/api.log" 2>&1 &
-          api=$!
-          files=""
-          for attempt in $(seq 1 30); do
-            if files=$(curl -fsS http://127.0.0.1:3123/api/files); then break; fi
-            sleep 1
+          for page in client/dist/index.html client/dist/generator/index.html client/dist/architecture/index.html; do
+            if [ ! -f "$page" ]; then
+              echo "::error::The unzipped release's build has no $page."
+              exit 1
+            fi
           done
-          kill -- "-$api" 2>/dev/null || true
-          count=$(printf '%s' "$files" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).length)}catch{console.log(0)}})')
-          if [ "$count" != "5" ]; then
-            echo "::error::The unzipped release's API did not list the 5 sample files."
-            cat "$RUNNER_TEMP/api.log"
+          if ! grep -rqF 'A-001' client/dist/assets; then
+            echo "::error::The unzipped release's build does not include the sample files."
             exit 1
           fi
 

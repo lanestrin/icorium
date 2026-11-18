@@ -1,135 +1,82 @@
-# Vercel multi-service deployment
+# Vercel deployment
 
-Status: repository configuration prepared; service/routing/storage choices
-confirmed by the person on 2026-11-06. No project, store or deployment has been
-created. Confirmation covers the configuration, not Git publication or deployment.
+Status: since 16.3 (2026-11-17), Vercel serves Reclaim Studio as **one static
+site**, with no server, API or cloud storage. The Vercel project is the Test
+site: it deploys `main` and PR Previews.
 
-Confirmed: service names `client` and `server`; public server paths `/api` and
-`/api/*`; public client catch-all; no internal-only service or service bindings;
-private Vercel Blob with separate Production/Preview namespaces and shared
-Preview namespace across preview branches by default.
+History: the person confirmed an optional Vercel deployment on 2026-11-06 (PR
+#6), first as two services (a Vite `client` and a Fastify `server` on `/api`)
+with private Vercel Blob storage. The Blob store reached the Hobby plan's usage
+limit on 2026-11-17, so milestone M16 moved every file action into the browser
+(16.1, 16.2) and 16.3 retired the server and Blob. The earlier setup is in this
+file's Git history and `blueprint/build-plan-archive.md`.
 
-## Services and routing
+## Build and routing
 
 Import the repository with the **repository root** as the Vercel project root.
-`vercel.json` defines `client` (Vite, root `client`) and `server` (Fastify,
-root `server`, explicit `src/index.ts` entrypoint). Keep access to files outside
-each service root enabled: both use `shared/`, and the server bundles the five
-sample CSVs via its service-scoped `functions.includeFiles` setting.
+`vercel.json` sets:
 
-- `/api` and `/api/*` are public server routes; all other paths reach client.
-- The `/api` prefix is preserved. Fastify already registers its routes with
-  that prefix, and browser calls already use same-origin `/api/...` URLs.
-- API 404s stay API 404s, not the client HTML fallback. The catch-all comes last.
-- Framework, build and function settings belong to their services, not the root.
+- `installCommand`: `npm ci` (both workspaces, from `package-lock.json`);
+- `buildCommand`: `npm run build -w client` (type-check and Vite build);
+- `outputDirectory`: `client/dist`;
+- `framework`: `vite`.
 
-There are **no production service-to-service calls or bindings**. The client
-is a static bundle: JavaScript in the user's browser calls the public API.
-Vercel bindings resolve only in service functions, so adding a binding to a
-static frontend would not make it available to browser code. Do not expose a
-binding URL through a `VITE_*` variable or attempt to use one during a build.
-The Vite `API_URL` proxy setting is for standalone local development only;
-it is not a production binding. `vercel dev` routes `/api` to server itself.
-If the API must be internal, a server-side frontend gateway is a separate
-architecture change requiring confirmation before adding a client→server binding.
+There are no rewrites and no functions. The build copies `index.html` to
+`client/dist/generator/` and `client/dist/architecture/`
+(`client/src/lib/pages.ts`), so `/generator` and `/architecture` load directly.
+The five sample CSVs are bundled into the JavaScript at build time.
 
-## Durable storage
+## Where files are kept
 
-The proposed provider is **private Vercel Blob**, consumed only by server.
-Attach a private Blob store to the Vercel project and selected environments;
-Vercel supplies `BLOB_READ_WRITE_TOKEN`. Keep this server-side and never add
-its value to the repository or a browser build. Blob is a managed external
-storage resource, not another named service or a service binding.
+Each visitor's uploads, results and archive flags stay in their own browser
+(IndexedDB, or memory when the browser blocks it; see
+`client/src/lib/browser-storage.ts`). Nothing is sent to Vercel, and visitors
+never see each other's files. The page says files can be lost when browser
+data is cleared, and **Clear my data** resets them to the five samples.
 
-- With the token present, each upload or result is two private objects: its
-  metadata (`<namespace>/meta/<id>.json`) and its CSV
-  (`<namespace>/text/<id>.csv`). Listing files and changing a flag such as
-  Archived read and write metadata only; a CSV is read only to preview, process
-  or download it. No process-local metadata index is used in Blob mode.
-- Origin reads (`useCache: false`) avoid stale metadata after writes. Metadata
-  updates use ETag preconditions; conflicting updates return 409 for refresh/retry.
-- Files are stored by File ID, so a file is read directly by its ID. A new
-  file's CSV is written before its metadata, so a listed file always has its
-  CSV; a result created at a fixed ID claims its metadata object first. A new base number is claimed by creating
-  `<namespace>/claims/<base>.json` with "fail if it exists"; a server that loses
-  the race takes the next number, so concurrent uploads never share an ID. A
-  confirmed re-run (`replace: true`) is written to its fixed ID (`101010-M`),
-  last write wins.
-- Files saved in the older one-object layout (`<namespace>/files/<id>.json`,
-  metadata and CSV together) are converted once at startup: the CSV and
-  metadata objects are written, checked, and only then is the old object
-  deleted. A file already in the new layout keeps its metadata and its CSV:
-  a missing CSV is filled in from the old copy, and the old copy is deleted
-  only when the CSVs match. A differing old copy, or any file that can't be
-  converted, is left in place and logged. Two servers starting together convert
-  safely.
-- Objects saved before File IDs (under `<namespace>/records/`) are not read;
-  that demo data is reset, not migrated.
-- Sample creation is idempotent across cold starts (samples take IDs
-  `100001`–`100005` and are created only if absent). Sample CSVs remain unchanged.
-- Default namespace: `icorium/<VERCEL_ENV>`, or `icorium/development` locally.
-  `RECLAIM_BLOB_PREFIX` overrides it. Production and Preview are separate by
-  default, but preview branches share the preview namespace; use an environment
-  override or separate stores if branch-level isolation is needed.
-- Listings read each file object, including its CSV, and paginate through the
-  store. This favors simplicity for the interview-sized dataset, not large-scale
-  file catalogs. Storage API usage and transfer can incur provider charges.
-- Vercel startup fails clearly when no token is configured. It never silently
-  falls back to temporary cloud disk. Do not configure `RECLAIM_DATA_DIR` on a
-  deployed project; it is an explicit local/test override.
+## Settings
 
-Existing `server/data` files are **not automatically migrated**. Vercel starts
-with the five bundled samples; upload other CSVs/results through the app. Local
-development still uses `server/data` when no Blob token is provided. Current
-API access remains unauthenticated and the deployed app shares one dataset;
-use the fictional demo data, not private uploads, for this configuration.
+Only one build variable is read:
 
-## Local service testing
+| Variable | Where | Effect |
+| --- | --- | --- |
+| `APP_ENV_LABEL` | Production environment, `Test` | The navigation label reads `vX.Y.Z · Test`. Previews show `· Preview` without it. |
 
-Run from the repository root:
+## Clean-up in the Vercel dashboard (the person)
 
-```powershell
-# Official CLI, local-only mode; no cloud login or deployment is required.
-# This explicit data override avoids contacting a real Blob store.
-$env:RECLAIM_DATA_DIR = Join-Path ([IO.Path]::GetTempPath()) 'icorium-vercel-local'
-npx vercel dev -L --listen 5300
-```
+These are no longer read by anything and can be removed in the Vercel
+dashboard. Nothing in the repository depends on them, and removing them is not
+part of a code change:
 
-The current CLI calls `-L` deprecated and accepts `--local` as the equivalent.
-Use `vercel dev` with project configuration when validating actual Blob access.
-Do not manually set service binding URL variables. No binding variables are
-needed by this static-client/public-API architecture.
+- the private Blob store attached to the project, and its data (fictional demo
+  files only; they are not moved into browsers);
+- the environment variables `BLOB_READ_WRITE_TOKEN`, `RECLAIM_BLOB_PREFIX` and
+  `MAX_UPLOAD_MB`.
 
-Check `/` for HTML; `/api/files` for JSON; process a sample and download/compare
-results. An unknown `/api/...` path must return an API 404, not HTML. Run
-`npm run verify` and `npx tsc -p server/tsconfig.json --noEmit` before publication.
+## Limits
 
-Vercel's function request/response size limits also apply: a request or
-response body over 4.5 MB fails with Vercel's own error. Added in 10.15
-(2026-11-17), the app refuses both cases itself first:
+- Uploads are limited to 10 MB per CSV (`UPLOAD_MAX_MB` in
+  `client/src/lib/api.ts`), checked in the browser. No request reaches Vercel,
+  so its 4.5 MB function body limit no longer applies.
+- A comparison holds at most 50,000 rows across its files (`COMPARE_MAX_ROWS`),
+  so the page stays responsive.
+- How much a browser stores depends on the browser and free disk space. When it
+  is full, the app says so and suggests downloading results and clearing data.
 
-- **Uploads:** set `MAX_UPLOAD_MB=2` in both the Production (Test site) and
-  Preview environments. A result is about 2× its input (5,000 rows: 225 KB →
-  439 KB for Classification), so a larger CSV would upload but its result
-  could not be downloaded. A larger file is refused with 413 "This file is
-  larger than the 2 MB upload limit." The default stays 10 MB locally.
-- **Comparisons:** a comparison may hold at most 50,000 rows across its files
-  (`COMPARE_MAX_ROWS`), locally and online; 5 files of 20,000 rows made a
-  5.57 MB response. Above it the API answers 400 "Too many rows to compare",
-  with the total and the limit, before reading any CSV.
+## Checking a deployment
 
-Larger-file support would need direct Blob uploads/downloads and is not part
-of this change. Do not raise the upload limit online expecting to bypass the
-platform.
+Open `/`, `/generator` and `/architecture`, upload a CSV, process, preview,
+compare and download it, then refresh and see the files are still there. The
+browser's Network tab shows no `/api` requests. A PR's Vercel Preview is the
+first real check of a `vercel.json` change; the repository's tests do not
+exercise Vercel.
 
 ## Releases and environments
 
 Added in 12.2 (2026-11-14).
 
 - **Test:** this Vercel project. It deploys `main` (Vercel calls that
-  environment Production, and its data folder is unchanged) and PR branches as
-  Previews. Set the build variable `APP_ENV_LABEL=Test` in Vercel's Production
-  environment so the navigation label reads `vX.Y.Z · Test`.
+  environment Production) and PR branches as Previews.
 - **Production:** not decided. No production branch, repository or host is
   configured, and nothing deploys automatically.
 - **Release zip:** when a GitHub Release is published,
@@ -138,42 +85,23 @@ Added in 12.2 (2026-11-14).
   - `scripts/build-release.mjs` zips only the files in `release/allowlist.txt`
     that are tracked at the tag, refusing planning, tooling, workflow, script
     or secret paths and token-like text;
-  - it installs, builds and starts the unzipped copy;
+  - it installs and builds the unzipped copy, and checks that the three pages
+    and the bundled sample files are in the build;
   - it attaches `icorium-vX.Y.Z.zip`, `icorium-vX.Y.Z.zip.sha256` and
     `icorium-vX.Y.Z.manifest.json` to the release.
 
-  "Run workflow" with a tag rebuilds an existing release's assets. Building
-  the same tag gives the same zip.
+  "Run workflow" with a tag rebuilds an existing release's assets. Only
+  releases that include the release tooling (`scripts/build-release.mjs` and
+  `release/allowlist.txt`, added in 12.2) can be built, since the build runs
+  from the tag itself. Building the same tag gives the same zip.
 - **Deploying a release:** download the three assets from the GitHub Release,
   check them with `sha256sum -c icorium-vX.Y.Z.zip.sha256`, unzip, and follow
-  `DEPLOY.md` inside: Node 24, `npm ci`, `npm run build -w client` (static
-  `client/dist`), `npm start -w server` (API), with `/api/*` routed to the API
-  on the same origin.
+  `DEPLOY.md` inside: Node 24, `npm ci`, `npm run build -w client`, then serve
+  `client/dist` from any static host.
 - **Artifact contract:** the build job's only output is the workflow artifact
   `release-icorium-vX.Y.Z` holding those three files. A future job that
   publishes to another repository or host should consume that artifact rather
   than rebuild.
 
-## Validation and outstanding checks
-
-- Vercel CLI 65.12.1 detected both service names/frameworks from the config.
-- `vercel dev -L` was attempted with isolated local data, but builder installation
-  failed with Windows `EPERM` while creating a symlink in Vercel's builder cache.
-  Full service routing/bundling was not exercised successfully on this machine.
-- Tests use an in-memory mock of Blob's SDK calls: persistence across fresh API
-  instances, metadata, paging, replacements, cold-start seeding and conflicts.
-  They do not prove connectivity or permissions against a live Blob store.
-- A real Vercel build, private store connection, and deployed routing/storage
-  smoke test remain required after provisioning. Nothing has
-  been published by this change.
-
-The configuration choices above are confirmed. Provisioning the project/store
-and publishing a deployment are separate actions that have not been performed.
-
-References: [Services](https://vercel.com/docs/services),
-[routing](https://vercel.com/docs/services/routing),
-[bindings](https://vercel.com/docs/services/bindings),
-[Fastify](https://vercel.com/docs/frameworks/backend/fastify),
-[Blob SDK](https://vercel.com/docs/vercel-blob/using-blob-sdk),
-[consistent private reads](https://vercel.com/changelog/vercel-blob-now-supports-consistent-reads-on-private-storage),
-[function limits](https://vercel.com/docs/functions/limitations).
+References: [vercel.json](https://vercel.com/docs/project-configuration),
+[Vite on Vercel](https://vercel.com/docs/frameworks/frontend/vite).

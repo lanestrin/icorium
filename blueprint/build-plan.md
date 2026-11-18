@@ -4,7 +4,7 @@
 
 **Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
 
-**Stack:** React + TypeScript + Vite + Sass (SCSS Modules) + Lucide React; Node.js + Fastify + TypeScript; Papa Parse; Zod; Recharts; Vitest; local file storage.  
+**Stack:** React + TypeScript + Vite + Sass (SCSS Modules) + Lucide React; Papa Parse; Zod; Recharts; Vitest; files kept in the browser (IndexedDB); a static site with no server (since 16.3).  
 
 Earlier revision and status notes from this header are in [the archive](build-plan-archive.md#plan-header-notes).
 
@@ -72,7 +72,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 16.2** `feature/16.2-browser-storage-and-local-api`. Decide the persistence question below first (IndexedDB is recommended), then write a browser `Storage` adapter and call `createFileService` from `shared/file-service.ts` in the browser.
+**Next: 16.4** `feature/16.4-real-file-workflow-test`. Decide how to test below first (Vitest with the real files is recommended), then test the whole workflow with a sample CSV and a real Excel file.
 
 **Order:** 9.14a → 9.14b → 16.1 → 16.2 → 16.3 → 16.4 → 9.14c → 9.15. M16 comes before 9.14c because the live site's API is down while its Blob store is over the Hobby limit, and 9.14c and 9.15 would otherwise describe a server that M16 retires. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
 
@@ -115,7 +115,7 @@ is next, and one concrete starting action.
 
   push and PR publication. The person squash-merges the PR.
 
-- Automated verification is server unit/API tests, client unit/component tests
+- Automated verification is the Node tests in `tests/` (shared logic and the file service), client unit/component tests
 
   and client type-check/build. UI changes require behavior-focused component
 
@@ -146,7 +146,7 @@ Completed milestones and items are in [build-plan-archive.md](build-plan-archive
 
 ### M9 — UI refinements
 
-- [ ] **9.14** Convert non-CSV partner files · **P2** — Partners may send Excel files, text PDFs or scanned PDFs and images, added at the person's request on 2026-11-13. They chose to have all three converted, with OCR running in the browser (Tesseract), not an AI service. Conversion runs entirely in the browser before upload. A non-CSV file becomes a table, the header row is found by matching one partner adapter's columns (`ADAPTERS` in `shared/types.ts`), and the person reviews the rows in a dialog (**Cancel** or **Import as CSV**). Only then is it sent as `<name>.csv` through the existing upload. The server stays CSV-only, so validation, File IDs and **Needs Review** work unchanged, and Vercel's 4.5 MB limit applies only to the CSV. Rows with the wrong number of cells are kept and flagged, never guessed. Readers are loaded only when used (dynamic `import()`). Limits: 20 pages per PDF, 20 MB per source file, English OCR. A failed file never blocks the others in a multi-file upload. Libraries: SheetJS `xlsx` 0.20.x from the official cdn.sheetjs.com tarball (npm's 0.18.5 has advisories), `pdfjs-dist` and `tesseract.js`. Tesseract downloads its English language data (~10 MB) from a CDN on first use; no partner data leaves the browser except as the uploaded CSV. Real PDF and OCR reading can't run in jsdom, so tests mock the libraries, and each sub-item's Try it now uses a real file.
+- [ ] **9.14** Convert non-CSV partner files · **P2** — Partners may send Excel files, text PDFs or scanned PDFs and images, added at the person's request on 2026-11-13. They chose to have all three converted, with OCR running in the browser (Tesseract), not an AI service. Conversion runs entirely in the browser before upload. A non-CSV file becomes a table, the header row is found by matching one partner adapter's columns (`ADAPTERS` in `shared/types.ts`), and the person reviews the rows in a dialog (**Cancel** or **Import as CSV**). Only then is it passed as `<name>.csv` to the existing upload. The file service stays CSV-only, so validation, File IDs and **Needs Review** work unchanged. Rows with the wrong number of cells are kept and flagged, never guessed. Readers are loaded only when used (dynamic `import()`). Limits: 20 pages per PDF, 20 MB per source file, English OCR. A failed file never blocks the others in a multi-file upload. Libraries: SheetJS `xlsx` 0.20.x from the official cdn.sheetjs.com tarball (npm's 0.18.5 has advisories), `pdfjs-dist` and `tesseract.js`. Tesseract downloads its English language data (~10 MB) from a CDN on first use; no partner data leaves the browser except as the uploaded CSV. Real PDF and OCR reading can't run in jsdom, so tests mock the libraries, and each sub-item's Try it now uses a real file.
 
   - [x] **9.14a** `feature/9.14a-convert-excel-uploads` — The pipeline: choosing a reader by extension, header detection against `ADAPTERS`, the review dialog, the "`report.docx` can't be converted. Upload a CSV, Excel, PDF or image file." message, a wider drop-zone `accept` list, and the Excel reader (first sheet). Also the stack exception, and the README and Architecture page updates for the new packages.
   - [x] **9.14b** `feature/9.14b-read-text-pdfs` — The pdf.js reader. Text items are grouped into rows by y position and into cells by x gaps. A page with no text layer is refused with "this page is a scanned image" until 9.14c.
@@ -164,7 +164,7 @@ Completed milestones and items are in [build-plan-archive.md](build-plan-archive
     - People sign in per customer through a managed OIDC provider with organizations, SSO and MFA, and roles (admin, uploader, viewer).
     - Systems that upload automatically use per-customer OAuth client credentials or scoped API keys: hashed, shown once, expiring, revocable, rate-limited and logged.
     - IP allowlisting is an optional extra layer, never the identity.
-    - API keys are not needed today; the only secret is the server-side Blob token.
+    - API keys are not needed today, and the app holds no secrets: it is a static site.
     - Tenant isolation: the customer ID comes from the session or key and is enforced in the one storage layer, plus PostgreSQL row-level security and cross-customer tests.
     - Upload safeguards: quotas and rate limits, content-type checks, presigned uploads to private per-customer storage, malware scanning for any stored PDF or image, encryption, an audit log, retention rules, and formula escaping for files shared outside.
   - **Evolution:** replace the five tiles with a "today → at scale" table:
@@ -216,7 +216,7 @@ Added at the person's request on 2026-11-17. The private Vercel Blob store reach
 **Open decisions (settle in each item's spec):**
 
 - **16.2, persistence (settled 2026-11-17):** IndexedDB, so files survive a refresh, with memory as the fallback when a browser blocks it.
-- **16.3, the Node server:** retire it entirely, or keep it as an optional local backend. Recommended: retire it, since one runtime is simpler and the audit found nothing that needs it.
+- **16.3, the Node server (settled 2026-11-17):** retired entirely. Its Node-only tests moved to a `tests/` workspace, and the release zip became a static-site release.
 - **16.4, how to test:** Vitest with the real files and a simulated IndexedDB (`fake-indexeddb`, installed in 16.2), or a Playwright browser test as well. Recommended: Vitest, which runs inside `npm run verify`. Playwright is the only real-browser check, but it restores browser tests, which section 4 says need a request.
 
 **Done when (milestone):** anyone can open the public Vercel site without an account, upload a supported file, convert it to CSV, process, preview, compare and download it, with nothing stored outside their browser, and `npm run verify` passes.

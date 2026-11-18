@@ -1,5 +1,4 @@
-// Tests for the release zip (scripts/build-release.mjs, release/allowlist.txt), the release workflow's shape
-// and the server start command it relies on. The scripts live outside the workspaces, so their tests sit here
+// Tests for the release zip (scripts/build-release.mjs, release/allowlist.txt) and the release workflow's shape. The scripts live outside the workspaces, so their tests sit here
 // where `npm run verify` runs them. Zips are built from a throwaway Git repository and read back with a small
 // zip reader, so the checks look at what would actually ship.
 import { execFileSync } from 'node:child_process';
@@ -11,9 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
 import { afterAll, describe, expect, it } from 'vitest';
 // @ts-expect-error -- plain JavaScript module without type declarations
-import { buildManifest, buildRelease, forbiddenPaths, filesWithSecrets, releaseVersion, selectFiles } from '../../scripts/build-release.mjs';
+import { buildManifest, buildRelease, forbiddenPaths, filesWithSecrets, releaseVersion, selectFiles } from '../scripts/build-release.mjs';
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 const sha256 = (data: Buffer | string) => createHash('sha256').update(data).digest('hex');
 
@@ -97,7 +96,7 @@ describe('release file selection', () => {
   );
 
   it('allows ordinary application paths', () => {
-    expect(forbiddenPaths(['client/src/App.tsx', 'server/src/index.ts', 'README.md', 'sample-data/a.csv'])).toEqual([]);
+    expect(forbiddenPaths(['client/src/App.tsx', 'shared/types.ts', 'README.md', 'sample-data/a.csv'])).toEqual([]);
   });
 
   it('flags text that looks like a credential', () => {
@@ -175,12 +174,16 @@ describe('release zip build', () => {
 
 describe("this repository's allowlist", () => {
   const tracked = execFileSync('git', ['ls-files'], { cwd: ROOT, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);
-  const selected = selectFiles(tracked, read('release/allowlist.txt'));
+  const selected: string[] = selectFiles(tracked, read('release/allowlist.txt'));
 
   it('ships what the app needs to install, build and run', () => {
-    for (const path of ['package.json', 'package-lock.json', 'vercel.json', 'client/index.html', 'client/package.json', 'client/vite.config.ts', 'client/src/main.tsx', 'server/package.json', 'server/src/index.ts', 'shared/types.ts']) {
+    for (const path of ['package.json', 'package-lock.json', 'vercel.json', 'client/index.html', 'client/package.json', 'client/vite.config.ts', 'client/src/main.tsx', 'shared/types.ts', 'tests/package.json']) {
       expect(selected, path).toContain(path);
     }
+    // Every workspace the root package names has its package.json in the zip, so npm ci can install it.
+    for (const workspace of JSON.parse(read('package.json')).workspaces) expect(selected).toContain(`${workspace}/package.json`);
+    // The test workspace ships only its manifest.
+    expect(selected.filter((path) => path.startsWith('tests/'))).toEqual(['tests/package.json']);
     expect(selected.filter((path) => path.startsWith('sample-data/') && path.endsWith('.csv')).length).toBe(5);
   });
 
@@ -207,7 +210,7 @@ describe('release artifact workflow', () => {
   });
 
   it('builds, verifies and smoke-tests before attaching, in that order', () => {
-    const order = ['npm run verify', 'node scripts/build-release.mjs', 'npm start -w server', 'actions/upload-artifact@', '\n  attach:\n    needs: build', 'actions/download-artifact@', 'gh release upload'];
+    const order = ['npm run verify', 'node scripts/build-release.mjs', 'client/dist/architecture/index.html', 'actions/upload-artifact@', '\n  attach:\n    needs: build', 'actions/download-artifact@', 'gh release upload'];
     const positions = order.map((text) => workflow.indexOf(text));
     expect(positions.every((position) => position > 0), String(positions)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
@@ -219,18 +222,17 @@ describe('release artifact workflow', () => {
     expect(inlineInRun).toEqual([]);
   });
 
+  it('smoke-tests the unzipped release as a static site: installs, builds, and checks its pages and samples', () => {
+    const smoke = runLines.join('\n');
+    for (const text of ['npm ci', 'npm run build -w client', 'client/dist/index.html', 'client/dist/generator/index.html', 'client/dist/architecture/index.html', "grep -rqF 'A-001' client/dist/assets"]) {
+      expect(smoke, text).toContain(text);
+    }
+    expect(smoke).not.toMatch(/npm start|curl /);
+  });
+
   it('never pushes, deploys or creates repositories', () => {
     for (const forbidden of ['git push', 'vercel', 'deploy', 'gh repo create', 'RELEASE_PLEASE_TOKEN']) {
       expect(runLines.join('\n').toLowerCase(), forbidden).not.toContain(forbidden.toLowerCase());
     }
-  });
-});
-
-describe('server start command', () => {
-  it('starts the API with tsx, installed as a runtime dependency', () => {
-    const pkg = JSON.parse(read('server/package.json'));
-    expect(pkg.scripts.start).toBe('tsx src/index.ts');
-    expect(pkg.dependencies).toHaveProperty('tsx');
-    expect(pkg.devDependencies ?? {}).not.toHaveProperty('tsx');
   });
 });

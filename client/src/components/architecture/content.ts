@@ -1,8 +1,8 @@
-import { Atom, BookOpen, Boxes, Braces, ChartColumn, Cloud, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Laptop, Layers, Palette, PanelsTopLeft, Server, Settings, Shapes, ShieldCheck, Upload, User, Users, Workflow, Zap, type LucideIcon } from 'lucide-react';
+import { Atom, BookOpen, Boxes, Braces, ChartColumn, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Globe, Laptop, Layers, Palette, PanelsTopLeft, Settings, Shapes, ShieldCheck, Upload, User, Users, Workflow, Zap, type LucideIcon } from 'lucide-react';
 
 // Everything the Architecture page says, kept as data so the section components only lay it out.
 // pages/architecture-content.test.ts checks every path and package named here against the repository.
-type Workspace = 'client' | 'server';
+type Workspace = 'client' | 'tests';
 
 export interface Tech {
   name: string;
@@ -23,26 +23,26 @@ export const TECH: Tech[] = [
       'Fits the interactive workflow: selecting rows, processing in turn, confirming warnings, undoing an archive.',
       'A large ecosystem and familiar patterns keep the code maintainable.',
     ],
-    tradeoff: 'A single-page app with no server rendering: data loads after the page does. That is fine for an internal tool.',
+    tradeoff: 'A single-page app with no server rendering: the files load after the page does. That is fine for an internal tool.',
     files: ['client/src/App.tsx', 'client/src/pages', 'client/src/components', 'client/src/hooks'],
   },
   {
-    name: 'TypeScript', label: 'TypeScript', role: 'Type safety', icon: Code2, packages: [['client', 'typescript'], ['server', 'typescript']],
+    name: 'TypeScript', label: 'TypeScript', role: 'Type safety', icon: Code2, packages: [['client', 'typescript'], ['tests', 'typescript']],
     why: [
-      'One language and static types on both sides of the API.',
-      'Shared contracts: FileMeta, CompareResult and the processor list live in one file both sides import.',
+      'One language and static types for the UI, the shared file service and the tests.',
+      'Shared contracts: FileMeta, CompareResult and the processor list live in one file the UI and the file service import.',
       'Renaming a field breaks the build in every place that uses it, not at runtime.',
     ],
-    tradeoff: 'Types disappear at runtime, so request bodies still need runtime validation (Zod).',
+    tradeoff: 'Types disappear at runtime, so uploaded files and action inputs still need runtime validation (Zod).',
     files: ['shared/types.ts'],
   },
   {
     name: 'Vite', label: 'Vite', role: 'Build & dev', icon: Zap, packages: [['client', 'vite']],
     why: [
-      'Fast dev server with hot reload, and a small config: React, built-in Sass support and an /api proxy to the local API.',
-      'A plain single-page build without the conventions of a larger full-stack framework.',
+      'Fast dev server with hot reload, and a small config: React and built-in Sass support.',
+      'A plain static build that any static host can serve, without the conventions of a larger full-stack framework.',
     ],
-    tradeoff: 'No built-in router or server. The app picks its pages from the URL itself, so the build copies index.html for /generator and /architecture to keep them loading on a static host; the API is a separate service.',
+    tradeoff: 'No built-in router. The app picks its pages from the URL itself, so the build copies index.html for /generator and /architecture to keep them loading on a static host.',
     files: ['client/vite.config.ts', 'client/src/lib/pages.ts'],
   },
   {
@@ -66,39 +66,29 @@ export const TECH: Tech[] = [
     files: ['client/src/components/modals/Modal.tsx', 'client/src/components/files/RowMenu.tsx'],
   },
   {
-    name: 'Fastify 5', label: 'Fastify 5', role: 'API', icon: Server, packages: [['server', 'fastify'], ['server', '@fastify/multipart']],
+    name: 'Zod', label: 'Zod', role: 'Validation', icon: ShieldCheck, packages: [['client', 'zod']],
     why: [
-      'A lightweight HTTP API; routes are registered as a plugin under /api.',
-      'The multipart plugin handles CSV uploads, capped at 10 MB per file by default (MAX_UPLOAD_MB).',
-      'One error handler turns validation and processing errors into clear messages with the right status code.',
-    ],
-    tradeoff: 'A second service to run and deploy alongside the frontend; locally, npm run dev starts both.',
-    files: ['server/src/app.ts', 'server/src/routes/files.ts', 'shared/file-service.ts'],
-  },
-  {
-    name: 'Zod', label: 'Zod', role: 'Validation', icon: ShieldCheck, packages: [['client', 'zod'], ['server', 'zod']],
-    why: [
-      'Runtime validation of request bodies and query strings: process, archive, compare and generate.',
+      'Runtime validation of every file action\x27s input: process, archive, rows, compare and generate.',
       'Explicit input contracts with plain-language error messages.',
       'Covers what TypeScript cannot: data arriving from outside the program.',
     ],
-    tradeoff: 'Request schemas are a second definition beside the TypeScript types. The allowed functions and partners come from the shared lists, but field rules such as limits and messages are written in the schemas.',
+    tradeoff: 'The schemas are a second definition beside the TypeScript types. The allowed functions and partners come from the shared lists, but field rules such as limits and messages are written in the schemas.',
     files: ['shared/file-service.ts'],
   },
   {
-    name: 'Papa Parse', label: 'Papa Parse', role: 'CSV parsing', icon: FileSpreadsheet, packages: [['client', 'papaparse'], ['server', 'papaparse']],
+    name: 'Papa Parse', label: 'Papa Parse', role: 'CSV parsing', icon: FileSpreadsheet, packages: [['client', 'papaparse']],
     why: [
       'Parses uploads and writes result CSVs, including quoting and escaping.',
       'Reports malformed rows, which become clear upload errors.',
       'Avoids writing and maintaining a custom CSV parser.',
     ],
-    tradeoff: 'Each file is parsed in memory, which suits interview-sized files rather than very large ones.',
+    tradeoff: 'Each file is parsed in the browser\x27s memory, which suits interview-sized files rather than very large ones.',
     files: ['shared/csv.ts'],
   },
   {
     name: 'SheetJS', label: 'SheetJS', role: 'Excel import', icon: FileSpreadsheet, packages: [['client', 'xlsx']],
     why: [
-      'Reads the first sheet of a partner\x27s .xlsx or .xls file in the browser; the rows are reviewed, then uploaded as a CSV, so the server stays CSV-only.',
+      'Reads the first sheet of a partner\x27s .xlsx or .xls file in the browser; the rows are reviewed, then uploaded as a CSV, so the file service stays CSV-only.',
       'Loaded only when an Excel file is chosen, so opening the file page does not download it.',
     ],
     tradeoff: 'Installed from SheetJS\x27s own download site (cdn.sheetjs.com), because the npm release is older and has security advisories; installs need that site to be reachable.',
@@ -130,14 +120,14 @@ export const TECH: Tech[] = [
   },
   {
     name: 'Vitest + React Testing Library', label: 'Vitest', role: 'Testing', icon: FlaskConical,
-    packages: [['client', 'vitest'], ['server', 'vitest'], ['client', '@testing-library/react'], ['client', '@testing-library/user-event']],
+    packages: [['client', 'vitest'], ['tests', 'vitest'], ['client', '@testing-library/react'], ['client', '@testing-library/user-event']],
     why: [
-      'Server unit tests for calculations and validation rules, and API tests through the real Fastify app.',
+      'Unit tests for calculations and validation rules, and tests of every file action through the real file service with the sample files.',
       'Component tests for user-visible behaviour: selection, dialogs, keyboard use, failures and retries.',
       'npm run verify runs them all plus the client type-check and build, locally and in CI.',
     ],
-    tradeoff: 'Component tests run in jsdom: they check behaviour, not real-browser layout or chart drawing.',
-    files: ['server/src/core.test.ts', 'server/src/api.test.ts', 'client/src/pages/FilesPage.test.tsx'],
+    tradeoff: 'Component tests run in jsdom, and storage tests use fake-indexeddb: they check behaviour, not real-browser layout, chart drawing or a real browser\x27s storage.',
+    files: ['tests/core.test.ts', 'tests/file-actions.test.ts', 'client/src/pages/FilesPage.test.tsx'],
   },
   {
     name: 'Storybook 10', label: 'Storybook', role: 'Component docs', icon: BookOpen,
@@ -150,14 +140,14 @@ export const TECH: Tech[] = [
     files: ['client/.storybook/main.ts', 'client/src/components/ui/Button.stories.tsx', 'client/src/components/stories.test.tsx'],
   },
   {
-    name: 'IndexedDB', label: 'IndexedDB', role: 'File storage', icon: Database, packages: [['client', 'fake-indexeddb'], ['server', '@vercel/blob']],
+    name: 'IndexedDB', label: 'IndexedDB', role: 'File storage', icon: Database, packages: [],
     why: [
       'Files and results stay in the person\x27s browser, so the demo costs nothing to run and no file leaves the device.',
       'Built into every browser, and it survives a refresh; memory is the fallback when a browser blocks it.',
       'Every storage implements one Storage interface, so a cloud backend can replace it without changing processing or the UI.',
     ],
     tradeoff: 'Files live on one device only: there is no sharing, and clearing browser data (or Clear my data) removes them. Tests use fake-indexeddb, not a real browser.',
-    files: ['shared/storage.ts', 'client/src/lib/browser-storage.ts', 'server/src/lib/storage.ts', 'server/src/lib/blob-storage.ts'],
+    files: ['shared/storage.ts', 'client/src/lib/browser-storage.ts'],
   },
 ];
 
@@ -165,7 +155,7 @@ export const TECH: Tech[] = [
 export const PIPELINE: { title: string; sub?: string; icon: LucideIcon }[] = [
   { title: 'User / Browser', sub: 'Upload CSVs and use the app', icon: User },
   { title: 'React', sub: 'Frontend', icon: Atom },
-  { title: 'Fastify', sub: 'API', icon: Zap },
+  { title: 'File service', sub: 'In the browser', icon: Zap },
   { title: 'Parse', icon: FileText },
   { title: 'Normalize', icon: Layers },
   { title: 'Validate', icon: ShieldCheck },
@@ -177,50 +167,50 @@ export const PIPELINE: { title: string; sub?: string; icon: LucideIcon }[] = [
 /** The same path in words, beside the diagram. */
 export const HOW_IT_WORKS = [
   'Upload CSVs in the browser; an Excel file is converted to CSV there, after a review.',
-  'React handles the UI and sends each request to the API.',
-  'The Fastify API checks every request.',
+  'React handles the UI and calls the file service in the same page.',
+  'The file service checks every action with Zod.',
   'Each file is parsed, normalized to one record per row and validated.',
   'A processing function adds its columns; results can be previewed, downloaded and compared.',
-  'Files are stored by File ID, locally or in Vercel Blob.',
+  'Files are stored by File ID in the browser\x27s IndexedDB.',
 ];
 
 /** The decision shown first and in full: where the CSV work runs. */
 export const PROCESSING_LOCATION = {
-  title: 'Processing location (server vs. browser)',
-  text: 'A server-side API parses, normalizes, validates and processes every CSV; the browser uploads, shows and downloads, and converts Excel files to CSV before upload.',
-  benefits: ['Centralized, consistent processing', 'Easier to add business rules and integrations', 'Works across devices with a simple UI'],
-  tradeoff: 'Uploads and processing need the API running and reachable. If it is down, or the person is offline, files cannot be processed.',
+  title: 'Processing location (browser only)',
+  text: 'The browser does everything: it parses, normalizes, validates and processes every CSV, keeps the files in IndexedDB, and converts Excel and PDF files to CSV before upload. No server is involved.',
+  benefits: ['Free to host: any static site works', 'No file ever leaves the person\x27s device', 'Nothing to run or maintain besides the page'],
+  tradeoff: 'Files live in one browser on one device: they cannot be shared, and they are lost when the person clears their browser data. Sharing or teams would need a backend and cloud storage.',
 };
 
 export const DECISIONS: { question: string; icon: LucideIcon; summary: string; answer: string[] }[] = [
-  { question: 'Why React + Fastify?', icon: Code2,
-    summary: 'A fast, simple stack that covers what the UI and API need, without server rendering the app does not use.', answer: [
-    'The app is one interactive screen plus two supporting pages, backed by a CSV-processing API. It needs no server rendering, no SEO and no file-based routing, which are where Next.js shines.',
-    'Keeping the API as its own Fastify service puts all parsing, validation and calculation on the server, behind an explicit /api contract that is tested directly. The frontend stays a plain static bundle.',
-    'Next.js would also work well; it simply was not necessary here, and a separate API keeps the processing logic independent of how the UI is built.',
+  { question: 'Why React and no server?', icon: Code2,
+    summary: 'A fast, simple stack that covers what the UI needs, with no server to run or pay for.', answer: [
+    'The app is one interactive screen plus two supporting pages. It needs no server rendering, no SEO and no file-based routing, which are where Next.js shines.',
+    'All parsing, validation and calculation is plain TypeScript in shared/, run by a file service over one Storage interface, and tested directly. The app is a static bundle any host can serve, at no cost.',
+    'A backend becomes worthwhile with accounts, shared files or large processing jobs; it would add a cloud Storage and services without changing the processing code or the UI.',
   ] },
   { question: 'Why TypeScript throughout?', icon: Braces,
-    summary: 'Shared types, fewer bugs and one consistent codebase on both sides of the API.', answer: [
-    'The client and server import the same types from shared/types.ts, so a field added to a response is checked everywhere it is read.',
-    'API contracts are clearer: the comparison response, generated files and file metadata each have one definition. Zod then validates what actually arrives at runtime.',
+    summary: 'Shared types, fewer bugs and one consistent codebase.', answer: [
+    'The UI and the file service import the same types from shared/types.ts, so a field added to a result is checked everywhere it is read.',
+    'Contracts are clearer: the comparison result, generated files and file metadata each have one definition. Zod then validates what actually arrives at runtime.',
   ] },
   { question: 'Why files over PostgreSQL?', icon: Database,
     summary: 'The app needs no database yet: CSV files plus a little metadata keep it simple and light.', answer: [
     'The primary data is CSV files plus a little metadata per file. The exercise needs no relational queries, user accounts or multi-step transactions.',
-    'Files keep the originals byte-for-byte, are easy to inspect and reset, and need no database to install for a local demo.',
+    'Files keep the originals byte-for-byte, are easy to inspect and reset (Clear my data), and need no database to install or host.',
     'A database becomes worthwhile with users and permissions, searching or reporting across many files, audit history, or many concurrent writers.',
   ] },
   { question: 'Why a modular pipeline?', icon: Boxes,
     summary: 'Separate steps (parse, normalize, validate, process) keep the code clear and easy to extend.', answer: [
     'Parsing, partner normalization, validation and the three functions are separate steps. Adapters absorb each partner’s column names and units, so processing only ever sees one normalized record.',
-    'A new partner format is one entry in the adapter list. A new calculation is one processor that declares its columns, plus its entry in the shared processor list, which the API’s allowed values come from.',
+    'A new partner format is one entry in the adapter list. A new calculation is one processor that declares its columns, plus its entry in the shared processor list, which the file service’s allowed values come from.',
     'Validation is shared, so every function treats bad rows the same way and the rules are tested once.',
   ] },
   { question: 'Why synchronous processing?', icon: Zap,
-    summary: 'Files are small and calculations fast, so doing the work inside the request keeps the system simple to run.', answer: [
-    'Each request parses, processes and saves one file and returns the result. The demo files are small: the samples have 25 rows and generated files are capped at 5,000. At that size, doing the work inside the request keeps things simple, and the UI shows a spinner per file while it runs.',
+    summary: 'Files are small and calculations fast, so doing the work straight away keeps the system simple.', answer: [
+    'Each action parses, processes and saves one file and returns the result. The demo files are small: the samples have 25 rows and generated files are capped at 5,000. At that size, doing the work straight away keeps things simple, and the UI shows a spinner per file while it runs.',
     'It keeps the system simple: no queue, worker or job status to build or explain.',
-    'Large files, many concurrent users or long-running calculations would motivate background jobs: accept the upload, process on a worker and let the UI poll or be notified.',
+    'Large files would motivate a Web Worker, so the page stays responsive; long-running or shared processing would motivate background jobs on a backend.',
   ] },
 ];
 
@@ -235,8 +225,6 @@ export const EVOLVE: { title: string; icon: LucideIcon; text: string }[] = [
 /** Storage backends in the order they apply: built ones first, then the possible next one. */
 export const STORAGE_OPTIONS: { name: string; icon: LucideIcon; note: string; built: boolean }[] = [
   { name: 'Browser (IndexedDB)', icon: Laptop, note: 'In use', built: true },
-  { name: 'Local filesystem', icon: Laptop, note: 'Server, until 16.3', built: true },
-  { name: 'Vercel Blob', icon: Cloud, note: 'Server, when a token is set', built: true },
   { name: 'S3 / Cloudflare R2', icon: Boxes, note: 'Not built', built: false },
 ];
 
@@ -247,7 +235,7 @@ export const OVERVIEW: [LucideIcon, string, string][] = [
   [ShieldCheck, 'Validate', 'Shared rules; bad rows kept'],
   [FileCog, 'Process', 'Three functions; originals kept'],
   [ChartColumn, 'Compare', '2–5 results side by side'],
-  [Cloud, 'Run anywhere', 'Local or cloud storage'],
+  [Globe, 'Run anywhere', 'Any static host; files stay in the browser'],
 ];
 
 /** The "On this page" links: each section's id and label, in page order. */

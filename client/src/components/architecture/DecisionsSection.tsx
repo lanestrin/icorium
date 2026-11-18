@@ -21,7 +21,7 @@ function ProcessingLocation() {
       <div className={styles.benefits}><Checks label="Benefits" items={PROCESSING_LOCATION.benefits} /></div>
       <div className={styles.tradeoffBox}>
         <p className={styles.tradeoffTitle}>
-          <TriangleAlert className={styles.tradeoffIcon} aria-hidden /> Trade-off: server dependency
+          <TriangleAlert className={styles.tradeoffIcon} aria-hidden /> Trade-off: one device only
         </p>
         <p className={styles.tradeoffText}>{PROCESSING_LOCATION.tradeoff}</p>
       </div>

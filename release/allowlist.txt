@@ -12,14 +12,12 @@ client/tsconfig.json
 client/vite.config.ts
 client/src/**
 
-# Server (Fastify API)
-server/package.json
-server/tsconfig.json
-server/src/**
-
-# Shared code and the sample partner files the API seeds
+# Shared code and the sample partner files the web app bundles
 shared/**
 sample-data/**
+
+# The test workspace's manifest only, so npm ci finds every workspace the lockfile names
+tests/package.json
 
 # Workspace and hosting configuration, and customer-facing docs
 package.json

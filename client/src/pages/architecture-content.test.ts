@@ -5,11 +5,11 @@ import { COMPARE_MAX } from '../../../shared/types';
 import { TECH } from '../components/architecture/content';
 
 const GLOBBED = import.meta.glob(
-  ['../../../client/src/**/*', '../../../client/*.ts', '../../../client/.storybook/*.ts', '../../../client/package.json', '../../../server/src/**/*.ts', '../../../server/package.json', '../../../shared/*.ts', '../../../blueprint/vercel-deployment.md'],
+  ['../../../client/src/**/*', '../../../client/*.ts', '../../../client/.storybook/*.ts', '../../../client/package.json', '../../../tests/*.ts', '../../../tests/package.json', '../../../shared/*.ts', '../../../vercel.json'],
   { query: '?raw', import: 'default', eager: true },
 ) as Record<string, string>;
 
-/** The same files keyed by repository path, e.g. "server/src/app.ts". */
+/** The same files keyed by repository path, e.g. "shared/types.ts". */
 const REPO = Object.fromEntries(Object.entries(GLOBBED).map(([key, text]) => [new URL(key, 'file:///repo/client/src/pages/x').pathname.slice('/repo/'.length), text]));
 const read = (file: string) => {
   expect(REPO, file).toHaveProperty([file]);
@@ -30,7 +30,7 @@ describe('Architecture page content', () => {
     expect(exists('client/src/no-such-file.tsx')).toBe(false);
   });
 
-  it('only names packages the client or server actually depends on', () => {
+  it('only names packages the client or the tests workspace actually depends on', () => {
     for (const t of TECH)
       for (const [workspace, name] of t.packages) expect(dependencies(workspace), `${t.name}: ${workspace} ${name}`).toHaveProperty([name]);
   });
@@ -39,14 +39,10 @@ describe('Architecture page content', () => {
     const major = (workspace: string, name: string) => dependencies(workspace)[name].replace(/^[^\d]*/, '').split('.')[0];
     expect(major('client', 'react')).toBe('19');
     expect(major('client', 'storybook')).toBe('10');
-    expect(major('server', 'fastify')).toBe('5');
   });
 
   it('quotes limits and rules that match the code', () => {
-    expect(read('server/src/app.ts')).toContain('DEFAULT_MAX_UPLOAD_MB = 10;'); // 10 MB uploads by default
-    expect(read('server/src/app.ts')).toContain("DEFAULT_LOG_LEVEL = 'warn';"); // warnings and errors only by default
-    expect(read('server/src/app.ts')).toContain("value('MAX_UPLOAD_MB')"); // the upload limit can be changed
-    expect(read('server/src/app.ts')).toContain("value('LOG_LEVEL')"); // the log level can be changed
+    expect(read('client/src/lib/api.ts')).toContain('UPLOAD_MAX_MB = 10;'); // 10 MB uploads
     expect(read('shared/storage.ts')).toMatch(/interface Storage \{[\s\S]*createAt\(id: string/); // the storage operations named
     expect(read('client/src/lib/browser-storage.ts')).toContain('indexedDB.open('); // files are kept in IndexedDB
     expect(read('shared/types.ts')).toContain('export const ADAPTERS = ['); // partner formats live in the shared file
@@ -54,12 +50,10 @@ describe('Architecture page content', () => {
     expect(read('shared/processing.ts')).toContain('TOTAL_TOLERANCE_PCT = 0.5'); // ±0.5 points
     expect(read('shared/types.ts')).toMatch(/GENERATOR_MAX_ROWS = 5000;[\s\S]*GENERATOR_MAX_FILES = 10;/);
     expect(COMPARE_MAX).toBe(5);
-    const storage = read('server/src/lib/storage.ts');
-    expect(storage).toContain("'meta.json'");
-    expect(storage).toContain('BLOB_READ_WRITE_TOKEN');
-    expect(storage).toMatch(/env\.VERCEL && !useBlob/); // no Blob token on Vercel: refuse to start
-    expect(storage).toContain('rename('); // meta.json is replaced atomically
-    // The page describes the Vercel setup as configured but not deployed, as the deployment notes record.
-    expect(read('blueprint/vercel-deployment.md')).toContain('No project, store or deployment has been');
+    // The page describes Vercel as serving one static site, with no server service.
+    const vercel = JSON.parse(read('vercel.json'));
+    expect(vercel).toMatchObject({ buildCommand: 'npm run build -w client', outputDirectory: 'client/dist' });
+    expect(vercel).not.toHaveProperty('services');
+    expect(vercel).not.toHaveProperty('rewrites');
   });
 });

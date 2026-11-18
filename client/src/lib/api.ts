@@ -4,9 +4,9 @@ import { createMemoryStorage, openBrowserStorage, type BrowserStorage } from './
 import { SAMPLE_FILES } from './samples';
 
 // The app's file actions, run in the browser: the shared file service over browser storage. Nothing is
-// sent to a server. Callers get the same results and messages the API used to send.
+// sent to a server.
 
-/** Largest CSV upload, in megabytes, as on the server. */
+/** Largest CSV upload, in megabytes. */
 export const UPLOAD_MAX_MB = 10;
 /** How long a download's object URL is kept before it is released, so the browser has time to start the download. */
 export const DOWNLOAD_URL_LIFETIME_MS = 60_000;
