@@ -81,7 +81,6 @@ describe('large uploads', () => {
     expect(Buffer.byteLength(big)).toBeGreaterThan(1.5 * 1024 * 1024);
     expect((await upload('big_default.csv', big)).statusCode).toBe(200);
   });
-
 });
 
 describe('preview paging', () => {
@@ -133,7 +132,7 @@ describe('preview paging', () => {
       await storage.put(result.id, { ...result, text: text.replace(/,Valid,/g, ',STALE,') });
     } finally { vi.useRealTimers(); }
     expect((await preview()).rows[0].processing_status).toBe('STALE');
-    // A confirmed re-run here, at any time (even within the same millisecond), is never served from the cache.
+    // A confirmed re-run then shows its fresh rows (the next test covers a re-run within the same millisecond).
     expect((await processFile(input.id, 'validation', true)).statusCode).toBe(200);
     expect((await preview()).rows.map((r) => r.processing_status)).toEqual(['Valid', 'Valid', 'Valid']);
   });
@@ -258,7 +257,6 @@ describe('problem rows', () => {
     expect(files[0].problems.items).toEqual([expect.objectContaining({ row: 8, message: 'mass missing' })]);
     expect(files[1].problems.items).toEqual([expect.objectContaining({ row: 18, message: expect.stringContaining('composition totals') })]);
   });
-
 });
 
 describe('comparing results', () => {
@@ -527,7 +525,6 @@ describe('legacy result compatibility', () => {
       expect(response.json().message).toContain('Regenerate the older result');
     }
   });
-
 });
 
 describe('R-32 + R-125 flag', () => {
@@ -613,7 +610,6 @@ describe('File IDs', () => {
     expect((await processFile(id, 'mass')).statusCode).toBe(404);
     expect((await archiveFiles({ ids: [id], archived: true })).statusCode).toBe(404);
   });
-
 });
 
 describe('replacing a result', () => {
