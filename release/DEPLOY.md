@@ -1,41 +1,37 @@
 # Deploying Reclaim Studio {{TAG}}
 
 This folder is the release {{TAG}} (version {{VERSION}}), built from commit
-`{{COMMIT}}`. `RELEASE-MANIFEST.json` lists every file with its SHA-256.
-Nothing in this folder is a secret; put secrets in your host's environment.
+`{{COMMIT}}`. `RELEASE-MANIFEST.json` lists every application file with its
+SHA-256. Nothing in this folder is a secret.
+
+Reclaim Studio is a static web app: it runs entirely in each visitor's
+browser and keeps their files in that browser's storage (IndexedDB). There is
+no server or database to run.
 
 ## Requirements
 
-- Node.js 24 and npm.
-- A host that serves static files and runs one Node.js process, with `/api/*`
-  routed to that process on the same origin as the web pages.
+- Node.js 24 and npm, to build it.
+- Any host that serves static files.
 
-## Build and run
+## Build
 
 ```bash
 npm ci                      # installs exactly the versions in package-lock.json
-npm run build -w client     # static web app in client/dist
-npm start -w server         # API on PORT (default 3001) and HOST (default 0.0.0.0)
+npm run build -w client     # the static site in client/dist
 ```
 
 Serve `client/dist` as the site root. Its `generator/index.html` and
-`architecture/index.html` serve `/generator` and `/architecture`. Send every
-`/api/*` request to the API. On Vercel, `vercel.json` already does this.
+`architecture/index.html` serve `/generator` and `/architecture`. On Vercel,
+`vercel.json` already builds and serves it.
 
-## Environment variables
+## Build-time setting
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `PORT`, `HOST` | Where the API listens | `3001`, `0.0.0.0` |
-| `MAX_UPLOAD_MB` | Largest accepted upload | `10` |
-| `LOG_LEVEL` | API log level | `warn` |
-| `RECLAIM_DATA_DIR` | Store files in this local folder | `server/data` |
-| `BLOB_READ_WRITE_TOKEN` | Store files in a private Vercel Blob store instead (secret) | unset |
-| `RECLAIM_BLOB_PREFIX` | Folder inside the Blob store | `icorium/<environment>` |
-| `APP_ENV_LABEL` | Label after the version in the page navigation, set at build time | none |
+| `APP_ENV_LABEL` | Label after the version in the page navigation | none |
 
-Local storage keeps files only as long as the host's disk does. On the first
-start the API adds the five sample files from `sample-data/`.
+Each visitor's uploads and results stay in their own browser and are lost when
+they clear its data. The five sample files are built into the site.
 
 ## Check the download
 

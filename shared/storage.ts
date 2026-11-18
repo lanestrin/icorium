@@ -1,14 +1,14 @@
 import type { FileMeta, ProcessorCode } from './types';
 
-// Storage contract: what the app needs from wherever files are kept. The server's local folder and Vercel Blob
-// backends implement it in server/src/lib/storage.ts; types only, so it runs anywhere.
+// Storage contract: what the app needs from wherever files are kept. The browser implements it with IndexedDB
+// or memory in client/src/lib/browser-storage.ts; a cloud backend would be another Storage. Types only.
 
 /** What saving a file needs; the ID and upload time are set by storage. */
 export type NewFile = Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string };
 /** For create(): the text may depend on the new File ID, which is written into the CSV's ID columns. */
 export type NewUpload = Omit<NewFile, 'text'> & { text: string | ((id: string) => string) };
 
-/** What both backends (local folder and Vercel Blob) provide. Files are keyed by File ID. */
+/** What every storage provides. Files are keyed by File ID. */
 export interface Storage {
   /** Every file's metadata, oldest upload first. */
   list(): Promise<FileMeta[]>;

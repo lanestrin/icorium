@@ -16,6 +16,4 @@ export default defineConfig({
   },
   // pageCopies writes dist/generator/index.html and dist/architecture/index.html so static hosts serve those pages.
   plugins: [react(), pageCopies()],
-  // API_URL optionally overrides the local development API target.
-  server: { proxy: { '/api': process.env.API_URL ?? 'http://localhost:3001' } },
 });

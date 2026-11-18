@@ -23,7 +23,7 @@ export function useFileList(onError: Report) {
   useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
 
   /**
-   * Uploads each file in turn, reports the ones that failed, and returns how many the server accepted.
+   * Uploads each file in turn, reports the ones that failed, and returns how many were saved.
    * prepare, when given, runs first for each file: it returns the file to send (a converted CSV), or null
    * to skip it without an error (a cancelled conversion).
    */

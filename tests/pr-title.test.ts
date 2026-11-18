@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const script = fileURLToPath(new URL('../../scripts/check-pr-title.ps1', import.meta.url));
-const releaseConfig = fileURLToPath(new URL('../../release-please-config.json', import.meta.url));
+const script = fileURLToPath(new URL('../scripts/check-pr-title.ps1', import.meta.url));
+const releaseConfig = fileURLToPath(new URL('../release-please-config.json', import.meta.url));
 
 // CI (Ubuntu) has PowerShell 7 as `pwsh`; a Windows machine without it has Windows PowerShell.
 function powershell(): string {

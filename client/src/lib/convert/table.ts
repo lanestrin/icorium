@@ -44,7 +44,7 @@ const s = (n: number) => (n === 1 ? '' : 's');
 
 /**
  * Finds the partner table in rows of cell text: the first row (within HEADER_SEARCH_ROWS) holding all of
- * one adapter's columns is the header, matched exactly as the server matches them, and the rows below it
+ * one adapter's columns is the header, matched exactly as uploads match them, and the rows below it
  * are the data. Rows with the wrong number of cells are kept and flagged, never guessed: a short row is
  * padded with empty cells, and cells beyond the header are left out. A later row equal to the header (a
  * PDF repeats it on each page) is left out and flagged. `where` names the place searched.

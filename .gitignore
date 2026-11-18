@@ -1,7 +1,6 @@
 node_modules
 dist
 storybook-static
-server/data
 blueprint/context/landing-*
 .vercel
 .env*
@@ -17,4 +16,4 @@ blueprint/context/
 blueprint/history/
 blueprint/workflow.md
 scripts/open-pr.mjs
-server/src/open-pr.test.ts
+tests/open-pr.test.ts

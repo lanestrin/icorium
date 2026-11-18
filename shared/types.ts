@@ -61,7 +61,7 @@ export interface FileMeta {
   importedFrom?: string; // provenance only: the source File ID an uploaded result named in its file_id column
 }
 
-/** POST /api/process answers 409 with this when the result exists and the request did not send replace: true. */
+/** What process() returns, instead of a saved result, when the result exists and replace: true was not sent. */
 export interface ReplaceConflict {
   message: string;
   existing: Pick<FileMeta, 'id' | 'name' | 'archived'>;
@@ -189,5 +189,5 @@ export interface GeneratedFile {
   errors: GeneratedError[];
 }
 
-/** POST /api/generate: 1–10 files with the same settings and different data. */
+/** generate(): 1–10 files with the same settings and different data. */
 export interface GeneratedBatch { files: GeneratedFile[] }

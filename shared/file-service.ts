@@ -7,9 +7,9 @@ import { httpError, parseCsv, toCsv } from './csv';
 import type { Storage } from './storage';
 import { generateFiles } from './generate';
 
-// The app's file actions as plain functions over a Storage: the server's routes call them today, and the
-// browser can call the same functions with its own Storage. Errors are httpError()s carrying the status
-// the API answers with.
+// The app's file actions as plain functions over a Storage. The browser calls them over its own storage
+// (client/src/lib/api.ts). Errors are httpError()s carrying a status: 400 for bad input, 404 for an
+// unknown file and 507 when browser storage is full.
 
 const processBody = z.object({
   fileId: z.string().min(1),
@@ -38,7 +38,7 @@ const generateBody = z.object({
 }).refine((body) => body.errorRows <= body.rows, { message: 'Rows with errors must be a whole number from 0 to the number of rows.', path: ['errorRows'] });
 
 /** Checks untrusted input against a schema; a failed check is a 400 listing every problem, separated by "; ". */
-export function parseInput<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
+function parseInput<T extends z.ZodType>(schema: T, value: unknown): z.output<T> {
   const parsed = schema.safeParse(value);
   if (!parsed.success) throw httpError(400, parsed.error.issues.map((i) => i.message).join('; '));
   return parsed.data;
@@ -97,10 +97,14 @@ export type ProcessOutcome = { file: FileMeta } | { conflict: ReplaceConflict };
 /** The app's file actions, reading and writing files through this storage. */
 export function createFileService(storage: Storage) {
   // Recently parsed files, so paging through a preview reads and parses the CSV once. The key is the
-  // File ID plus its upload time: every save sets a new upload time, so a file saved again (here or
-  // by another server sharing Blob storage) is parsed afresh and its old rows are never served.
-  // Metadata is always read fresh from storage; only what comes from the CSV text is cached.
+  // File ID plus its upload time, so a file saved again elsewhere (another tab) is parsed afresh. A
+  // result this service saves is also forgotten at once, because a fast storage can save it again
+  // within the same millisecond, keeping its upload time. Metadata is always read fresh from storage;
+  // only what comes from the CSV text is cached.
   const parsed = new Map<string, ParsedFile>();
+  function forget(id: string) {
+    for (const key of parsed.keys()) if (key.startsWith(`${id}@`)) parsed.delete(key);
+  }
   async function parsedFile(meta: FileMeta): Promise<ParsedFile> {
     const key = `${meta.id}@${meta.uploadedAt}`;
     const cached = parsed.get(key);
@@ -117,7 +121,7 @@ export function createFileService(storage: Storage) {
   }
 
   return {
-    // A pure read: metadata from older versions is corrected once at startup (reconcileMetadata).
+    // A pure read: listing never reads a CSV or writes anything.
     list: () => storage.list(),
 
     /** Upload: parse + schema check always run here, regardless of processing function. */
@@ -213,10 +217,15 @@ export function createFileService(storage: Storage) {
         problemRows: out.problemRows,
       };
       // A confirmed re-run overwrites, saving new metadata, so an archived result returns to Active Files.
-      if (replace) return { file: await storage.put(id, result) };
-      // Otherwise only create: if another request saved this result since the check above, refuse
+      if (replace) {
+        const file = await storage.put(id, result);
+        forget(id);
+        return { file };
+      }
+      // Otherwise only create: if another action saved this result since the check above, refuse
       // like a normal re-run rather than overwrite it.
       const created = await storage.createAt(id, result);
+      if (created) forget(id);
       return created ? { file: created } : { conflict: conflict(await storage.get(id)) };
     },
 

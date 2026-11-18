@@ -23,7 +23,7 @@ function random(seed: number) {
   };
 }
 
-/** "partnerA-11092026-001.csv": partner, the day it was made (MMDDYYYY, server time) and its number in the batch. */
+/** "partnerA-11092026-001.csv": partner, the day it was made (MMDDYYYY, local time) and its number in the batch. */
 export function generatedName(partner: GeneratorPartner, number: number, made: Date) {
   const mmddyyyy = `${String(made.getMonth() + 1).padStart(2, '0')}${String(made.getDate()).padStart(2, '0')}${made.getFullYear()}`;
   return `partner${partner}-${mmddyyyy}-${String(number).padStart(3, '0')}.csv`;

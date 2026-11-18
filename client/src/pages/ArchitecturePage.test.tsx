@@ -48,7 +48,7 @@ describe('Architecture & Tech Stack page', () => {
     render(<ArchitecturePage />);
     const tiles = within(screen.getByRole('group', { name: 'Technology stack' })).getAllByRole('button');
     expect(tiles.map((t) => t.textContent)).toEqual([
-      'React 19UI', 'TypeScriptType safety', 'ViteBuild & dev', 'SassStyling', 'RadixDialog & menu', 'Fastify 5API', 'ZodValidation',
+      'React 19UI', 'TypeScriptType safety', 'ViteBuild & dev', 'SassStyling', 'RadixDialog & menu', 'ZodValidation',
       'Papa ParseCSV parsing', 'SheetJSExcel import', 'pdf.jsPDF import', 'RechartsCharts', 'LucideIcons', 'VitestTesting', 'StorybookComponent docs', 'IndexedDBFile storage',
     ]);
     const detail = () => screen.getByRole('region', { name: 'Selected technology' });
@@ -76,7 +76,7 @@ describe('Architecture & Tech Stack page', () => {
     expect(within(architecture).getByRole('heading', { level: 2 })).toHaveTextContent('How data moves through the app');
     const diagram = within(architecture).getByRole('list', { name: 'Architecture diagram' });
     expect(within(diagram).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'User / BrowserUpload CSVs and use the app', 'ReactFrontend', 'FastifyAPI', 'Parse', 'Normalize', 'Validate', 'Process', 'Results', 'Storage',
+      'User / BrowserUpload CSVs and use the app', 'ReactFrontend', 'File serviceIn the browser', 'Parse', 'Normalize', 'Validate', 'Process', 'Results', 'Storage',
     ]);
     const steps = within(within(architecture).getByRole('region', { name: 'How it works' })).getAllByRole('listitem');
     expect(steps.map((s) => s.textContent)).toEqual(HOW_IT_WORKS.map((text, i) => `${i + 1}${text}`));
@@ -87,11 +87,12 @@ describe('Architecture & Tech Stack page', () => {
     const user = userEvent.setup();
     render(<ArchitecturePage />);
     const decisions = document.getElementById('decisions')!;
-    const featured = within(decisions).getByRole('article', { name: 'Processing location (server vs. browser)' });
+    const featured = within(decisions).getByRole('article', { name: 'Processing location (browser only)' });
     expect(within(featured).getByRole('list', { name: 'Benefits' }).children).toHaveLength(3);
-    expect(featured).toHaveTextContent('Trade-off: server dependency');
+    expect(featured).toHaveTextContent('Trade-off: one device only');
+    expect(featured).toHaveTextContent('No server is involved.');
     expect(within(decisions).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Processing location (server vs. browser)', 'Why React + Fastify?', 'Why TypeScript throughout?', 'Why files over PostgreSQL?',
+      'Processing location (browser only)', 'Why React and no server?', 'Why TypeScript throughout?', 'Why files over PostgreSQL?',
       'Why a modular pipeline?', 'Why synchronous processing?',
     ]);
     const reasoning = within(decisions).getAllByText('The full reasoning');
@@ -108,10 +109,12 @@ describe('Architecture & Tech Stack page', () => {
     const storage = document.getElementById('storage')!;
     expect(within(storage).getByRole('heading', { level: 2 })).toHaveTextContent('Hosting and storage');
     const vercel = within(storage).getByRole('list', { name: 'Optional Vercel deployment' });
+    expect(vercel).toHaveTextContent('One static site, free on the Hobby plan');
     expect(vercel).toHaveTextContent('Test site: deploys main');
+    expect(storage).not.toHaveTextContent(/Vercel Blob|server\/data|Fastify/);
     expect(vercel).toHaveTextContent('Each release also ships as a deployable zip (scripts/build-release.mjs); Production host not chosen yet');
     expect(within(storage).getByRole('img', { name: /S3 or Cloudflare R2 could be added/ })).toHaveTextContent(
-      'Browser (IndexedDB)In useLocal filesystemServer, until 16.3Vercel BlobServer, when a token is setS3 / Cloudflare R2Not built');
+      'Browser (IndexedDB)In useS3 / Cloudflare R2Not built');
     expect(storage).toHaveTextContent('list · get · read · patch · create · createAt · put');
   });
 

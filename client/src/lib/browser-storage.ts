@@ -3,7 +3,7 @@ import { nextBaseId, parseFileId, type FileMeta } from '../../../shared/types';
 import type { NewFile, Storage } from '../../../shared/storage';
 
 // Where the workspace's files live in the browser: IndexedDB, so files survive a refresh on this device,
-// or memory when the browser won't open IndexedDB. Both implement the same Storage as the server's.
+// or memory when the browser won't open IndexedDB. Both implement Storage from shared/storage.ts.
 
 /** A browser storage, which can also be emptied (Clear my data). */
 export interface BrowserStorage extends Storage {

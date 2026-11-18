@@ -39,7 +39,7 @@ All MVP capabilities are shipped (see `build-plan.md`):
   restore with Undo
 - Compare 2 to 5 results of one function in a full-screen dashboard
 - File IDs (`100001`, `100001-M`) that identify files and travel in the CSV data;
-  re-runs replace a result only with confirmation (server side done, UI dialog next)
+  re-runs replace a result only with confirmation
 - CSV generator page (`/generator`) and an Architecture & Tech Stack page (`/architecture`)
 
 ## 4. Data - What are we storing?
@@ -60,12 +60,12 @@ No database, accounts or user data.
 
 ## 5. Tech - What stack are we using?
 
-- **Client:** React 19, TypeScript, Vite, Sass (SCSS Modules) on design tokens, Radix (dialog and menu), Storybook, Recharts, Lucide React
-- **Server:** Node.js 24, Fastify 5 (+ `@fastify/multipart`), Papa Parse, Zod, run with tsx
-- **Shared:** `shared/types.ts` for types and the processor list
-- **Storage:** local files under `server/data/`; private Vercel Blob when deployed
-- **Tests:** Vitest (server unit + API via `app.inject`; client unit/component
-  with React Testing Library and jsdom)
+- **Client:** React 19, TypeScript, Vite, Sass (SCSS Modules) on design tokens, Radix (dialog and menu), Storybook, Recharts, Lucide React, Papa Parse, Zod
+- **Shared:** `shared/` for types, the processor list, processing and the file service, with no Node imports; it runs in the browser
+- **Storage:** the browser's IndexedDB (memory when it is blocked); files stay on the person's device
+- **No server:** the app is a static site (since build-plan 16.3)
+- **Tests:** Vitest (Node tests in `tests/` for shared logic, the file service and
+  the release tooling; client unit/component with React Testing Library and jsdom)
 - **Tooling:** npm workspaces; GitHub Actions CI running `npm run verify`
 
 ## 6. Monetize - How will this make money?
@@ -83,11 +83,11 @@ sideways page scroll. The frozen UI scope is in `build-plan.md` section 2.
 
 ## 8. Deployment - Where and how will this ship?
 
-Primary target is a local demo: `npm install`, then `npm run dev` (API :3001,
-UI :5173). An optional Vercel deployment (client and server services, private
-Blob storage, server-side only) is configured but not deployed; see
-`blueprint/vercel-deployment.md` for settings and outstanding checks. Approved
-by the person on 2026-11-06; any further cloud addition needs a new decision.
+Primary target is a local demo: `npm install`, then `npm run dev` (the app on
+:5173). Vercel serves it as one static site, free and with no server or cloud
+storage: the Test site deploys `main`. See `blueprint/vercel-deployment.md`.
+Approved by the person on 2026-11-06 and reduced to static hosting in 16.3
+(2026-11-17); any further cloud addition needs a new decision.
 
 ## 9. Usage model and constraints (optional)
 

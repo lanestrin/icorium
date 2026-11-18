@@ -1,19 +1,18 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { createFileService, type FileService } from '../../shared/file-service';
-import { parseCsv } from '../../shared/csv';
-import type { FileMeta } from '../../shared/types';
-import { openLocalStorage } from './lib/storage';
+import { createFileService, type FileService } from '../shared/file-service';
+import { parseCsv } from '../shared/csv';
+import type { FileMeta } from '../shared/types';
+import { createMemoryStorage } from '../client/src/lib/browser-storage';
 
 // The file service called directly, with no HTTP layer, as the browser will call it (16.2).
 
-const sample = (name: string) => fs.readFileSync(path.resolve(import.meta.dirname, '../../sample-data', name), 'utf8');
+const sample = (name: string) => fs.readFileSync(path.resolve(import.meta.dirname, '../sample-data', name), 'utf8');
 
 let files: FileService;
 beforeEach(async () => {
-  files = createFileService(await openLocalStorage(fs.mkdtempSync(path.join(os.tmpdir(), 'reclaim-service-'))));
+  files = createFileService(createMemoryStorage());
 });
 
 /** The saved file of a process() call that is expected to succeed. */

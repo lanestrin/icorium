@@ -25,7 +25,7 @@ function StorageOptions() {
     <div className={styles.storageOptions}>
       <h3 className={styles.storageHeading}>Storage options</h3>
       <div role="img" className={styles.storageRow}
-        aria-label="Storage options: the local filesystem (the default) and private Vercel Blob are built; S3 or Cloudflare R2 could be added as another backend behind the same interface.">
+        aria-label="Storage options: the browser's IndexedDB is in use; S3 or Cloudflare R2 could be added as another backend behind the same interface.">
         {STORAGE_OPTIONS.map((option, i) => (
           <div key={option.name} className={styles.storageStep}>
             {i > 0 && <ArrowRight className={styles.storageArrow} aria-hidden />}
@@ -34,30 +34,30 @@ function StorageOptions() {
         ))}
       </div>
       <p className={styles.storageNote}>
-        One interface (list · get · read · patch · create · createAt · put) in <Path>server/src/lib</Path>, so another backend changes nothing else.
+        One interface (list · get · read · patch · create · createAt · put) in <Path>shared/storage.ts</Path>, so another backend changes nothing else.
       </p>
     </div>
   );
 }
 
-/** Section 5: local and Vercel hosting, and the storage backends behind one interface. */
+/** Section 5: local and Vercel hosting of the static site, and the storage backends behind one interface. */
 export function StorageSection() {
   return (
     <Section id="storage" eyebrow="5 · Storage and deployment" title="Hosting and storage" side
-      intro="Separate concerns, one storage interface. Routes and processing never touch persistence; the backend is chosen at startup.">
+      intro="Separate concerns, one storage interface. Processing never touches persistence directly; the browser opens IndexedDB, or memory when it is blocked.">
       <div className={styles.storageGrid}>
         <Card as="article">
           <h3 className={styles.cardHeading}><Laptop className={styles.headingIcon} aria-hidden /> Local development</h3>
           <Checks label="Local development" items={[
-            'Node.js API with filesystem storage',
-            <>Originals, results and metadata under <Path>server/data</Path></>,
+            'One Vite dev server; no API or database to start',
+            <>Files kept in the browser by <Path>client/src/lib/browser-storage.ts</Path></>,
           ]} />
         </Card>
         <Card as="article">
           <h3 className={styles.cardHeading}><Cloud className={styles.headingIcon} aria-hidden /> Optional Vercel deployment</h3>
           <Checks label="Optional Vercel deployment" items={[
-            'Separate frontend and API services',
-            'Private Vercel Blob storage',
+            'One static site, free on the Hobby plan',
+            'No server or cloud storage: files stay in each visitor\'s browser',
             'Test site: deploys main',
             <>Each release also ships as a deployable zip (<Path>scripts/build-release.mjs</Path>); Production host not chosen yet</>,
           ]} />

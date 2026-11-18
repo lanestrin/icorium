@@ -12,16 +12,16 @@ Requires Node.js 24 (the version CI uses).
 
 ```bash
 npm install
-npm run dev       # API on :3001, UI on http://localhost:5173 (Vite picks the next free port if 5173 is taken)
+npm run dev       # the app on http://localhost:5173 (Vite picks the next free port if 5173 is taken)
 npm run verify    # every test + the production build
 npm run storybook # the shared ui/ components in Storybook on http://localhost:6006 (npm run build-storybook for a static copy)
 ```
 
 **Where files are kept.** The app runs in the browser: uploads, results and archive flags are kept in the browser's IndexedDB on that device (`client/src/lib/browser-storage.ts`), and nothing is sent to a server. They survive a refresh but are removed when the person clears their browser data. If the browser blocks IndexedDB, files are kept in memory until the page is refreshed, and the page says so. The five synthetic sample CSVs in `sample-data/` (described in `sample-data/README.txt`) are built into the page and loaded as File IDs `100001`–`100005`. To reset the demo, click **Clear my data** under the upload area and confirm: every upload and result in that browser is deleted and the five samples come back.
 
-The Node server in `server/` still runs the same file actions over `server/data/` (or Vercel Blob) until 16.3 retires it, but the app no longer calls it. To reset its data, stop the servers, delete `server/data/` and start again.
+There is no server, API or database: the app is a static site, and any static host can serve it.
 
-**File IDs.** Every file has a File ID. Each upload gets a new six-digit base ID, counting up from `100001` and never reused while the workspace exists. **Clear my data** starts a new workspace, so numbering starts again at `100006`; an old download that names a reused ID is linked again only if its data matches that input exactly. A result's ID is its input's ID plus its function's code: `-V` Validation, `-M` Mass, `-C` Classification, e.g. `101010-M`. Re-running a function on the same input replaces that result and keeps its ID, but only when confirmed: `POST /api/process` answers 409, naming the existing result, unless the request sends `replace: true`. In the app, **Run Processing** first opens **Replace existing result?**, listing each result the run would replace (and saying when one is archived; replacing it returns it to Active Files), together with the Data Quality Warning when that also applies. **Cancel** changes nothing; **Run & Replace** sends `replace: true` for exactly the listed files. If the list was out of date and the server still refuses a file, the same dialog opens for it after the run. Uploading a downloaded result gives it a new base ID plus its code. Names are labels only, so two inputs with the same name keep separate results. Anything that is not a File ID is treated as an unknown file (404).
+**File IDs.** Every file has a File ID. Each upload gets a new six-digit base ID, counting up from `100001` and never reused while the workspace exists. **Clear my data** starts a new workspace, so numbering starts again at `100006`; an old download that names a reused ID is linked again only if its data matches that input exactly. A result's ID is its input's ID plus its function's code: `-V` Validation, `-M` Mass, `-C` Classification, e.g. `101010-M`. Re-running a function on the same input replaces that result and keeps its ID, but only when confirmed: without `replace: true`, processing refuses and names the existing result. In the app, **Run Processing** first opens **Replace existing result?**, listing each result the run would replace (and saying when one is archived; replacing it returns it to Active Files), together with the Data Quality Warning when that also applies. **Cancel** changes nothing; **Run & Replace** sends `replace: true` for exactly the listed files. If the list was out of date and processing still refuses a file, the same dialog opens for it after the run. Uploading a downloaded result gives it a new base ID plus its code. Names are labels only, so two inputs with the same name keep separate results. Anything that is not a File ID is treated as an unknown file (404).
 
 The File ID travels with the data. A stored input gets a `file_id` column with its ID on every row. A result keeps that `file_id` (so it names its original) and adds its own `result_id` as its first generated column. Downloads therefore carry their IDs. Uploading a file that already has these columns overwrites them with the new IDs (every upload is a new file); an uploaded result is marked as imported. Results exported before these columns existed are still recognised, stored unchanged and compared with new ones. Comparisons never compare `result_id`, since it always differs between files.
 
@@ -29,9 +29,10 @@ The File ID travels with the data. A stored input gets a `file_id` column with i
 
 | Level | File | What it proves |
 | --- | --- | --- |
-| Unit (Vitest) | `server/src/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths and row matching for 2–5 files, and the CSV generator (formats, exact error counts and reasons, file names, distinct files in a batch, seeds, limits) |
-| API (Vitest + `app.inject`) | `server/src/api.test.ts` | Every endpoint and error message, including archive and restore and CSV generation; all three functions on all five samples: exact invalid rows and reasons, every original column and value kept, download, renamed re-upload and compare; and a file identity regression for each function: same-named uploads, separate results, refused and confirmed re-runs, archive and restore, download, re-upload linking and 2- and 5-file comparison, all by full File ID |
-| Unit + API (Vitest, Blob SDK mocked in memory) | `server/src/blob-storage.test.ts` | The private Blob storage adapter: shared files across instances, metadata and CSV stored as separate objects (SDK calls counted per operation), the one-time conversion of the older layout, atomic result replacement, idempotent sample seeding, conflict and failure handling, and refusing a Vercel start without storage configured; and same-named uploads and results kept apart by File ID across fresh API instances |
+| Unit (Vitest) | `tests/core.test.ts` | Unit conversions, validation rules and tolerance, mass maths, classification thresholds, CSV escaping, comparison maths and row matching for 2–5 files, and the CSV generator (formats, exact error counts and reasons, file names, distinct files in a batch, seeds, limits) |
+| Unit (Vitest, the real file service over memory storage, real sample CSVs) | `tests/file-actions.test.ts` | Every file action and error message, including archive and restore and CSV generation; all three functions on all five samples: exact invalid rows and reasons, every original column and value kept, download, renamed re-upload and compare; and a file identity regression for each function: same-named uploads, separate results, refused and confirmed re-runs, archive and restore, download, re-upload linking and 2- and 5-file comparison, all by full File ID |
+| Unit (Vitest) | `tests/file-service.test.ts` | The file service called directly: each action's result, a refused and a confirmed re-run, and the 400 and 404 messages for bad input |
+| Unit (Vitest) | `tests/release.test.ts`, `tests/pr-title.test.ts` | The release zip (allowlist, forbidden paths, credential scan, a deterministic build), the release workflow's static smoke test, and the PR title check |
 | Unit (Vitest) | `client/src/lib/compare-view.test.ts` | When a selection can be compared, short file labels, metric names, Δ vs reference, number formats, top-difference ranking and the fitted chart axis |
 | Component (Vitest + React Testing Library) | `client/src/pages/ArchitecturePage.test.tsx` | Architecture page sections and links, overview cards, technology tiles and their details (mouse and keyboard), the diagram and its numbered steps, the decisions and their full reasoning, storage options, evolution cards and section dividers |
 | Unit (Vitest) | `client/src/pages/architecture-content.test.ts` | Every repository path, package, card version and quoted limit on the Architecture page exists in or matches the code |
@@ -48,7 +49,7 @@ The File ID travels with the data. A stored input gets a `file_id` column with i
 | Unit (Vitest + React Testing Library `renderHook`) | `client/src/hooks/useConversion.test.ts` | One conversion at a time: cancelling, unmounting or starting another file ends it and stops its reader, a late reader result or failure is ignored, PDFs use the PDF reader, and Import hands back the CSV |
 | Component (Vitest + React Testing Library, readers mocked) | `client/src/pages/FilesPage.convert.test.tsx` | Importing Excel and PDF files (PDFs offered in the file picker, a repeated header left out): the review dialog (partner, header row, rows to check, cell text shown as text), Import as CSV uploading `<name>.csv`, Cancel and Escape uploading nothing, one review at a time, and files that can't be converted named while the others still upload |
 
-`npm test` runs server unit/API tests and client unit/component tests. Client tests use Vitest, React Testing Library and jsdom; API calls are mocked at the client boundary while server behavior has separate API coverage. `npm run verify` also type-checks and builds the client. These replace required manual acceptance checks; they do not establish real-browser layout or visual correctness. Run `npm test -w client` for client tests only.
+`npm test` runs the Node tests in `tests/` (shared logic, the file service and the release tooling) and the client unit/component tests. Client tests use Vitest, React Testing Library and jsdom; page tests mock the file actions in `client/src/lib/api.ts`, which `tests/file-actions.test.ts` and `client/src/lib/api.test.ts` cover for real. `npm run verify` also type-checks and builds the client. These replace required manual acceptance checks; they do not establish real-browser layout or visual correctness. Run `npm test -w client` for client tests only.
 
 ## Importing Excel and PDF files
 
@@ -58,7 +59,7 @@ PDFs (`.pdf`, up to 20 MB and 20 pages) go through the same review. Only PDFs th
 
 ## File status and selection
 
-The **Processing function** column says which function made each file: **Original** for uploaded inputs, or **Validation**, **Mass Calculation** or **Classification** for results. Each file shows its **File ID** (`101010`, `101010-V`) and **File Name** in separate columns, so files with the same name stay distinct (row and column counts are shown in **Preview**, not in the table); an uploaded result is marked **Imported** and gets a new ID. It is linked to its original ("Imported from 101010") only when its `file_id` names an input in the workspace and its original columns and values match that input exactly, in any column order; otherwise it records the source it named but stays unlinked ("not linked to 101010"). The preview, the processing panel and the comparison chips show the File ID too. The filters sit together in one card: search by File ID or file name (`101010` finds the input and its results), **Date Range**, **Processing Function** and **Status**. They combine, apply within the current tab, and **Clear filters** (enabled once any filter is set) resets them all. **Sort by**, at the right of the tabs, orders the list by upload time (newest first by default), name or File ID (each original followed by its `-V`, `-M`, `-C` results); the Archived tab also offers, and starts with, **Archived (newest)**. Each tab keeps its own sort, and the sorted column's header shows an arrow. Input files without invalid rows are **Ready**; inputs with invalid rows are **Needs Review** and remain selectable for all three functions. The status filter includes both states. Results remain **Processed**; open **Preview file** from a row's ⋯ menu to see which rows are invalid and why. Metadata saved by older versions is updated once when the server starts, without rewriting CSVs or resetting data; listing files never writes. A stored file that cannot be read is skipped and logged as a warning.
+The **Processing function** column says which function made each file: **Original** for uploaded inputs, or **Validation**, **Mass Calculation** or **Classification** for results. Each file shows its **File ID** (`101010`, `101010-V`) and **File Name** in separate columns, so files with the same name stay distinct (row and column counts are shown in **Preview**, not in the table); an uploaded result is marked **Imported** and gets a new ID. It is linked to its original ("Imported from 101010") only when its `file_id` names an input in the workspace and its original columns and values match that input exactly, in any column order; otherwise it records the source it named but stays unlinked ("not linked to 101010"). The preview, the processing panel and the comparison chips show the File ID too. The filters sit together in one card: search by File ID or file name (`101010` finds the input and its results), **Date Range**, **Processing Function** and **Status**. They combine, apply within the current tab, and **Clear filters** (enabled once any filter is set) resets them all. **Sort by**, at the right of the tabs, orders the list by upload time (newest first by default), name or File ID (each original followed by its `-V`, `-M`, `-C` results); the Archived tab also offers, and starts with, **Archived (newest)**. Each tab keeps its own sort, and the sorted column's header shows an arrow. Input files without invalid rows are **Ready**; inputs with invalid rows are **Needs Review** and remain selectable for all three functions. The status filter includes both states. Results remain **Processed**; open **Preview file** from a row's ⋯ menu to see which rows are invalid and why. Listing files never reads a CSV or writes anything.
 
 Every row, input or result, can be selected. **Run Processing** uses only the selected inputs, and the processing panel lists every selected input filename, including selections hidden by filters. Filters do not clear selections; select-all affects the visible rows. Processing a file does not repair its source data, so an invalid input remains Needs Review after a successful run.
 
@@ -66,7 +67,7 @@ The list has two tabs, **Active Files** and **Archived**, each showing its file 
 
 ## Architecture page
 
-**Architecture** (top right of the file list), or `/architecture`, is an engineering case study for walking through the design: the technology stack with the reason and trade-off for each tool, an interactive architecture diagram that follows the Upload, Process, Compare and Generate requests and shows which files implement each component, the main design decisions, how storage is kept separate from hosting, trade-offs, and what would change as the product scales. `client/src/pages/architecture-content.test.ts` checks that every repository path, package and quoted limit on the page matches the code.
+**Architecture** (top right of the file list), or `/architecture`, is an engineering case study for walking through the design: the technology stack with the reason and trade-off for each tool, an interactive architecture diagram that follows the Upload, Process, Compare and Generate actions and shows which files implement each component, the main design decisions, how storage is kept separate from hosting, trade-offs, and what would change as the product scales. `client/src/pages/architecture-content.test.ts` checks that every repository path, package and quoted limit on the page matches the code.
 
 ## CSV generator
 
@@ -108,12 +109,12 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 - Both rows of a duplicate batch ID are marked Invalid; neither is picked as the correct one.
 - Comparison matches rows by batch ID only when every pair of compared files shares IDs (a partner's baseline and follow-up); files from different partners share none, so their rows are matched by position, up to the longest file. The comparison states which was used. A repeated ID is matched occurrence by occurrence, and a blank ID never matches.
 - Only results from the same function and the current column layout can be compared. Regenerate an older result before comparing it with a new one.
-- A comparison holds at most 50,000 rows across its files, so it stays under Vercel's 4.5 MB response limit online; above that it is refused with "Too many rows to compare", naming the total.
-- A confirmed re-run of a function on the same input replaces the earlier result under the same File ID; there is no version history. A result is first saved with a create-if-absent write, so of two first runs of the same result at the same moment one is saved and the other is refused with 409, like any unconfirmed re-run. Two *confirmed* replacements at the same moment both write and the last one is kept (both are made from the same input, so only the save time differs). File IDs end at `999999`.
-- Processing is synchronous and handles one file at a time, which suits interview-sized files. Preview lists the first 100 problem rows in detail.
+- A comparison holds at most 50,000 rows across its files, so the page stays responsive; above that it is refused with "Too many rows to compare", naming the total.
+- A confirmed re-run of a function on the same input replaces the earlier result under the same File ID; there is no version history. A result is first saved with a create-if-absent write, so of two first runs of the same result at the same moment one is saved and the other is refused, like any unconfirmed re-run. Two *confirmed* replacements at the same moment both write and the last one is kept (both are made from the same input, so only the save time differs). File IDs end at `999999`.
+- Processing runs in the browser, one file at a time, which suits interview-sized files. Preview lists the first 100 problem rows in detail.
 - Classification thresholds are demo-only, and no purity or recovery is inferred from feed composition.
 - Automated tests cover behavior in jsdom; they do not check real-browser layout or visuals.
-- `/generator` and `/architecture` are client-side pages. The Vite dev and preview servers serve them directly, and the build copies `index.html` to `dist/generator/` and `dist/architecture/` (`client/src/lib/pages.ts`) so a static host such as the optional Vercel deployment serves them too. That has not yet been confirmed on a live deployment.
+- `/generator` and `/architecture` are client-side pages. The Vite dev and preview servers serve them directly, and the build copies `index.html` to `dist/generator/` and `dist/architecture/` (`client/src/lib/pages.ts`) so a static host such as the Vercel deployment serves them too. That has not yet been confirmed on a live deployment.
 
 ## Layout
 
@@ -133,17 +134,15 @@ client/        React + Vite UI, styled with SCSS Modules on design tokens
   src/hooks/       the workspace state, one hook per file: file list, selection, filters, archiving, processing
   src/lib/         api (the file actions, run in the browser), browser-storage (IndexedDB, or memory), samples (the bundled sample CSVs),
                    file-status (file rules), compare-view (comparison rules), format
-server/        Fastify API
-  src/lib/         storage (local files, or private Blob via blob-storage.ts)
-  src/routes/      files.ts: /api/files, /api/files/archive, /api/process, /api/compare, /api/generate
-shared/        code with no Node imports, used by the server and, from 16.2, the browser
-  types.ts         types and the processor list used by both sides
+shared/        code with no Node imports, run in the browser (a test in tests/ enforces it)
+  types.ts         types and the processor list
   csv.ts           CSV parse/export
   adapters.ts      partner header and unit mappings -> one normalized record
   processing.ts    the three processing functions
   compare.ts, generate.ts   comparison and the CSV generator
-  storage.ts       the Storage interface both storage backends implement
+  storage.ts       the Storage interface every storage implements
   file-service.ts  the file actions (upload, rows, download, archive, process, compare, generate) over a Storage
+tests/         Node-side tests: shared logic, the file service and the release tooling
 sample-data/   the five synthetic partner CSVs (never edited)
 ```
 
@@ -187,24 +186,13 @@ Storybook (`npm run storybook`, http://localhost:6006) documents the shared comp
 
 ## Settings
 
-The API reads these environment variables when it starts. Each is optional; unset or empty means the default. An invalid value stops the server with a message naming the variable.
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `MAX_UPLOAD_MB` | `10` | Largest CSV upload, in megabytes (any positive number, e.g. `0.5`). A larger file is refused with 413 "This file is larger than the 10 MB upload limit." Set `2` on Vercel, whose 4.5 MB body limit would otherwise block downloading the result of a larger file (see `blueprint/vercel-deployment.md`). |
-| `LOG_LEVEL` | `warn` | Server log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent`. Use `info` to see the "API on http://localhost:3001" startup line. |
-| `HOST` | `0.0.0.0` | Address the API listens on. |
-| `PORT` | `3001` | Port the API listens on. |
-
-Storage is chosen by `RECLAIM_DATA_DIR`, `BLOB_READ_WRITE_TOKEN`, `RECLAIM_BLOB_PREFIX` and `VERCEL` (see `createStorage` in `server/src/lib/storage.ts` and the deployment notes below).
-
-These limits are fixed in code, each as one named constant:
+The app has no runtime settings. These limits are fixed in code, each as one named constant:
 
 | Constant | Value | File |
 | --- | --- | --- |
 | `PREVIEW_MAX_ROWS` | 1,000 rows per preview page (100 by default) | `shared/file-service.ts` |
 | `PARSED_CACHE_FILES` | 10 parsed files kept for previews and comparisons | `shared/file-service.ts` |
-| `BLOB_LIST_PAGE` | 1,000 objects per Blob listing request | `server/src/lib/blob-storage.ts` |
+| `UPLOAD_MAX_MB` | 10 MB per CSV upload | `client/src/lib/api.ts` |
 | `GENERATOR_MAX_ROWS`, `GENERATOR_MAX_FILES` | 5,000 rows per generated file, 10 files per request | `shared/types.ts` |
 | `GENERATOR_FIRST_DAY`, `GENERATOR_RANGES` | Generated rows start on 2026-09-01; mass 110–140 kg, R-32 33–43 %, R-125 26–33 % | `shared/generate.ts` |
 | `DEMO_CLASS_RULES` | Demo classification thresholds: R-32-rich from 40 %, R-134a-rich from 34 % | `shared/processing.ts` |
@@ -213,14 +201,14 @@ These limits are fixed in code, each as one named constant:
 
 ## Deploy
 
-Local development needs no account or cloud service. An optional Vercel deployment (client and server services, private Blob storage) is configured; see [deployment configuration and outstanding checks](blueprint/vercel-deployment.md).
+Local development needs no account or cloud service. Vercel builds the client and serves it as one static site (`vercel.json`), with no server or cloud storage; see [the deployment notes](blueprint/vercel-deployment.md). The build variable `APP_ENV_LABEL` is the only setting.
 
 **Releases.** Versions are worked out automatically from the PR titles (`fix:` patch, `feat:` minor, `feat!:` major) by release-please, which keeps one `chore: release X.Y.Z` PR open with the next version and `CHANGELOG.md`. Merging it creates the `vX.Y.Z` tag and GitHub Release. The current version shows at the end of each page's navigation: `· Test` on the Vercel site (set with the build variable `APP_ENV_LABEL=Test`) and `· Preview` on other branches' Vercel Previews. See "Releases" in [blueprint/commit-rules.md](blueprint/commit-rules.md).
 
-**Release zip.** Each published release also gets `icorium-vX.Y.Z.zip`, its `.sha256` and a manifest as release assets, built from the exact tag by `.github/workflows/release-artifact.yml`. The zip holds only the files in `release/allowlist.txt` plus `DEPLOY.md` (how to install, build and run it anywhere, with `npm start -w server` for the API). Vercel is the Test site; where Production runs is not decided yet. See "Releases and environments" in [blueprint/vercel-deployment.md](blueprint/vercel-deployment.md).
+**Release zip.** Each published release also gets `icorium-vX.Y.Z.zip`, its `.sha256` and a manifest as release assets, built from the exact tag by `.github/workflows/release-artifact.yml`. The zip holds only the files in `release/allowlist.txt` plus `DEPLOY.md` (how to install and build it, then serve `client/dist` from any static host). Vercel is the Test site; where Production runs is not decided yet. See "Releases and environments" in [blueprint/vercel-deployment.md](blueprint/vercel-deployment.md).
 
 ## Extending
 
 - **New partner CSV schema:** add one entry to `ADAPTERS` in `shared/types.ts`, listing its id, name, description, column names, unit factors and number formats. Uploads, processing and the CSV generator all read it.
-- **New processing function:** add an entry to `processors` in `shared/processing.ts`, plus its id, code and labels in `PROCESSORS` in `shared/types.ts`. The API's accepted functions and the file table's label follow from `PROCESSORS`.
-- **Storage:** every backend implements `Storage` in `shared/storage.ts`, and `createFileService(storage)` runs the file actions over it. The app uses `client/src/lib/browser-storage.ts` (IndexedDB, or memory). A cloud backend would be another `Storage`, without changing processing or the UI. Until 16.3, `server/src/lib/storage.ts` still owns the server's local files and its private Blob adapter in `server/src/lib/blob-storage.ts`.
+- **New processing function:** add an entry to `processors` in `shared/processing.ts`, plus its id, code and labels in `PROCESSORS` in `shared/types.ts`. The file service's accepted functions and the file table's label follow from `PROCESSORS`.
+- **Storage:** every backend implements `Storage` in `shared/storage.ts`, and `createFileService(storage)` runs the file actions over it. The app uses `client/src/lib/browser-storage.ts` (IndexedDB, or memory). A cloud backend would be another `Storage`, without changing processing or the UI.

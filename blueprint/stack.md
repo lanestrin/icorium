@@ -17,17 +17,15 @@ This project is an interview exercise, **not** an industrial production system o
 | Layer | Technology | Role |
 | --- | --- | --- |
 | Frontend | React | User interface, file list, controls, preview and comparison modals |
-| Language | TypeScript | Type safety across frontend and backend |
+| Language | TypeScript | Type safety across the UI, the shared file service and the tests |
 | Frontend tooling | Vite | Local development and frontend builds |
 | Styling | SCSS Modules (Sass) on design tokens, Radix for the dialog and row menu, Storybook for the `ui/` components | Responsive, clean Apple-inspired visual styling |
 | Icons | Lucide React | Consistent interface icons |
-| Backend runtime | Node.js | Run server-side code |
-| Backend framework | Fastify | HTTP API, file uploads and processing endpoints |
 | CSV parsing / export | Papa Parse | Parse CSV data and serialize exported results |
-| Validation | Zod | Validate API inputs and normalized records |
+| Validation | Zod | Validate file-action inputs and normalized records |
 | Charting | Recharts | Visualize differences between 2 to 5 result files |
-| Testing | Vitest | Unit tests for adapters, validation, processing, and export logic |
-| Storage | Local files; private Vercel Blob when deployed | Keep original/processed CSVs for the demo |
+| Testing | Vitest | Unit tests for adapters, validation, processing, and export logic (Node, in `tests/`), and client component tests |
+| Storage | The browser's IndexedDB (memory when it is blocked) | Keep original/processed CSVs for the demo, on the person's device |
 | File conversion (browser) | SheetJS (`xlsx`, from cdn.sheetjs.com), `pdfjs-dist` | Read partner Excel files and text PDFs into a reviewed CSV before upload; the OCR reader follows in 9.14c |
 
 All free and open source. Expected local software cost: $0.
@@ -35,10 +33,10 @@ All free and open source. Expected local software cost: $0.
 ## Architecture
 
 ```text
-React + TypeScript UI
+React + TypeScript UI (in the browser)
         |
         v
-Node.js + Fastify API
+Shared file service (shared/, run in the browser)
         |
         +-- CSV import / parsing
         +-- Company-specific normalization adapters
@@ -48,7 +46,7 @@ Node.js + Fastify API
         +-- Comparison calculations for 2–5 result CSVs
         |
         v
-Local file storage (original files and result files)
+Browser storage: IndexedDB (original files and result files)
 ```
 
 A database is **not required** by the assignment. Keep processing logic independent of storage so persistence can be changed later.
@@ -80,13 +78,13 @@ Base CSV parsing and schema checks run on upload regardless of the processing fu
 
 ## Keep the Implementation Simple
 
-**Include:** normal file selection, CSV validation, modular backend functions, error handling, CSV export, comparison graph, and tests.
+**Include:** normal file selection, CSV validation, modular processing functions, error handling, CSV export, comparison graph, and tests.
 
 **Do not add:** user accounts, cloud infrastructure, PostgreSQL, Convex, notifications, AI features, microservices, queues, or an analytics dashboard.
 
-**Approved exception:** an optional Vercel deployment with private Blob storage (PR #6, confirmed by the person on 2026-11-06; see `blueprint/vercel-deployment.md`). It is server-side only and needs no accounts. Local development still uses local files and no cloud service. Any further cloud addition needs a new decision.
+**Approved exception:** an optional Vercel deployment (PR #6, confirmed by the person on 2026-11-06; see `blueprint/vercel-deployment.md`). Since 2026-11-17 (build-plan 16.3) it serves one static site and nothing else. **Withdrawn 2026-11-17:** the private Vercel Blob storage and the server service this exception also allowed, removed by 16.3 at the person's request after the Blob store reached the Hobby plan's usage limit; files now stay in each person's browser. Any further cloud addition needs a new decision.
 
-**Approved exception:** browser-side file conversion with SheetJS (`xlsx`), `pdfjs-dist` and `tesseract.js`, so partners' Excel files, text PDFs and scanned PDFs or images can be imported (build-plan 9.14, confirmed by the person on 2026-11-13). SheetJS `xlsx` 0.20.3 is installed from the official cdn.sheetjs.com tarball for Excel (9.14a), and `pdfjs-dist` for text PDFs (9.14b); `tesseract.js` arrives with 9.14c. Conversion runs in the browser; the server stays CSV-only. No account, server-side service or AI service is involved: OCR runs locally, and only Tesseract's language data is downloaded from a CDN.
+**Approved exception:** browser-side file conversion with SheetJS (`xlsx`), `pdfjs-dist` and `tesseract.js`, so partners' Excel files, text PDFs and scanned PDFs or images can be imported (build-plan 9.14, confirmed by the person on 2026-11-13). SheetJS `xlsx` 0.20.3 is installed from the official cdn.sheetjs.com tarball for Excel (9.14a), and `pdfjs-dist` for text PDFs (9.14b); `tesseract.js` arrives with 9.14c. Conversion runs in the browser; the file service stays CSV-only. No account, server-side service or AI service is involved: OCR runs locally, and only Tesseract's language data is downloaded from a CDN.
 
 **Approved change:** styling moves from Tailwind CSS to SCSS Modules with central design tokens, a shared `ui/` component library documented in Storybook, and Radix primitives (`@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`) for the dialog and row menu (build-plan M13, confirmed by the person on 2026-11-14). Tailwind was removed in 13.7; all styling uses SCSS Modules and the tokens.
 
