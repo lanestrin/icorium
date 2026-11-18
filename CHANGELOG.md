@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/lanestrin/icorium/compare/v2.1.0...v2.2.0) (2026-11-18)
+
+
+### Features
+
+* explain OCR, scaling and customer security (9.15) ([#126](https://github.com/lanestrin/icorium/issues/126)) ([0656409](https://github.com/lanestrin/icorium/commit/06564097b8cd53855ded898904b952ce7470012d))
+
 ## [2.1.0](https://github.com/lanestrin/icorium/compare/v2.0.0...v2.1.0) (2026-11-18)
 
 
