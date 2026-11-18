@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/lanestrin/icorium/compare/v2.0.0...v2.1.0) (2026-11-18)
+
+
+### Features
+
+* read scanned PDFs and images with OCR (9.14c) ([#124](https://github.com/lanestrin/icorium/issues/124)) ([14a4f6f](https://github.com/lanestrin/icorium/commit/14a4f6fa4790f21c08ff1421a86958ada5618b71))
+
 ## [2.0.0](https://github.com/lanestrin/icorium/compare/v1.20.0...v2.0.0) (2026-11-18)
 
 
