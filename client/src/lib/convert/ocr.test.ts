@@ -126,13 +126,14 @@ describe('createOcrReader', () => {
 
     it('says the language data could not be downloaded, and ends the Web Worker tesseract.js started', async () => {
       languageDataFails();
+      const browserWorker = globalThis.Worker; // the constructor before OCR starts
       const ocr = createOcrReader(new AbortController().signal);
       await expect(ocr.ready()).rejects.toThrow(new ConvertError(OCR_DOWNLOAD_FAILED));
       expect(OCR_DOWNLOAD_FAILED).toBe("The text-reading data couldn't be downloaded. Check your connection and try again.");
       expect(spawned).toHaveLength(1);
       expect(spawned[0].url).toBe(`${location.origin}/assets/worker.min.js`);
       expect(spawned[0].terminate).toHaveBeenCalledTimes(1);
-      expect(globalThis.Worker).toBe(Worker); // the browser's Worker is put back after the start
+      expect(globalThis.Worker).toBe(browserWorker); // exactly the browser's Worker is put back after the start
       await ocr.close();
     });
 
