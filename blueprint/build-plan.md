@@ -210,7 +210,7 @@ Added at the person's request on 2026-11-17. The private Vercel Blob store reach
   - A notice that data stays on this device and can be lost, a **Clear my data** action, and clear messages when browser storage is full or unavailable.
 
   **Depends on:** 16.1.
-- [ ] **16.3** `feature/16.3-retire-server-and-vercel-blob` · **P1** — Remove the Fastify server, the Blob adapter, `@vercel/blob` and the server service in `vercel.json`, so Vercel serves only the static client, for free. Withdraw the Blob exception in `blueprint/stack.md`. Update the Architecture page, the README, `blueprint/vercel-deployment.md`, `blueprint/project-plan.md`, this plan's header, and the 9.14 and 9.15 text that describes the server. **Depends on:** 16.2.
+- [x] **16.3** `feature/16.3-retire-server-and-vercel-blob` · **P1** — Remove the Fastify server, the Blob adapter, `@vercel/blob` and the server service in `vercel.json`, so Vercel serves only the static client, for free. Withdraw the Blob exception in `blueprint/stack.md`. Update the Architecture page, the README, `blueprint/vercel-deployment.md`, `blueprint/project-plan.md`, this plan's header, and the 9.14 and 9.15 text that describes the server. **Depends on:** 16.2.
 - [ ] **16.4** `feature/16.4-real-file-workflow-test` · **P2** — An automated test of the whole workflow with real files and no mocked results: upload a sample CSV and a real Excel file, run each processing function, then preview, download and compare. **Depends on:** 16.2.
 
 **Open decisions (settle in each item's spec):**
