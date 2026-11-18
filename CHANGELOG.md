@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/lanestrin/icorium/compare/v1.20.0...v2.0.0) (2026-11-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* the HTTP API (/api/files, /api/process, /api/compare, /api/generate and the rest) and `npm start -w server` no longer exist. Build with `npm run build -w client` and serve client/dist from any static host; files are kept in each visitor's browser.
+
+### Features
+
+* retire the server and Vercel Blob for a static site (16.3) ([#121](https://github.com/lanestrin/icorium/issues/121)) ([8ff66a8](https://github.com/lanestrin/icorium/commit/8ff66a8d88193c2fb310a35997fdb33ce64b8446))
+
 ## [1.20.0](https://github.com/lanestrin/icorium/compare/v1.19.0...v1.20.0) (2026-11-18)
 
 
