@@ -1,4 +1,4 @@
-import { Atom, BookOpen, Boxes, Braces, ChartColumn, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Globe, Laptop, Layers, Palette, PanelsTopLeft, Settings, Shapes, ShieldCheck, Upload, User, Users, Workflow, Zap, type LucideIcon } from 'lucide-react';
+import { Atom, BookOpen, Boxes, Braces, ChartColumn, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Globe, ScanText, Laptop, Layers, Palette, PanelsTopLeft, Settings, Shapes, ShieldCheck, Upload, User, Users, Workflow, Zap, type LucideIcon } from 'lucide-react';
 
 // Everything the Architecture page says, kept as data so the section components only lay it out.
 // pages/architecture-content.test.ts checks every path and package named here against the repository.
@@ -100,8 +100,18 @@ export const TECH: Tech[] = [
       'Reads the text of a partner\x27s PDF in the browser; text is grouped into rows by its height on the page and into cells by the gaps between it, then reviewed and uploaded as a CSV.',
       'Loaded only when a PDF is chosen, and parses in its own worker so the page stays responsive.',
     ],
-    tradeoff: 'Rows and cells are inferred from where the text sits, so unusual layouts need the review; it reads text only, so a scanned page is refused until OCR is added.',
-    files: ['client/src/lib/convert/pdf.ts'],
+    tradeoff: 'Rows and cells are inferred from where the text sits, so unusual layouts need the review; a scanned page has no text, so it is drawn and passed to OCR.',
+    files: ['client/src/lib/convert/pdf.ts', 'client/src/lib/convert/layout.ts'],
+  },
+  {
+    name: 'Tesseract.js', label: 'Tesseract.js', role: 'OCR', icon: ScanText, packages: [['client', 'tesseract.js']],
+    why: [
+      'Reads scanned PDF pages and .png or .jpg photos of a table in the browser, in a Web Worker, so no file is sent to an OCR or AI service.',
+      'Its words go through the same row and cell rules as text PDFs; the review then warns "Read by OCR: check the numbers".',
+      'The worker and core are served by this site; only the English language data (about 10 MB) comes from a CDN, the first time.',
+    ],
+    tradeoff: 'OCR can misread digits and decimal points, so every OCR import needs checking; large scans are slow on weak devices, and the first use needs a 10 MB download.',
+    files: ['client/src/lib/convert/ocr.ts'],
   },
   {
     name: 'Recharts', label: 'Recharts', role: 'Charts', icon: ChartColumn, packages: [['client', 'recharts']],

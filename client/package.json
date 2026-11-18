@@ -18,6 +18,9 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "recharts": "^3.10.1",
+    "tesseract.js": "^7.0.0",
+    "tesseract.js-core": "^7.0.0",
+    "wasm-feature-detect": "^1.10.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.6.7"
   },

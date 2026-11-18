@@ -88,9 +88,17 @@
   margin: 0 auto;
 }
 .uploading {
-  margin-top: var(--app-space-2);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: var(--app-space-2);
   @include text-xs;
   color: var(--app-color-text-muted);
+}
+/* Space above the status line only while it shows something. */
+.uploadingShown {
+  margin-top: var(--app-space-2);
 }
 .storage {
   display: flex;

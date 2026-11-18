@@ -149,6 +149,7 @@ export function FilesPage() {
           uploading={uploading && !conversion.review}
           uploadDisabled={clearing}
           reading={conversion.reading ?? undefined}
+          onCancelReading={conversion.cancel}
           selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
           storageMode={storageMode}
           onClearData={() => setConfirmClear(true)}
@@ -224,7 +225,7 @@ export function FilesPage() {
       )}
 
       {conversion.review && (
-        <ConvertReviewDialog name={conversion.review.name} table={conversion.review.table} onCancel={conversion.cancel} onImport={conversion.importReviewed} />
+        <ConvertReviewDialog name={conversion.review.name} table={conversion.review.table} ocr={conversion.review.ocr} onCancel={conversion.cancel} onImport={conversion.importReviewed} />
       )}
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}
       {confirmClear && <ClearDataModal onCancel={() => setConfirmClear(false)} onConfirm={clearData} />}

@@ -26,7 +26,7 @@ This project is an interview exercise, **not** an industrial production system o
 | Charting | Recharts | Visualize differences between 2 to 5 result files |
 | Testing | Vitest | Unit tests for adapters, validation, processing, and export logic (Node, in `tests/`), and client component tests |
 | Storage | The browser's IndexedDB (memory when it is blocked) | Keep original/processed CSVs for the demo, on the person's device |
-| File conversion (browser) | SheetJS (`xlsx`, from cdn.sheetjs.com), `pdfjs-dist` | Read partner Excel files and text PDFs into a reviewed CSV before upload; the OCR reader follows in 9.14c |
+| File conversion (browser) | SheetJS (`xlsx`, from cdn.sheetjs.com), `pdfjs-dist`, `tesseract.js` | Read partner Excel files, text PDFs, and scanned PDFs or images (OCR) into a reviewed CSV before upload |
 
 All free and open source. Expected local software cost: $0.
 
@@ -84,7 +84,7 @@ Base CSV parsing and schema checks run on upload regardless of the processing fu
 
 **Approved exception:** an optional Vercel deployment (PR #6, confirmed by the person on 2026-11-06; see `blueprint/vercel-deployment.md`). Since 2026-11-17 (build-plan 16.3) it serves one static site and nothing else. **Withdrawn 2026-11-17:** the private Vercel Blob storage and the server service this exception also allowed, removed by 16.3 at the person's request after the Blob store reached the Hobby plan's usage limit; files now stay in each person's browser. Any further cloud addition needs a new decision.
 
-**Approved exception:** browser-side file conversion with SheetJS (`xlsx`), `pdfjs-dist` and `tesseract.js`, so partners' Excel files, text PDFs and scanned PDFs or images can be imported (build-plan 9.14, confirmed by the person on 2026-11-13). SheetJS `xlsx` 0.20.3 is installed from the official cdn.sheetjs.com tarball for Excel (9.14a), and `pdfjs-dist` for text PDFs (9.14b); `tesseract.js` arrives with 9.14c. Conversion runs in the browser; the file service stays CSV-only. No account, server-side service or AI service is involved: OCR runs locally, and only Tesseract's language data is downloaded from a CDN.
+**Approved exception:** browser-side file conversion with SheetJS (`xlsx`), `pdfjs-dist` and `tesseract.js`, so partners' Excel files, text PDFs and scanned PDFs or images can be imported (build-plan 9.14, confirmed by the person on 2026-11-13). SheetJS `xlsx` 0.20.3 is installed from the official cdn.sheetjs.com tarball for Excel (9.14a), and `pdfjs-dist` for text PDFs (9.14b); `tesseract.js` 7 with its WebAssembly core `tesseract.js-core` (and `wasm-feature-detect`, its own dependency, to choose the core build) reads scanned pages and images (9.14c). Its worker script and WebAssembly core are served by this site, not a CDN. Conversion runs in the browser; the file service stays CSV-only. No account, server-side service or AI service is involved: OCR runs locally, and only Tesseract's language data is downloaded from a CDN.
 
 **Approved change:** styling moves from Tailwind CSS to SCSS Modules with central design tokens, a shared `ui/` component library documented in Storybook, and Radix primitives (`@radix-ui/react-dialog`, `@radix-ui/react-dropdown-menu`) for the dialog and row menu (build-plan M13, confirmed by the person on 2026-11-14). Tailwind was removed in 13.7; all styling uses SCSS Modules and the tokens.
 
