@@ -191,6 +191,9 @@ describe("this repository's allowlist", () => {
   it('ships no tests, planning, tooling or forbidden paths', () => {
     expect(forbiddenPaths(selected)).toEqual([]);
     expect(selected.filter((path) => /\.test\.tsx?$/.test(path) || path === 'client/src/test-setup.ts')).toEqual([]);
+    // Test fixtures, such as the Excel file the workflow test uploads, are development-only too.
+    expect(tracked).toContain('client/src/test-fixtures/partner_b_baseline.xlsx');
+    expect(selected.filter((path) => path.startsWith('client/src/test-fixtures/'))).toEqual([]);
   });
 });
 

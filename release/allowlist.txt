@@ -30,6 +30,7 @@ CHANGELOG.md
 !**/*.test.ts
 !**/*.test.tsx
 !client/src/test-setup.ts
+!client/src/test-fixtures/**
 
 # Storybook stories document components; they are development-only too
 !**/*.stories.tsx
