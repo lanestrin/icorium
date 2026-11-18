@@ -487,7 +487,6 @@ describe('input review status', () => {
     expect((await textOf(result.id))).toBe(text);
   });
 
-
   it('lists without reading a CSV or writing anything', async () => {
     await upload('list_only.csv', clean);
     const spies = (['read', 'patch', 'create', 'put', 'createAt'] as const).map((method) => vi.spyOn(storage, method));

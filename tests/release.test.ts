@@ -1,4 +1,5 @@
-// Tests for the release zip (scripts/build-release.mjs, release/allowlist.txt) and the release workflow's shape. The scripts live outside the workspaces, so their tests sit here
+// Tests for the release zip (scripts/build-release.mjs, release/allowlist.txt) and the release workflow's
+// shape. The scripts live outside the workspaces, so their tests sit here
 // where `npm run verify` runs them. Zips are built from a throwaway Git repository and read back with a small
 // zip reader, so the checks look at what would actually ship.
 import { execFileSync } from 'node:child_process';

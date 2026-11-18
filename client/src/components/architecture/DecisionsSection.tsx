@@ -1,4 +1,4 @@
-import { Server, TriangleAlert } from 'lucide-react';
+import { Laptop, TriangleAlert } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
 import { Card } from '../ui/Card';
 import { DECISIONS, PROCESSING_LOCATION } from './content';
@@ -12,7 +12,7 @@ function ProcessingLocation() {
   return (
     <Card as="article" aria-label={PROCESSING_LOCATION.title} className={styles.featuredDecision}>
       <div className={styles.decision}>
-        <span className={styles.largeIconBadge}><Server className={styles.largeBadgeIcon} aria-hidden /></span>
+        <span className={styles.largeIconBadge}><Laptop className={styles.largeBadgeIcon} aria-hidden /></span>
         <div className={styles.textColumn}>
           <h3 className={styles.featuredTitle}>{PROCESSING_LOCATION.title}</h3>
           <p className={styles.decisionSummary}>{PROCESSING_LOCATION.text}</p>
