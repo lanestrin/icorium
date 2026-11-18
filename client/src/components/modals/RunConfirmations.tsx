@@ -37,8 +37,8 @@ function QualityDetails({ warning }: { warning: QualityWarning }) {
   );
 }
 
-/** Cancel, and a confirm button that is green, or red when the action replaces results. */
-function ConfirmButtons({ label, danger, onCancel, onConfirm }: { label: string; danger?: boolean; onCancel: () => void; onConfirm: () => void }) {
+/** Cancel, and a confirm button that is green, or red when the action replaces or deletes files. */
+export function ConfirmButtons({ label, danger, onCancel, onConfirm }: { label: string; danger?: boolean; onCancel: () => void; onConfirm: () => void }) {
   return (
     <div className={styles.confirmButtons}>
       <Button variant="secondary" onClick={onCancel}>Cancel</Button>

@@ -203,7 +203,7 @@ Added at the person's request on 2026-11-17. The private Vercel Blob store reach
 - The client reaches the server only through the 8 functions in `client/src/lib/api.ts`.
 
 - [x] **16.1** `feature/16.1-shared-processing-core` · **P1** — Move processing, adapters, CSV handling, comparison and the generator out of `server/src` into shared code with no Node imports. Turn the route bodies in `server/src/routes/files.ts` into plain functions over the existing `Storage` interface: upload, process, archive, rows, compare and generate. No behavior change: the existing server unit and API tests keep passing against the shared code.
-- [ ] **16.2** `feature/16.2-browser-storage-and-local-api` · **P1** — Store files in the browser and run the app's logic there.
+- [x] **16.2** `feature/16.2-browser-storage-and-local-api` · **P1** — Store files in the browser and run the app's logic there.
   - A browser storage adapter implements `Storage`: File IDs counting up from `100001`, archive flags and metadata.
   - The five samples are bundled and seeded under their fixed IDs.
   - `client/src/lib/api.ts` calls the shared functions instead of `fetch`, and downloads are browser `Blob`s.
@@ -215,9 +215,9 @@ Added at the person's request on 2026-11-17. The private Vercel Blob store reach
 
 **Open decisions (settle in each item's spec):**
 
-- **16.2, persistence:** memory only, or IndexedDB so files survive a refresh. Recommended: IndexedDB, because the File ID, archive and results workflow loses its meaning when a refresh wipes it.
+- **16.2, persistence (settled 2026-11-17):** IndexedDB, so files survive a refresh, with memory as the fallback when a browser blocks it.
 - **16.3, the Node server:** retire it entirely, or keep it as an optional local backend. Recommended: retire it, since one runtime is simpler and the audit found nothing that needs it.
-- **16.4, how to test:** Vitest with the real files and a simulated IndexedDB (`fake-indexeddb`), or a Playwright browser test as well. Recommended: Vitest, which runs inside `npm run verify`. Playwright is the only real-browser check, but it restores browser tests, which section 4 says need a request.
+- **16.4, how to test:** Vitest with the real files and a simulated IndexedDB (`fake-indexeddb`, installed in 16.2), or a Playwright browser test as well. Recommended: Vitest, which runs inside `npm run verify`. Playwright is the only real-browser check, but it restores browser tests, which section 4 says need a request.
 
 **Done when (milestone):** anyone can open the public Vercel site without an account, upload a supported file, convert it to CSV, process, preview, compare and download it, with nothing stored outside their browser, and `npm run verify` passes.
 

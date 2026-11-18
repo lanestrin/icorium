@@ -76,7 +76,7 @@ export const TECH: Tech[] = [
     files: ['server/src/app.ts', 'server/src/routes/files.ts', 'shared/file-service.ts'],
   },
   {
-    name: 'Zod', label: 'Zod', role: 'Validation', icon: ShieldCheck, packages: [['server', 'zod']],
+    name: 'Zod', label: 'Zod', role: 'Validation', icon: ShieldCheck, packages: [['client', 'zod'], ['server', 'zod']],
     why: [
       'Runtime validation of request bodies and query strings: process, archive, compare and generate.',
       'Explicit input contracts with plain-language error messages.',
@@ -86,7 +86,7 @@ export const TECH: Tech[] = [
     files: ['shared/file-service.ts'],
   },
   {
-    name: 'Papa Parse', label: 'Papa Parse', role: 'CSV parsing', icon: FileSpreadsheet, packages: [['server', 'papaparse']],
+    name: 'Papa Parse', label: 'Papa Parse', role: 'CSV parsing', icon: FileSpreadsheet, packages: [['client', 'papaparse'], ['server', 'papaparse']],
     why: [
       'Parses uploads and writes result CSVs, including quoting and escaping.',
       'Reports malformed rows, which become clear upload errors.',
@@ -150,14 +150,14 @@ export const TECH: Tech[] = [
     files: ['client/.storybook/main.ts', 'client/src/components/ui/Button.stories.tsx', 'client/src/components/stories.test.tsx'],
   },
   {
-    name: 'Local filesystem / Vercel Blob', label: 'Files / Blob', role: 'File storage', icon: Database, packages: [['server', '@vercel/blob']],
+    name: 'IndexedDB', label: 'IndexedDB', role: 'File storage', icon: Database, packages: [['client', 'fake-indexeddb'], ['server', '@vercel/blob']],
     why: [
-      'Simple persistence for CSV files and their metadata, matched to the scope.',
-      'Local folder during development; private Vercel Blob when deployed to Vercel.',
-      'One storage module is the only code that touches disk; processing never does.',
+      'Files and results stay in the person\x27s browser, so the demo costs nothing to run and no file leaves the device.',
+      'Built into every browser, and it survives a refresh; memory is the fallback when a browser blocks it.',
+      'Every storage implements one Storage interface, so a cloud backend can replace it without changing processing or the UI.',
     ],
-    tradeoff: 'Listing reads one small metadata object per file and never the CSVs: fine for a small catalogue, not for thousands of files or relational queries.',
-    files: ['shared/storage.ts', 'server/src/lib/storage.ts', 'server/src/lib/blob-storage.ts'],
+    tradeoff: 'Files live on one device only: there is no sharing, and clearing browser data (or Clear my data) removes them. Tests use fake-indexeddb, not a real browser.',
+    files: ['shared/storage.ts', 'client/src/lib/browser-storage.ts', 'server/src/lib/storage.ts', 'server/src/lib/blob-storage.ts'],
   },
 ];
 
@@ -234,8 +234,9 @@ export const EVOLVE: { title: string; icon: LucideIcon; text: string }[] = [
 
 /** Storage backends in the order they apply: built ones first, then the possible next one. */
 export const STORAGE_OPTIONS: { name: string; icon: LucideIcon; note: string; built: boolean }[] = [
-  { name: 'Local filesystem', icon: Laptop, note: 'Default', built: true },
-  { name: 'Vercel Blob', icon: Cloud, note: 'When a token is set', built: true },
+  { name: 'Browser (IndexedDB)', icon: Laptop, note: 'In use', built: true },
+  { name: 'Local filesystem', icon: Laptop, note: 'Server, until 16.3', built: true },
+  { name: 'Vercel Blob', icon: Cloud, note: 'Server, when a token is set', built: true },
   { name: 'S3 / Cloudflare R2', icon: Boxes, note: 'Not built', built: false },
 ];
 

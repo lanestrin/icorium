@@ -9,7 +9,7 @@ const LABEL = 'Actions for 101010 data.csv';
 const meta = {
   title: 'Files/RowMenu',
   component: RowMenu,
-  args: { file, onPreview: fn() },
+  args: { file, onPreview: fn(), onDownload: fn() },
   parameters: {
     docs: {
       description: {
@@ -38,7 +38,6 @@ export const ActiveFile: Story = {
     await userEvent.click(trigger);
     await expect(screen.getByRole('menu', { name: LABEL })).toBeInTheDocument();
     await expect(itemNames(canvasElement)).toEqual(['Preview file', 'Download file']);
-    await expect(screen.getByRole('menuitem', { name: 'Download file' })).toHaveAttribute('href', '/api/files/101010/download');
 
     // Preview runs once, after focus is back on ⋯.
     let focusedWhenRun: Element | null = null;
@@ -47,6 +46,19 @@ export const ActiveFile: Story = {
     await waitFor(() => expect(args.onPreview).toHaveBeenCalledTimes(1));
     await expect(focusedWhenRun).toBe(trigger);
     await expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  },
+};
+
+export const Download: Story = {
+  parameters: { docs: { description: { story: 'Download file saves the file once, after the menu has closed and focus is back on ⋯.' } } },
+  play: async ({ args, canvasElement }) => {
+    const screen = page(canvasElement);
+    const trigger = screen.getByRole('button', { name: LABEL });
+    await userEvent.click(trigger);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Download file' }));
+    await waitFor(() => expect(args.onDownload).toHaveBeenCalledTimes(1));
+    await expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    await expect(trigger).toHaveFocus();
   },
 };
 

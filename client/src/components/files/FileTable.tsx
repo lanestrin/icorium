@@ -34,6 +34,7 @@ interface FileTableProps {
   onToggle: (id: string) => void;
   onToggleAll: (ids: string[], on: boolean) => void;
   onPreview: (file: FileMeta) => void;
+  onDownload: (file: FileMeta) => void;
   archived?: boolean; // Archived tab: Archived On / Original Upload columns and Restore in the row menu
   onRestore?: (file: FileMeta) => void;
   restoreDisabled?: boolean;
@@ -43,7 +44,7 @@ interface FileTableProps {
 }
 
 /** The file list: a checkbox, File ID, name, dates, function, status and actions for every file. */
-export function FileTable({ files, selectedIds, processingId, failedIds, locked, onToggle, onToggleAll, onPreview, archived, onRestore, restoreDisabled, selectionBar, sort, emptyMessage }: FileTableProps) {
+export function FileTable({ files, selectedIds, processingId, failedIds, locked, onToggle, onToggleAll, onPreview, onDownload, archived, onRestore, restoreDisabled, selectionBar, sort, emptyMessage }: FileTableProps) {
   // Every file can be selected for archiving; Run Processing uses only the selected inputs.
   const ids = files.map((f) => f.id);
   const checkedCount = ids.filter((id) => selectedIds.has(id)).length;
@@ -125,7 +126,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   </td>
                   <td className={styles.pinnedRight}>
                     <div className={styles.actionsCell}>
-                      <RowMenu file={file} onPreview={() => onPreview(file)} onRestore={archived && onRestore ? () => onRestore(file) : undefined} disabled={restoreDisabled} />
+                      <RowMenu file={file} onPreview={() => onPreview(file)} onDownload={() => onDownload(file)} onRestore={archived && onRestore ? () => onRestore(file) : undefined} disabled={restoreDisabled} />
                     </div>
                   </td>
                 </tr>

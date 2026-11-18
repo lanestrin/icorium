@@ -9,7 +9,7 @@ import generatorStyles from '../components/generator/generator.module.scss';
 
 vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
-  downloadUrl: (id: string) => `/api/files/${id}/download`,
+  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(),
 } }));
 
 const header = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
@@ -176,6 +176,7 @@ describe('page routing', () => {
 
   it('shows the generator at /generator and the file workspace elsewhere', async () => {
     vi.mocked(api.list).mockResolvedValue([]);
+    vi.mocked(api.storageMode).mockResolvedValue('saved');
     window.history.pushState({}, '', '/generator');
     const { unmount } = render(<App />);
     // The page is loaded on demand, so it appears after a moment.

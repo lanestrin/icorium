@@ -11,7 +11,7 @@ import { api } from '../lib/api';
 
 vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
-  downloadUrl: (id: string) => `/api/files/${id}/download`,
+  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(),
 } }));
 
 // The comparison dialog is loaded on demand. Transforming its chart code takes over a second in jsdom
@@ -42,6 +42,8 @@ async function previewRow(user: ReturnType<typeof userEvent.setup>, rowName: str
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(api.storageMode).mockResolvedValue('saved');
+  vi.mocked(api.download).mockResolvedValue();
   vi.mocked(api.list).mockResolvedValue([clean, invalid, result]);
   vi.mocked(api.rows).mockResolvedValue({ headers: ['batch_id'], rows: [], offset: 0, totalRows: 0, generatedColumns: [], problems: { total: 0, items: [] } });
 });
@@ -659,7 +661,6 @@ describe('archive and restore', () => {
     const user = await setup();
     await user.click(tab(/Archived/));
     let menu = await openMenu(user, 'invalid.csv');
-    expect(within(menu).getByRole('menuitem', { name: 'Download file' })).toHaveAttribute('href', '/api/files/invalid/download');
     await user.click(within(menu).getByRole('menuitem', { name: 'Preview file' }));
     expect(await screen.findByRole('dialog', { name: 'invalid.csv' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
@@ -915,8 +916,8 @@ describe('file IDs', () => {
     for (const id of ['101010', '101011']) {
       const menu = await rowMenu(user, new RegExp(`Select ${id} data`));
       expect(menu).toHaveAccessibleName(`Actions for ${id} data.csv`);
-      expect(within(menu).getByRole('menuitem', { name: 'Download file' })).toHaveAttribute('href', `/api/files/${id}/download`);
-      await user.keyboard('{Escape}');
+      await user.click(within(menu).getByRole('menuitem', { name: 'Download file' }));
+      expect(api.download).toHaveBeenLastCalledWith(id);
     }
     await user.click(screen.getByRole('checkbox', { name: 'Select 101011 data.csv' }));
     expect(screen.getByRole('checkbox', { name: 'Select 101010 data.csv' })).not.toBeChecked();
@@ -1100,7 +1101,6 @@ describe('row actions menu', () => {
     expect(within(row('clean.csv')).queryByRole('link')).not.toBeInTheDocument();
     const menu = await rowMenu(user, 'clean.csv');
     expect(items(menu)).toEqual(['Preview file', 'Download file']);
-    expect(within(menu).getByRole('menuitem', { name: 'Download file' })).toHaveAttribute('href', '/api/files/clean/download');
     expect(check('clean.csv')).not.toBeChecked(); // opening the menu is not a row click
     await user.click(within(menu).getByRole('menuitem', { name: 'Preview file' }));
     expect(await screen.findByRole('dialog', { name: 'clean.csv' })).toBeInTheDocument();
@@ -1112,6 +1112,20 @@ describe('row actions menu', () => {
     const user = await setup();
     await user.click(screen.getByRole('tab', { name: /Archived/ }));
     expect(items(await rowMenu(user, 'old.csv'))).toEqual(['Preview file', 'Download file', 'Restore file']);
+  });
+
+  it('downloads a file from its row menu in either tab, and says when a download fails', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, archivedFile]);
+    vi.mocked(api.download).mockResolvedValueOnce().mockRejectedValueOnce(new Error('File not found'));
+    const user = await setup();
+    await user.click(within(await rowMenu(user, 'clean.csv')).getByRole('menuitem', { name: 'Download file' }));
+    expect(api.download).toHaveBeenLastCalledWith('clean');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    await user.click(within(await rowMenu(user, 'old.csv')).getByRole('menuitem', { name: 'Download file' }));
+    expect(api.download).toHaveBeenLastCalledWith(archivedFile.id);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Download failed: File not found');
   });
 
   it.each([['Active Files', 'clean.csv'], ['Archived', 'old.csv']])('works from the keyboard and returns focus to ⋯ after a preview (%s)', async (tab, name) => {
@@ -1200,7 +1214,8 @@ describe('preview', () => {
     await previewRow(user, 'clean.csv');
     const dialog = await screen.findByRole('dialog', { name: 'clean.csv' });
     expect(await within(dialog).findByText('Showing 100 of 150 rows')).toBeInTheDocument();
-    expect(within(dialog).getByRole('link', { name: 'Download CSV' })).toHaveAttribute('href', '/api/files/clean/download');
+    await user.click(within(dialog).getByRole('button', { name: 'Download CSV' }));
+    expect(api.download).toHaveBeenCalledWith('clean');
     await user.click(within(dialog).getByRole('button', { name: 'Show 50 more' }));
     expect(await within(dialog).findByText('Showing 150 of 150 rows')).toBeInTheDocument();
     expect(api.rows).toHaveBeenLastCalledWith('clean', 100, 100);
@@ -1213,6 +1228,116 @@ describe('preview', () => {
     vi.mocked(api.rows).mockRejectedValueOnce(new Error('File not found'));
     await previewRow(user, 'clean.csv');
     expect(await within(await screen.findByRole('dialog')).findByText('File not found')).toBeInTheDocument();
+  });
+
+  it('shows the error when the download fails', async () => {
+    const user = await setup();
+    vi.mocked(api.download).mockRejectedValueOnce(new Error('File not found'));
+    await previewRow(user, 'clean.csv');
+    const dialog = await screen.findByRole('dialog', { name: 'clean.csv' });
+    await user.click(within(dialog).getByRole('button', { name: 'Download CSV' }));
+    expect(await within(dialog).findByText('File not found')).toBeInTheDocument();
+  });
+});
+
+describe('browser storage notice and Clear my data', () => {
+  const clearButton = (options = {}) => screen.getByRole('button', { name: 'Clear my data', ...options });
+
+  it('says files are kept only in this browser', async () => {
+    await setup();
+    expect(await screen.findByText('Files are kept only in this browser. Clearing your browser data removes them.')).toBeInTheDocument();
+  });
+
+  it('says files will be lost on refresh when the browser is not saving them', async () => {
+    vi.mocked(api.storageMode).mockResolvedValue('memory');
+    await setup();
+    expect(await screen.findByText("This browser isn't saving files. They'll be gone when you refresh or close this page.")).toBeInTheDocument();
+  });
+
+  it('asks first, and Escape or Cancel changes nothing', async () => {
+    const user = await setup();
+    clearButton().focus();
+    await user.keyboard('{Enter}');
+    const dialog = await screen.findByRole('dialog', { name: 'Clear my data?' });
+    expect(dialog).toHaveTextContent("This deletes every file you uploaded and every result in this browser. The five sample files come back. This can't be undone.");
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(clearButton()).toHaveFocus();
+
+    await user.click(clearButton());
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.clearData).not.toHaveBeenCalled();
+  });
+
+  it('clears the data, clears the selection, reloads the list and says the samples are back', async () => {
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    vi.mocked(api.clearData).mockResolvedValueOnce();
+    vi.mocked(api.list).mockResolvedValue([invalid]);
+    await user.click(clearButton());
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clear my data' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Your data was cleared. The five sample files are back.');
+    expect(api.clearData).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('row', { name: /clean\.csv/ })).not.toBeInTheDocument();
+    expect(check('invalid.csv')).not.toBeChecked();
+  });
+
+  it('shows an error when clearing fails', async () => {
+    const user = await setup();
+    vi.mocked(api.clearData).mockRejectedValueOnce(new Error('The browser stopped saving this file.'));
+    await user.click(clearButton());
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clear my data' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Clear my data failed: The browser stopped saving this file.');
+  });
+
+  it('closes the archive Undo toast before clearing, so Undo cannot act on a reused File ID', async () => {
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    vi.mocked(api.archive).mockResolvedValueOnce([{ ...clean, archived: true }]);
+    await user.click(within(screen.getByRole('toolbar', { name: 'Selected files' })).getByRole('button', { name: /^Archive 1 file$/ }));
+    expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
+
+    vi.mocked(api.clearData).mockResolvedValueOnce();
+    await user.click(clearButton());
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clear my data' }));
+    expect(await screen.findByText('Your data was cleared. The five sample files are back.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
+    expect(api.archive).toHaveBeenCalledTimes(1);
+  });
+
+  it('locks Run Processing, uploading, Archive and Restore until the clear has finished', async () => {
+    const old: FileMeta = { ...clean, id: 'old', name: 'old.csv', archived: true, archivedAt: '2026-11-08T10:00:00Z' };
+    vi.mocked(api.list).mockResolvedValue([clean, invalid, old]);
+    const user = await setup();
+    await user.click(check('clean.csv'));
+    let finish!: () => void;
+    vi.mocked(api.clearData).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    await user.click(clearButton());
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clear my data' }));
+
+    expect(screen.getByRole('button', { name: /Run Processing/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'browse files' })).toBeDisabled();
+    expect(within(screen.getByRole('toolbar', { name: 'Selected files' })).getByRole('button', { name: /^Archive 1 file$/ })).toBeDisabled();
+    expect(clearButton()).toBeDisabled();
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    await user.click(screen.getByRole('button', { name: withId('Actions for', 'old.csv') }));
+    expect(screen.getByRole('menuitem', { name: 'Restore file' })).toHaveAttribute('aria-disabled', 'true');
+    await user.keyboard('{Escape}');
+
+    await act(async () => finish());
+    expect(await screen.findByText('Your data was cleared. The five sample files are back.')).toBeInTheDocument();
+    expect(clearButton()).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'browse files' })).toBeEnabled();
+  });
+
+  it('cannot be used while a run is in progress', async () => {
+    const user = await setup();
+    vi.mocked(api.process).mockImplementationOnce(() => new Promise(() => {}));
+    await user.click(check('clean.csv'));
+    await user.click(screen.getByRole('button', { name: /Run Processing/ }));
+    expect(await screen.findByRole('button', { name: /Processing/ })).toBeInTheDocument();
+    expect(clearButton()).toBeDisabled();
   });
 });
 

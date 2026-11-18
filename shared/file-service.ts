@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { codeOf, COMPARE_MAX, COMPARE_MAX_ROWS, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ProcessorId, type ReplaceConflict, type Row } from './types';
+import { codeOf, COMPARE_MAX, FIRST_FILE_ID, COMPARE_MAX_ROWS, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ProcessorId, type ReplaceConflict, type Row } from './types';
 import { getAdapter } from './adapters';
 import { detectResult, embeddedSourceId, findProblems, matchesInput, processRows, stampFileIds } from './processing';
 import { compareResults } from './compare';
@@ -65,6 +65,24 @@ async function originalMatching(storage: Storage, sourceId: string, headers: str
   if (!source || !isInputFile(source)) return undefined;
   const input = parseCsv(await storage.read(source.id));
   return matchesInput(headers, rows, generatedColumns, input.headers, input.rows) ? source.id : undefined;
+}
+
+/**
+ * Stores the synthetic sample CSVs as 100001–100005, in name order, each with its file_id column (the
+ * sample files themselves are never changed). seed() skips an ID that is already taken, so this is safe
+ * every time storage opens.
+ */
+export async function seedSampleFiles(store: Pick<Storage, 'seed'>, samples: { name: string; text: string }[]) {
+  const sorted = [...samples].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  for (const [i, { name, text }] of sorted.entries()) {
+    const id = String(FIRST_FILE_ID + i);
+    const { headers, rows } = parseCsv(text);
+    const problemRows = findProblems(headers, rows).total;
+    const stored = stampFileIds(headers, rows, id, false);
+    const input = { name, text: toCsv(stored.headers, stored.rows), rows: rows.length, columns: stored.headers.length,
+      status: problemRows > 0 ? 'Needs Review' as const : 'Ready' as const, problemRows };
+    await store.seed(id, input);
+  }
 }
 
 /** How many parsed files previews and comparisons keep in memory. */

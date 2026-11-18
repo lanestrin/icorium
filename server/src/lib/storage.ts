@@ -1,9 +1,10 @@
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { FIRST_FILE_ID, nextBaseId, parseFileId, type FileMeta, type ProcessorCode } from '../../../shared/types';
-import { httpError, parseCsv, toCsv } from '../../../shared/csv';
-import { findProblems, stampFileIds } from '../../../shared/processing';
+import { nextBaseId, parseFileId, type FileMeta, type ProcessorCode } from '../../../shared/types';
+import { httpError, parseCsv } from '../../../shared/csv';
+import { findProblems } from '../../../shared/processing';
 import { createBlobStorage, migrateCombinedFiles } from './blob-storage';
+import { seedSampleFiles } from '../../../shared/file-service';
 import type { NewFile, NewUpload, Storage } from '../../../shared/storage';
 
 export type { NewFile, NewUpload, Storage };
@@ -183,19 +184,11 @@ export async function reconcileMetadata(store: Store) {
 }
 
 /**
- * Loads the synthetic CSVs as 100001–100005, in name order, each stored with its file_id column (the
- * files in sample-data are never changed). seed() skips an ID that is already taken, so this is safe
- * on every start. Delete server/data to reset.
+ * Loads the synthetic CSVs from sample-data as 100001–100005 (see seedSampleFiles). Safe on every start.
+ * Delete server/data to reset.
  */
 export async function seedSamples(store: Pick<Storage, 'seed'>) {
-  const names = (await readdir(SAMPLES)).filter((f) => f.endsWith('.csv')).sort();
-  for (const [i, name] of names.entries()) {
-    const id = String(FIRST_FILE_ID + i);
-    const { headers, rows } = parseCsv(await readFile(path.join(SAMPLES, name), 'utf8'));
-    const problemRows = findProblems(headers, rows).total;
-    const stored = stampFileIds(headers, rows, id, false);
-    const input = { name, text: toCsv(stored.headers, stored.rows), rows: rows.length, columns: stored.headers.length,
-      status: problemRows > 0 ? 'Needs Review' as const : 'Ready' as const, problemRows };
-    await store.seed(id, input);
-  }
+  const names = (await readdir(SAMPLES)).filter((f) => f.endsWith('.csv'));
+  const samples = await Promise.all(names.map(async (name) => ({ name, text: await readFile(path.join(SAMPLES, name), 'utf8') })));
+  await seedSampleFiles(store, samples);
 }

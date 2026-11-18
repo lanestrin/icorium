@@ -117,9 +117,9 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
 
   const remaining = data ? data.totalRows - data.rows.length : 0;
   const downloadButton = (
-    <a href={api.downloadUrl(file.id)} className={styles.downloadLink}>
+    <button type="button" className={styles.downloadLink} onClick={() => api.download(file.id).catch((e) => setError(errorMessage(e)))}>
       <Download aria-hidden /> Download CSV
-    </a>
+    </button>
   );
 
   return (
