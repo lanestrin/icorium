@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // The workflow test imports its Excel fixture (src/test-fixtures/*.xlsx) as a file; tests only.
+  assetsInclude: ['**/*.xlsx'],
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
