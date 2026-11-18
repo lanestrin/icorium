@@ -171,17 +171,7 @@
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
-.evolutionGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--app-space-3);
-  @include up(sm) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  @include up(lg) {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-}
+
 .principle {
   margin-top: var(--app-space-4);
   border: var(--app-border-width) solid var(--app-color-primary-border);
@@ -657,4 +647,47 @@
   margin-top: var(--app-space-3);
   @include text-xs;
   color: var(--app-color-text-muted);
+}
+
+// Featured decisions, scaling comparison and future customer recommendations.
+.featuredDecisions {
+  display: grid;
+  gap: var(--app-space-4);
+}
+.scaleTable {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  @include text-sm;
+
+  caption {
+    text-align: left;
+    font-weight: var(--app-weight-semibold);
+    padding-bottom: var(--app-space-3);
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    border-bottom: var(--app-border-width) solid var(--app-color-border);
+    padding: var(--app-space-3) var(--app-space-2);
+  }
+  th {
+    font-weight: var(--app-weight-semibold);
+  }
+  thead {
+    background: var(--app-color-surface-subtle);
+  }
+}
+.recommendation {
+  @include text-xs;
+  color: var(--app-color-text-muted);
+}
+.securityGrid {
+  display: grid;
+  gap: var(--app-space-4);
+  margin-top: var(--app-space-4);
+  @include up(md) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

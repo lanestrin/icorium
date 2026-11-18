@@ -25,7 +25,7 @@ describe('Architecture & Tech Stack page', () => {
     expect(screen.getByText('Building a maintainable CSV processing application with a focused, type-safe technology stack.')).toBeInTheDocument();
     expect(screen.getByText(/Choose the simplest technology that meets the requirements/)).toBeInTheDocument();
     const links = within(screen.getByRole('navigation', { name: 'On this page' })).getAllByRole('link');
-    expect(links.map((l) => l.textContent)).toEqual(['Overview', 'Tech stack', 'Architecture', 'Decisions', 'Storage', 'Evolution']);
+    expect(links.map((l) => l.textContent)).toEqual(['Overview', 'Tech stack', 'Architecture', 'Decisions', 'Storage', 'Evolution', 'Customers and security']);
     for (const link of links) {
       const id = link.getAttribute('href')!.slice(1);
       expect(document.getElementById(id)?.tagName).toBe('SECTION');
@@ -92,7 +92,7 @@ describe('Architecture & Tech Stack page', () => {
     expect(featured).toHaveTextContent('Trade-off: one device only');
     expect(featured).toHaveTextContent('No server is involved.');
     expect(within(decisions).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Processing location (browser only)', 'Why React and no server?', 'Why TypeScript throughout?', 'Why files over PostgreSQL?',
+      'Processing location (browser only)', 'File conversion in the browser', 'Why React and no server?', 'Why TypeScript throughout?', 'Why files over PostgreSQL?',
       'Why a modular pipeline?', 'Why synchronous processing?',
     ]);
     const reasoning = within(decisions).getAllByText('The full reasoning');
@@ -102,6 +102,14 @@ describe('Architecture & Tech Stack page', () => {
     await user.click(reasoning[2]);
     expect(details).toHaveAttribute('open');
     expect(details).toHaveTextContent('A database becomes worthwhile with users and permissions');
+  });
+
+  it('explains conversion in use and the limits of OCR', () => {
+    render(<ArchitecturePage />);
+    const card = screen.getByRole('article', { name: 'File conversion in the browser' });
+    for (const text of ['In use', 'Free: no API key', 'Files stay in the browser', 'No server load or Vercel server limits', '10 MB', 'Blurry, skewed, handwritten or merged-cell', 'weak devices', 'no unattended batch runs', 'every converted file needs review', 'Recommended, not built', 'AWS Textract', 'Azure Document Intelligence']) {
+      expect(card).toHaveTextContent(text);
+    }
   });
 
   it('separates hosting from storage and says what is not built', () => {
@@ -118,15 +126,36 @@ describe('Architecture & Tech Stack page', () => {
     expect(storage).toHaveTextContent('list · get · read · patch · create · createAt · put');
   });
 
-  it('lists how the product could evolve, without a separate trade-offs table', () => {
+  it('compares the current demo with recommendations at scale', () => {
     render(<ArchitecturePage />);
-    expect(screen.queryByRole('table', { name: 'Trade-offs' })).not.toBeInTheDocument();
-    const evolve = document.getElementById('evolve')!;
-    expect(within(evolve).getByRole('heading', { level: 2 })).toHaveTextContent('Future evolution');
-    expect(within(evolve).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Authentication', 'PostgreSQL', 'Background jobs', 'Upload hardening', 'Monitoring',
+    const table = screen.getByRole('table', { name: 'Today and at scale' });
+    const rows = within(table).getAllByRole('row');
+    expect(rows).toHaveLength(8);
+    expect(within(rows[0]).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual([
+      'Layer', 'Today', 'At scaleRecommended, not built',
     ]);
-    expect(evolve).toHaveTextContent('Every repository path and package named on this page is checked by an automated test.');
+    const expected = [
+      ['UI', 'React application', 'Same React UI'],
+      ['API', 'Browser-local file service', 'Fastify in containers'],
+      ['Identity', 'No accounts', 'Managed OIDC provider'],
+      ['Data', 'IndexedDB, with memory fallback', 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs'],
+      ['Work', 'Local processing; PDF and OCR conversion workers', 'A queue and workers'],
+      ['OCR', 'Tesseract in the browser', 'Managed document AI when volume or accuracy requires it'],
+      ['Operations', 'Static hosting, automated tests and CI', 'Logs, Sentry, metrics, a secrets manager and backups'],
+    ];
+    for (const [index, values] of expected.entries()) {
+      expect(within(rows[index + 1]).getByRole('rowheader')).toHaveTextContent(values[0]);
+      expect(within(rows[index + 1]).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(values.slice(1));
+    }
+  });
+
+  it('presents customer security as future recommendations, not demo guarantees', () => {
+    render(<ArchitecturePage />);
+    const section = screen.getByRole('region', { name: 'Customers and security' });
+    expect(screen.getByRole('link', { name: 'Customers and security' })).toHaveAttribute('href', '#customers');
+    for (const text of ['7 · Recommended, not built', 'no accounts, no API keys and no secrets', 'multi-tenant', 'dedicated deployment', 'OIDC', 'organizations, SSO and MFA', 'admin, uploader or viewer', 'OAuth client credentials', 'hashed', 'show them once', 'expiring and revocable', 'Rate-limit', 'never plaintext secrets', 'IP allowlisting', 'authenticated session or key', 'storage layer', 'row-level security', 'cross-customer tests', 'quotas', 'content-type checks', 'presigned uploads', 'malware', 'encryption', 'audit log', 'retention', 'formula escaping']) {
+      expect(section).toHaveTextContent(text);
+    }
   });
 });
 
