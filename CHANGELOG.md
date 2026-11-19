@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/lanestrin/icorium/compare/v2.3.0...v2.4.0) (2026-11-19)
+
+
+### Features
+
+* add sign-in, activation, recovery and sign-out (17.2b) ([#132](https://github.com/lanestrin/icorium/issues/132)) ([0dbe9ec](https://github.com/lanestrin/icorium/commit/0dbe9ecf4334859ac4889b3ae4ba1b1e10a47545))
+
 ## [2.3.0](https://github.com/lanestrin/icorium/compare/v2.2.0...v2.3.0) (2026-11-19)
 
 
