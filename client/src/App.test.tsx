@@ -32,6 +32,21 @@ describe('App', () => {
     expect(screen.queryByRole('heading', { name: 'Something went wrong' })).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['/sign-in', 'Sign in'],
+    ['/activate', 'Activate your account'],
+    ['/reset-password', 'Reset your password'],
+    ['/sign-in/', 'Sign in'],
+  ])('opens the page at %s', async (path, heading) => {
+    window.history.replaceState(null, '', path);
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
+    // The test build has no Supabase settings, so each page explains that instead of showing a form.
+    expect(screen.getByText("Sign-in isn't set up on this site yet.")).toBeInTheDocument();
+  });
+
   it('shows the error message instead of a blank screen when a page fails to render', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     window.history.replaceState(null, '', '/generator');

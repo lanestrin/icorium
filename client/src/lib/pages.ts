@@ -1,7 +1,13 @@
 import type { Plugin } from 'vite';
 
 /** The app's pages besides the file workspace at "/". App.tsx picks them from the URL. */
-export const PAGES = { generator: '/generator', architecture: '/architecture' } as const;
+export const PAGES = {
+  generator: '/generator',
+  architecture: '/architecture',
+  signIn: '/sign-in',
+  activate: '/activate',
+  resetPassword: '/reset-password',
+} as const;
 
 /**
  * A Vite build plugin that writes a copy of the built index.html for every page, for example

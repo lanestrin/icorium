@@ -42,7 +42,7 @@ export const TECH: Tech[] = [
       'Fast dev server with hot reload, and a small config: React and built-in Sass support.',
       'A plain static build that any static host can serve, without the conventions of a larger full-stack framework.',
     ],
-    tradeoff: 'No built-in router. The app picks its pages from the URL itself, so the build copies index.html for /generator and /architecture to keep them loading on a static host.',
+    tradeoff: 'No built-in router. The app picks its pages from the URL itself, so the build copies index.html for /generator, /architecture and the sign-in pages to keep them loading on a static host.',
     files: ['client/vite.config.ts', 'client/src/lib/pages.ts'],
   },
   {
@@ -127,6 +127,16 @@ export const TECH: Tech[] = [
     why: ['Consistent, lightweight icons; only the icons a file imports are bundled.'],
     tradeoff: 'One more dependency, for icons alone.',
     files: ['client/src/components/files/FileTable.tsx'],
+  },
+  {
+    name: 'Supabase Auth', label: 'Supabase', role: 'Sign-in', icon: User, packages: [['client', '@supabase/supabase-js']],
+    why: [
+      'Invitation-only accounts with email and password or Google, password recovery and sign-out, from one managed free service (build-plan 17.1).',
+      'Database rules decide who may sign up and which role they get; the browser holds only the public publishable key, never a secret.',
+      'Loaded only on a site with Supabase settings, so the demo downloads none of it.',
+    ],
+    tradeoff: 'Sign-in works but is not required yet, and files still stay in the browser: cloud files arrive in 17.4. Supabase\x27s free plan pauses a project after a week without use.',
+    files: ['client/src/lib/supabase.ts', 'client/src/lib/auth.ts', 'client/src/hooks/useAccount.ts'],
   },
   {
     name: 'Vitest + React Testing Library', label: 'Vitest', role: 'Testing', icon: FlaskConical,
@@ -243,7 +253,7 @@ export const SCALE = {
   rows: [
     { layer: 'UI', today: 'React application', future: 'Same React UI' },
     { layer: 'API', today: 'Browser-local file service', future: 'Fastify in containers' },
-    { layer: 'Identity', today: 'No accounts', future: 'Managed OIDC provider' },
+    { layer: 'Identity', today: 'Optional sign-in (Supabase Auth)', future: 'Managed OIDC provider' },
     { layer: 'Data', today: 'IndexedDB, with memory fallback', future: 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs' },
     { layer: 'Work', today: 'Local processing; PDF and OCR conversion workers', future: 'A queue and workers' },
     { layer: 'OCR', today: 'Tesseract in the browser', future: 'Managed document AI when volume or accuracy requires it' },
@@ -253,7 +263,7 @@ export const SCALE = {
 
 export const CUSTOMER_SECURITY = {
   status: 'Recommended, not built',
-  today: 'Today this is a static demo: no accounts, no API keys and no secrets. The following describes a future hosted product, not safeguards implemented in this demo.',
+  today: 'Today this is a static demo with optional sign-in that nothing requires yet: no secret keys reach the browser and no files leave it. The following describes a future hosted product, not safeguards implemented in this demo.',
   topics: [
     { title: 'One hosted product', text: 'Use one hosted multi-tenant app rather than copies customers download. Offer a dedicated deployment only when a contract needs it.' },
     { title: 'People and roles', text: 'Use a managed OIDC provider with customer organizations, SSO and MFA. Give people admin, uploader or viewer roles within their customer.' },

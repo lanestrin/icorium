@@ -1,0 +1,89 @@
+// The sign-in pages (17.2b): a narrow centred column with the page navigation, a card holding the
+// form, labelled fields with their hint or error, and the links under the form.
+@use '../../styles/mixins' as *;
+
+.page {
+  padding: var(--app-space-8) var(--app-space-4) calc(var(--app-space-unit) * 16);
+
+  @include up(md) {
+    padding: var(--app-space-10) var(--app-space-6) calc(var(--app-space-unit) * 16);
+  }
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-6);
+  max-width: 28rem; // a comfortable width for a short form
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-2);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-1-5);
+}
+
+.label {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  font-weight: var(--app-weight-semibold);
+}
+
+.input {
+  width: 100%;
+  min-width: 0;
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-color-surface);
+  padding: var(--app-space-2) var(--app-space-3);
+  color: var(--app-color-text);
+  box-shadow: var(--app-shadow-sm);
+  @include focus-ring;
+}
+
+.inputInvalid {
+  border-color: var(--app-color-danger-border);
+}
+
+.hint {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: var(--app-color-text-muted);
+}
+
+.error {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: var(--app-color-danger-text);
+}
+
+.divider {
+  text-align: center;
+  font-size: var(--app-text-sm);
+  color: var(--app-color-text-muted);
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-2);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
+
+.notice {
+  color: var(--app-color-text-secondary);
+}

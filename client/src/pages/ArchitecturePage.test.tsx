@@ -49,7 +49,7 @@ describe('Architecture & Tech Stack page', () => {
     const tiles = within(screen.getByRole('group', { name: 'Technology stack' })).getAllByRole('button');
     expect(tiles.map((t) => t.textContent)).toEqual([
       'React 19UI', 'TypeScriptType safety', 'ViteBuild & dev', 'SassStyling', 'RadixDialog & menu', 'ZodValidation',
-      'Papa ParseCSV parsing', 'SheetJSExcel import', 'pdf.jsPDF import', 'Tesseract.jsOCR', 'RechartsCharts', 'LucideIcons', 'VitestTesting', 'StorybookComponent docs', 'IndexedDBFile storage',
+      'Papa ParseCSV parsing', 'SheetJSExcel import', 'pdf.jsPDF import', 'Tesseract.jsOCR', 'RechartsCharts', 'LucideIcons', 'SupabaseSign-in', 'VitestTesting', 'StorybookComponent docs', 'IndexedDBFile storage',
     ]);
     const detail = () => screen.getByRole('region', { name: 'Selected technology' });
     expect(tiles[0]).toHaveAttribute('aria-pressed', 'true');
@@ -137,7 +137,7 @@ describe('Architecture & Tech Stack page', () => {
     const expected = [
       ['UI', 'React application', 'Same React UI'],
       ['API', 'Browser-local file service', 'Fastify in containers'],
-      ['Identity', 'No accounts', 'Managed OIDC provider'],
+      ['Identity', 'Optional sign-in (Supabase Auth)', 'Managed OIDC provider'],
       ['Data', 'IndexedDB, with memory fallback', 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs'],
       ['Work', 'Local processing; PDF and OCR conversion workers', 'A queue and workers'],
       ['OCR', 'Tesseract in the browser', 'Managed document AI when volume or accuracy requires it'],
@@ -153,7 +153,7 @@ describe('Architecture & Tech Stack page', () => {
     render(<ArchitecturePage />);
     const section = screen.getByRole('region', { name: 'Customers and security' });
     expect(screen.getByRole('link', { name: 'Customers and security' })).toHaveAttribute('href', '#customers');
-    for (const text of ['7 · Recommended, not built', 'no accounts, no API keys and no secrets', 'multi-tenant', 'dedicated deployment', 'OIDC', 'organizations, SSO and MFA', 'admin, uploader or viewer', 'OAuth client credentials', 'hashed', 'show them once', 'expiring and revocable', 'Rate-limit', 'never plaintext secrets', 'IP allowlisting', 'authenticated session or key', 'storage layer', 'row-level security', 'cross-customer tests', 'quotas', 'content-type checks', 'presigned uploads', 'malware', 'encryption', 'audit log', 'retention', 'formula escaping']) {
+    for (const text of ['7 · Recommended, not built', 'no secret keys reach the browser and no files leave it', 'multi-tenant', 'dedicated deployment', 'OIDC', 'organizations, SSO and MFA', 'admin, uploader or viewer', 'OAuth client credentials', 'hashed', 'show them once', 'expiring and revocable', 'Rate-limit', 'never plaintext secrets', 'IP allowlisting', 'authenticated session or key', 'storage layer', 'row-level security', 'cross-customer tests', 'quotas', 'content-type checks', 'presigned uploads', 'malware', 'encryption', 'audit log', 'retention', 'formula escaping']) {
       expect(section).toHaveTextContent(text);
     }
   });

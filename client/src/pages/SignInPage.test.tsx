@@ -1,0 +1,126 @@
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getSupabase, isAuthConfigured } from '../lib/supabase';
+import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
+import { SignInPage } from './SignInPage';
+
+vi.mock('../lib/supabase', () => ({ getSupabase: vi.fn(), isAuthConfigured: vi.fn(() => true) }));
+
+function setUp(options: Parameters<typeof fakeSupabase>[0] = {}) {
+  const fake = fakeSupabase(options);
+  vi.mocked(getSupabase).mockResolvedValue(fake.client);
+  return fake;
+}
+
+async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(await screen.findByLabelText('Email'), ' ada@example.com ');
+  await user.type(screen.getByLabelText('Password'), 'correct horse');
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+}
+
+afterEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(isAuthConfigured).mockReturnValue(true);
+});
+
+describe('SignInPage', () => {
+  it('signs in with email and password, then opens the file workspace', async () => {
+    const fake = setUp();
+    const onSignedIn = vi.fn();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={onSignedIn} />);
+    await fillAndSubmit(user);
+    expect(fake.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'ada@example.com', password: 'correct horse' });
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalled());
+  });
+
+  it('submits with Enter', async () => {
+    const fake = setUp();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await user.type(await screen.findByLabelText('Email'), 'ada@example.com');
+    await user.type(screen.getByLabelText('Password'), 'pw{Enter}');
+    await waitFor(() => expect(fake.auth.signInWithPassword).toHaveBeenCalled());
+  });
+
+  it('says when the email or password is wrong, keeping what was typed', async () => {
+    const fake = setUp();
+    fake.auth.signInWithPassword.mockResolvedValueOnce({ error: { name: 'AuthApiError', code: 'invalid_credentials', status: 400 } });
+    const onSignedIn = vi.fn();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={onSignedIn} />);
+    await fillAndSubmit(user);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Email or password is incorrect.');
+    // An email input drops surrounding spaces from its value, as browsers do.
+    expect(screen.getByLabelText('Email')).toHaveValue('ada@example.com');
+    expect(screen.getByLabelText('Password')).toHaveValue('correct horse');
+    expect(onSignedIn).not.toHaveBeenCalled();
+  });
+
+  it('asks an unconfirmed account to confirm its email', async () => {
+    const fake = setUp();
+    fake.auth.signInWithPassword.mockResolvedValueOnce({ error: { name: 'AuthApiError', code: 'email_not_confirmed', status: 400 } });
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await fillAndSubmit(user);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Confirm your email address first.');
+  });
+
+  it('reports a network failure as temporarily unavailable', async () => {
+    const fake = setUp();
+    fake.auth.signInWithPassword.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await fillAndSubmit(user);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in is temporarily unavailable. Try again later.');
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
+  });
+
+  it('disables the button while signing in', async () => {
+    const fake = setUp();
+    fake.auth.signInWithPassword.mockReturnValueOnce(new Promise(() => {}));
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await fillAndSubmit(user);
+    expect(await screen.findByRole('button', { name: 'Signing in…' })).toBeDisabled();
+  });
+
+  it('starts Google sign-in back to this site', async () => {
+    const fake = setUp();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: 'Continue with Google' }));
+    expect(fake.auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: { redirectTo: `${window.location.origin}/` } });
+  });
+
+  it('shows a Google error', async () => {
+    const fake = setUp();
+    fake.auth.signInWithOAuth.mockResolvedValueOnce({ error: { name: 'AuthRetryableFetchError', status: 0 } });
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: 'Continue with Google' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('temporarily unavailable');
+  });
+
+  it('links to password recovery and activation', async () => {
+    setUp();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/reset-password');
+    expect(screen.getByRole('link', { name: 'Have an invitation? Activate your account' })).toHaveAttribute('href', '/activate');
+  });
+
+  it('tells a signed-in person who they are signed in as', async () => {
+    setUp({ session: fakeSession(), profile: { name: 'Ada', role: 'Member', active: true } });
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByText(/You're signed in as Ada/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+  });
+
+  it('says sign-in is not set up on a site without Supabase settings', () => {
+    vi.mocked(isAuthConfigured).mockReturnValue(false);
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(screen.getByRole('status')).toHaveTextContent("Sign-in isn't set up on this site yet.");
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+  });
+});

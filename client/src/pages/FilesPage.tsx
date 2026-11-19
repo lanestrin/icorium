@@ -26,6 +26,7 @@ import { api, type StorageMode } from '../lib/api';
 import { compareBlocker } from '../lib/compare-view';
 import { filterFiles } from '../lib/file-status';
 import { errorMessage } from '../lib/format';
+import { AccountStatus } from '../components/AccountStatus';
 import { AppVersion } from '../components/AppVersion';
 
 // The comparison dialog and its charts download the first time Compare is used, alongside the request.
@@ -136,6 +137,7 @@ export function FilesPage() {
               <Network aria-hidden /> Architecture
             </a>
             <AppVersion />
+            <AccountStatus />
           </nav>
         </div>
 

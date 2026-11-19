@@ -9,8 +9,8 @@ yet. Every step below is **not done; needs the person's authorization**. The
 SQL is checked as text by `tests/supabase-sql.test.ts`, but it has never run
 against Postgres. Its hosted behavior is verified in 17.7.
 
-The app does not use any of this yet. Sign-in screens arrive in 17.2b, and
-cloud files in 17.4.
+The app's sign-in pages (17.2b) use these rules once the setup below is done.
+Sign-in is not required until 17.6, and cloud files arrive in 17.4.
 
 ## What is here
 
@@ -57,8 +57,37 @@ can be used with the CLI later. The CLI is not a dependency of this project.
    editor (never in this repository), then run it once. The owner then signs
    up with that address and confirms it, using the 17.2b screens.
 
-Google sign-in, the Gmail SMTP sender and redirect URLs are set up with
-17.2b.
+## Sign-in setup (17.2b; not done, each step needs authorization)
+
+The sign-in pages (`/sign-in`, `/activate`, `/reset-password`) are in the app
+but stay off until these steps are done. Use placeholders here; real values
+belong only in the dashboards. Dashboard menu names and the Gmail SMTP host
+and ports below were not checked against the providers' current pages:
+confirm them there before entering anything.
+
+1. **Site URL and redirect URLs** (Authentication > URL Configuration). Set
+   the Site URL to the site's own address. Add as redirect URLs the
+   production origin with `/**`, Vercel preview URLs if previews should sign
+   in, and `http://localhost:5173/**` for local development. The app only ever
+   redirects to its own origin plus `/`, `/sign-in` or `/reset-password`.
+2. **Google provider** (Authentication > Sign In / Providers > Google).
+   Create an OAuth client of type "Web application" in the Google Cloud
+   console. Use the callback URL Supabase shows there as the client's
+   authorized redirect URI, then paste the client ID and secret into
+   Supabase. The secret stays in Supabase; it never goes into this repository
+   or the browser.
+3. **Email sender** (Authentication > Emails > SMTP settings). Use the Gmail
+   choice in `blueprint/hosted-services.md`: turn on 2-Step Verification for
+   the sending Google account, create an app password, and enter host
+   `smtp.gmail.com`, port 465 (SSL) or 587 (STARTTLS), that account as user
+   name, the app password, and that address as sender. The confirmation and
+   reset emails use Supabase's default templates.
+4. **Vercel build variables.** Set `VITE_SUPABASE_URL` (the project URL) and
+   `VITE_SUPABASE_PUBLISHABLE_KEY` (the publishable key, never the secret
+   key), as described in `blueprint/vercel-deployment.md`, then redeploy.
+
+Password reset links work only in the browser that asked for them, because
+the PKCE flow keeps its code verifier there. The reset page says so.
 
 ## Not verified yet (17.7)
 
@@ -71,7 +100,9 @@ These are recorded as assumptions until hosted evidence exists:
 - the profile is created only after confirmation, and an expired or revoked
   invitation creates none;
 - a user can read only their own profile and update only its name;
-- the grants `supabase_auth_admin` needs to read `invitations` are complete.
+- the grants `supabase_auth_admin` needs to read `invitations` are complete;
+- the sign-in pages against a real project: password and Google sign-in, the
+  confirmation and reset emails, and the PKCE redirects back to the site.
 
 ## Sources
 
