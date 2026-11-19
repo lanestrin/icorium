@@ -150,7 +150,7 @@ All completed checklist items are in [build-plan-archive.md](build-plan-archive.
 
 ### M17 — Invitation-only private workspaces
 
-- [ ] **17.1** Validate the free hosted-service design — Select the
+- [x] **17.1** Validate the free hosted-service design — Select the
   smallest supported combination for identity, private metadata/files
   and email. Verify free limits, existing-file access at capacity,
   Google sign-in, invitation-only activation, deactivation, sender
