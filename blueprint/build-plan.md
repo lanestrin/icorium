@@ -168,7 +168,7 @@ All completed checklist items are in [build-plan-archive.md](build-plan-archive.
   is ready.
   **Depends on:** 17.1. Split into 17.2a and 17.2b (decided 2026-11-18).
 
-  - [ ] **17.2a** Identity schema and invite-only activation rules —
+  - [x] **17.2a** Identity schema and invite-only activation rules —
     Add the Supabase SQL migration for profiles and invitations, the
     "Before User Created" hook that rejects any new user (password or
     Google) without a pending, unexpired, unrevoked invitation, profile
