@@ -885,3 +885,119 @@ If time is limited, prioritize **working P0 functionality over appearance refine
 7. Run **Composition Validation** to show it needs no confirmation, then explain how a fourth adapter or processing function would be added.
 
 **Be ready to explain tradeoffs:** why TypeScript for both ends, why Fastify, why local CSV storage instead of a database, why comparison stops at five files, and how the code handles changing requirements.
+
+
+## Completed demonstration follow-up (archived 2026-11-18)
+
+Moved verbatim from the active plan after completion of 9.15. Stable IDs and original requirements are preserved below. Descriptions refer to the demo milestone at the time, not the newly approved M17/M18 scope.
+
+### M9 — UI refinements
+
+- [x] **9.14** Convert non-CSV partner files · **P2** — Partners may send Excel files, text PDFs or scanned PDFs and images, added at the person's request on 2026-11-13. They chose to have all three converted, with OCR running in the browser (Tesseract), not an AI service. Conversion runs entirely in the browser before upload. A non-CSV file becomes a table, the header row is found by matching one partner adapter's columns (`ADAPTERS` in `shared/types.ts`), and the person reviews the rows in a dialog (**Cancel** or **Import as CSV**). Only then is it passed as `<name>.csv` to the existing upload. The file service stays CSV-only, so validation, File IDs and **Needs Review** work unchanged. Rows with the wrong number of cells are kept and flagged, never guessed. Readers are loaded only when used (dynamic `import()`). Limits: 20 pages per PDF, 20 MB per source file, English OCR. A failed file never blocks the others in a multi-file upload. Libraries: SheetJS `xlsx` 0.20.x from the official cdn.sheetjs.com tarball (npm's 0.18.5 has advisories), `pdfjs-dist` and `tesseract.js`. Tesseract downloads its English language data (~10 MB) from a CDN on first use; no partner data leaves the browser except as the uploaded CSV. Real PDF and OCR reading can't run in jsdom, so tests mock the libraries, and each sub-item's Try it now uses a real file.
+
+  - [x] **9.14a** `feature/9.14a-convert-excel-uploads` — The pipeline: choosing a reader by extension, header detection against `ADAPTERS`, the review dialog, the "`report.docx` can't be converted. Upload a CSV, Excel, PDF or image file." message, a wider drop-zone `accept` list, and the Excel reader (first sheet). Also the stack exception, and the README and Architecture page updates for the new packages.
+  - [x] **9.14b** `feature/9.14b-read-text-pdfs` — The pdf.js reader. Text items are grouped into rows by y position and into cells by x gaps. A page with no text layer is refused with "this page is a scanned image" until 9.14c.
+  - [x] **9.14c** `feature/9.14c-ocr-scanned-pdfs-and-images` — Tesseract for image-only PDF pages and `.png` / `.jpg` files, with "Reading page 2 of 5…" progress and **Cancel**, and an "Read by OCR: check the numbers" warning in the review dialog.
+
+  **Conversion lifecycle (applies to 9.14a–c, not a second conversion feature):** apply the following acceptance criteria while specifying 9.14a–c. The pipeline owns one active conversion job, with explicit reading, review, importing, cancelled and failed states. Cancel or closing the review must prevent that job from uploading and ignore any late completion; a cancelled conversion must not block the next file. For readers that support interruption, stop the active work and release it. Scope worker instances, PDF loading/render tasks, image resources and object URLs to the job and release them on completion, failure, cancellation and unmount, as applicable to each reader. Keep any expensive OCR work off the UI thread using the reader's supported worker mechanism. Explain the boundary between conversion cancellation and an upload already submitted; do not promise to undo a stored upload. Deferred-promise/component tests cover cancel-then-late-result, closing/unmounting, cleanup and continuing a multi-file batch after failure or cancellation. Tests may mock the readers, as 9.14 already specifies; real PDF/OCR reading and responsiveness require the real-file Try it now checks. These criteria must be carried into each relevant 9.14 spec before implementation.
+
+  **Depends on:** 10.13 (clear upload errors).
+
+- [x] **9.15** `feature/9.15-architecture-scaling-and-security` · **P2** — Extend the Architecture & Tech Stack page to answer three interview questions, at the person's request on 2026-11-13: the trade-offs of Tesseract OCR in the browser, the recommended stack if the product scales, and how customer uploads should be secured once the product serves several customers. Presentation only: no API, dependency or stack change. Planned and recommended items are labelled **Planned** or **Recommended, not built**, like the existing "S3 / Cloudflare R2 · Not built". No tech card names Tesseract, SheetJS or pdf.js until 9.14a installs them.
+
+  - **Decisions:** make the existing processing-location card a reusable featured card, and add **File conversion in the browser (In use, 9.14a-c)**. It has benefits (free, no API key, files stay in the browser, no server load, avoids Vercel's limits) and a trade-off box (weaker on blurry, skewed, handwritten or merged-cell scans; ~10 MB language data on first use; slow on many pages or weak devices; no unattended batch runs; every file needs review; switch to a managed document-AI service such as AWS Textract or Azure Document Intelligence when volume or accuracy targets require it).
+  - **New section 7, Customers and security (recommended, not built):**
+    - One hosted multi-tenant app rather than copies customers download; a dedicated deployment only for contracts that need it.
+    - People sign in per customer through a managed OIDC provider with organizations, SSO and MFA, and roles (admin, uploader, viewer).
+    - Systems that upload automatically use per-customer OAuth client credentials or scoped API keys: hashed, shown once, expiring, revocable, rate-limited and logged.
+    - IP allowlisting is an optional extra layer, never the identity.
+    - API keys are not needed today, and the app holds no secrets: it is a static site.
+    - Tenant isolation: the customer ID comes from the session or key and is enforced in the one storage layer, plus PostgreSQL row-level security and cross-customer tests.
+    - Upload safeguards: quotas and rate limits, content-type checks, presigned uploads to private per-customer storage, malware scanning for any stored PDF or image, encryption, an audit log, retention rules, and formula escaping for files shared outside.
+  - **Evolution:** replace the five tiles with a "today → at scale" table:
+    - UI: same.
+    - API: Fastify in containers.
+    - Identity: a managed OIDC provider.
+    - Data: PostgreSQL with row-level security, plus S3 or R2 via presigned URLs.
+    - Work: a queue and workers.
+    - OCR: Tesseract, then managed document AI.
+    - Operations: logs, Sentry, metrics, a secrets manager and backups.
+  - Content stays in `client/src/components/architecture/content.ts`, reusing the existing section and card patterns, with no sideways scroll at phone width.
+
+  **Done when:** section 7 is in the page and its "On this page" links; the conversion card shows **In use** with its trade-off; the scale table shows today and at-scale values per layer; component tests cover all three and the content test checks that browser conversion is labelled In use and future recommendations are labelled not built; `npm run verify` passes.
+
+### M16 — Temporary demo storage in the browser
+
+Added at the person's request on 2026-11-17. The private Vercel Blob store reached the Hobby plan's usage limit (access resumes 12/14/26), so the live site's API stopped starting. The proof of concept must now run at **no cost**: no paid storage, database or cloud infrastructure. Icorium will later support persistent cloud storage, user accounts and file sharing, but none of that is built until it is explicitly approved.
+
+**Requirements (the person's briefs, 2026-11-17):**
+
+- Standard browser file uploads and temporary in-memory file handling, with real conversions, CSV previews and downloads. Downloads are created in the browser as `Blob` objects.
+- IndexedDB only if persistence across page refreshes is necessary. Users never choose a local folder. Vercel's filesystem is never used as persistent storage.
+- Keep server-side conversion only where it is required, and never assume temporary server files persist between requests.
+- File storage, conversion and processing, and frontend presentation are separate modules. One storage interface has a local demo adapter now, and a cloud-backed adapter can be added later.
+- Stable internal file identifiers and metadata that can later carry ownership and sharing. The File ID contract in section 1 is unchanged.
+- Uploads and results are temporary demo data. Say they can be lost when browser storage is cleared, offer a way to clear them, and promise no recovery. The five sample datasets always load.
+- No accounts, authentication, cloud storage or sharing until explicitly approved. Avoid overengineering and unnecessary dependencies.
+- File-size limits stay. Large work must not freeze the UI (a Web Worker only where needed). Unsupported files, malformed data, conversion errors and browser-storage limits are handled clearly.
+- **Architecture objective:** moving later to authenticated cloud storage means adding backend services and replacing the storage adapter, not rewriting the upload, conversion, preview or download interfaces.
+
+**Audit (2026-11-17):** nothing requires a server.
+
+- Excel and PDF conversion already runs in the browser.
+- CSV parsing (Papa Parse), the partner adapters, the three processors, File ID stamping, result linking, comparison and the generator are plain TypeScript.
+- The only Node-only parts are Fastify, the disk and Blob storage backends, and one `randomInt` call in the generator.
+- The client reaches the server only through the 8 functions in `client/src/lib/api.ts`.
+
+- [x] **16.1** `feature/16.1-shared-processing-core` · **P1** — Move processing, adapters, CSV handling, comparison and the generator out of `server/src` into shared code with no Node imports. Turn the route bodies in `server/src/routes/files.ts` into plain functions over the existing `Storage` interface: upload, process, archive, rows, compare and generate. No behavior change: the existing server unit and API tests keep passing against the shared code.
+- [x] **16.2** `feature/16.2-browser-storage-and-local-api` · **P1** — Store files in the browser and run the app's logic there.
+  - A browser storage adapter implements `Storage`: File IDs counting up from `100001`, archive flags and metadata.
+  - The five samples are bundled and seeded under their fixed IDs.
+  - `client/src/lib/api.ts` calls the shared functions instead of `fetch`, and downloads are browser `Blob`s.
+  - A notice that data stays on this device and can be lost, a **Clear my data** action, and clear messages when browser storage is full or unavailable.
+
+  **Depends on:** 16.1.
+- [x] **16.3** `feature/16.3-retire-server-and-vercel-blob` · **P1** — Remove the Fastify server, the Blob adapter, `@vercel/blob` and the server service in `vercel.json`, so Vercel serves only the static client, for free. Withdraw the Blob exception in `blueprint/stack.md`. Update the Architecture page, the README, `blueprint/vercel-deployment.md`, `blueprint/project-plan.md`, this plan's header, and the 9.14 and 9.15 text that describes the server. **Depends on:** 16.2.
+- [x] **16.4** `feature/16.4-real-file-workflow-test` · **P2** — An automated test of the whole workflow with real files and no mocked results: upload a sample CSV and a real Excel file, run each processing function, then preview, download and compare. **Depends on:** 16.2.
+
+**Open decisions (settle in each item's spec):**
+
+- **16.2, persistence (settled 2026-11-17):** IndexedDB, so files survive a refresh, with memory as the fallback when a browser blocks it.
+- **16.3, the Node server (settled 2026-11-17):** retired entirely. Its Node-only tests moved to a `tests/` workspace, and the release zip became a static-site release.
+- **16.4, how to test:** Vitest with the real files and a simulated IndexedDB (`fake-indexeddb`, installed in 16.2), or a Playwright browser test as well. Recommended: Vitest, which runs inside `npm run verify`. Playwright is the only real-browser check, but it restores browser tests, which section 4 says need a request.
+
+**Done when (milestone):** anyone can open the public Vercel site without an account, upload a supported file, convert it to CSV, process, preview, compare and download it, with nothing stored outside their browser, and `npm run verify` passes.
+
+
+### Previous recommendation and build order (2026-11-18)
+
+The recommendation below was stale when archived; 9.15 was already complete.
+
+### What to build next
+
+**Next: 9.15** `feature/9.15-architecture-scaling-and-security`. Extend the Architecture page with the OCR trade-offs, the stack at scale and customer upload security (presentation only).
+
+**Order:** 9.14a → 9.14b → 16.1 → 16.2 → 16.3 → 16.4 → 9.14c → 9.15. M16 comes before 9.14c because the live site's API is down while its Blob store is over the Hobby limit, and 9.14c and 9.15 would otherwise describe a server that M16 retires. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
+
+**After the demo:** once 9.15 is done, the project moves toward a production platform. That direction is [Proposed — Not Yet Implemented](project-plan.md#10-future-direction--proposed-not-yet-implemented); no production items are planned yet, and none may be built until they are added here as approved items.
+
+New work needs a new request: add it as a new stable ID with its scope before building, or use a `fix/` branch for a bug.
+
+**Selection rule:** take the first unchecked item in the order above whose dependencies are
+
+satisfied; once that list is finished, take the first unchecked item below whose dependencies are satisfied. Completed baseline capabilities are not new work. If an item is
+
+blocked, name the blocker and the next eligible item; do not silently skip it.
+
+After completing an item, update this recommendation to the next eligible ID.
+
+For a future request such as "what next?", report the ID, title, branch, why it
+
+is next, and one concrete starting action.
+
+
+### Completion references
+
+- 9.15: PR #126, squash commit 06564097b8cd53855ded898904b952ce7470012d; final Verify passed (276 Node and 466 client tests, type-check and build).
+- 9.14c: PR #124, merged; completion and independent-review evidence is retained in its local feature archive.
+- The feature records under blueprint/history/features/ retain the detailed specifications and evidence for these items.
