@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/lanestrin/icorium/compare/v2.2.0...v2.3.0) (2026-11-19)
+
+
+### Features
+
+* add identity schema and invite-only rules (17.2a) ([#130](https://github.com/lanestrin/icorium/issues/130)) ([1a3cf00](https://github.com/lanestrin/icorium/commit/1a3cf009dec27851db290006ab405b1de88ee1ff))
+
 ## [2.2.0](https://github.com/lanestrin/icorium/compare/v2.1.0...v2.2.0) (2026-11-18)
 
 
