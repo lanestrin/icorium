@@ -166,7 +166,24 @@ All completed checklist items are in [build-plan-archive.md](build-plan-archive.
   Public self-registration must not grant workspace access.
   Keep the existing demo usable until the signed-in cloud workflow
   is ready.
-  **Depends on:** 17.1.
+  **Depends on:** 17.1. Split into 17.2a and 17.2b (decided 2026-11-18).
+
+  - [x] **17.2a** Identity schema and invite-only activation rules —
+    Add the Supabase SQL migration for profiles and invitations, the
+    "Before User Created" hook that rejects any new user (password or
+    Google) without a pending, unexpired, unrevoked invitation, profile
+    creation with the invited role only once the email is confirmed,
+    row-level security, and the documented first-Admin bootstrap.
+    Record the `stack.md` exception. No client change. Hosted evidence
+    is deferred to 17.7.
+    **Depends on:** 17.1.
+
+  - [ ] **17.2b** Sign-in, activation, recovery and sign-out — Add the
+    Supabase client and the sign-in (email/password and Google),
+    invitation activation (name plus password or Google), password
+    recovery and sign-out screens, reading the trusted role from the
+    profile. Keep the existing demo usable; sign-in is not required yet.
+    **Depends on:** 17.2a.
 
 - [ ] **17.3** Admin invitations and account access — Add the Admin
   page for email invitations with Member as the default role.
