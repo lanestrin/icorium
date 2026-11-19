@@ -159,7 +159,7 @@ All completed checklist items are in [build-plan-archive.md](build-plan-archive.
   verification approach. Document any conflict before implementation.
   No service provisioning or paid plan is authorized by this item.
 
-- [ ] **17.2** Account activation and sign-in foundation — Add the
+- [x] **17.2** Account activation and sign-in foundation — Add the
   selected identity integration with email/password, Google sign-in,
   sign-out, password recovery and invitation-bound activation.
   Establish trusted Admin/Member roles and the initial Admin.
@@ -178,7 +178,7 @@ All completed checklist items are in [build-plan-archive.md](build-plan-archive.
     is deferred to 17.7.
     **Depends on:** 17.1.
 
-  - [ ] **17.2b** Sign-in, activation, recovery and sign-out — Add the
+  - [x] **17.2b** Sign-in, activation, recovery and sign-out — Add the
     Supabase client and the sign-in (email/password and Google),
     invitation activation (name plus password or Google), password
     recovery and sign-out screens, reading the trusted role from the
