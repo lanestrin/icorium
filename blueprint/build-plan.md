@@ -1,12 +1,21 @@
-# Reclaim Studio — Build Plan
+# Reclaim Studio - Build Plan
 
-**Project:** Icorium full-stack coding exercise  
+**Project:** Completed Icorium demonstration evolving into an
+invitation-only prototype.
 
-**Goal:** Deliver the complete CSV workflow in one straightforward application, using the agreed Apple-inspired two-column UI.  
+**Current milestone:** Private individual workspaces with sign-in and
+cross-device storage, followed by permanent deletion and data correction.
 
-**Stack:** React + TypeScript + Vite + Sass (SCSS Modules) + Lucide React; Papa Parse; Zod; Recharts; Vitest; files kept in the browser (IndexedDB); a static site with no server (since 16.3).  
+**Constraints:** Free-only; preserve existing prototype limits and
+browser processing. No teams, sharing or customer organizations yet.
 
-Earlier revision and status notes from this header are in [the archive](build-plan-archive.md#plan-header-notes).
+**Stack:** Keep the existing React/TypeScript browser application and
+shared processing core. Managed identity, private cloud storage and email
+providers are selected in 17.1 before implementation.
+
+Earlier revision and status notes are in [the archive](build-plan-archive.md#plan-header-notes).
+
+> Sections 1-3 describe the shipped demonstration baseline. M17/M18 are the approved next scope, not implemented behavior. Scoped changes to stack restrictions and identity contracts must be explicit in the relevant approved feature specs before implementation.
 
 ## 1. What “done” means
 
@@ -72,25 +81,27 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 9.15** `feature/9.15-architecture-scaling-and-security`. Extend the Architecture page with the OCR trade-offs, the stack at scale and customer upload security (presentation only).
+**Next: 17.1 - Validate the free hosted-service design.**
 
-**Order:** 9.14a → 9.14b → 16.1 → 16.2 → 16.3 → 16.4 → 9.14c → 9.15. M16 comes before 9.14c because the live site's API is down while its Blob store is over the Hobby limit, and 9.14c and 9.15 would otherwise describe a server that M16 retires. 9.14 depends on 10.13 (done). The earlier order, including the completed frontend-first block, is in [the archive](build-plan-archive.md#build-order-history).
+The demonstration milestone through 9.15 is complete.
 
-**After the demo:** once 9.15 is done, the project moves toward a production platform. That direction is [Proposed — Not Yet Implemented](project-plan.md#10-future-direction--proposed-not-yet-implemented); no production items are planned yet, and none may be built until they are added here as approved items.
+Build in this order:
 
-New work needs a new request: add it as a new stable ID with its scope before building, or use a `fix/` branch for a bug.
+17.1 -> 17.2 -> 17.3 -> 17.4 -> 17.5 -> 17.6 -> 17.7
+-> 18.1 -> 18.2 -> 18.3
 
-**Selection rule:** take the first unchecked item in the order above whose dependencies are
+Select only an unchecked item whose dependencies are satisfied.
 
-satisfied; once that list is finished, take the first unchecked item below whose dependencies are satisfied. Completed baseline capabilities are not new work. If an item is
+Each item requires an approved feature spec, implementation and applicable
+verification, completion drafts, and separately authorized publication.
+A checked item requires evidence; existing code alone is not completion.
 
-blocked, name the blocker and the next eligible item; do not silently skip it.
+The full requirements for this milestone are in [project-plan.md](project-plan.md).
+Deferred production capabilities remain outside the build scope.
 
-After completing an item, update this recommendation to the next eligible ID.
-
-For a future request such as "what next?", report the ID, title, branch, why it
-
-is next, and one concrete starting action.
+For the next feature, report its stable ID, title, intended branch, why it
+is next and the concrete starting action. Never infer completion from code
+or a passing build alone.
 
 ### Rules for features
 
@@ -131,95 +142,97 @@ is next, and one concrete starting action.
 
 ### Completed work
 
-Completed milestones and items are in [build-plan-archive.md](build-plan-archive.md), with their IDs, results and PR references.
+All completed checklist items are in [build-plan-archive.md](build-plan-archive.md).
 
-- [Former phases 1–7](build-plan-archive.md#existing-implementation-baseline-former-phases-17): the implementation baseline.
-- [M8 — Partial processing](build-plan-archive.md#m8--partial-processing): done (4 items, 8.1–8.4).
-- [M9 — UI refinements](build-plan-archive.md#m9--ui-refinements): 14 items done (9.1–9.13); its open items are below.
-- [M10 — Code review fixes](build-plan-archive.md#m10--code-review-fixes): done (15 items, 10.1–10.15).
-- [M11 — File IDs](build-plan-archive.md#m11--file-ids): done (8 items, 11.1–11.6).
-- [M12 — Releases and environments](build-plan-archive.md#m12--releases-and-environments): done (2 items, 12.1–12.2).
-- [M13 — Styling architecture and design system](build-plan-archive.md#m13--styling-architecture-and-design-system): done (7 items, 13.1–13.7).
-- [M14 — Frontend resilience and component coverage](build-plan-archive.md#m14--frontend-resilience-and-component-coverage): done (8 items, 14.1–14.5c).
-- [M15 — Planning documents](build-plan-archive.md#m15--planning-documents): done (1 item, 15.1).
-- [M7 — Final interview readiness](build-plan-archive.md#m7--final-interview-readiness): done (1 item, 7.1).
+- The existing archive preserves the baseline and completed M7-M15 history.
+- [Completed conversion, Architecture and browser-storage work](build-plan-archive.md#completed-demonstration-follow-up-archived-2026-11-18) preserves 9.14a-c, 9.15 and 16.1-16.4, including their original requirements and decisions.
+- Detailed feature records remain under `blueprint/history/features/`. Stable IDs are never reused.
 
-### M9 — UI refinements
+### M17 — Invitation-only private workspaces
 
-- [x] **9.14** Convert non-CSV partner files · **P2** — Partners may send Excel files, text PDFs or scanned PDFs and images, added at the person's request on 2026-11-13. They chose to have all three converted, with OCR running in the browser (Tesseract), not an AI service. Conversion runs entirely in the browser before upload. A non-CSV file becomes a table, the header row is found by matching one partner adapter's columns (`ADAPTERS` in `shared/types.ts`), and the person reviews the rows in a dialog (**Cancel** or **Import as CSV**). Only then is it passed as `<name>.csv` to the existing upload. The file service stays CSV-only, so validation, File IDs and **Needs Review** work unchanged. Rows with the wrong number of cells are kept and flagged, never guessed. Readers are loaded only when used (dynamic `import()`). Limits: 20 pages per PDF, 20 MB per source file, English OCR. A failed file never blocks the others in a multi-file upload. Libraries: SheetJS `xlsx` 0.20.x from the official cdn.sheetjs.com tarball (npm's 0.18.5 has advisories), `pdfjs-dist` and `tesseract.js`. Tesseract downloads its English language data (~10 MB) from a CDN on first use; no partner data leaves the browser except as the uploaded CSV. Real PDF and OCR reading can't run in jsdom, so tests mock the libraries, and each sub-item's Try it now uses a real file.
+- [ ] **17.1** Validate the free hosted-service design — Select the
+  smallest supported combination for identity, private metadata/files
+  and email. Verify free limits, existing-file access at capacity,
+  Google sign-in, invitation-only activation, deactivation, sender
+  requirements and upgrade/export paths. Define initial Admin
+  bootstrap, cloud File ID ownership/namespace and the hosted
+  verification approach. Document any conflict before implementation.
+  No service provisioning or paid plan is authorized by this item.
 
-  - [x] **9.14a** `feature/9.14a-convert-excel-uploads` — The pipeline: choosing a reader by extension, header detection against `ADAPTERS`, the review dialog, the "`report.docx` can't be converted. Upload a CSV, Excel, PDF or image file." message, a wider drop-zone `accept` list, and the Excel reader (first sheet). Also the stack exception, and the README and Architecture page updates for the new packages.
-  - [x] **9.14b** `feature/9.14b-read-text-pdfs` — The pdf.js reader. Text items are grouped into rows by y position and into cells by x gaps. A page with no text layer is refused with "this page is a scanned image" until 9.14c.
-  - [x] **9.14c** `feature/9.14c-ocr-scanned-pdfs-and-images` — Tesseract for image-only PDF pages and `.png` / `.jpg` files, with "Reading page 2 of 5…" progress and **Cancel**, and an "Read by OCR: check the numbers" warning in the review dialog.
+- [ ] **17.2** Account activation and sign-in foundation — Add the
+  selected identity integration with email/password, Google sign-in,
+  sign-out, password recovery and invitation-bound activation.
+  Establish trusted Admin/Member roles and the initial Admin.
+  Public self-registration must not grant workspace access.
+  Keep the existing demo usable until the signed-in cloud workflow
+  is ready.
+  **Depends on:** 17.1.
 
-  **Conversion lifecycle (applies to 9.14a–c, not a second conversion feature):** apply the following acceptance criteria while specifying 9.14a–c. The pipeline owns one active conversion job, with explicit reading, review, importing, cancelled and failed states. Cancel or closing the review must prevent that job from uploading and ignore any late completion; a cancelled conversion must not block the next file. For readers that support interruption, stop the active work and release it. Scope worker instances, PDF loading/render tasks, image resources and object URLs to the job and release them on completion, failure, cancellation and unmount, as applicable to each reader. Keep any expensive OCR work off the UI thread using the reader's supported worker mechanism. Explain the boundary between conversion cancellation and an upload already submitted; do not promise to undo a stored upload. Deferred-promise/component tests cover cancel-then-late-result, closing/unmounting, cleanup and continuing a multi-file batch after failure or cancellation. Tests may mock the readers, as 9.14 already specifies; real PDF/OCR reading and responsiveness require the real-file Try it now checks. These criteria must be carried into each relevant 9.14 spec before implementation.
+- [ ] **17.3** Admin invitations and account access — Add the Admin
+  page for email invitations with Member as the default role.
+  Support the agreed 30-day expiry, resend, extend and revoke
+  controls, role changes, deactivation and reactivation. Retain files
+  on deactivation and enforce access changes for existing sessions.
+  Admin cannot read members’ file contents.
+  **Depends on:** 17.2.
 
-  **Depends on:** 10.13 (clear upload errors).
+- [ ] **17.4** Private cross-device file workspace — Persist registered
+  users’ files, results and metadata through the selected cloud
+  services. Preserve the existing workspace and processing workflow,
+  applying the approved identity contract and trusted owner checks
+  to every file operation. Refuse affected new uploads at capacity
+  with clear feedback.
+  **Depends on:** 17.1, 17.2.
 
-- [x] **9.15** `feature/9.15-architecture-scaling-and-security` · **P2** — Extend the Architecture & Tech Stack page to answer three interview questions, at the person's request on 2026-11-13: the trade-offs of Tesseract OCR in the browser, the recommended stack if the product scales, and how customer uploads should be secured once the product serves several customers. Presentation only: no API, dependency or stack change. Planned and recommended items are labelled **Planned** or **Recommended, not built**, like the existing "S3 / Cloudflare R2 · Not built". No tech card names Tesseract, SheetJS or pdf.js until 9.14a installs them.
+- [ ] **17.5** Isolated guest demo and existing-file export — Add
+  Try the demo credential autofill followed by login submission.
+  Each demo receives isolated temporary browser data and sample
+  files, with cleanup on session end. Provide export access to
+  pre-existing browser files without automatically uploading them
+  or erasing them during demo cleanup.
+  **Depends on:** 17.2, 17.4.
 
-  - **Decisions:** make the existing processing-location card a reusable featured card, and add **File conversion in the browser (In use, 9.14a-c)**. It has benefits (free, no API key, files stay in the browser, no server load, avoids Vercel's limits) and a trade-off box (weaker on blurry, skewed, handwritten or merged-cell scans; ~10 MB language data on first use; slow on many pages or weak devices; no unattended batch runs; every file needs review; switch to a managed document-AI service such as AWS Textract or Azure Document Intelligence when volume or accuracy targets require it).
-  - **New section 7, Customers and security (recommended, not built):**
-    - One hosted multi-tenant app rather than copies customers download; a dedicated deployment only for contracts that need it.
-    - People sign in per customer through a managed OIDC provider with organizations, SSO and MFA, and roles (admin, uploader, viewer).
-    - Systems that upload automatically use per-customer OAuth client credentials or scoped API keys: hashed, shown once, expiring, revocable, rate-limited and logged.
-    - IP allowlisting is an optional extra layer, never the identity.
-    - API keys are not needed today, and the app holds no secrets: it is a static site.
-    - Tenant isolation: the customer ID comes from the session or key and is enforced in the one storage layer, plus PostgreSQL row-level security and cross-customer tests.
-    - Upload safeguards: quotas and rate limits, content-type checks, presigned uploads to private per-customer storage, malware scanning for any stored PDF or image, encryption, an audit log, retention rules, and formula escaping for files shared outside.
-  - **Evolution:** replace the five tiles with a "today → at scale" table:
-    - UI: same.
-    - API: Fastify in containers.
-    - Identity: a managed OIDC provider.
-    - Data: PostgreSQL with row-level security, plus S3 or R2 via presigned URLs.
-    - Work: a queue and workers.
-    - OCR: Tesseract, then managed document AI.
-    - Operations: logs, Sentry, metrics, a secrets manager and backups.
-  - Content stays in `client/src/components/architecture/content.ts`, reusing the existing section and card patterns, with no sideways scroll at phone width.
+- [ ] **17.6** Require sign-in and apply page access — Make the file
+  workspace the signed-in landing page. Require either an active
+  invited account or an isolated demo session for file tools.
+  Restrict Admin, Architecture and Generator pages to Admin.
+  Complete direct-route and trusted-service access enforcement.
+  **Depends on:** 17.3, 17.4, 17.5.
 
-  **Done when:** section 7 is in the page and its "On this page" links; the conversion card shows **In use** with its trade-off; the scale table shows today and at-scale values per layer; component tests cover all three and the content test checks that browser conversion is labelled In use and future recommendations are labelled not built; `npm run verify` passes.
+- [ ] **17.7** Hosted workflow verification and operating guidance —
+  Demonstrate invitation acceptance, both sign-in methods,
+  cross-device files, cross-user isolation, deactivation, demo
+  isolation and supported service-limit behavior. Record actual
+  hosted evidence, capacity limitations and provider upgrade/export
+  steps. Keep the Architecture page and setup documentation accurate.
+  No deployment or invitation sending without explicit authorization.
+  **Depends on:** 17.6.
 
-### M16 — Temporary demo storage in the browser
+### M18 — File deletion and correction
 
-Added at the person's request on 2026-11-17. The private Vercel Blob store reached the Hobby plan's usage limit (access resumes 12/14/26), so the live site's API stopped starting. The proof of concept must now run at **no cost**: no paid storage, database or cloud infrastructure. Icorium will later support persistent cloud storage, user accounts and file sharing, but none of that is built until it is explicitly approved.
+- [ ] **18.1** Permanently delete selected files — Add an explicit
+  confirmation and permanent deletion of the owner’s selected file.
+  Deleting an input keeps its results available, with their source
+  marked deleted. Deleting a result leaves its input and other
+  results unchanged. Preserve Archive/Restore and report failures
+  accurately.
+  **Depends on:** 17.6.
 
-**Requirements (the person's briefs, 2026-11-17):**
+- [ ] **18.2** Identify correctable validation cells — Expose
+  structured validation issues that identify editable input cells,
+  including row-level or multi-column rules. Preserve processing
+  validation and existing error explanations. Explain issues that
+  cannot be corrected through cell editing.
+  **Depends on:** 17.4.
 
-- Standard browser file uploads and temporary in-memory file handling, with real conversions, CSV previews and downloads. Downloads are created in the browser as `Blob` objects.
-- IndexedDB only if persistence across page refreshes is necessary. Users never choose a local folder. Vercel's filesystem is never used as persistent storage.
-- Keep server-side conversion only where it is required, and never assume temporary server files persist between requests.
-- File storage, conversion and processing, and frontend presentation are separate modules. One storage interface has a local demo adapter now, and a cloud-backed adapter can be added later.
-- Stable internal file identifiers and metadata that can later carry ownership and sharing. The File ID contract in section 1 is unchanged.
-- Uploads and results are temporary demo data. Say they can be lost when browser storage is cleared, offer a way to clear them, and promise no recovery. The five sample datasets always load.
-- No accounts, authentication, cloud storage or sharing until explicitly approved. Avoid overengineering and unnecessary dependencies.
-- File-size limits stay. Large work must not freeze the UI (a Web Worker only where needed). Unsupported files, malformed data, conversion errors and browser-storage limits are handled clearly.
-- **Architecture objective:** moving later to authenticated cloud storage means adding backend services and replacing the storage adapter, not rewriting the upload, conversion, preview or download interfaces.
-
-**Audit (2026-11-17):** nothing requires a server.
-
-- Excel and PDF conversion already runs in the browser.
-- CSV parsing (Papa Parse), the partner adapters, the three processors, File ID stamping, result linking, comparison and the generator are plain TypeScript.
-- The only Node-only parts are Fastify, the disk and Blob storage backends, and one `randomInt` call in the generator.
-- The client reaches the server only through the 8 functions in `client/src/lib/api.ts`.
-
-- [x] **16.1** `feature/16.1-shared-processing-core` · **P1** — Move processing, adapters, CSV handling, comparison and the generator out of `server/src` into shared code with no Node imports. Turn the route bodies in `server/src/routes/files.ts` into plain functions over the existing `Storage` interface: upload, process, archive, rows, compare and generate. No behavior change: the existing server unit and API tests keep passing against the shared code.
-- [x] **16.2** `feature/16.2-browser-storage-and-local-api` · **P1** — Store files in the browser and run the app's logic there.
-  - A browser storage adapter implements `Storage`: File IDs counting up from `100001`, archive flags and metadata.
-  - The five samples are bundled and seeded under their fixed IDs.
-  - `client/src/lib/api.ts` calls the shared functions instead of `fetch`, and downloads are browser `Blob`s.
-  - A notice that data stays on this device and can be lost, a **Clear my data** action, and clear messages when browser storage is full or unavailable.
-
-  **Depends on:** 16.1.
-- [x] **16.3** `feature/16.3-retire-server-and-vercel-blob` · **P1** — Remove the Fastify server, the Blob adapter, `@vercel/blob` and the server service in `vercel.json`, so Vercel serves only the static client, for free. Withdraw the Blob exception in `blueprint/stack.md`. Update the Architecture page, the README, `blueprint/vercel-deployment.md`, `blueprint/project-plan.md`, this plan's header, and the 9.14 and 9.15 text that describes the server. **Depends on:** 16.2.
-- [x] **16.4** `feature/16.4-real-file-workflow-test` · **P2** — An automated test of the whole workflow with real files and no mocked results: upload a sample CSV and a real Excel file, run each processing function, then preview, download and compare. **Depends on:** 16.2.
-
-**Open decisions (settle in each item's spec):**
-
-- **16.2, persistence (settled 2026-11-17):** IndexedDB, so files survive a refresh, with memory as the fallback when a browser blocks it.
-- **16.3, the Node server (settled 2026-11-17):** retired entirely. Its Node-only tests moved to a `tests/` workspace, and the release zip became a static-site release.
-- **16.4, how to test:** Vitest with the real files and a simulated IndexedDB (`fake-indexeddb`, installed in 16.2), or a Playwright browser test as well. Recommended: Vitest, which runs inside `npm run verify`. Playwright is the only real-browser check, but it restores browser tests, which section 4 says need a request.
-
-**Done when (milestone):** anyone can open the public Vercel site without an account, upload a supported file, convert it to CSV, process, preview, compare and download it, with nothing stored outside their browser, and `npm run verify` passes.
+- [ ] **18.3** Fix errors and save a corrected copy with re-run —
+  Add the correction dialog with editable flagged cells,
+  Save & re-run [function] and Cancel. Validate edits, create a new
+  linked corrected input, select it and run the chosen function.
+  Preserve the original and existing results. If processing fails
+  after saving, retain the corrected input and retry without
+  duplicating it.
+  **Depends on:** 18.1, 18.2.
 
 ## 5. Minimal API outline (suggested, not prescribed)
 
