@@ -4,8 +4,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const MIGRATION = readFileSync(new URL('../supabase/migrations/20261118000000_identity.sql', import.meta.url), 'utf8');
-const BOOTSTRAP = readFileSync(new URL('../supabase/bootstrap-first-admin.sql', import.meta.url), 'utf8');
+/** A SQL file with LF line endings, whatever line endings the checkout uses (core.autocrlf on Windows). */
+const readSql = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+const MIGRATION = readSql('../supabase/migrations/20261118000000_identity.sql');
+const BOOTSTRAP = readSql('../supabase/bootstrap-first-admin.sql');
 
 const HOOK = 'public.hook_before_user_created';
 const REJECTION = 'Sign-up is by invitation only. Ask an administrator for an invitation.';
@@ -18,6 +20,15 @@ function functions(sql: string): string[] {
   return [...code(sql).matchAll(/create function[\s\S]*?\$\$[\s\S]*?\$\$/g)].map((m) => m[0]);
 }
 
+/** Every `grant <privileges> on <object> to <roles>;` statement, with whitespace collapsed and roles split. */
+function grants(sql: string): { privileges: string; object: string; roles: string[] }[] {
+  return [...sql.replace(/\s+/g, ' ').matchAll(/\bgrant (.+?) on (.+?) to (.+?);/g)].map(([, privileges, object, roles]) => ({
+    privileges,
+    object: object.replace(/^table /, ''),
+    roles: roles.split(',').map((role) => role.trim()),
+  }));
+}
+
 /** Every safety rule the migration and bootstrap must keep, as a list of the rules broken. */
 function sqlProblems(migration: string, bootstrap: string): string[] {
   const sql = code(migration);
@@ -28,12 +39,22 @@ function sqlProblems(migration: string, bootstrap: string): string[] {
 
   if (/grant[^;]*\bto\b[^;]*\banon\b/.test(sql)) problems.push('something is granted to anon');
 
+  // Broad grants would quietly reach every table or function, including the hook and invitations.
+  if (grants(sql).some((grant) => /^all (tables|functions|routines|sequences) in schema /.test(grant.object))) problems.push('a schema-wide grant');
+  // The hook may run only as the Auth service role, whatever privilege or role list a grant uses.
+  if (grants(sql).some((grant) => grant.object.startsWith(`function ${HOOK}`) && grant.roles.some((role) => role !== 'supabase_auth_admin')))
+    problems.push('hook granted to another role');
+  // Browser clients (authenticated, or every role through public) get exactly two table privileges.
+  const clientGrants = grants(sql)
+    .filter((grant) => !grant.object.startsWith('function ') && grant.roles.some((role) => role === 'authenticated' || role === 'public'))
+    .map((grant) => `${grant.privileges} on ${grant.object}`);
+  if (clientGrants.join(' | ') !== 'select on public.profiles | update (name) on public.profiles') problems.push(`client table grants changed: ${clientGrants.join(' | ')}`);
+
   for (const fn of functions(migration))
     if (/\bsecurity definer\b/.test(fn) && !fn.includes("set search_path = ''")) problems.push('security definer function without empty search_path');
 
   if (!sql.includes(`grant execute on function ${HOOK}(jsonb) to supabase_auth_admin;`)) problems.push('hook not granted to supabase_auth_admin');
   if (!sql.includes(`revoke execute on function ${HOOK}(jsonb) from public, anon, authenticated;`)) problems.push('hook not revoked from clients');
-  if (new RegExp(`grant execute on function ${HOOK}[^;]*\\bto\\b(?![^;]*supabase_auth_admin;)`).test(sql)) problems.push('hook granted to another role');
   const hook = functions(migration).find((fn) => fn.includes(HOOK));
   if (!hook || /\bsecurity definer\b/.test(hook)) problems.push('hook missing or security definer');
   if (!hook?.includes(`'message', '${REJECTION}'`) || !hook.includes("'http_code', 403")) problems.push('hook rejection is not the generic 403');
@@ -41,9 +62,6 @@ function sqlProblems(migration: string, bootstrap: string): string[] {
   if (!sql.includes("role text not null default 'Member' check (role in ('Admin', 'Member'))")) problems.push('invitation role default or check changed');
   if (!sql.includes("expires_at timestamptz not null default now() + interval '30 days'")) problems.push('invitation expiry is not 30 days');
   if (!sql.includes("role text not null check (role in ('Admin', 'Member'))")) problems.push('profile role check changed');
-
-  const clientGrants = [...sql.matchAll(/grant ([^;]*?) on table (public\.\w+) to authenticated;/g)].map((m) => `${m[1]} on ${m[2]}`);
-  if (clientGrants.join(' | ') !== 'select on public.profiles | update (name) on public.profiles') problems.push(`authenticated grants changed: ${clientGrants.join(' | ')}`);
 
   if (!sql.includes('revoke execute on function public.activate_invited_user() from public, anon, authenticated;')) problems.push('activation function not revoked from clients');
   if (!sql.includes('after insert or update of email_confirmed_at on auth.users')) problems.push('activation trigger missing');
@@ -70,7 +88,15 @@ describe('Supabase identity SQL', () => {
     ['hook message reveals invitations', (s) => s.replace(REJECTION, 'This address has not been invited.'), 'hook rejection is not the generic 403'],
     ['default role changed', (s) => s.replace("default 'Member'", "default 'Admin'"), 'invitation role default or check changed'],
     ['expiry changed', (s) => s.replace("interval '30 days'", "interval '90 days'"), 'invitation expiry is not 30 days'],
-    ['role writable by clients', (s) => s.replace('grant update (name) on table public.profiles', 'grant update (name, role) on table public.profiles'), 'authenticated grants changed: select on public.profiles | update (name, role) on public.profiles'],
+    ['role writable by clients', (s) => s.replace('grant update (name) on table public.profiles', 'grant update (name, role) on table public.profiles'), 'client table grants changed: select on public.profiles | update (name, role) on public.profiles'],
+    ['hook granted to clients beside the Auth role', (s) => `${s}\ngrant execute on function ${HOOK}(jsonb) to authenticated, supabase_auth_admin;`, 'hook granted to another role'],
+    ['all privileges on the hook', (s) => `${s}\ngrant all on function ${HOOK}(jsonb) to authenticated;`, 'hook granted to another role'],
+    ['a schema-wide function grant', (s) => `${s}\ngrant execute on all functions in schema public to authenticated;`, 'a schema-wide grant'],
+    ['a schema-wide table grant', (s) => `${s}\ngrant insert on all tables in schema public to authenticated;`, 'a schema-wide grant'],
+    ['a client grant without the table keyword', (s) => `${s}\ngrant insert on public.profiles to authenticated;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | insert on public.profiles'],
+    ['a client grant among several roles', (s) => `${s}\ngrant all on table public.profiles to service_role, authenticated;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | all on public.profiles'],
+    ['a grant to every role', (s) => `${s}\ngrant select on table public.invitations to public;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | select on public.invitations'],
+    ['invitations readable by clients', (s) => `${s}\ngrant select on public.invitations to authenticated;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | select on public.invitations'],
     ['activation trigger removed', (s) => s.replace('after insert or update of email_confirmed_at on auth.users', 'after insert on auth.users'), 'activation trigger missing'],
   ];
   it.each(broken)('fails when %s', (_label, breakIt, problem) => {
