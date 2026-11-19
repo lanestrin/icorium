@@ -10,8 +10,8 @@ function emitted(bundle: Record<string, unknown>) {
 }
 
 describe('page copies', () => {
-  it('lists the generator and architecture pages', () => {
-    expect(Object.values(PAGES)).toEqual(['/generator', '/architecture']);
+  it('lists the generator, architecture and sign-in pages', () => {
+    expect(Object.values(PAGES)).toEqual(['/generator', '/architecture', '/sign-in', '/activate', '/reset-password']);
   });
 
   it('copies the built index.html into a folder for every page', () => {
@@ -19,6 +19,9 @@ describe('page copies', () => {
     expect(emitted({ 'index.html': { type: 'asset', source } })).toEqual([
       { type: 'asset', fileName: 'generator/index.html', source },
       { type: 'asset', fileName: 'architecture/index.html', source },
+      { type: 'asset', fileName: 'sign-in/index.html', source },
+      { type: 'asset', fileName: 'activate/index.html', source },
+      { type: 'asset', fileName: 'reset-password/index.html', source },
     ]);
   });
 

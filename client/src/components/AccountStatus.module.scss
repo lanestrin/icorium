@@ -1,0 +1,19 @@
+// The signed-in account in the page navigation: who is signed in, their role, and Sign out.
+@use '../styles/mixins' as *;
+
+.account {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-1) var(--app-space-3);
+  min-width: 0;
+}
+
+.label {
+  color: var(--app-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.error {
+  color: var(--app-color-danger-text);
+}

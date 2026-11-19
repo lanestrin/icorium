@@ -8,12 +8,19 @@ import page from './styles/page.module.scss';
 // default page, so it stays in the main bundle.
 const GeneratorPage = lazy(() => import('./pages/GeneratorPage').then((m) => ({ default: m.GeneratorPage })));
 const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage').then((m) => ({ default: m.ArchitecturePage })));
+// The sign-in pages (17.2b) also download only when opened. No link leads to them until 17.6.
+const SignInPage = lazy(() => import('./pages/SignInPage').then((m) => ({ default: m.SignInPage })));
+const ActivatePage = lazy(() => import('./pages/ActivatePage').then((m) => ({ default: m.ActivatePage })));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })));
 
-/** Picks the page from the URL: /generator and /architecture have their own pages; anything else is the file workspace. */
+/** Picks the page from the URL: each path in PAGES has its own page; anything else is the file workspace. */
 function CurrentPage() {
   const path = window.location.pathname.replace(/\/+$/, '');
   if (path === PAGES.generator) return <GeneratorPage />;
   if (path === PAGES.architecture) return <ArchitecturePage />;
+  if (path === PAGES.signIn) return <SignInPage />;
+  if (path === PAGES.activate) return <ActivatePage />;
+  if (path === PAGES.resetPassword) return <ResetPasswordPage />;
   return <FilesPage />;
 }
 

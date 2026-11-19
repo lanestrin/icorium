@@ -36,11 +36,17 @@ data is cleared, and **Clear my data** resets them to the five samples.
 
 ## Settings
 
-Only one build variable is read:
+Three build variables are read. All are public values built into the page:
 
 | Variable | Where | Effect |
 | --- | --- | --- |
 | `APP_ENV_LABEL` | Production environment, `Test` | The navigation label reads `vX.Y.Z · Test`. Previews show `· Preview` without it. |
+| `VITE_SUPABASE_URL` | Not set yet (build-plan 17.2b) | With the key below, turns on the sign-in pages (`/sign-in`, `/activate`, `/reset-password`). Without both, those pages say sign-in isn't set up, and the demo is unchanged. |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Not set yet (build-plan 17.2b) | The Supabase publishable key, which is safe in the browser. Never put the secret key here. |
+
+Setting the two Supabase variables needs the person's authorization, and the
+Supabase setup in `supabase/README.md` first. Nothing in this repository sets
+them.
 
 ## Clean-up in the Vercel dashboard (the person)
 
@@ -65,7 +71,8 @@ part of a code change:
 
 ## Checking a deployment
 
-Open `/`, `/generator` and `/architecture`, upload a CSV, process, preview,
+Open `/`, `/generator` and `/architecture` (and, once sign-in is set up,
+`/sign-in`, `/activate` and `/reset-password`), upload a CSV, process, preview,
 compare and download it, then refresh and see the files are still there. The
 browser's Network tab shows no `/api` requests. A PR's Vercel Preview is the
 first real check of a `vercel.json` change; the repository's tests do not
