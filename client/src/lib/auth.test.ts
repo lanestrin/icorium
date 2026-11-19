@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { INVITE_ONLY_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE, authErrorMessage, cleanName, redirectUrl } from './auth';
+import {
+  INVITE_ONLY_MESSAGE, LINK_EXPIRED_MESSAGE, REDIRECT_FAILED_MESSAGE, UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE,
+  authErrorMessage, cleanName, redirectError, redirectUrl, withoutRedirectError,
+} from './auth';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -12,6 +15,40 @@ describe('cleanName', () => {
   it('refuses a blank or too-long name', () => {
     expect(cleanName('   ')).toBeNull();
     expect(cleanName('a'.repeat(101))).toBeNull();
+  });
+});
+
+describe('redirectError', () => {
+  it('is null for an address without error parameters', () => {
+    expect(redirectError('?code=abc', '')).toBeNull();
+    expect(redirectError('', '')).toBeNull();
+  });
+
+  it('explains an expired or already-used link, in the query string or the hash', () => {
+    expect(redirectError('?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid', '')).toBe(LINK_EXPIRED_MESSAGE);
+    expect(redirectError('', '#error=access_denied&error_code=otp_expired')).toBe(LINK_EXPIRED_MESSAGE);
+    expect(redirectError('?error_code=flow_state_expired', '')).toBe(LINK_EXPIRED_MESSAGE);
+  });
+
+  it('shows the invite-only rejection from a refused Google sign-up', () => {
+    const description = encodeURIComponent(`500: ${INVITE_ONLY_MESSAGE}`);
+    expect(redirectError(`?error=server_error&error_description=${description}`, '')).toBe(INVITE_ONLY_MESSAGE);
+  });
+
+  it('lets the query string win over the hash, as auth-js does', () => {
+    expect(redirectError('?error_code=otp_expired', '#error_code=over_request_rate_limit')).toBe(LINK_EXPIRED_MESSAGE);
+  });
+
+  it('maps known codes and falls back to a general message', () => {
+    expect(redirectError('?error=x&error_code=over_request_rate_limit', '')).toBe('Too many attempts. Wait a few minutes and try again.');
+    expect(redirectError('?error=access_denied', '')).toBe(REDIRECT_FAILED_MESSAGE);
+  });
+});
+
+describe('withoutRedirectError', () => {
+  it('removes only the error parameters, from the query string and the hash', () => {
+    expect(withoutRedirectError('https://site.example/sign-in?error=a&error_code=b&error_description=c&keep=1#error=a&x=2')).toBe('/sign-in?keep=1#x=2');
+    expect(withoutRedirectError('https://site.example/reset-password?error_code=otp_expired')).toBe('/reset-password');
   });
 });
 

@@ -5,7 +5,7 @@ import { GoogleButton } from '../components/auth/GoogleButton';
 import styles from '../components/auth/auth.module.scss';
 import { Banner } from '../components/Banner';
 import { Button } from '../components/ui/Button';
-import { authErrorMessage, cleanName, NAME_MAX, NOT_SET_UP_MESSAGE, redirectUrl } from '../lib/auth';
+import { authErrorMessage, cleanName, INVITE_ONLY_MESSAGE, NAME_MAX, NOT_SET_UP_MESSAGE, redirectUrl } from '../lib/auth';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { PAGES } from '../lib/pages';
 
@@ -41,13 +41,15 @@ export function ActivatePage() {
         password,
         options: { data: { name: cleanedName }, emailRedirectTo: redirectUrl('/sign-in') },
       })) ?? { error: null };
-      // Supabase answers an address that already has an account like a new one, so the same message
-      // shows either way and nothing reveals who has an account.
-      if (!failure) {
+      // One neutral answer whether the address was invited, already has an account (Supabase answers that
+      // like a new sign-up) or was refused by the invite-only hook, so nobody can probe which addresses
+      // are invited (F-35, decided 2026-11-19). Other problems, such as a weak password, still show.
+      const message = failure ? authErrorMessage(failure) : null;
+      if (!message || message === INVITE_ONLY_MESSAGE) {
         setSent(true);
         return;
       }
-      setError(authErrorMessage(failure));
+      setError(message);
     } catch (failure) {
       setError(authErrorMessage(failure));
     }
@@ -59,7 +61,8 @@ export function ActivatePage() {
       {!isAuthConfigured() && <NotSetUp message={NOT_SET_UP_MESSAGE} />}
       {isAuthConfigured() && sent && (
         <p role="status" className={styles.notice}>
-          Check your email to confirm your address, then <a href={PAGES.signIn}>sign in</a>.
+          If this address has an invitation, check your email to confirm it, then <a href={PAGES.signIn}>sign in</a>.
+          Nothing arrived? Ask an administrator for an invitation.
         </p>
       )}
       {isAuthConfigured() && !sent && (

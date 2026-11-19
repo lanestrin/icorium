@@ -20,9 +20,43 @@ export function cleanName(raw: string): string | null {
   return name.length >= 1 && name.length <= NAME_MAX ? name : null;
 }
 
-/** Where Supabase sends the person back to: always this site plus a fixed path, never input or URL text. */
-export function redirectUrl(path: '/' | '/sign-in' | '/reset-password'): string {
+/**
+ * Where Supabase sends the person back to: always this site plus a fixed path, never input or URL text.
+ * Both land on a page that reads a failed redirect's error (redirectError) instead of losing it.
+ */
+export function redirectUrl(path: '/sign-in' | '/reset-password'): string {
   return `${window.location.origin}${path}`;
+}
+
+export const LINK_EXPIRED_MESSAGE = 'This link has expired or was already used. Ask for a new one.';
+export const REDIRECT_FAILED_MESSAGE = "Sign-in didn't finish. Try again.";
+
+/** The error parameters Supabase adds to a redirect that failed (Google sign-in, a confirmation or reset link). */
+const REDIRECT_ERROR_KEYS = ['error', 'error_code', 'error_description'];
+
+/**
+ * The message for a redirect that came back with an error, or null when it carries none. Reads the query
+ * string and the hash the way auth-js does (parseParametersFromURL: the query string wins). auth-js
+ * reports these only as an initialize() error, not an auth event, so the page reads them itself.
+ */
+export function redirectError(search: string, hash: string): string | null {
+  const params = new URLSearchParams(hash.replace(/^#/, ''));
+  new URLSearchParams(search).forEach((value, key) => params.set(key, value));
+  if (!REDIRECT_ERROR_KEYS.some((key) => params.has(key))) return null;
+  const code = params.get('error_code') ?? '';
+  if (code === 'otp_expired' || code === 'flow_state_expired') return LINK_EXPIRED_MESSAGE;
+  if ((params.get('error_description') ?? '').includes(INVITE_ONLY_MESSAGE)) return INVITE_ONLY_MESSAGE;
+  return MESSAGES[code] ?? REDIRECT_FAILED_MESSAGE;
+}
+
+/** The current address without Supabase's redirect error parameters, so a reload doesn't show the error again. */
+export function withoutRedirectError(href: string): string {
+  const url = new URL(href);
+  for (const key of REDIRECT_ERROR_KEYS) url.searchParams.delete(key);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+  for (const key of REDIRECT_ERROR_KEYS) hash.delete(key);
+  url.hash = hash.toString();
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 /** The fields of an AuthError (or any thrown value) this file reads. */

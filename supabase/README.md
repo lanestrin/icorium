@@ -69,7 +69,8 @@ confirm them there before entering anything.
    the Site URL to the site's own address. Add as redirect URLs the
    production origin with `/**`, Vercel preview URLs if previews should sign
    in, and `http://localhost:5173/**` for local development. The app only ever
-   redirects to its own origin plus `/`, `/sign-in` or `/reset-password`.
+   redirects to its own origin plus `/sign-in` or `/reset-password`, and those
+   pages show a failed redirect's error.
 2. **Google provider** (Authentication > Sign In / Providers > Google).
    Create an OAuth client of type "Web application" in the Google Cloud
    console. Use the callback URL Supabase shows there as the client's

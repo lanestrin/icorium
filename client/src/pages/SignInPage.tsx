@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { AuthField } from '../components/auth/AuthField';
 import { AuthLayout, NotSetUp } from '../components/auth/AuthLayout';
 import { GoogleButton } from '../components/auth/GoogleButton';
@@ -6,20 +6,31 @@ import styles from '../components/auth/auth.module.scss';
 import { Banner } from '../components/Banner';
 import { Button } from '../components/ui/Button';
 import { useAccount } from '../hooks/useAccount';
+import { useRedirectResult } from '../hooks/useRedirectResult';
 import { authErrorMessage, NOT_SET_UP_MESSAGE } from '../lib/auth';
 import { getSupabase } from '../lib/supabase';
 import { PAGES } from '../lib/pages';
 
 /**
  * /sign-in: email and password, or Google (build-plan 17.2b). No link leads here until 17.6.
- * onSignedIn opens the file workspace; tests pass their own.
+ * Google and email-confirmation redirects come back here: a failed one shows its message, and a
+ * successful one opens the file workspace. onSignedIn opens it; tests pass their own.
  */
 export function SignInPage({ onSignedIn = () => window.location.assign('/') }: { onSignedIn?: () => void }) {
   const { account } = useAccount();
+  const redirect = useRedirectResult();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [signingIn, setSigningIn] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(redirect.error);
+
+  // Back from Google or a confirmation link with a session: go straight to the files.
+  const signedInByRedirect = redirect.fromRedirect && account.status === 'signed-in';
+  // Runs once when the redirect's session arrives; onSignedIn is left out so a new default function on
+  // each render doesn't open the files twice.
+  useEffect(() => {
+    if (signedInByRedirect) onSignedIn();
+  }, [signedInByRedirect]);
 
   async function signIn(event: FormEvent) {
     event.preventDefault();

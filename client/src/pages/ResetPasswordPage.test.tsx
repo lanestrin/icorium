@@ -26,9 +26,19 @@ const fromLink = () => setUp({ session: fakeSession(), profile: { name: 'Ada', r
 afterEach(() => {
   vi.clearAllMocks();
   vi.mocked(isAuthConfigured).mockReturnValue(true);
+  window.history.replaceState(null, '', '/');
 });
 
 describe('ResetPasswordPage', () => {
+  it('explains an expired reset link above the request form, then cleans the address', async () => {
+    setUp();
+    window.history.replaceState(null, '', '/reset-password?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired');
+    render(<ResetPasswordPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('This link has expired or was already used. Ask for a new one.');
+    expect(screen.getByRole('button', { name: 'Send reset link' })).toBeInTheDocument();
+    expect(window.location.search).toBe('');
+  });
+
   it('emails a reset link that comes back to this page', async () => {
     const fake = setUp();
     const user = userEvent.setup();

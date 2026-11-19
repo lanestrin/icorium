@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { INVITE_ONLY_MESSAGE } from '../lib/auth';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
 import { SignInPage } from './SignInPage';
@@ -22,9 +23,42 @@ async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
 afterEach(() => {
   vi.clearAllMocks();
   vi.mocked(isAuthConfigured).mockReturnValue(true);
+  window.history.replaceState(null, '', '/');
 });
 
 describe('SignInPage', () => {
+  it('explains a refused Google sign-up from the redirect, then cleans the address', async () => {
+    setUp();
+    window.history.replaceState(null, '', `/sign-in?error=server_error&error_description=${encodeURIComponent(INVITE_ONLY_MESSAGE)}`);
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(INVITE_ONLY_MESSAGE);
+    expect(window.location.pathname + window.location.search).toBe('/sign-in');
+  });
+
+  it('explains an expired confirmation link', async () => {
+    setUp();
+    window.history.replaceState(null, '', '/sign-in#error=access_denied&error_code=otp_expired');
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('This link has expired or was already used. Ask for a new one.');
+    expect(window.location.hash).toBe('');
+  });
+
+  it('opens the file workspace once a Google or confirmation redirect has signed the person in', async () => {
+    setUp({ session: fakeSession(), profile: { name: 'Ada', role: 'Member', active: true } });
+    window.history.replaceState(null, '', '/sign-in?code=abc');
+    const onSignedIn = vi.fn();
+    render(<SignInPage onSignedIn={onSignedIn} />);
+    await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+  });
+
+  it('stays on the page for a person who opens it while already signed in', async () => {
+    setUp({ session: fakeSession(), profile: { name: 'Ada', role: 'Member', active: true } });
+    const onSignedIn = vi.fn();
+    render(<SignInPage onSignedIn={onSignedIn} />);
+    expect(await screen.findByText(/You're signed in as Ada/)).toBeInTheDocument();
+    expect(onSignedIn).not.toHaveBeenCalled();
+  });
+
   it('signs in with email and password, then opens the file workspace', async () => {
     const fake = setUp();
     const onSignedIn = vi.fn();
@@ -86,12 +120,12 @@ describe('SignInPage', () => {
     expect(await screen.findByRole('button', { name: 'Signing in…' })).toBeDisabled();
   });
 
-  it('starts Google sign-in back to this site', async () => {
+  it('starts Google sign-in back to this page', async () => {
     const fake = setUp();
     const user = userEvent.setup();
     render(<SignInPage onSignedIn={vi.fn()} />);
     await user.click(await screen.findByRole('button', { name: 'Continue with Google' }));
-    expect(fake.auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: { redirectTo: `${window.location.origin}/` } });
+    expect(fake.auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: { redirectTo: `${window.location.origin}/sign-in` } });
   });
 
   it('shows a Google error', async () => {

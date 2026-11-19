@@ -26,6 +26,9 @@ afterEach(() => {
   vi.mocked(isAuthConfigured).mockReturnValue(true);
 });
 
+/** The one answer for an invited, already registered or uninvited address (F-35). */
+const NEUTRAL = 'If this address has an invitation, check your email to confirm it, then sign in. Nothing arrived? Ask an administrator for an invitation.';
+
 describe('ActivatePage', () => {
   it('creates the account with the trimmed name and asks the person to confirm their email', async () => {
     const fake = setUp();
@@ -37,17 +40,18 @@ describe('ActivatePage', () => {
       password: 'correct horse',
       options: { data: { name: 'Ada Lovelace' }, emailRedirectTo: `${window.location.origin}/sign-in` },
     });
-    expect(await screen.findByRole('status')).toHaveTextContent('Check your email to confirm your address, then sign in.');
+    expect(await screen.findByRole('status')).toHaveTextContent(NEUTRAL);
   });
 
-  it('shows the invite-only rejection', async () => {
+  it('answers an address without an invitation exactly like an invited one, so invitations cannot be probed', async () => {
     const fake = setUp();
     fake.auth.signUp.mockResolvedValueOnce({ error: { name: 'AuthApiError', status: 403, message: INVITE_ONLY_MESSAGE } });
     const user = userEvent.setup();
     render(<ActivatePage />);
     await fill(user);
-    expect(await screen.findByRole('alert')).toHaveTextContent(INVITE_ONLY_MESSAGE);
-    expect(screen.queryByText(/Check your email/)).not.toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(NEUTRAL);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(INVITE_ONLY_MESSAGE)).not.toBeInTheDocument();
   });
 
   it('asks for a name before sending anything, then clears the error as the person types', async () => {
@@ -109,7 +113,7 @@ describe('ActivatePage', () => {
     const user = userEvent.setup();
     render(<ActivatePage />);
     await user.click(screen.getByRole('button', { name: 'Continue with Google' }));
-    await waitFor(() => expect(fake.auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: { redirectTo: `${window.location.origin}/` } }));
+    await waitFor(() => expect(fake.auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: { redirectTo: `${window.location.origin}/sign-in` } }));
   });
 
   it('says sign-in is not set up on a site without Supabase settings', () => {

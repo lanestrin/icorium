@@ -5,6 +5,7 @@ import styles from '../components/auth/auth.module.scss';
 import { Banner } from '../components/Banner';
 import { Button } from '../components/ui/Button';
 import { useAccount } from '../hooks/useAccount';
+import { useRedirectResult } from '../hooks/useRedirectResult';
 import { authErrorMessage, NOT_SET_UP_MESSAGE, redirectUrl } from '../lib/auth';
 import { getSupabase } from '../lib/supabase';
 import { PAGES } from '../lib/pages';
@@ -17,10 +18,12 @@ import { PAGES } from '../lib/pages';
  */
 export function ResetPasswordPage() {
   const { account, recovering } = useAccount();
+  // An expired or already-used reset link comes back with an error; show it above the request form.
+  const redirect = useRedirectResult();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(redirect.error);
   const [done, setDone] = useState<'sent' | 'changed' | null>(null);
 
   async function run(action: () => Promise<{ error: unknown } | undefined>, outcome: 'sent' | 'changed') {
