@@ -33,9 +33,9 @@ describe('Architecture page content', () => {
     for (const recommendation of ['fastify', 'pg', '@sentry/react']) expect(installed).not.toContain(recommendation);
   });
 
-  it('matches the roadmap to the build plan: every M17 and M18 item, Done only when checked, Next the first unchecked', () => {
+  it('matches the roadmap to the build plan: every M19, M17 and M18 item, Done only when checked, Next the first unchecked', () => {
     // Top-level plan items such as "- [x] **17.1** ..." (lettered sub-items like 17.2a are left out).
-    const planItems = [...read('blueprint/build-plan.md').matchAll(/^\s*- \[( |x)\] \*\*(1[78]\.\d+)\*\*/gm)]
+    const planItems = [...read('blueprint/build-plan.md').matchAll(/^\s*- \[( |x)\] \*\*(1[789]\.\d+)\*\*/gm)]
       .map(([, mark, id]) => ({ id, done: mark === 'x' }));
     const roadmapItems = ROADMAP.flatMap((milestone) => milestone.items);
     expect(roadmapItems.map((item) => item.id)).toEqual(planItems.map((item) => item.id));
