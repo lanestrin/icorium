@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/lanestrin/icorium/compare/v2.4.0...v2.4.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* update the Architecture page and add the roadmap ([#134](https://github.com/lanestrin/icorium/issues/134)) ([90921d8](https://github.com/lanestrin/icorium/commit/90921d8db76789727adab0ac4ea009ae4199ed15))
+
 ## [2.4.0](https://github.com/lanestrin/icorium/compare/v2.3.0...v2.4.0) (2026-11-19)
 
 
