@@ -133,7 +133,7 @@ describe('Architecture & Tech Stack page', () => {
     const roadmap = screen.getByRole('region', { name: 'What is planned next' });
     expect(roadmap).toHaveTextContent('6 · Roadmap');
     expect(within(roadmap).getAllByRole('article').map((card) => within(card).getByRole('heading', { level: 3 }).textContent!.trim())).toEqual([
-      'M17 · Invitation-only private workspaces', 'M18 · File deletion and correction', 'Planned hosted design',
+      'M19 · Universal file ingestion', 'M17 · Invitation-only private workspaces', 'M18 · File deletion and correction', 'Planned hosted design',
     ]);
     for (const milestone of ROADMAP) {
       const items = within(within(roadmap).getByRole('list', { name: `${milestone.milestone} items` })).getAllByRole('listitem');

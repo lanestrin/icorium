@@ -81,13 +81,18 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 17.1 - Validate the free hosted-service design.**
+**Next: 19.1 - Structured validation issues and canonical ingestion types.**
 
-The demonstration milestone through 9.15 is complete.
+The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
+are done. M19 (universal file ingestion) comes before the rest of M17
+(decided 2026-11-20): it is browser-side, shares no code with 17.3, and
+its mapping and provenance metadata should exist before files move to
+the cloud in 17.4.
 
 Build in this order:
 
-17.1 -> 17.2 -> 17.3 -> 17.4 -> 17.5 -> 17.6 -> 17.7
+17.1 -> 17.2 -> 19.1 -> 19.2 -> 19.3 -> 19.4 -> 19.5 -> 19.6 -> 19.7
+-> 19.8 -> 19.9 -> 17.3 -> 17.4 -> 17.5 -> 17.6 -> 17.7
 -> 18.1 -> 18.2 -> 18.3
 
 Select only an unchecked item whose dependencies are satisfied.
@@ -147,6 +152,103 @@ All completed checklist items are in [build-plan-archive.md](build-plan-archive.
 - The existing archive preserves the baseline and completed M7-M15 history.
 - [Completed conversion, Architecture and browser-storage work](build-plan-archive.md#completed-demonstration-follow-up-archived-2026-11-18) preserves 9.14a-c, 9.15 and 16.1-16.4, including their original requirements and decisions.
 - Detailed feature records remain under `blueprint/history/features/`. Stable IDs are never reused.
+
+### M19 — Universal file ingestion, column mapping and validation
+
+Goal: accept supplier CSV, Excel, PDF and image files whatever their
+column names or layout, and calculate only from mapped, unit-verified,
+validated data that traces back to its source. Requirements and
+decisions are in [project-plan.md](project-plan.md#14-universal-file-ingestion-m19).
+Built before 17.3 (decided 2026-11-20).
+
+Rules for every M19 item:
+
+- Existing Partner A, B and C files, result files, generated columns,
+  File IDs and comparison keep working. The sample CSVs are never edited.
+- Never assume a column's meaning or unit without evidence, never
+  convert an unverified unit, and never replace a missing measurement
+  with zero. Ambiguous values are flagged, never corrected automatically.
+- Deterministic only: no AI or external service.
+- The processing gate is enforced in `shared/file-service.ts`, the only
+  API every caller uses (decided 2026-11-20). It cannot stop someone
+  editing the browser's own code; trusted enforcement arrives with 17.4.
+
+- [ ] **19.1** Structured validation issues and canonical ingestion
+  types — Add the ingestion types (source reference with sheet, page,
+  row and column; field mapping and its origin; unit decision and
+  factor; validation issue with severity blocking, warning or info, a
+  code, field, row, reason and source; the states Needs Mapping, Needs
+  Review and Ready for Processing). Row validation returns structured
+  issues while `validation_errors` text stays identical. Fix the
+  composition total counting missing components as zero.
+  **Depends on:** none.
+
+- [ ] **19.2** Layered header matching — One matching engine used by
+  upload and conversion: exact partner match, then a normalized match
+  (case, whitespace and separators folded, unit words kept), then known
+  aliases with their stated units, then manual mapping. Report two
+  candidates for one field, or one column for two fields, as ambiguous;
+  never pick the first silently. Partner A, B and C still match exactly.
+  **Depends on:** 19.1.
+
+- [ ] **19.3** Unit verification and normalization — Decide units from
+  an explicit header or alias unit, then a supplier profile, then user
+  confirmation. Value ranges only warn. Support kg, lb and g, and
+  percent (0–100) or fraction (0–1), normalized to kg and percent for
+  the unchanged processors, recording each factor. Unsupported or
+  unconfirmed units, and ambiguous decimal or thousands separators,
+  are blocking.
+  **Depends on:** 19.2.
+
+- [ ] **19.4** Stored mapping and the processing gate — Store an
+  unrecognized or ambiguous upload unchanged as Needs Mapping instead
+  of refusing it. Add a validated action to confirm a mapping and its
+  units, optionally saved as a supplier profile that only suggests.
+  Processing refuses an input without an approved mapping, confirmed
+  units, resolved file-level blocking issues and recorded provenance.
+  A blocking row error excludes that row (no calculated value, never
+  zero), disclosed in the result and comparison (decided 2026-11-20).
+  Existing records that exactly match a partner count as approved.
+  **Depends on:** 19.3.
+
+- [ ] **19.5** Import review and mapping UI — One import review step for
+  every file type, including a CSV that needs mapping: file and table,
+  original headers, suggested mapping with a choice per field and Not
+  used, unit confirmation, sample values, row counts, blocking errors
+  and warnings, and why processing is blocked. Show the ingestion
+  states. A confidently mapped, validated file needs no forced review.
+  **Depends on:** 19.4.
+
+- [ ] **19.6** Excel sheets, tables and formulas — Read every sheet with
+  correct cell coordinates, find candidate tables (the user chooses
+  when there are several; never merged), tell header, data, total and
+  note rows apart, flag duplicate or missing headers, and flag formula
+  values that cannot be independently validated. Keep sheet and cell
+  provenance.
+  **Depends on:** 19.5.
+
+- [ ] **19.7** PDF and OCR safeguards — Keep page numbers per row,
+  detect repeated headers across pages, place empty cells and detect
+  misalignment from cell positions, keep OCR confidence, and flag
+  ambiguous numbers (O/0, I/1, S/5, lost decimals or minus signs,
+  merged digits) for confirmation instead of correcting them. Show
+  extracted values beside their source page and row.
+  **Depends on:** 19.5.
+
+- [ ] **19.8** Provenance and result traceability — Keep the original
+  source file and per-row source references in browser storage (with
+  a storage upgrade), and record on each result its input File ID,
+  source type, mapping, units, factors, validation decision and
+  processing function version. Explain a calculated value from its raw
+  source cell. Exported CSV columns stay unchanged.
+  **Depends on:** 19.6, 19.7.
+
+- [ ] **19.9** Ingestion regression, acceptance and documentation —
+  One automated test per acceptance criterion in project-plan section
+  14, regression for all samples, existing results and comparison, and
+  updated Architecture page, sample-data notes and extension guide,
+  including known limitations.
+  **Depends on:** 19.8.
 
 ### M17 — Invitation-only private workspaces
 
@@ -239,8 +341,9 @@ All completed checklist items are in [build-plan-archive.md](build-plan-archive.
   structured validation issues that identify editable input cells,
   including row-level or multi-column rules. Preserve processing
   validation and existing error explanations. Explain issues that
-  cannot be corrected through cell editing.
-  **Depends on:** 17.4.
+  cannot be corrected through cell editing. Builds on the structured
+  issues from 19.1.
+  **Depends on:** 17.4, 19.1.
 
 - [ ] **18.3** Fix errors and save a corrected copy with re-run —
   Add the correction dialog with editable flagged cells,

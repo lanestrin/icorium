@@ -94,6 +94,9 @@ Preserve the shipped behavior and completed feature history:
 7. Editing validation-flagged input cells and saving a corrected copy,
    with a direct re-run action.
 
+Before items 3–7 above: universal file ingestion (M19, section 14),
+decided 2026-11-20.
+
 Routine UI and implementation choices should use the simplest existing
 pattern. Ask for decisions only when they materially affect behavior,
 privacy, data loss, interoperability or cost.
@@ -439,7 +442,8 @@ Success:
 - Per-user Admin troubleshooting access.
 - Billing, licensing and paid infrastructure.
 - Large-file processing, queues and server workers.
-- Managed document AI and expanded ingestion.
+- Managed document AI and AI-assisted document interpretation
+  (deterministic ingestion is in scope in section 14).
 - Automatic migration of existing browser files.
 - Permanent account deletion.
 - Extra overview dashboards without a demonstrated use.
@@ -458,3 +462,91 @@ Resolve in the provider/design prerequisite or the relevant feature spec:
 - Required hosted verification setup.
 
 Preserve these as explicit decisions; do not substitute assumptions.
+
+## 14. Universal file ingestion (M19)
+
+Decided by the person on 2026-11-20, from the "Universal File Ingestion,
+Intelligent Column Mapping & Data Validation" brief. Built before 17.3.
+
+### Outcome
+
+Supplier files in CSV, Excel, PDF or supported image form can be imported
+whatever their column names or layout. A file may be uploaded without
+being approved for processing; a field may be recognised without being
+verified; a value may be extracted without being reliable. The app keeps
+these distinctions and calculates only from mapped, unit-verified,
+validated data that traces back to its source.
+
+### Requirements
+
+- **Mapping:** exact partner schemas first, then normalized headers
+  (case, whitespace and separators folded, units kept), then known
+  aliases, then manual mapping. Columns may stay unmapped. Each
+  essential field needs exactly one approved source column; ambiguities
+  and collisions are reported, never resolved by picking the first.
+  Optional supplier mapping profiles suggest, but never override
+  contradicting evidence in a new file.
+- **Units:** taken from an explicit column unit, document metadata, an
+  approved supplier profile or user confirmation. Value ranges only warn
+  (0.40 may be 0.40% or 40%). Mass in kg, lb or g; composition as percent
+  or fraction; normalized to kg and percent with every factor recorded.
+  Unsupported or unverified units block processing.
+- **Validation:** one shared module for every file type, with blocking
+  errors, warnings and information. Schema, numeric, record and source
+  integrity are checked, including ambiguous decimal or thousands
+  separators and lost minus signs. The existing 0.5-point composition
+  tolerance and the demo rules and formulas stay.
+- **Excel:** every sheet, candidate tables with headers below
+  introductory rows, header, data, total and note rows told apart,
+  duplicate or missing headers, formula values flagged; the user chooses
+  between several tables, which are never merged.
+- **PDF and OCR:** page numbers and positions kept, repeated headers
+  across pages, misalignment, missing or extra cells, OCR confidence, and
+  ambiguous characters (0/O, 1/I, 5/S, lost decimals or signs, digits in
+  the wrong column) flagged for confirmation, never corrected silently.
+- **Review:** an import review step shows the table, headers, suggested
+  mapping, units, sample values, row counts, blocking errors and warnings,
+  lets the person correct the mapping, and explains any block. Ingestion
+  states: Needs Mapping, Needs Review, Ready for Processing, then the
+  existing Processed.
+- **Traceability:** each result records its input File ID, source type,
+  sheet or page, row and column, raw value, mapping, unit, conversion,
+  validation decision and processing function version. The original
+  source file is kept. Exported CSV columns and File IDs stay unchanged.
+
+### Decisions (the person, 2026-11-20)
+
+1. **Order:** M19 is built after 17.2 and before 17.3.
+2. **Enforcement:** the processing gate lives in `shared/file-service.ts`,
+   the only API every caller uses, so a direct or modified request cannot
+   bypass it. There is no server (retired in 16.3) and none is added;
+   trusted enforcement arrives with cloud files in 17.4. This is a
+   recorded limitation.
+3. **Bad rows:** a blocking row error excludes that row: it gets no
+   calculated value and never a zero. The exclusion is disclosed in the
+   result and comparison, and totals are labelled as covering only the
+   valid rows. File-level problems (an unmapped essential field, an
+   unconfirmed unit, unresolved extraction uncertainty) block the whole
+   file.
+
+### Acceptance
+
+1. Existing partner files work without regression.
+2. A supplier CSV with unfamiliar headers can be mapped and validated.
+3. An Excel file with data on a later sheet imports correctly.
+4. A PDF with an identifiable table can be extracted and reviewed.
+5. Unknown or conflicting units prevent calculation.
+6. Ambiguous OCR results are flagged, not accepted silently.
+7. Missing required measurements block the affected calculations.
+8. Validated data uses the existing calculation functions.
+9. Every calculated output traces to its source data.
+10. Comparison and File ID conventions keep working.
+11. Direct calls to the file service cannot bypass validation.
+12. Automated tests cover the supported file types and critical failures.
+
+### Non-goals
+
+No rewrite of the app, new formulas, required supplier header names, AI
+or external services, guessed units, invented values, edited source
+files, warnings hiding blocking errors, removed partner formats, or UI
+redesign unrelated to ingestion safety.

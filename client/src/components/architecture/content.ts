@@ -285,17 +285,32 @@ export const STORAGE_OPTIONS: { name: string; icon: LucideIcon; note: string; bu
 export type RoadmapStatus = 'Done' | 'Next' | 'Planned';
 
 /**
- * The approved next scope from blueprint/build-plan.md (M17, M18), one entry per build-plan item.
+ * The approved next scope from blueprint/build-plan.md (M19, M17, M18, in plan order), one entry per build-plan item.
  * pages/architecture-content.test.ts checks every ID and its Done status against the plan's checkboxes.
  */
 export const ROADMAP: { milestone: string; title: string; goal: string; items: { id: string; title: string; status: RoadmapStatus; text: string }[] }[] = [
+  {
+    milestone: 'M19', title: 'Universal file ingestion',
+    goal: 'Supplier files in any column layout are mapped, unit-checked and validated before any calculation, and every result traces to its source.',
+    items: [
+      { id: '19.1', title: 'Structured validation issues', status: 'Next', text: 'Issues carry a severity (blocking, warning or info), field, row and source; a missing component is never counted as zero.' },
+      { id: '19.2', title: 'Layered header matching', status: 'Planned', text: 'Exact, normalized, alias and manual matching; two candidates for one field are reported, never picked silently.' },
+      { id: '19.3', title: 'Unit verification', status: 'Planned', text: 'Units come from the header, a supplier profile or confirmation, never from value ranges; each conversion factor is recorded.' },
+      { id: '19.4', title: 'Stored mapping and processing gate', status: 'Planned', text: 'Unrecognized files are kept as Needs Mapping; the file service refuses to process anything not mapped, unit-confirmed and validated.' },
+      { id: '19.5', title: 'Import review and mapping', status: 'Planned', text: 'One review step for every file type: headers, suggested mapping, units, row counts, and why processing is blocked.' },
+      { id: '19.6', title: 'Excel sheets, tables and formulas', status: 'Planned', text: 'Every sheet, a choice between candidate tables, total and note rows told apart, and formula values flagged.' },
+      { id: '19.7', title: 'PDF and OCR safeguards', status: 'Planned', text: 'Page numbers, repeated headers, misaligned cells, OCR confidence and ambiguous numbers flagged for confirmation.' },
+      { id: '19.8', title: 'Provenance and traceability', status: 'Planned', text: 'The original file and source cells are kept, and a calculated value can be explained from its raw source value.' },
+      { id: '19.9', title: 'Ingestion regression and docs', status: 'Planned', text: 'A test for every acceptance criterion, regression for existing files and results, and updated documentation.' },
+    ],
+  },
   {
     milestone: 'M17', title: 'Invitation-only private workspaces',
     goal: 'Invited people sign in and keep private files on every device; a guest demo stays open to anyone.',
     items: [
       { id: '17.1', title: 'Free hosted-service design', status: 'Done', text: 'Supabase chosen over Firebase and Appwrite: the only free plan that met invite-only sign-in, private files and access to existing files without a card.' },
       { id: '17.2', title: 'Sign-in and activation', status: 'Done', text: 'Invite-only database rules, then sign-in, activation, password recovery and sign-out pages. Sign-in is optional until 17.6.' },
-      { id: '17.3', title: 'Admin invitations and access', status: 'Next', text: 'Invite by email (30-day expiry, resend, extend, revoke), change roles, deactivate and reactivate. An Admin cannot read members\x27 files.' },
+      { id: '17.3', title: 'Admin invitations and access', status: 'Planned', text: 'Invite by email (30-day expiry, resend, extend, revoke), change roles, deactivate and reactivate. An Admin cannot read members\x27 files.' },
       { id: '17.4', title: 'Private cross-device files', status: 'Planned', text: 'Files, results and metadata in Supabase, checked against the signed-in owner on every action; uploads refused at capacity.' },
       { id: '17.5', title: 'Guest demo and export', status: 'Planned', text: 'Try the demo signs in with demo credentials; each demo gets isolated, temporary browser data with sample files, cleared when it ends. Files already in the browser can be exported.' },
       { id: '17.6', title: 'Require sign-in', status: 'Planned', text: 'The file workspace needs an invited account or a demo session; Admin, Architecture and Generator pages are Admin-only.' },
