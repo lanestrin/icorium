@@ -23,7 +23,7 @@ export function OverviewSection() {
           Choose the simplest technology that meets the requirements, while keeping the system maintainable and extensible.
         </p>
         <p className={styles.principleNote}>
-          No accounts, database, queues or extra services until a requirement calls for them. Each layer has one job, so it can be replaced without touching the others.
+          No queues or extra services until a requirement calls for them: accounts and a database arrive only with M17, because invited people need their files on every device. Each layer has one job, so it can be replaced without touching the others.
         </p>
       </blockquote>
     </Section>

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { ArchitecturePage } from './ArchitecturePage';
-import { HOW_IT_WORKS, TECH } from '../components/architecture/content';
+import { HOSTED_DESIGN, HOW_IT_WORKS, ROADMAP, TECH } from '../components/architecture/content';
 import sectionStyles from '../components/architecture/architecture.module.scss';
 import { api } from '../lib/api';
 
@@ -25,7 +25,7 @@ describe('Architecture & Tech Stack page', () => {
     expect(screen.getByText('Building a maintainable CSV processing application with a focused, type-safe technology stack.')).toBeInTheDocument();
     expect(screen.getByText(/Choose the simplest technology that meets the requirements/)).toBeInTheDocument();
     const links = within(screen.getByRole('navigation', { name: 'On this page' })).getAllByRole('link');
-    expect(links.map((l) => l.textContent)).toEqual(['Overview', 'Tech stack', 'Architecture', 'Decisions', 'Storage', 'Evolution', 'Customers and security']);
+    expect(links.map((l) => l.textContent)).toEqual(['Overview', 'Tech stack', 'Architecture', 'Decisions', 'Storage', 'Roadmap', 'Evolution', 'Customers and security']);
     for (const link of links) {
       const id = link.getAttribute('href')!.slice(1);
       expect(document.getElementById(id)?.tagName).toBe('SECTION');
@@ -92,7 +92,7 @@ describe('Architecture & Tech Stack page', () => {
     expect(featured).toHaveTextContent('Trade-off: one device only');
     expect(featured).toHaveTextContent('No server is involved.');
     expect(within(decisions).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Processing location (browser only)', 'File conversion in the browser', 'Why React and no server?', 'Why TypeScript throughout?', 'Why files over PostgreSQL?',
+      'Processing location (browser only)', 'File conversion in the browser', 'Why React and no server?', 'Why TypeScript throughout?', 'Why browser files, then Postgres?',
       'Why a modular pipeline?', 'Why synchronous processing?',
     ]);
     const reasoning = within(decisions).getAllByText('The full reasoning');
@@ -102,6 +102,7 @@ describe('Architecture & Tech Stack page', () => {
     await user.click(reasoning[2]);
     expect(details).toHaveAttribute('open');
     expect(details).toHaveTextContent('A database becomes worthwhile with users and permissions');
+    expect(details).toHaveTextContent('M17 adds exactly that');
   });
 
   it('explains conversion in use and the limits of OCR', () => {
@@ -121,9 +122,36 @@ describe('Architecture & Tech Stack page', () => {
     expect(vercel).toHaveTextContent('Test site: deploys main');
     expect(storage).not.toHaveTextContent(/Vercel Blob|server\/data|Fastify/);
     expect(vercel).toHaveTextContent('Each release also ships as a deployable zip (scripts/build-release.mjs); Production host not chosen yet');
-    expect(within(storage).getByRole('img', { name: /S3 or Cloudflare R2 could be added/ })).toHaveTextContent(
-      'Browser (IndexedDB)In useS3 / Cloudflare R2Not built');
+    expect(vercel).toHaveTextContent('Stays static with no functions when Supabase holds signed-in users\' files (planned, 17.4)');
+    expect(within(storage).getByRole('img', { name: /Supabase Storage is planned for signed-in users in 17.4/ })).toHaveTextContent(
+      'Browser (IndexedDB)In useSupabase StoragePlanned (17.4)S3 / Cloudflare R2At scale');
     expect(storage).toHaveTextContent('list · get · read · patch · create · createAt · put');
+  });
+
+  it('lists the planned milestones with each item\x27s status, and the hosted design they build on', () => {
+    render(<ArchitecturePage />);
+    const roadmap = screen.getByRole('region', { name: 'What is planned next' });
+    expect(roadmap).toHaveTextContent('6 · Roadmap');
+    expect(within(roadmap).getAllByRole('article').map((card) => within(card).getByRole('heading', { level: 3 }).textContent!.trim())).toEqual([
+      'M17 · Invitation-only private workspaces', 'M18 · File deletion and correction', 'Planned hosted design',
+    ]);
+    for (const milestone of ROADMAP) {
+      const items = within(within(roadmap).getByRole('list', { name: `${milestone.milestone} items` })).getAllByRole('listitem');
+      expect(items.map((item) => item.querySelector('p')!.textContent)).toEqual(
+        milestone.items.map((item) => `${item.id} ${item.title}${item.status}`));
+      for (const [i, item] of milestone.items.entries()) expect(items[i]).toHaveTextContent(item.text);
+    }
+    const design = within(roadmap).getByRole('article', { name: 'Planned hosted design' });
+    expect(design).toHaveTextContent('Planned, not provisioned');
+    for (const { role, service } of HOSTED_DESIGN.services) {
+      expect(within(design).getByText(role).tagName).toBe('DT');
+      expect(design).toHaveTextContent(service);
+    }
+    expect(within(within(design).getByRole('list', { name: 'Accepted free-plan limits' })).getAllByRole('listitem').map((li) => li.textContent))
+      .toEqual(HOSTED_DESIGN.limits);
+    expect(design).toHaveTextContent('pause after a week without use');
+    expect(design).toHaveTextContent('supabase/migrations/20261118000000_identity.sql');
+    expect(design).toHaveTextContent('they have not been applied to any project yet');
   });
 
   it('compares the current demo with recommendations at scale', () => {
@@ -137,8 +165,8 @@ describe('Architecture & Tech Stack page', () => {
     const expected = [
       ['UI', 'React application', 'Same React UI'],
       ['API', 'Browser-local file service', 'Fastify in containers'],
-      ['Identity', 'Optional sign-in (Supabase Auth)', 'Managed OIDC provider'],
-      ['Data', 'IndexedDB, with memory fallback', 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs'],
+      ['Identity', 'Optional, invitation-only sign-in (Supabase Auth)', 'Managed OIDC provider with customer organizations'],
+      ['Data', 'IndexedDB, with memory fallback; Supabase Postgres and Storage planned (17.4)', 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs'],
       ['Work', 'Local processing; PDF and OCR conversion workers', 'A queue and workers'],
       ['OCR', 'Tesseract in the browser', 'Managed document AI when volume or accuracy requires it'],
       ['Operations', 'Static hosting, automated tests and CI', 'Logs, Sentry, metrics, a secrets manager and backups'],
@@ -153,7 +181,7 @@ describe('Architecture & Tech Stack page', () => {
     render(<ArchitecturePage />);
     const section = screen.getByRole('region', { name: 'Customers and security' });
     expect(screen.getByRole('link', { name: 'Customers and security' })).toHaveAttribute('href', '#customers');
-    for (const text of ['7 · Recommended, not built', 'no secret keys reach the browser and no files leave it', 'multi-tenant', 'dedicated deployment', 'OIDC', 'organizations, SSO and MFA', 'admin, uploader or viewer', 'OAuth client credentials', 'hashed', 'show them once', 'expiring and revocable', 'Rate-limit', 'never plaintext secrets', 'IP allowlisting', 'authenticated session or key', 'storage layer', 'row-level security', 'cross-customer tests', 'quotas', 'content-type checks', 'presigned uploads', 'malware', 'encryption', 'audit log', 'retention', 'formula escaping']) {
+    for (const text of ['8 · Recommended, not built', 'no secret keys reach the browser and no files leave it', 'teams, sharing and customer organizations are not planned yet', 'multi-tenant', 'dedicated deployment', 'OIDC', 'organizations, SSO and MFA', 'admin, uploader or viewer', 'OAuth client credentials', 'hashed', 'show them once', 'expiring and revocable', 'Rate-limit', 'never plaintext secrets', 'IP allowlisting', 'authenticated session or key', 'storage layer', 'row-level security', 'cross-customer tests', 'quotas', 'content-type checks', 'presigned uploads', 'malware', 'encryption', 'audit log', 'retention', 'formula escaping']) {
       expect(section).toHaveTextContent(text);
     }
   });

@@ -2,10 +2,10 @@
 // Files are read with Vite's import.meta.glob (raw text), so the client needs no Node type definitions.
 import { describe, expect, it } from 'vitest';
 import { COMPARE_MAX } from '../../../shared/types';
-import { CONVERSION, CUSTOMER_SECURITY, SCALE, TECH } from '../components/architecture/content';
+import { CONVERSION, CUSTOMER_SECURITY, HOSTED_DESIGN, ROADMAP, SCALE, TECH } from '../components/architecture/content';
 
 const GLOBBED = import.meta.glob(
-  ['../../../client/src/**/*', '../../../client/*.ts', '../../../client/.storybook/*.ts', '../../../client/package.json', '../../../tests/*.ts', '../../../tests/package.json', '../../../shared/*.ts', '../../../vercel.json'],
+  ['../../../client/src/**/*', '../../../client/*.ts', '../../../client/.storybook/*.ts', '../../../client/package.json', '../../../tests/*.ts', '../../../tests/package.json', '../../../shared/*.ts', '../../../vercel.json', '../../../supabase/**/*.sql', '../../../blueprint/build-plan.md'],
   { query: '?raw', import: 'default', eager: true },
 ) as Record<string, string>;
 
@@ -33,10 +33,23 @@ describe('Architecture page content', () => {
     for (const recommendation of ['fastify', 'pg', '@sentry/react']) expect(installed).not.toContain(recommendation);
   });
 
+  it('matches the roadmap to the build plan: every M17 and M18 item, Done only when checked, Next the first unchecked', () => {
+    // Top-level plan items such as "- [x] **17.1** ..." (lettered sub-items like 17.2a are left out).
+    const planItems = [...read('blueprint/build-plan.md').matchAll(/^\s*- \[( |x)\] \*\*(1[78]\.\d+)\*\*/gm)]
+      .map(([, mark, id]) => ({ id, done: mark === 'x' }));
+    const roadmapItems = ROADMAP.flatMap((milestone) => milestone.items);
+    expect(roadmapItems.map((item) => item.id)).toEqual(planItems.map((item) => item.id));
+    for (const [i, item] of roadmapItems.entries()) expect(item.status === 'Done', item.id).toBe(planItems[i].done);
+    const firstUnchecked = planItems.find((item) => !item.done);
+    expect(roadmapItems.filter((item) => item.status === 'Next').map((item) => item.id)).toEqual(firstUnchecked ? [firstUnchecked.id] : []);
+    expect(HOSTED_DESIGN.status).toBe('Planned, not provisioned');
+  });
+
   it('only names repository paths that exist', () => {
     const paths = TECH.flatMap((t) => t.files);
     expect(paths.length).toBeGreaterThan(10);
     for (const p of paths) expect(exists(p), p).toBe(true);
+    expect(exists('supabase/migrations/20261118000000_identity.sql')).toBe(true); // named in the Roadmap section
     expect(exists('client/src/no-such-file.tsx')).toBe(false);
   });
 

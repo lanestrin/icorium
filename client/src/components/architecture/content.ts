@@ -1,4 +1,4 @@
-import { Atom, BookOpen, Boxes, Braces, ChartColumn, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Globe, ScanText, Laptop, Layers, Palette, PanelsTopLeft, Settings, Shapes, ShieldCheck, Upload, User, Zap, type LucideIcon } from 'lucide-react';
+import { Atom, BookOpen, Boxes, Braces, ChartColumn, Cloud, Code2, Database, FileCog, FileSpreadsheet, FileText, FlaskConical, Globe, ScanText, Laptop, Layers, Palette, PanelsTopLeft, Settings, Shapes, ShieldCheck, Upload, User, Zap, type LucideIcon } from 'lucide-react';
 
 // Everything the Architecture page says, kept as data so the section components only lay it out.
 // pages/architecture-content.test.ts checks every path and package named here against the repository.
@@ -132,11 +132,11 @@ export const TECH: Tech[] = [
     name: 'Supabase Auth', label: 'Supabase', role: 'Sign-in', icon: User, packages: [['client', '@supabase/supabase-js']],
     why: [
       'Invitation-only accounts with email and password or Google, password recovery and sign-out, from one managed free service (build-plan 17.1).',
-      'Database rules decide who may sign up and which role they get; the browser holds only the public publishable key, never a secret.',
-      'Loaded only on a site with Supabase settings, so the demo downloads none of it.',
+      'The SQL in supabase/ decides who may sign up: a "Before User Created" hook rejects any email without a pending invitation, and row-level security limits each profile to its owner.',
+      'The browser holds only the public publishable key, never a secret, and loads the client only on a site with Supabase settings, so the demo downloads none of it.',
     ],
-    tradeoff: 'Sign-in works but is not required yet, and files still stay in the browser: cloud files arrive in 17.4. Supabase\x27s free plan pauses a project after a week without use.',
-    files: ['client/src/lib/supabase.ts', 'client/src/lib/auth.ts', 'client/src/hooks/useAccount.ts'],
+    tradeoff: 'Sign-in works but is not required yet, no Supabase project has been set up, and files still stay in the browser: cloud files arrive in 17.4. Supabase\x27s free plan pauses a project after a week without use.',
+    files: ['client/src/lib/supabase.ts', 'client/src/lib/auth.ts', 'client/src/hooks/useAccount.ts', 'supabase/migrations/20261118000000_identity.sql'],
   },
   {
     name: 'Vitest + React Testing Library', label: 'Vitest', role: 'Testing', icon: FlaskConical,
@@ -164,7 +164,7 @@ export const TECH: Tech[] = [
     why: [
       'Files and results stay in the person\x27s browser, so the demo costs nothing to run and no file leaves the device.',
       'Built into every browser, and it survives a refresh; memory is the fallback when a browser blocks it.',
-      'Every storage implements one Storage interface, so a cloud backend can replace it without changing processing or the UI.',
+      'Every storage implements one Storage interface, so the planned Supabase backend (17.4) can sit behind it without changing processing or the UI.',
     ],
     tradeoff: 'Files live on one device only: there is no sharing, and clearing browser data (or Clear my data) removes them. Tests use fake-indexeddb, not a real browser.',
     files: ['shared/storage.ts', 'client/src/lib/browser-storage.ts'],
@@ -201,7 +201,7 @@ export const PROCESSING_LOCATION = {
   tradeoffTitle: 'one device only',
   text: 'The browser does everything: it parses, normalizes, validates and processes every CSV, keeps the files in IndexedDB, and converts Excel and PDF files to CSV before upload. No server is involved.',
   benefits: ['Free to host: any static site works', 'No file ever leaves the person\x27s device', 'Nothing to run or maintain besides the page'],
-  tradeoff: 'Files live in one browser on one device: they cannot be shared, and they are lost when the person clears their browser data. Sharing or teams would need a backend and cloud storage.',
+  tradeoff: 'Files live in one browser on one device, and they are lost when the person clears their browser data. Planned in 17.4: invited accounts keep their files in private Supabase storage, so they reach every device, while processing stays in the browser.',
 };
 
 export const CONVERSION = {
@@ -221,18 +221,19 @@ export const DECISIONS: { question: string; icon: LucideIcon; summary: string; a
     summary: 'A fast, simple stack that covers what the UI needs, with no server to run or pay for.', answer: [
     'The app is one interactive screen plus two supporting pages. It needs no server rendering, no SEO and no file-based routing, which are where Next.js shines.',
     'All parsing, validation and calculation is plain TypeScript in shared/, run by a file service over one Storage interface, and tested directly. The app is a static bundle any host can serve, at no cost.',
-    'A backend becomes worthwhile with accounts, shared files or large processing jobs; it would add a cloud Storage and services without changing the processing code or the UI.',
+    'Accounts and cross-device files (M17) come from managed Supabase services rather than a server of our own: Auth for sign-in, Postgres and Storage behind row-level security, and Edge Functions for Admin actions. Vercel keeps serving one static site.',
+    'A server of our own becomes worthwhile with large or shared processing jobs, or with automated uploads from partners.',
   ] },
   { question: 'Why TypeScript throughout?', icon: Braces,
     summary: 'Shared types, fewer bugs and one consistent codebase.', answer: [
     'The UI and the file service import the same types from shared/types.ts, so a field added to a result is checked everywhere it is read.',
     'Contracts are clearer: the comparison result, generated files and file metadata each have one definition. Zod then validates what actually arrives at runtime.',
   ] },
-  { question: 'Why files over PostgreSQL?', icon: Database,
-    summary: 'The app needs no database yet: CSV files plus a little metadata keep it simple and light.', answer: [
-    'The primary data is CSV files plus a little metadata per file. The exercise needs no relational queries, user accounts or multi-step transactions.',
+  { question: 'Why browser files, then Postgres?', icon: Database,
+    summary: 'CSV files plus a little metadata need no database, until accounts need private files on every device.', answer: [
+    'The primary data is CSV files plus a little metadata per file. The demo needs no relational queries or multi-step transactions, so it keeps them in the browser.',
     'Files keep the originals byte-for-byte, are easy to inspect and reset (Clear my data), and need no database to install or host.',
-    'A database becomes worthwhile with users and permissions, searching or reporting across many files, audit history, or many concurrent writers.',
+    'A database becomes worthwhile with users and permissions. M17 adds exactly that, so it adds Supabase Postgres: the CSVs go to a private Storage bucket, and Postgres holds their metadata, the per-owner File ID counter and the row-level security that keeps each owner\x27s files private.',
   ] },
   { question: 'Why a modular pipeline?', icon: Boxes,
     summary: 'Separate steps (parse, normalize, validate, process) keep the code clear and easy to extend.', answer: [
@@ -253,8 +254,8 @@ export const SCALE = {
   rows: [
     { layer: 'UI', today: 'React application', future: 'Same React UI' },
     { layer: 'API', today: 'Browser-local file service', future: 'Fastify in containers' },
-    { layer: 'Identity', today: 'Optional sign-in (Supabase Auth)', future: 'Managed OIDC provider' },
-    { layer: 'Data', today: 'IndexedDB, with memory fallback', future: 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs' },
+    { layer: 'Identity', today: 'Optional, invitation-only sign-in (Supabase Auth)', future: 'Managed OIDC provider with customer organizations' },
+    { layer: 'Data', today: 'IndexedDB, with memory fallback; Supabase Postgres and Storage planned (17.4)', future: 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs' },
     { layer: 'Work', today: 'Local processing; PDF and OCR conversion workers', future: 'A queue and workers' },
     { layer: 'OCR', today: 'Tesseract in the browser', future: 'Managed document AI when volume or accuracy requires it' },
     { layer: 'Operations', today: 'Static hosting, automated tests and CI', future: 'Logs, Sentry, metrics, a secrets manager and backups' },
@@ -263,7 +264,7 @@ export const SCALE = {
 
 export const CUSTOMER_SECURITY = {
   status: 'Recommended, not built',
-  today: 'Today this is a static demo with optional sign-in that nothing requires yet: no secret keys reach the browser and no files leave it. The following describes a future hosted product, not safeguards implemented in this demo.',
+  today: 'Today this is a static demo with optional sign-in that nothing requires yet: no secret keys reach the browser and no files leave it. M17 adds private workspaces for invited individuals only; teams, sharing and customer organizations are not planned yet. The following describes a future hosted product, not safeguards implemented in this demo.',
   topics: [
     { title: 'One hosted product', text: 'Use one hosted multi-tenant app rather than copies customers download. Offer a dedicated deployment only when a contract needs it.' },
     { title: 'People and roles', text: 'Use a managed OIDC provider with customer organizations, SSO and MFA. Give people admin, uploader or viewer roles within their customer.' },
@@ -277,8 +278,57 @@ export const CUSTOMER_SECURITY = {
 /** Storage backends in the order they apply: built ones first, then the possible next one. */
 export const STORAGE_OPTIONS: { name: string; icon: LucideIcon; note: string; built: boolean }[] = [
   { name: 'Browser (IndexedDB)', icon: Laptop, note: 'In use', built: true },
-  { name: 'S3 / Cloudflare R2', icon: Boxes, note: 'Not built', built: false },
+  { name: 'Supabase Storage', icon: Cloud, note: 'Planned (17.4)', built: false },
+  { name: 'S3 / Cloudflare R2', icon: Boxes, note: 'At scale', built: false },
 ];
+
+export type RoadmapStatus = 'Done' | 'Next' | 'Planned';
+
+/**
+ * The approved next scope from blueprint/build-plan.md (M17, M18), one entry per build-plan item.
+ * pages/architecture-content.test.ts checks every ID and its Done status against the plan's checkboxes.
+ */
+export const ROADMAP: { milestone: string; title: string; goal: string; items: { id: string; title: string; status: RoadmapStatus; text: string }[] }[] = [
+  {
+    milestone: 'M17', title: 'Invitation-only private workspaces',
+    goal: 'Invited people sign in and keep private files on every device; a guest demo stays open to anyone.',
+    items: [
+      { id: '17.1', title: 'Free hosted-service design', status: 'Done', text: 'Supabase chosen over Firebase and Appwrite: the only free plan that met invite-only sign-in, private files and access to existing files without a card.' },
+      { id: '17.2', title: 'Sign-in and activation', status: 'Done', text: 'Invite-only database rules, then sign-in, activation, password recovery and sign-out pages. Sign-in is optional until 17.6.' },
+      { id: '17.3', title: 'Admin invitations and access', status: 'Next', text: 'Invite by email (30-day expiry, resend, extend, revoke), change roles, deactivate and reactivate. An Admin cannot read members\x27 files.' },
+      { id: '17.4', title: 'Private cross-device files', status: 'Planned', text: 'Files, results and metadata in Supabase, checked against the signed-in owner on every action; uploads refused at capacity.' },
+      { id: '17.5', title: 'Guest demo and export', status: 'Planned', text: 'Try the demo signs in with demo credentials; each demo gets isolated, temporary browser data with sample files, cleared when it ends. Files already in the browser can be exported.' },
+      { id: '17.6', title: 'Require sign-in', status: 'Planned', text: 'The file workspace needs an invited account or a demo session; Admin, Architecture and Generator pages are Admin-only.' },
+      { id: '17.7', title: 'Hosted verification', status: 'Planned', text: 'Real evidence on a non-production project: invitations, both sign-in methods, cross-device files, isolation and deactivation.' },
+    ],
+  },
+  {
+    milestone: 'M18', title: 'File deletion and correction',
+    goal: 'Owners remove files for good and fix flagged values without losing the original.',
+    items: [
+      { id: '18.1', title: 'Permanent deletion', status: 'Planned', text: 'Delete selected files after a confirmation; an input\x27s results stay, marked as from a deleted source. Archive stays.' },
+      { id: '18.2', title: 'Correctable validation cells', status: 'Planned', text: 'Validation names the input cells to edit, and explains issues that cell edits cannot fix.' },
+      { id: '18.3', title: 'Fix errors and re-run', status: 'Planned', text: 'Edit flagged cells, save a new linked corrected input and re-run the function; the original and its results are kept.' },
+    ],
+  },
+];
+
+/** The design chosen in 17.1 (blueprint/hosted-services.md): one provider, its free-plan limits accepted. */
+export const HOSTED_DESIGN = {
+  status: 'Planned, not provisioned',
+  services: [
+    { role: 'Sign-in and sessions', service: 'Supabase Auth: email and password, Google, and an invite-only sign-up hook' },
+    { role: 'Files and metadata', service: 'Supabase Postgres and one private Storage bucket, both behind row-level security' },
+    { role: 'Admin actions', service: 'Supabase Edge Functions for invitations, roles and deactivation; they never read files' },
+    { role: 'Email', service: 'Supabase custom SMTP through a Gmail sender' },
+  ],
+  limits: [
+    'Free projects pause after a week without use; the app will say the workspace is temporarily unavailable until it is restored.',
+    'No backups on the free plan, so regular exports are part of the operating guide (17.7).',
+    'One quota shared by every user: 1 GB of files and 500 MB of database. Uploads are refused before it is reached; existing files stay readable.',
+    'Gmail sends up to 500 emails a day; a failed invitation email is reported as a failure.',
+  ],
+};
 
 /** What the system does, one short card each. */
 export const OVERVIEW: [LucideIcon, string, string][] = [
@@ -293,5 +343,5 @@ export const OVERVIEW: [LucideIcon, string, string][] = [
 /** The "On this page" links: each section's id and label, in page order. */
 export const SECTIONS = [
   ['overview', 'Overview'], ['stack', 'Tech stack'], ['architecture', 'Architecture'], ['decisions', 'Decisions'],
-  ['storage', 'Storage'], ['evolve', 'Evolution'], ['customers', 'Customers and security'],
+  ['storage', 'Storage'], ['roadmap', 'Roadmap'], ['evolve', 'Evolution'], ['customers', 'Customers and security'],
 ] as const;
