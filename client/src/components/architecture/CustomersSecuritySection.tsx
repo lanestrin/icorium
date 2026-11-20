@@ -3,10 +3,10 @@ import { Section } from './Section';
 import { Card } from '../ui/Card';
 import styles from './architecture.module.scss';
 
-/** Section 7 describes future customer boundaries, not current demo guarantees. */
+/** Section 8 describes future customer boundaries, not current demo guarantees. */
 export function CustomersSecuritySection() {
   return (
-    <Section id="customers" eyebrow="7 · Recommended, not built" title="Customers and security" intro={CUSTOMER_SECURITY.today}>
+    <Section id="customers" eyebrow="8 · Recommended, not built" title="Customers and security" intro={CUSTOMER_SECURITY.today}>
       <p className={styles.storageHeading}>{CUSTOMER_SECURITY.status}</p>
       <div className={styles.securityGrid}>
         {CUSTOMER_SECURITY.topics.map((topic) => (

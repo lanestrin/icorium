@@ -3,11 +3,11 @@ import { SCALE } from './content';
 import { Section } from './Section';
 import styles from './architecture.module.scss';
 
-/** Section 6: the working demo beside recommendations for a larger product. */
+/** Section 7: the working demo beside recommendations for a larger product. */
 export function EvolutionSection() {
   return (
-    <Section id="evolve" eyebrow="6 · How it can scale" title="Future evolution"
-      intro="Add services only when volume, accuracy or collaboration requirements justify them.">
+    <Section id="evolve" eyebrow="7 · How it can scale" title="Future evolution"
+      intro="Beyond the roadmap: add services only when volume, accuracy or collaboration requirements justify them.">
       <table className={styles.scaleTable}>
         <caption>Today and at scale</caption>
         <thead><tr><th scope="col">Layer</th><th scope="col">Today</th><th scope="col">At scale<br /><span className={styles.recommendation}>{SCALE.status}</span></th></tr></thead>

@@ -5,6 +5,7 @@ import { DecisionsSection } from '../components/architecture/DecisionsSection';
 import { CustomersSecuritySection } from '../components/architecture/CustomersSecuritySection';
 import { EvolutionSection } from '../components/architecture/EvolutionSection';
 import { OverviewSection } from '../components/architecture/OverviewSection';
+import { RoadmapSection } from '../components/architecture/RoadmapSection';
 import { StorageSection } from '../components/architecture/StorageSection';
 import { TechStackSection } from '../components/architecture/TechStackSection';
 import sections from '../components/architecture/architecture.module.scss';
@@ -44,6 +45,7 @@ export function ArchitecturePage() {
         <ArchitectureSection />
         <DecisionsSection />
         <StorageSection />
+        <RoadmapSection />
         <EvolutionSection />
         <CustomersSecuritySection />
       </div>

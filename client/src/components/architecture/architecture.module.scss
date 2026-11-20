@@ -691,3 +691,88 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+// Roadmap: one card per milestone, then the planned hosted design.
+.roadmapGrid {
+  display: grid;
+  gap: var(--app-space-4);
+  @include up(lg) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+.roadmapList {
+  margin-top: var(--app-space-3);
+}
+.roadmapItem {
+  border-top: var(--app-border-width) solid var(--app-color-border-subtle);
+  padding: var(--app-space-3) 0;
+
+  &:last-child {
+    padding-bottom: 0;
+  }
+}
+.roadmapItemTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--app-space-2);
+  @include text-sm;
+  font-weight: var(--app-weight-semibold);
+}
+.roadmapId {
+  color: var(--app-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.roadmapText {
+  margin-top: var(--app-space-1);
+  @include text-sm;
+  color: var(--app-color-text-secondary);
+}
+.statusChip {
+  margin-left: auto;
+  border: var(--app-border-width) solid transparent;
+  border-radius: var(--app-radius-full);
+  padding: 0 var(--app-space-2);
+  @include text-xs;
+  font-weight: var(--app-weight-semibold);
+}
+.statusDone {
+  border-color: var(--app-color-success-border);
+  background: var(--app-color-success-surface);
+  color: var(--app-color-success-text);
+}
+.statusNext {
+  border-color: var(--app-color-primary-border);
+  background: var(--app-color-primary-surface);
+  color: var(--app-color-primary-text);
+}
+.statusPlanned {
+  border-color: var(--app-color-border-strong);
+  border-style: dashed;
+  background: var(--app-color-surface-subtle);
+  color: var(--app-color-text-secondary);
+}
+.hostedDesign {
+  margin-top: var(--app-space-4);
+
+  & > * + * {
+    margin-top: var(--app-space-3);
+  }
+}
+.serviceList {
+  display: grid;
+  gap: var(--app-space-2);
+}
+.serviceRow {
+  @include up(md) {
+    display: grid;
+    grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+    gap: var(--app-space-3);
+    align-items: baseline;
+  }
+}
+.serviceRole {
+  @include text-sm;
+  font-weight: var(--app-weight-semibold);
+}

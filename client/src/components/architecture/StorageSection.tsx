@@ -25,7 +25,7 @@ function StorageOptions() {
     <div className={styles.storageOptions}>
       <h3 className={styles.storageHeading}>Storage options</h3>
       <div role="img" className={styles.storageRow}
-        aria-label="Storage options: the browser's IndexedDB is in use; S3 or Cloudflare R2 could be added as another backend behind the same interface.">
+        aria-label="Storage options: the browser's IndexedDB is in use; Supabase Storage is planned for signed-in users in 17.4; S3 or Cloudflare R2 could follow at scale, behind the same interface.">
         {STORAGE_OPTIONS.map((option, i) => (
           <div key={option.name} className={styles.storageStep}>
             {i > 0 && <ArrowRight className={styles.storageArrow} aria-hidden />}
@@ -58,6 +58,7 @@ export function StorageSection() {
           <Checks label="Optional Vercel deployment" items={[
             'One static site, free on the Hobby plan',
             'No server or cloud storage: files stay in each visitor\'s browser',
+            'Stays static with no functions when Supabase holds signed-in users\' files (planned, 17.4)',
             'Test site: deploys main',
             <>Each release also ships as a deployable zip (<Path>scripts/build-release.mjs</Path>); Production host not chosen yet</>,
           ]} />
