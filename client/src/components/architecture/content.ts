@@ -295,8 +295,8 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
     items: [
       { id: '19.1', title: 'Structured validation issues', status: 'Done', text: 'Issues carry a severity (blocking, warning or info), field, row and source; a missing component is never counted as zero.' },
       { id: '19.2', title: 'Layered header matching', status: 'Done', text: 'Exact, normalized, alias and manual matching; two candidates for one field are reported, never picked silently.' },
-      { id: '19.3', title: 'Unit verification', status: 'Next', text: 'Units come from the header, a supplier profile or confirmation, never from value ranges; each conversion factor is recorded.' },
-      { id: '19.4', title: 'Stored mapping and processing gate', status: 'Planned', text: 'Unrecognized files are kept as Needs Mapping; the file service refuses to process anything not mapped, unit-confirmed and validated.' },
+      { id: '19.3', title: 'Unit verification', status: 'Done', text: 'Units come from the header, a supplier profile or confirmation, never from value ranges; each conversion factor is recorded.' },
+      { id: '19.4', title: 'Stored mapping and processing gate', status: 'Next', text: 'Unrecognized files are kept as Needs Mapping; the file service refuses to process anything not mapped, unit-confirmed and validated.' },
       { id: '19.5', title: 'Import review and mapping', status: 'Planned', text: 'One review step for every file type: headers, suggested mapping, units, row counts, and why processing is blocked.' },
       { id: '19.6', title: 'Excel sheets, tables and formulas', status: 'Planned', text: 'Every sheet, a choice between candidate tables, total and note rows told apart, and formula values flagged.' },
       { id: '19.7', title: 'PDF and OCR safeguards', status: 'Planned', text: 'Page numbers, repeated headers, misaligned cells, OCR confidence and ambiguous numbers flagged for confirmation.' },

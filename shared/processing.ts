@@ -25,11 +25,14 @@ export const R32_R125_FLAG_COLUMN = 'r32_r125_over_50';
 /** Field checks shared by all processors. Invalid values are reported, never replaced with zero. */
 export function issues(n: Normalized): ValidationIssue[] {
   const out: ValidationIssue[] = [];
-  if (n.massKg === null) out.push(blocking('mass_missing', 'mass missing', 'massKg'));
+  const ambiguous = n.ambiguous ?? [];
+  if (ambiguous.includes('massKg')) out.push(blocking('number_separator_ambiguous', 'mass has an ambiguous separator', 'massKg'));
+  else if (n.massKg === null) out.push(blocking('mass_missing', 'mass missing', 'massKg'));
   else if (!ok(n.massKg) || n.massKg <= 0) out.push(blocking('mass_invalid', 'mass invalid', 'massKg'));
   for (const c of COMPONENTS) {
     const v = n[c];
-    if (v === null) out.push(blocking('component_missing', `${LABEL[c]} missing`, c));
+    if (ambiguous.includes(c)) out.push(blocking('number_separator_ambiguous', `${LABEL[c]} has an ambiguous separator`, c));
+    else if (v === null) out.push(blocking('component_missing', `${LABEL[c]} missing`, c));
     else if (!Number.isFinite(v)) out.push(blocking('component_not_number', `${LABEL[c]} not a number`, c));
     else if (v < 0 || v > 100) out.push(blocking('component_out_of_range', `${LABEL[c]} out of range`, c));
   }
