@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.1](https://github.com/lanestrin/icorium/compare/v2.6.0...v2.6.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* guard profile policies and normalize SQL grant checks ([#141](https://github.com/lanestrin/icorium/issues/141)) ([af4605a](https://github.com/lanestrin/icorium/commit/af4605a3452f423169451ad20bc462af26f37ee0))
+
 ## [2.6.0](https://github.com/lanestrin/icorium/compare/v2.5.0...v2.6.0) (2026-11-22)
 
 
