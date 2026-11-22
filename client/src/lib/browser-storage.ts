@@ -21,6 +21,11 @@ function storageError(error: unknown) {
 
 const notFound = () => httpError(404, 'File not found');
 
+/** Shown when another tab still runs an older version of the app and holds the database open, so it cannot be upgraded. */
+export const UPGRADE_BLOCKED_MESSAGE = 'Close other Reclaim Studio tabs, then reload this page to finish updating.';
+/** The status code of that error, so a caller can tell it from IndexedDB being unavailable. */
+export const UPGRADE_BLOCKED_STATUS = 409;
+
 /** The metadata and text to save for this file. Fields set to undefined (archivedAt on restore) are left out. */
 function toSaved(id: string, input: NewFile) {
   const { text, ...rest } = input;
@@ -57,7 +62,12 @@ export async function openBrowserStorage(name = 'reclaim-studio'): Promise<Brows
     if (!names.contains('files')) request.result.createObjectStore('files');
     if (!names.contains('profiles')) request.result.createObjectStore('profiles', { keyPath: 'key' });
   };
-  const db = await promised(request);
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    let gaveUp = false;
+    request.onsuccess = () => (gaveUp ? request.result.close() : resolve(request.result)); // a late success must not block the next upgrade
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => { gaveUp = true; reject(httpError(UPGRADE_BLOCKED_STATUS, UPGRADE_BLOCKED_MESSAGE)); };
+  });
   db.onversionchange = () => db.close(); // let a newer version of the app upgrade the database
 
   /** Runs work in one transaction and resolves with its result once the transaction has committed. */

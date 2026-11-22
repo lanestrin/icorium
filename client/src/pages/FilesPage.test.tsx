@@ -303,6 +303,29 @@ describe('input selection and status filtering', () => {
   });
 });
 
+describe('files that need mapping', () => {
+  const gateMessage = "File needmap can't be processed yet: its columns and units have not been confirmed";
+  const needsMapping: FileMeta = { ...base, id: 'needmap', name: 'needmap.csv', status: 'Needs Mapping' };
+
+  it('shows the Needs Mapping badge, filters by it, and shows the processing gate message when it is run', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, needsMapping, result]);
+    const user = await setup();
+    expect(within(row('needmap.csv')).getByText('Needs Mapping')).toBeInTheDocument();
+
+    await user.selectOptions(statusFilter(), 'Needs Mapping');
+    expect(check('needmap.csv')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Select clean clean.csv' })).not.toBeInTheDocument();
+
+    vi.mocked(api.process).mockRejectedValueOnce(new Error(gateMessage));
+    await user.click(check('needmap.csv'));
+    await user.click(screen.getByRole('button', { name: 'Run Processing' }));
+    expect(api.process).toHaveBeenCalledWith('needmap', 'validation');
+    await user.selectOptions(statusFilter(), 'Error');
+    expect(within(row('needmap.csv')).getByText('Error')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(gateMessage);
+  });
+});
+
 describe('data quality warning', () => {
   const runButton = (n?: number) => screen.getByRole('button', { name: n ? `Run Processing (${n})` : 'Run Processing' });
   const warning = () => screen.getByRole('dialog', { name: 'Data Quality Warning' });

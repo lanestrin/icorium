@@ -1,6 +1,6 @@
 import type { GeneratorPartner, ProcessorId } from '../../../shared/types';
 import { createFileService, seedSampleFiles, type FileService } from '../../../shared/file-service';
-import { createMemoryStorage, openBrowserStorage, type BrowserStorage } from './browser-storage';
+import { createMemoryStorage, openBrowserStorage, UPGRADE_BLOCKED_STATUS, type BrowserStorage } from './browser-storage';
 import { SAMPLE_FILES } from './samples';
 
 // The app's file actions, run in the browser: the shared file service over browser storage. Nothing is
@@ -15,11 +15,15 @@ export const DOWNLOAD_URL_LIFETIME_MS = 60_000;
 export type StorageMode = 'saved' | 'memory';
 export interface Workspace { storage: BrowserStorage; mode: StorageMode }
 
-/** Opens IndexedDB, or keeps files in memory when the browser won't open it (storage turned off, some private windows). */
+/**
+ * Opens IndexedDB, or keeps files in memory when the browser won't open it (storage turned off, some private windows).
+ * An upgrade blocked by another open tab is not that: it is reported, because memory would hide the person's saved files.
+ */
 export async function openWorkspace(name?: string): Promise<Workspace> {
   try {
     return { storage: await openBrowserStorage(name), mode: 'saved' };
-  } catch {
+  } catch (error) {
+    if ((error as { statusCode?: number }).statusCode === UPGRADE_BLOCKED_STATUS) throw error;
     return { storage: createMemoryStorage(), mode: 'memory' };
   }
 }

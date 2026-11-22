@@ -2,12 +2,23 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SupplierProfile } from '../../../shared/ingestion';
 import type { NewFile } from '../../../shared/storage';
-import { createMemoryStorage, openBrowserStorage, STORAGE_FULL_MESSAGE, type BrowserStorage } from './browser-storage';
+import { createMemoryStorage, openBrowserStorage, STORAGE_FULL_MESSAGE, UPGRADE_BLOCKED_MESSAGE, type BrowserStorage } from './browser-storage';
 
 // IndexedDB is simulated with fake-indexeddb, since jsdom has none.
 
 let databases = 0;
 const freshName = () => `storage-test-${++databases}`;
+
+/** An open version 1 connection that never closes on a version change, like the older app in another tab. */
+const holdVersionOne = (name: string) => new Promise<IDBDatabase>((resolve, reject) => {
+  const request = indexedDB.open(name, 1);
+  request.onupgradeneeded = () => {
+    request.result.createObjectStore('meta', { keyPath: 'id' });
+    request.result.createObjectStore('files');
+  };
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error);
+});
 
 const input = (name: string, text = 'batch_id\nA-1\n'): NewFile => ({ name, text, rows: 1, columns: 1, status: 'Ready', problemRows: 0 });
 
@@ -135,6 +146,14 @@ describe('IndexedDB storage only', () => {
     expect((await store.list()).map((f) => f.id)).toEqual(['100001']);
     expect(await store.read('100001')).toBe('batch_id\nA-1\n');
     expect(await store.listProfiles()).toEqual([]);
+  });
+
+  it('says to close other tabs, instead of waiting forever, when another tab holds the old version open', async () => {
+    const name = freshName();
+    const oldTab = await holdVersionOne(name);
+    await expect(openBrowserStorage(name)).rejects.toMatchObject({ statusCode: 409, message: UPGRADE_BLOCKED_MESSAGE });
+    oldTab.close();
+    expect(await (await openBrowserStorage(name)).list()).toEqual([]); // once that tab is gone, the upgrade goes through
   });
 
   it('gives uploads made at the same time different IDs', async () => {
