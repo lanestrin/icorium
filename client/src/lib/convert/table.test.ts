@@ -47,6 +47,12 @@ describe('findTable', () => {
     expect(() => findTable([A.map((c) => c.toUpperCase())])).toThrow(ConvertError);
   });
 
+  it('refuses a header with two partners\' columns or a repeated partner column, instead of picking one', () => {
+    expect(() => findTable([[...A, ...B], ['1']])).toThrow('This file has the columns of more than one partner format (Partner A, Partner B); keep one set of columns.');
+    expect(() => findTable([[...A, 'feed_mass_kg'], ['1']])).toThrow('The column feed_mass_kg appears more than once; keep one.');
+    expect(() => findTable([[...A, 'notes', '', 'notes'], ['1']])).not.toThrow(); // a repeated column that is not a partner column is left alone
+  });
+
   it('says what was expected when no header is found', () => {
     expect(() => findTable([['name', 'value'], ['a', '1']])).toThrow(
       "No header row with a partner's columns was found in the first sheet. Expected the columns of one of: Partner A (batch_id, sample_date, feed_mass_kg, r32_pct, r125_pct, r134a_pct); ");

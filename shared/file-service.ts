@@ -127,8 +127,8 @@ export function createFileService(storage: Storage) {
     /** Upload: parse + schema check always run here, regardless of processing function. */
     async upload({ name, text }: { name: string; text: string }) {
       if (!name.toLowerCase().endsWith('.csv')) throw httpError(400, 'Only .csv files are supported');
-      const { headers, rows } = parseCsv(text);
-      getAdapter(headers);
+      const { headers, rows, duplicateHeaders } = parseCsv(text);
+      getAdapter(headers, { duplicates: duplicateHeaders });
       // Every upload gets a new base File ID. A previously exported result is registered as a result,
       // with that new base ID plus its function's code (e.g. 101012-M), and marked Imported.
       const result = detectResult(headers);

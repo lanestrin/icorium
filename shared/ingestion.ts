@@ -46,6 +46,11 @@ export const ISSUE_CODES = [
   'component_not_number',
   'component_out_of_range',
   'composition_total',
+  'mapping_missing',
+  'mapping_ambiguous',
+  'mapping_collision',
+  'mapping_unknown_column',
+  'header_duplicate',
 ] as const;
 export type IssueCode = (typeof ISSUE_CODES)[number];
 
@@ -59,6 +64,10 @@ export interface ValidationIssue {
   reason: string;
   source?: SourceRef;
 }
+
+/** A blocking issue: it keeps the affected data out of calculations. Every check so far is blocking. */
+export const blockingIssue = (code: IssueCode, reason: string, field?: CanonicalField): ValidationIssue =>
+  field ? { severity: 'blocking', code, field, reason } : { severity: 'blocking', code, reason };
 
 /** Where a file is in import, apart from its stored status. */
 export type IngestionState = 'Needs Mapping' | 'Needs Review' | 'Ready for Processing';

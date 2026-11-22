@@ -1,7 +1,7 @@
 import { FILE_ID_COLUMN, parseFileId, RESULT_ID_COLUMN, type Problem, type ProblemList, type ProcessorId, type Row } from './types';
 import { getAdapter, type Normalized } from './adapters';
 import { httpError } from './csv';
-import type { CanonicalField, IssueCode, ValidationIssue } from './ingestion';
+import { blockingIssue as blocking, type ValidationIssue } from './ingestion';
 
 const COMPONENTS = ['r32', 'r125', 'r134a'] as const;
 type Component = (typeof COMPONENTS)[number];
@@ -21,10 +21,6 @@ const DEMO_CLASS_RULES = { r32RichMin: 40, r134aRichMin: 34 };
 const R32_R125_FLAG_ABOVE = 50;
 /** Classification's Yes/No column for R-32 + R-125 above R32_R125_FLAG_ABOVE. */
 export const R32_R125_FLAG_COLUMN = 'r32_r125_over_50';
-
-/** Every row check today stops the row from being calculated, so each is blocking. */
-const blocking = (code: IssueCode, reason: string, field?: CanonicalField): ValidationIssue =>
-  field ? { severity: 'blocking', code, field, reason } : { severity: 'blocking', code, reason };
 
 /** Field checks shared by all processors. Invalid values are reported, never replaced with zero. */
 export function issues(n: Normalized): ValidationIssue[] {

@@ -1,4 +1,5 @@
 import { ADAPTERS } from '../../../../shared/types';
+import { matchPartner, partnerMatchProblem } from '../../../../shared/mapping';
 
 // Turning a non-CSV partner file into a CSV, after a reader (Excel, PDF, or OCR for images and scans) has
 // produced rows of cell text. Nothing here knows which reader ran, so every reader shares these rules.
@@ -47,7 +48,8 @@ const s = (n: number) => (n === 1 ? '' : 's');
 
 /**
  * Finds the partner table in rows of cell text: the first row (within HEADER_SEARCH_ROWS) holding all of
- * one adapter's columns is the header, matched exactly as uploads match them, and the rows below it
+ * one adapter's columns is the header, matched exactly as uploads match them (a header holding two partners'
+ * columns, or repeating one, is refused), and the rows below it
  * are the data. Rows with the wrong number of cells are kept and flagged, never guessed: a short row is
  * padded with empty cells, and cells beyond the header are left out. A later row equal to the header (a
  * PDF repeats it on each page) is left out and flagged. `where` names the place searched.
@@ -62,7 +64,11 @@ export function findTable(source: string[][], where = 'the first sheet'): FoundT
   const headerCells = cleaned[headerIndex];
   const width = headerCells.reduce((last, cell, i) => (cell !== '' ? i + 1 : last), 0);
   const headers = headerCells.slice(0, width);
-  const partner = ADAPTERS.find((a) => a.columns.every((c) => headers.includes(c)))!.name;
+  const duplicates = headers.filter((h, i) => h !== '' && headers.indexOf(h) !== i);
+  const match = matchPartner(headers, duplicates);
+  const problem = partnerMatchProblem(match);
+  if (problem) throw new ConvertError(problem);
+  const partner = match?.kind === 'partner' ? match.adapter.name : '';
 
   const rows: FoundTable['rows'] = [];
   const flags: RowFlag[] = [];
