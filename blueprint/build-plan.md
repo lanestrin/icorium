@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.5 - Import review and mapping UI.**
+**Next: 19.6 - Excel sheets, tables and formulas.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -211,7 +211,7 @@ Rules for every M19 item:
   Existing records that exactly match a partner count as approved.
   **Depends on:** 19.3.
 
-- [ ] **19.5** Import review and mapping UI — One import review step for
+- [x] **19.5** Import review and mapping UI — One import review step for
   every file type, including a CSV that needs mapping: file and table,
   original headers, suggested mapping with a choice per field and Not
   used, unit confirmation, sample values, row counts, blocking errors

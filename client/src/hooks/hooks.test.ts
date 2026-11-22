@@ -93,9 +93,9 @@ describe('useFileList', () => {
     }
     const { result } = renderHook(() => useFileList(onError));
     await act(async () => {}); // the first load
-    let count!: number;
-    await act(async () => { count = await result.current.upload([new File(['a'], 'a.csv'), new File(['b'], 'b.csv')]); });
-    expect(count).toBe(accepted);
+    let outcome!: Awaited<ReturnType<typeof result.current.upload>>;
+    await act(async () => { outcome = await result.current.upload([new File(['a'], 'a.csv'), new File(['b'], 'b.csv')]); });
+    expect(outcome.accepted).toBe(accepted);
     expect(onError).toHaveBeenLastCalledWith(accepted === 2 ? undefined : expect.stringContaining('Upload failed'));
   });
 });

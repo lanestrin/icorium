@@ -23,7 +23,8 @@ export function useFileList(onError: Report) {
   useEffect(() => { refresh().finally(() => setLoading(false)); }, []);
 
   /**
-   * Uploads each file in turn, reports the ones that failed, and returns how many were saved.
+   * Uploads each file in turn, reports the ones that failed, and returns how many were saved and which of them
+   * need their columns mapped (so the page can open the mapping dialog).
    * prepare, when given, runs first for each file: it returns the file to send (a converted CSV), or null
    * to skip it without an error (a cancelled conversion).
    */
@@ -32,12 +33,14 @@ export function useFileList(onError: Report) {
     onError(undefined);
     const errors: string[] = [];
     let accepted = 0;
+    const needsMapping: FileMeta[] = [];
     for (const f of list) {
       try {
         const ready = prepare ? await prepare(f) : f;
         if (!ready) continue;
-        await api.upload(ready);
+        const saved = await api.upload(ready);
         accepted++;
+        if (saved?.status === 'Needs Mapping') needsMapping.push(saved);
       } catch (e) {
         errors.push(`${f.name}: ${errorMessage(e)}`);
       }
@@ -45,7 +48,7 @@ export function useFileList(onError: Report) {
     setUploading(false);
     if (errors.length) onError(`Upload failed\n${errors.join('\n')}`);
     await refresh();
-    return accepted;
+    return { accepted, needsMapping };
   }
 
   return { files, refresh, upload, uploading, loading };

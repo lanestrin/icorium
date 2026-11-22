@@ -212,6 +212,26 @@
   line-height: var(--app-leading-sm);
   color: var(--app-color-text-muted);
 }
+// The Map columns dialog: the field and unit choices.
+.mappingSelect {
+  min-width: 10rem;
+  max-width: 100%;
+}
+.mappingUnits {
+  margin: var(--app-space-4) 0 0;
+  padding: 0;
+  border: 0;
+}
+.mappingUnitRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-2);
+  margin-top: var(--app-space-3);
+  > label {
+    min-width: 9rem;
+  }
+}
 .confirmButtons {
   display: flex;
   flex-direction: column-reverse;

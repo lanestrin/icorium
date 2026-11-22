@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, FileSpreadsheet } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { FileMeta } from '../../../../shared/types';
+import { isInputFile, type FileMeta } from '../../../../shared/types';
 import { classNames } from '../../lib/class-names';
 import { displayStatus, importedLineage, processingFunction, type SortKey } from '../../lib/file-status';
 import { RowMenu } from './RowMenu';
@@ -36,6 +36,7 @@ interface FileTableProps {
   onPreview: (file: FileMeta) => void;
   onDownload: (file: FileMeta) => void;
   archived?: boolean; // Archived tab: Archived On / Original Upload columns and Restore in the row menu
+  onMapColumns?: (file: FileMeta) => void; // offered for an unarchived input that has a mapping to review
   onRestore?: (file: FileMeta) => void;
   restoreDisabled?: boolean;
   selectionBar?: ReactNode; // shown at the top of the card while rows are selected
@@ -44,7 +45,7 @@ interface FileTableProps {
 }
 
 /** The file list: a checkbox, File ID, name, dates, function, status and actions for every file. */
-export function FileTable({ files, selectedIds, processingId, failedIds, locked, onToggle, onToggleAll, onPreview, onDownload, archived, onRestore, restoreDisabled, selectionBar, sort, emptyMessage }: FileTableProps) {
+export function FileTable({ files, selectedIds, processingId, failedIds, locked, onToggle, onToggleAll, onPreview, onDownload, archived, onMapColumns, onRestore, restoreDisabled, selectionBar, sort, emptyMessage }: FileTableProps) {
   // Every file can be selected for archiving; Run Processing uses only the selected inputs.
   const ids = files.map((f) => f.id);
   const checkedCount = ids.filter((id) => selectedIds.has(id)).length;
@@ -126,7 +127,7 @@ export function FileTable({ files, selectedIds, processingId, failedIds, locked,
                   </td>
                   <td className={styles.pinnedRight}>
                     <div className={styles.actionsCell}>
-                      <RowMenu file={file} onPreview={() => onPreview(file)} onDownload={() => onDownload(file)} onRestore={archived && onRestore ? () => onRestore(file) : undefined} disabled={restoreDisabled} />
+                      <RowMenu file={file} onPreview={() => onPreview(file)} onDownload={() => onDownload(file)} onMapColumns={onMapColumns && isInputFile(file) && file.ingestion && !file.archived ? () => onMapColumns(file) : undefined} onRestore={archived && onRestore ? () => onRestore(file) : undefined} disabled={restoreDisabled} />
                     </div>
                   </td>
                 </tr>

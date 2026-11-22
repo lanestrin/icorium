@@ -14,7 +14,7 @@ const meta = {
     docs: {
       description: {
         component: [
-          'The ⋯ menu at the end of a file row (Radix DropdownMenu): Preview file and Download file, plus Restore file in the archived view. It is non-modal: a click outside closes it and still reaches what was clicked.',
+          'The ⋯ menu at the end of a file row (Radix DropdownMenu): Preview file and Download file, plus Map columns for an input with a mapping to review and Restore file in the archived view. It is non-modal: a click outside closes it and still reaches what was clicked.',
           '**When not to use it:** for actions on several selected files (the selection bar) or a question that needs an answer (Modal).',
           '**Accessibility:** the ⋯ button is named "Actions for <File ID> <name>". Enter or Space opens the menu on its first item, the arrow keys move and wrap, Escape closes it and focus goes back to ⋯. A chosen action runs once, after focus is back on ⋯.',
           '**Motion:** none. The menu opens and closes without an entrance or exit animation.',
@@ -70,6 +70,21 @@ export const ArchivedFile: Story = {
     await expect(itemNames(canvasElement)).toEqual(['Preview file', 'Download file', 'Restore file']);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Restore file' }));
     await waitFor(() => expect(args.onRestore).toHaveBeenCalledTimes(1));
+  },
+};
+
+export const MapColumns: Story = {
+  args: { onMapColumns: fn() },
+  parameters: { docs: { description: { story: 'An input that has a column mapping to review also offers Map columns, which opens the mapping dialog once the menu has closed and focus is back on ⋯.' } } },
+  play: async ({ args, canvasElement }) => {
+    const screen = page(canvasElement);
+    const trigger = screen.getByRole('button', { name: LABEL });
+    await userEvent.click(trigger);
+    await expect(itemNames(canvasElement)).toEqual(['Preview file', 'Download file', 'Map columns']);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Map columns' }));
+    await waitFor(() => expect(args.onMapColumns).toHaveBeenCalledTimes(1));
+    await expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    await expect(trigger).toHaveFocus();
   },
 };
 

@@ -11,7 +11,7 @@ import { api } from '../lib/api';
 
 vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
-  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(),
+  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(), confirmMapping: vi.fn(),
 } }));
 
 // The comparison dialog is loaded on demand. Transforming its chart code takes over a second in jsdom
@@ -323,6 +323,77 @@ describe('files that need mapping', () => {
     await user.selectOptions(statusFilter(), 'Error');
     expect(within(row('needmap.csv')).getByText('Error')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(gateMessage);
+  });
+});
+
+describe('mapping dialog', () => {
+  const mapping = (field: string, sourceColumn: string) => ({ field, sourceColumn, origin: 'normalized', approved: false });
+  const ingestion = {
+    mappings: [mapping('batchId', 'Batch ID'), mapping('sampleDate', 'Sample Date'), mapping('massKg', 'Net Mass'), mapping('r32', 'R32'), mapping('r125', 'R125'), mapping('r134a', 'R134a')],
+    units: [{ field: 'massKg', unit: 'kg', factor: 1, origin: 'confirmed' }, ...['r32', 'r125', 'r134a'].map((field) => ({ field, unit: '%', factor: 1, origin: 'confirmed' }))],
+    issues: [], duplicateHeaders: [], approved: false,
+  } as unknown as FileMeta['ingestion'];
+  const needsMapping = (id: string, over: Partial<FileMeta> = {}): FileMeta => ({ ...base, id, name: `${id}.csv`, status: 'Needs Mapping', ingestion, ...over });
+  const fileInput = () => document.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const upload = (user: ReturnType<typeof userEvent.setup>, ...names: string[]) => user.upload(fileInput(), names.map((n) => new File(['a'], n, { type: 'text/csv' })));
+  const dialog = () => screen.getByRole('dialog', { name: /^Map columns: / });
+  beforeEach(() => {
+    vi.mocked(api.rows).mockResolvedValue({
+      headers: ['Batch ID', 'Sample Date', 'Net Mass', 'R32', 'R125', 'R134a', 'file_id'], rows: [], offset: 0, totalRows: 0, generatedColumns: [], problems: { total: 0, items: [] },
+    });
+  });
+
+  it('opens after uploading a file that needs mapping, but not after an exact partner file', async () => {
+    const user = await setup();
+    vi.mocked(api.upload).mockResolvedValueOnce(clean);
+    await upload(user, 'partner.csv');
+    await waitFor(() => expect(api.upload).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    vi.mocked(api.upload).mockResolvedValueOnce(needsMapping('mapme'));
+    await upload(user, 'supplier.csv');
+    expect(await screen.findByRole('dialog', { name: 'Map columns: mapme.csv' })).toBeInTheDocument();
+    expect(screen.queryByText(/files need their columns mapped/)).not.toBeInTheDocument();
+  });
+
+  it('opens the first of several files that need mapping and points to Map columns for the rest', async () => {
+    const user = await setup();
+    vi.mocked(api.upload).mockResolvedValueOnce(needsMapping('first')).mockResolvedValueOnce(needsMapping('second'));
+    await upload(user, 'first.csv', 'second.csv');
+    expect(await screen.findByRole('dialog', { name: 'Map columns: first.csv' })).toBeInTheDocument();
+    expect(screen.getByRole('status', behindDialog)).toHaveTextContent('2 files need their columns mapped; use Map columns on each.');
+  });
+
+  it('offers Map columns only for an unarchived input that has a mapping, and opens the dialog from it', async () => {
+    const mapped = needsMapping('mapped', { status: 'Ready' });
+    const resultWithMapping = needsMapping('mapped-V', { status: 'Processed', processor: 'validation' });
+    const archivedMapped = needsMapping('gone', { archived: true, archivedAt: '2026-11-20T10:00:00Z' });
+    vi.mocked(api.list).mockResolvedValue([clean, mapped, resultWithMapping, archivedMapped]);
+    const user = await setup();
+    const hasMapColumns = async (name: string) => {
+      const menu = await rowMenu(user, name);
+      const found = !!within(menu).queryByRole('menuitem', { name: 'Map columns' });
+      await user.keyboard('{Escape}');
+      return found;
+    };
+    expect(await hasMapColumns('clean.csv')).toBe(false); // an exact partner file has no mapping record
+    expect(await hasMapColumns('mapped-V.csv')).toBe(false); // a result
+    expect(await hasMapColumns('mapped.csv')).toBe(true);
+    await user.click(within(await rowMenu(user, 'mapped.csv')).getByRole('menuitem', { name: 'Map columns' }));
+    expect(await screen.findByRole('dialog', { name: 'Map columns: mapped.csv' })).toBeInTheDocument();
+  });
+
+  it('refreshes the list and says the file is ready after a successful confirm', async () => {
+    vi.mocked(api.list).mockResolvedValue([clean, needsMapping('mapme')]);
+    vi.mocked(api.confirmMapping).mockResolvedValue({ ...needsMapping('mapme'), status: 'Ready' });
+    const user = await setup();
+    await user.click(within(await rowMenu(user, 'mapme.csv')).getByRole('menuitem', { name: 'Map columns' }));
+    const open = await screen.findByRole('dialog', { name: 'Map columns: mapme.csv' });
+    await user.click(await within(open).findByRole('button', { name: 'Confirm mapping' }).then(async (b) => { await waitFor(() => expect(b).toBeEnabled()); return b; }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(api.confirmMapping).toHaveBeenCalledWith(expect.objectContaining({ fileId: 'mapme', units: { massKg: 'kg', r32: '%', r125: '%', r134a: '%' } }));
+    expect(screen.getByRole('status')).toHaveTextContent('mapme.csv is ready for processing.');
+    expect(api.list).toHaveBeenCalledTimes(2); // initial load + refresh after the confirm
   });
 });
 
