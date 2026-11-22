@@ -243,7 +243,7 @@ export function FilesPage() {
       )}
 
       {conversion.review && (
-        <ConvertReviewDialog name={conversion.review.name} table={conversion.review.table} ocr={conversion.review.ocr} onCancel={conversion.cancel} onImport={conversion.importReviewed} />
+        <ConvertReviewDialog name={conversion.review.name} tables={conversion.review.tables} chosen={conversion.review.chosen} ocr={conversion.review.ocr} onChoose={conversion.choose} onCancel={conversion.cancel} onImport={conversion.importReviewed} />
       )}
       {mapping && <MappingDialog key={mapping.id} file={mapping} onClose={() => setMapping(undefined)} onConfirmed={mappingConfirmed} />}
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}

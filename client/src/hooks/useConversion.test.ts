@@ -1,7 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReadProgress } from '../lib/convert/ocr';
-import { useConversion, type ReadOutcome } from './useConversion';
+import type { FoundTable } from '../lib/convert/table';
+import { useConversion, type ReadByOcr, type ReadOutcome } from './useConversion';
 
 const A = ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'];
 const sheet = [A, ['X-1', '2026-09-01', '100', '40', '30', '30']];
@@ -16,8 +17,9 @@ function slowReader() {
   const signal = (call = 0) => read.mock.calls[call][2];
   /** Reports progress from the reader's nth call, as a reader does while it works. */
   const progress = (value: ReadProgress, call = 0) => act(() => read.mock.calls[call][3](value));
-  const finish = (rows: string[][], ocr?: ReadOutcome['ocr']) => act(async () => pending.shift()?.(ocr ? { rows, ocr } : { rows }));
-  return { read, signal, progress, finish };
+  const finish = (rows: string[][], ocr?: ReadByOcr) => act(async () => pending.shift()?.(ocr ? { rows, ocr } : { rows }));
+  const finishTables = (tables: FoundTable[]) => act(async () => pending.shift()?.({ tables }));
+  return { read, signal, progress, finish, finishTables };
 }
 
 describe('useConversion', () => {
@@ -75,7 +77,7 @@ describe('useConversion', () => {
     let outcome!: Promise<File | null>;
     act(() => { outcome = result.current.prepare(new File(['x'], 'report.xlsx')); });
     // Attach the expectation first, as the upload loop awaits prepare, so the rejection is always handled.
-    const rejected = expect(outcome).rejects.toThrow("No header row with a partner's columns was found in the first sheet.");
+    const rejected = expect(outcome).rejects.toThrow("No header row with a partner's columns was found in the workbook.");
     await reader.finish([['name'], ['a']]);
     await rejected;
     expect(result.current.reading).toBeNull();
@@ -172,9 +174,40 @@ describe('useConversion', () => {
     let outcome!: Promise<File | null>;
     act(() => { outcome = result.current.prepare(new File(['x'], 'report.xlsx')); });
     await reader.finish(sheet);
-    expect(result.current.review?.table.partner).toBe('Partner A');
+    expect(result.current.review).toMatchObject({ chosen: 0, tables: [{ partner: 'Partner A' }] });
     act(() => result.current.importReviewed());
     expect((await outcome)?.name).toBe('report.csv');
     expect(result.current.review).toBeNull();
+  });
+
+  describe('Excel files with several tables', () => {
+    const table = (name: string): FoundTable => ({ partner: '', headerRow: 1, headers: ['Lot', 'Mass'], sheet: name, range: 'A1:B2', rows: [{ sourceRow: 2, cells: [name, '1'] }], flags: [] });
+
+    async function openWithTables(tables: FoundTable[]) {
+      const reader = slowReader();
+      const hook = renderHook(() => useConversion(reader.read));
+      let outcome!: Promise<File | null>;
+      act(() => { outcome = hook.result.current.prepare(new File(['x'], 'report.xlsx')); });
+      await reader.finishTables(tables);
+      return { result: hook.result, outcome };
+    }
+
+    it('chooses the only table for the person, but none of several', async () => {
+      expect((await openWithTables([table('One')])).result.current.review?.chosen).toBe(0);
+      expect((await openWithTables([table('One'), table('Two')])).result.current.review?.chosen).toBeNull();
+    });
+
+    it('does nothing on import until a table is chosen, then uploads only the chosen one', async () => {
+      const { result, outcome } = await openWithTables([table('One'), table('Two')]);
+      act(() => result.current.importReviewed());
+      expect(result.current.review).not.toBeNull();
+      act(() => result.current.choose(7)); // not a table
+      expect(result.current.review?.chosen).toBeNull();
+      act(() => result.current.choose(1));
+      act(() => result.current.importReviewed());
+      const file = await outcome;
+      expect(file?.name).toBe('report.csv');
+      expect(await file?.text()).toBe('Lot,Mass\nTwo,1\n');
+    });
   });
 });

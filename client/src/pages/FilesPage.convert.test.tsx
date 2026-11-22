@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileMeta } from '../../../shared/types';
 import { FilesPage } from './FilesPage';
 import { api } from '../lib/api';
-import { readExcel } from '../lib/convert/excel';
+import { readExcel, type SheetCell, type SheetData } from '../lib/convert/excel';
 import { readImage } from '../lib/convert/ocr';
 import { readPdf } from '../lib/convert/pdf';
 import { ConvertError } from '../lib/convert/table';
@@ -14,23 +14,29 @@ vi.mock('../lib/api', () => ({ api: {
   download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(),
 } }));
 // The Excel reader is tested with real workbooks in lib/convert; here it is mocked to control timing.
-vi.mock('../lib/convert/excel', () => ({ readExcel: vi.fn() }));
+vi.mock('../lib/convert/excel', async (importOriginal) => ({ ...(await importOriginal<typeof import('../lib/convert/excel')>()), readExcel: vi.fn() }));
 vi.mock('../lib/convert/pdf', () => ({ readPdf: vi.fn() }));
 vi.mock('../lib/convert/ocr', () => ({ readImage: vi.fn() }));
 
 const clean: FileMeta = { id: 'clean', name: 'clean.csv', status: 'Ready', problemRows: 0, rows: 25, columns: 7, uploadedAt: '2026-11-06T12:00:00Z' };
 const A = ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'];
-// A first sheet with a title row above the header, one full row and one short row.
-const sheet = [['Partner A export'], A, ['X-1', '2026-09-01', '100', '40', '30', '30'], ['X-2', '2026-09-01', '200', '40']];
+/** A sheet from rows of text, as the real reader would give it: numbers and dates told from text, rows as wide as the sheet. */
+function grid(rows: string[][], name = 'Sheet1'): SheetData {
+  const width = Math.max(...rows.map((r) => r.length));
+  const cell = (text: string): SheetCell => ({ text, kind: !text ? 'empty' : /^\d{4}-\d\d-\d\d$/.test(text) ? 'date' : Number.isFinite(Number(text)) ? 'number' : 'text' });
+  return { name, firstRow: 1, firstCol: 0, merges: [], cells: rows.map((r) => Array.from({ length: width }, (_, i) => cell(r[i] ?? ''))) };
+}
+// A first sheet with a title row above the header, two rows (the second missing two values) and a total row.
+const sheet = [grid([['Partner A export'], A, ['X-1', '2026-09-01', '100', '40', '30', '30'], ['X-2', '2026-09-01', '200', '40'], ['Total', '', '300']])];
 const xlsx = (name = 'report.xlsx') => new File(['not read: the reader is mocked'], name);
 const fileInput = () => document.querySelector<HTMLInputElement>('input[type="file"]')!;
 const uploadedNames = () => vi.mocked(api.upload).mock.calls.map(([f]) => f.name);
 
 /** A reader call that finishes only when the test says so. */
 function deferredRead() {
-  let resolve!: (rows: string[][]) => void;
+  let resolve!: (sheets: SheetData[]) => void;
   vi.mocked(readExcel).mockReturnValueOnce(new Promise((r) => { resolve = r; }));
-  return (rows: string[][]) => act(async () => resolve(rows));
+  return (sheets: SheetData[]) => act(async () => resolve(sheets));
 }
 
 beforeEach(() => {
@@ -54,10 +60,10 @@ describe('converting Excel uploads', () => {
     await user.upload(fileInput(), xlsx());
 
     const review = await screen.findByRole('dialog', { name: 'Review report.xlsx' });
-    expect(review).toHaveTextContent('Partner A · header on row 2 · 2 rows');
+    expect(review).toHaveTextContent('Partner A · Sheet1 A2:F5 · header on row 2 · 2 rows');
     const toCheck = within(review).getByRole('region', { name: 'Rows to check' });
     expect(toCheck).toHaveTextContent('1 row need checking');
-    expect(toCheck).toHaveTextContent('Row 4: missing 2 cells');
+    expect(toCheck).toHaveTextContent('Row 5: total row, left out');
     expect(within(review).getByRole('row', { name: /X-1/ })).toBeInTheDocument();
     expect(within(review).getByText('Showing 2 of 2 rows')).toBeInTheDocument();
     expect(api.upload).not.toHaveBeenCalled(); // nothing is sent before Import
@@ -72,7 +78,7 @@ describe('converting Excel uploads', () => {
 
   it('renders cell text as text, never as markup', async () => {
     const user = await setup();
-    vi.mocked(readExcel).mockResolvedValue([A, ['<b>X-1</b>', '2026-09-01', '1', '2', '3', '4']]);
+    vi.mocked(readExcel).mockResolvedValue([grid([A, ['<b>X-1</b>', '2026-09-01', '1', '2', '3', '4']])]);
     await user.upload(fileInput(), xlsx());
     const review = await screen.findByRole('dialog', { name: 'Review report.xlsx' });
     expect(within(review).getByText('<b>X-1</b>')).toBeInTheDocument();
@@ -128,16 +134,70 @@ describe('converting Excel uploads', () => {
 
   it('names files it cannot convert, and still uploads the others', async () => {
     await setup();
-    vi.mocked(readExcel).mockResolvedValueOnce([['name', 'value'], ['a', '1']]);
+    vi.mocked(readExcel).mockResolvedValueOnce([grid([['just a title']])]);
     const big = new File([new Uint8Array(20 * 1024 * 1024 + 1)], 'big.xlsx');
     // fireEvent, not user.upload, so the input's accept list doesn't filter out the .docx.
     fireEvent.change(fileInput(), { target: { files: [new File(['x'], 'report.docx'), big, xlsx('notes.xlsx'), new File(['a'], 'good.csv')] } });
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent("report.docx: This file type can't be converted. Upload a CSV, Excel, PDF or image file.");
     expect(alert).toHaveTextContent('big.xlsx: It is larger than the 20 MB conversion limit.');
-    expect(alert).toHaveTextContent("notes.xlsx: No header row with a partner's columns was found in the first sheet.");
+    expect(alert).toHaveTextContent("notes.xlsx: No table with a header row and data rows was found on any of its 1 sheet.");
     expect(uploadedNames()).toEqual(['good.csv']);
     expect(readExcel).toHaveBeenCalledTimes(1); // the oversized file was never read
+  });
+});
+
+describe('Excel files with several tables or unfamiliar headers', () => {
+  const lots = ['Lot', 'Mass (lb)', 'R32 %', 'R125 %', 'R134a %'];
+  const workbook = [
+    grid([lots, ['L1', '10', '40', '30', '30']], 'Lots'),
+    grid([['Intro'], A, ['X-1', '2026-09-01', '100', '40', '30', '30']], 'Partner'),
+  ];
+
+  it('makes the person choose between tables, then uploads only the chosen one', async () => {
+    const user = await setup();
+    vi.mocked(readExcel).mockResolvedValue(workbook);
+    await user.upload(fileInput(), xlsx());
+    const review = await screen.findByRole('dialog', { name: 'Review report.xlsx' });
+    const choice = within(review).getByRole('group', { name: 'Choose a table' });
+    expect(within(choice).getAllByRole('radio')).toHaveLength(2);
+    expect(choice).toHaveTextContent('Lots A1:E2 · Columns to map · 1 row');
+    expect(choice).toHaveTextContent('Partner A2:F3 · Partner A · 1 row');
+    expect(within(review).queryByRole('table')).not.toBeInTheDocument(); // nothing is previewed until one is chosen
+    const importButton = within(review).getByRole('button', { name: 'Import as CSV' });
+    expect(importButton).toBeDisabled();
+
+    await user.click(within(choice).getByRole('radio', { name: /Lots A1:E2/ }));
+    expect(review).toHaveTextContent('Columns to map · Lots A1:E2 · header on row 1 · 1 row');
+    expect(within(review).getByRole('row', { name: /L1/ })).toBeInTheDocument();
+    await user.click(importButton);
+    await waitFor(() => expect(api.upload).toHaveBeenCalledTimes(1));
+    expect(uploadedNames()).toEqual(['report.csv']); // only one table is ever uploaded
+    expect(await vi.mocked(api.upload).mock.calls[0][0].text()).toBe(`${lots.join(',')}
+L1,10,40,30,30
+`);
+  });
+
+  it('imports a lone table with unfamiliar headers without asking, for the file service to hold for mapping', async () => {
+    const user = await setup();
+    vi.mocked(readExcel).mockResolvedValue([workbook[0]]);
+    await user.upload(fileInput(), xlsx());
+    const review = await screen.findByRole('dialog', { name: 'Review report.xlsx' });
+    expect(within(review).queryByRole('group', { name: 'Choose a table' })).not.toBeInTheDocument();
+    expect(review).toHaveTextContent('Columns to map · Lots A1:E2');
+    await user.click(within(review).getByRole('button', { name: 'Import as CSV' }));
+    await waitFor(() => expect(uploadedNames()).toEqual(['report.csv']));
+  });
+
+  it('shows formula, merged and blank-header flags by sheet row', async () => {
+    const user = await setup();
+    const flagged = grid([['Lot', '', 'Mass (lb)'], ['L1', 'x', '10']]);
+    flagged.cells[1][2] = { text: '10', kind: 'number', formula: 'B2*2' };
+    vi.mocked(readExcel).mockResolvedValue([flagged]);
+    await user.upload(fileInput(), xlsx());
+    const toCheck = within(await screen.findByRole('dialog', { name: 'Review report.xlsx' })).getByRole('region', { name: 'Rows to check' });
+    expect(toCheck).toHaveTextContent('B1 has no header; named "Column B"');
+    expect(toCheck).toHaveTextContent("C2 is a formula (=B2*2); its stored result is used and can't be checked here");
   });
 });
 

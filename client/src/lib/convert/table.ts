@@ -36,9 +36,12 @@ export interface RowFlag { row: number; reason: string }
 /** A partner table found in a source file, ready to review and import. */
 export interface FoundTable {
   partner: string;
-  /** 1-based row number of the header in the source. */
+  /** 1-based row number of the header in the source (a sheet row, for Excel). */
   headerRow: number;
   headers: string[];
+  /** Excel only: the sheet's name, and the A1 range from the header through the last row of the table (B3:G20). */
+  sheet?: string;
+  range?: string;
   /** Data rows, each exactly as wide as the header; sourceRow is its 1-based row number in the source. */
   rows: { sourceRow: number; cells: string[] }[];
   flags: RowFlag[];

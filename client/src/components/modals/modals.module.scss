@@ -287,6 +287,23 @@
   padding: var(--app-space-3) var(--app-space-4);
   color: var(--app-color-warning-text);
 }
+.tableChoice {
+  margin-top: var(--app-space-5);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  padding: var(--app-space-3) var(--app-space-4);
+
+  legend {
+    padding: 0 var(--app-space-2);
+    font-weight: var(--app-weight-semibold);
+  }
+}
+.tableOption {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  padding: var(--app-space-1) 0;
+}
 .problemsTitle {
   display: flex;
   align-items: center;

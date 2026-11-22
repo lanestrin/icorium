@@ -88,7 +88,7 @@ export const TECH: Tech[] = [
   {
     name: 'SheetJS', label: 'SheetJS', role: 'Excel import', icon: FileSpreadsheet, packages: [['client', 'xlsx']],
     why: [
-      'Reads the first sheet of a partner\x27s .xlsx or .xls file in the browser; the rows are reviewed, then uploaded as a CSV, so the file service stays CSV-only.',
+      'Reads every sheet of a .xlsx or .xls file in the browser and finds its tables below any introduction rows. If there are several, you choose one; they are never merged. Total and note rows are left out and listed, and formula and merged cells are flagged. The chosen table is reviewed, then uploaded as a CSV, so the file service stays CSV-only.',
       'Loaded only when an Excel file is chosen, so opening the file page does not download it.',
     ],
     tradeoff: 'Installed from SheetJS\x27s own download site (cdn.sheetjs.com), because the npm release is older and has security advisories; installs need that site to be reachable.',
@@ -298,8 +298,8 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
       { id: '19.3', title: 'Unit verification', status: 'Done', text: 'Units come from the header, a supplier profile or confirmation, never from value ranges; each conversion factor is recorded.' },
       { id: '19.4', title: 'Stored mapping and processing gate', status: 'Done', text: 'CSVs with other columns are kept as Needs Mapping; confirming their columns and units (optionally saved as a suggest-only supplier profile) unlocks processing, and the file service checks the mapping on every run.' },
       { id: '19.5', title: 'Import review and mapping', status: 'Done', text: 'One review step for every file type: headers, suggested mapping, units, row counts, and why processing is blocked.' },
-      { id: '19.6', title: 'Excel sheets, tables and formulas', status: 'Next', text: 'Every sheet, a choice between candidate tables, total and note rows told apart, and formula values flagged.' },
-      { id: '19.7', title: 'PDF and OCR safeguards', status: 'Planned', text: 'Page numbers, repeated headers, misaligned cells, OCR confidence and ambiguous numbers flagged for confirmation.' },
+      { id: '19.6', title: 'Excel sheets, tables and formulas', status: 'Done', text: 'Every sheet, a choice between candidate tables, total and note rows told apart, and formula values flagged.' },
+      { id: '19.7', title: 'PDF and OCR safeguards', status: 'Next', text: 'Page numbers, repeated headers, misaligned cells, OCR confidence and ambiguous numbers flagged for confirmation.' },
       { id: '19.8', title: 'Provenance and traceability', status: 'Planned', text: 'The original file and source cells are kept, and a calculated value can be explained from its raw source value.' },
       { id: '19.9', title: 'Ingestion regression and docs', status: 'Planned', text: 'A test for every acceptance criterion, regression for existing files and results, and updated documentation.' },
     ],
