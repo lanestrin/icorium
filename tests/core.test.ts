@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from '../shared/csv';
 import { getAdapter } from '../shared/adapters';
+import { decideUnits, normalizeRow, parseMeasurement, partnerUnits, UNIT_FACTORS, unitRangeWarnings } from '../shared/units';
 import { matchPartner, normalizeHeader, partnerMatchProblem, suggestMapping } from '../shared/mapping';
 import { detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from '../shared/processing';
 import { compareResults, matchRows } from '../shared/compare';
@@ -741,5 +742,119 @@ describe('shared code', () => {
 
   it('finds the shared modules', () => {
     expect(files).toEqual(expect.arrayContaining(['csv.ts', 'adapters.ts', 'processing.ts', 'compare.ts', 'generate.ts', 'types.ts']));
+  });
+});
+
+describe('unit verification', () => {
+  const sampleDir = path.join(__dirname, '..', 'sample-data');
+  const sample = (file: string) => parseCsv(readFileSync(path.join(sampleDir, file), 'utf8'));
+  const field = (list: { field: string }[], f: string) => list.find((x) => x.field === f);
+
+  it("decides every sample file's units from its partner schema, with the adapter factors", () => {
+    for (const [file, adapter] of [['partner_a_baseline.csv', ADAPTERS[0]], ['partner_b_baseline.csv', ADAPTERS[1]], ['partner_c_baseline.csv', ADAPTERS[2]]] as const) {
+      const out = decideUnits(suggestMapping(sample(file).headers));
+      expect(out.issues).toEqual([]);
+      expect(out.decisions.map((d) => d.origin)).toEqual(Array(4).fill('partner'));
+      expect(out.decisions).toEqual(partnerUnits(adapter));
+      expect(field(out.decisions, 'massKg')).toMatchObject({ factor: adapter.massFactor });
+      expect(field(out.decisions, 'r32')).toMatchObject({ factor: adapter.pctFactor });
+    }
+  });
+  it("keeps UNIT_FACTORS equal to each adapter's factors", () => {
+    for (const a of ADAPTERS) {
+      expect(UNIT_FACTORS[a.units.mass]).toBe(a.massFactor);
+      expect(UNIT_FACTORS[a.units.composition === 'percent' ? '%' : 'fraction']).toBe(a.pctFactor);
+    }
+  });
+  const aliasHeaders = ['Batch ID', 'Sample Date', 'net_mass', 'R32 %', 'R125', 'R134a'];
+  it('takes a unit an alias states as a header unit', () => {
+    const out = decideUnits(suggestMapping(aliasHeaders));
+    expect(field(out.decisions, 'r32')).toEqual({ field: 'r32', unit: '%', factor: 1, origin: 'header' });
+  });
+  it('blocks a unitless mapped field until a profile or a confirmation gives its unit', () => {
+    const s = suggestMapping(aliasHeaders);
+    const none = decideUnits(s);
+    expect(none.issues.map((i) => [i.severity, i.code, i.field])).toEqual([['blocking', 'unit_unverified', 'massKg'], ['blocking', 'unit_unverified', 'r125'], ['blocking', 'unit_unverified', 'r134a']]);
+    expect(none.issues[0].reason).toBe('mass: no unit is stated; confirm kg, lb or g');
+    expect(field(none.decisions, 'massKg')).toBeUndefined();
+    const profile = decideUnits(s, { profile: { massKg: 'lb', r125: '%', r134a: '%' } });
+    expect(profile.issues).toEqual([]);
+    expect(field(profile.decisions, 'massKg')).toEqual({ field: 'massKg', unit: 'lb', factor: 0.45359237, origin: 'profile' });
+    const confirmed = decideUnits(s, { confirmed: { massKg: 'g', r125: 'fraction', r134a: '%' } });
+    expect(field(confirmed.decisions, 'massKg')).toMatchObject({ unit: 'g', origin: 'confirmed' });
+    expect(field(confirmed.decisions, 'r125')).toMatchObject({ unit: 'fraction', factor: 100 });
+  });
+  it('lets a confirmation replace a profile, and a header unit beat a profile with a warning', () => {
+    const out = decideUnits(suggestMapping(aliasHeaders), { profile: { massKg: 'lb', r32: 'fraction', r125: '%', r134a: '%' }, confirmed: { massKg: 'kg' } });
+    expect(field(out.decisions, 'massKg')).toMatchObject({ unit: 'kg', origin: 'confirmed' });
+    expect(field(out.decisions, 'r32')).toMatchObject({ unit: '%', origin: 'header' });
+    expect(out.issues.map((i) => [i.severity, i.code, i.field])).toEqual([['warning', 'unit_conflict', 'r32']]);
+  });
+  it('blocks a confirmation that contradicts a stated unit', () => {
+    const out = decideUnits(suggestMapping(aliasHeaders), { confirmed: { massKg: 'kg', r32: 'fraction', r125: '%', r134a: '%' } });
+    expect(out.issues.map((i) => [i.severity, i.code, i.field])).toEqual([['blocking', 'unit_conflict', 'r32']]);
+    expect(out.issues[0].reason).toBe('R-32: the column states % but fraction was confirmed; resolve the difference');
+    expect(field(out.decisions, 'r32')).toBeUndefined();
+  });
+  it('blocks unsupported units, including a composition unit on mass', () => {
+    const out = decideUnits(suggestMapping(aliasHeaders), { confirmed: { massKg: '%', r125: 'oz', r134a: '%' } });
+    expect(out.issues.map((i) => [i.code, i.field])).toEqual([['unit_unsupported', 'massKg'], ['unit_unsupported', 'r125']]);
+    expect(out.issues[1].reason).toBe('R-125: unit "oz" is not supported; use % or fraction');
+    expect(out.decisions.map((d) => d.field)).toEqual(['r32', 'r134a']);
+  });
+  it('skips fields that have no mapping', () => {
+    expect(decideUnits(suggestMapping(['foo']))).toEqual({ decisions: [], issues: [] });
+  });
+
+  it('reads measurements like Number() and reports ambiguous separators', () => {
+    expect(parseMeasurement('')).toEqual({ value: null, ambiguous: false });
+    expect(parseMeasurement('  ')).toEqual({ value: null, ambiguous: false });
+    expect(parseMeasurement(undefined)).toEqual({ value: null, ambiguous: false });
+    expect(parseMeasurement(' 12.5 ')).toEqual({ value: 12.5, ambiguous: false });
+    expect(parseMeasurement('-3')).toEqual({ value: -3, ambiguous: false });
+    expect(parseMeasurement('n/a')).toEqual({ value: NaN, ambiguous: false });
+    expect(parseMeasurement('n/a, see note')).toEqual({ value: NaN, ambiguous: false });
+    for (const t of ['1,234', '1,5', '1.234,5', '1.234.567']) expect(parseMeasurement(t)).toEqual({ value: NaN, ambiguous: true });
+  });
+  it('normalizes pounds to kilograms and fractions to percent', () => {
+    const fields = ['batchId', 'sampleDate', 'massKg', 'r32', 'r125', 'r134a'] as const;
+    const mappings = fields.map((f, i) => ({ field: f, sourceColumn: `c${i}`, origin: 'manual' as const, approved: true }));
+    const decisions = [
+      { field: 'massKg' as const, unit: 'lb', factor: UNIT_FACTORS.lb, origin: 'confirmed' as const },
+      ...(['r32', 'r125', 'r134a'] as const).map((f) => ({ field: f, unit: 'fraction', factor: 100, origin: 'confirmed' as const })),
+    ];
+    const n = normalizeRow({ c0: ' X ', c1: '2026-01-01', c2: '100', c3: '0.5', c4: '0.3', c5: '0.2' }, mappings, decisions, 'Test');
+    expect(n).toEqual({ batchId: 'X', sampleDate: '2026-01-01', source: 'Test', massKg: 100 * 0.45359237, r32: 50, r125: 30, r134a: 20 });
+    expect(normalizeRow({ c0: 'X', c1: 'd', c2: '1,5', c3: '', c4: '1', c5: '1' }, mappings, decisions, 'T')).toMatchObject({ massKg: NaN, r32: null, ambiguous: ['massKg'] });
+    expect(normalizeRow({ c0: 'X', c2: '1' }, mappings, decisions.slice(1), 'T').massKg).toBeNull(); // no unit decision: never read as a number
+  });
+  it('warns, never blocks, when values look like the other composition unit', () => {
+    const fields = ['r32', 'r125', 'r134a'] as const;
+    const mappings = fields.map((f, i) => ({ field: f, sourceColumn: `c${i}`, origin: 'manual' as const, approved: true }));
+    const unit = (u: string) => fields.map((f) => ({ field: f, unit: u, factor: 1, origin: 'confirmed' as const }));
+    const small = [{ c0: '0.5', c1: '0.3', c2: '0.2' }];
+    const big = [{ c0: '50', c1: '30', c2: '20' }];
+    const warned = unitRangeWarnings(small, mappings, unit('%'));
+    expect(warned.map((w) => [w.severity, w.code, w.field])).toEqual([['warning', 'unit_range_suspect', 'r32'], ['warning', 'unit_range_suspect', 'r125'], ['warning', 'unit_range_suspect', 'r134a']]);
+    expect(warned[0].reason).toBe('R-32: every value is 1 or less; check they are percent, not fractions');
+    expect(unitRangeWarnings(big, mappings, unit('fraction'))[0].reason).toBe('R-32: some values are above 1; check they are fractions, not percent');
+    expect(unitRangeWarnings(small, mappings, unit('fraction'))).toEqual([]);
+    expect(unitRangeWarnings(big, mappings, unit('%'))).toEqual([]);
+  });
+  it('warns on none of the sample files', () => {
+    for (const file of readdirSync(sampleDir).filter((f) => f.endsWith('.csv'))) {
+      const { headers, rows } = sample(file);
+      const s = suggestMapping(headers);
+      const { decisions } = decideUnits(s);
+      expect(unitRangeWarnings(rows, s.mappings.map((m) => m.mapping), decisions)).toEqual([]);
+    }
+  });
+  it('flags an ambiguous separator in processing without changing other reasons', () => {
+    const norm = getAdapter(A_HEADERS.split(',')).normalize;
+    const row = (mass: string, r32 = '50') => norm({ batch_id: 'A', feed_mass_kg: mass, r32_pct: r32, r125_pct: '30', r134a_pct: '20' });
+    expect(issues(row('1,234')).map((i) => [i.code, i.reason])).toEqual([['number_separator_ambiguous', 'mass has an ambiguous separator']]);
+    expect(issues(row('100', '1.234.5')).map((i) => i.reason)).toEqual(['R-32 has an ambiguous separator']);
+    expect(issues(row('n/a')).map((i) => i.reason)).toEqual(['mass invalid']);
+    expect(issues(row('100')).map((i) => i.reason)).toEqual([]);
   });
 });

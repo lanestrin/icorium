@@ -26,9 +26,12 @@ export interface FieldMapping {
   approved: boolean;
 }
 
+/** The fields that hold a measured number, and so a unit. */
+export type MeasurementField = 'massKg' | 'r32' | 'r125' | 'r134a';
+
 /** The unit a measurement is read in, and the factor that converts it to kg or percent. */
 export interface UnitDecision {
-  field: 'massKg' | 'r32' | 'r125' | 'r134a';
+  field: MeasurementField;
   unit: string;
   factor: number;
   origin: 'header' | 'metadata' | 'profile' | 'confirmed' | 'partner';
@@ -51,6 +54,11 @@ export const ISSUE_CODES = [
   'mapping_collision',
   'mapping_unknown_column',
   'header_duplicate',
+  'unit_unverified',
+  'unit_unsupported',
+  'unit_conflict',
+  'unit_range_suspect',
+  'number_separator_ambiguous',
 ] as const;
 export type IssueCode = (typeof ISSUE_CODES)[number];
 
@@ -68,6 +76,10 @@ export interface ValidationIssue {
 /** A blocking issue: it keeps the affected data out of calculations. Every check so far is blocking. */
 export const blockingIssue = (code: IssueCode, reason: string, field?: CanonicalField): ValidationIssue =>
   field ? { severity: 'blocking', code, field, reason } : { severity: 'blocking', code, reason };
+
+/** A warning: it is shown for review and never blocks processing or changes a decision. */
+export const warningIssue = (code: IssueCode, reason: string, field?: CanonicalField): ValidationIssue =>
+  field ? { severity: 'warning', code, field, reason } : { severity: 'warning', code, reason };
 
 /** Where a file is in import, apart from its stored status. */
 export type IngestionState = 'Needs Mapping' | 'Needs Review' | 'Ready for Processing';

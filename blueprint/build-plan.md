@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.3 - Unit verification and normalization.**
+**Next: 19.4 - Stored mapping and the processing gate.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -191,7 +191,7 @@ Rules for every M19 item:
   never pick the first silently. Partner A, B and C still match exactly.
   **Depends on:** 19.1.
 
-- [ ] **19.3** Unit verification and normalization — Decide units from
+- [x] **19.3** Unit verification and normalization — Decide units from
   an explicit header or alias unit, then a supplier profile, then user
   confirmation. Value ranges only warn. Support kg, lb and g, and
   percent (0–100) or fraction (0–1), normalized to kg and percent for

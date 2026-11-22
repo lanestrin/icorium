@@ -177,7 +177,7 @@ export const ADAPTERS = [
 /** The canonical field each position of an adapter's `columns` holds, in the same order. */
 export const ADAPTER_FIELDS = ['batchId', 'sampleDate', 'massKg', 'r32', 'r125', 'r134a'] as const satisfies readonly CanonicalField[];
 
-/** A unit a column name or alias states. Recorded for review; verified in 19.3. */
+/** A unit a column name or alias states. shared/units.ts verifies it against the other evidence (19.3). */
 export type StatedUnit = 'kg' | 'lb' | 'g' | '%' | 'fraction';
 
 /** The unit one of an adapter's columns states, or undefined for the batch ID and date. */
