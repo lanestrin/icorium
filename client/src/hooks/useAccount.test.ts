@@ -59,6 +59,23 @@ describe('useAccount', () => {
     await waitFor(() => expect(result.current.account).toEqual({ status: 'error', message: 'Something went wrong. Try again.' }));
   });
 
+  it('ignores a slow profile read that finishes after signing out (F-39)', async () => {
+    const fake = setUp({ session: fakeSession(), profile: active });
+    let finishRead: (result: { data: unknown; error: unknown }) => void = () => {};
+    fake.maybeSingle.mockImplementationOnce(() => new Promise((resolve) => { finishRead = resolve; }));
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(fake.maybeSingle).toHaveBeenCalled());
+
+    act(() => fake.emit('SIGNED_OUT', null));
+    expect(result.current.account).toEqual({ status: 'signed-out' });
+
+    await act(async () => {
+      finishRead({ data: active, error: null });
+      await Promise.resolve();
+    });
+    expect(result.current.account).toEqual({ status: 'signed-out' });
+  });
+
   it('notices a password-reset link', async () => {
     setUp({ session: fakeSession(), profile: active, initialEvent: 'PASSWORD_RECOVERY' });
     const { result } = renderHook(() => useAccount());
