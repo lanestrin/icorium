@@ -4,6 +4,7 @@ import { isInputFile, type CompareResult, type FileMeta } from '../../../shared/
 import { Banner } from '../components/Banner';
 import { ClearDataModal } from '../components/modals/ClearDataModal';
 import { ConvertReviewDialog } from '../components/modals/ConvertReviewDialog';
+import { MappingDialog } from '../components/modals/MappingDialog';
 import { PreviewModal } from '../components/modals/PreviewModal';
 import { QualityWarningModal, ReplaceResultModal } from '../components/modals/RunConfirmations';
 import { ArchiveToast } from '../components/files/ArchiveToast';
@@ -39,6 +40,7 @@ export function FilesPage() {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [preview, setPreview] = useState<FileMeta>();
+  const [mapping, setMapping] = useState<FileMeta>(); // the file whose columns the Map columns dialog is confirming
   const [comparison, setComparison] = useState<CompareResult>();
   const [comparing, setComparing] = useState(false);
   const busy = useRef(false); // set synchronously, so a double click cannot start a second batch or archive
@@ -101,8 +103,21 @@ export function FilesPage() {
 
   // After an upload that added at least one file, filter to today's originals so the new files show first.
   // Excel files are converted and reviewed first; each is uploaded as a CSV only after Import as CSV.
+  // A CSV with unfamiliar columns opens the Map columns dialog; an exact partner file is never sent through it.
   async function uploadFiles(list: File[]) {
-    if (await upload(list, conversion.prepare) > 0) showNewFiles('original');
+    const { accepted, needsMapping } = await upload(list, conversion.prepare);
+    if (accepted > 0) showNewFiles('original');
+    if (needsMapping.length) {
+      setMapping(needsMapping[0]);
+      if (needsMapping.length > 1) setNotice(`${needsMapping.length} files need their columns mapped; use Map columns on each.`);
+    }
+  }
+
+  function mappingConfirmed({ name, profileError }: { name: string; profileError?: string }) {
+    setMapping(undefined);
+    refresh();
+    if (profileError) setError(profileError);
+    else setNotice(`${name} is ready for processing.`);
   }
 
   async function compare() {
@@ -206,6 +221,7 @@ export function FilesPage() {
               onToggle={toggle}
               onToggleAll={toggleAll}
               onPreview={setPreview}
+              onMapColumns={setMapping}
               onDownload={(f) => api.download(f.id).catch((e) => setError(`Download failed: ${errorMessage(e)}`))}
               onRestore={viewArchived ? (f) => setArchived([f.id], false) : undefined}
               restoreDisabled={archiving || clearing}
@@ -229,6 +245,7 @@ export function FilesPage() {
       {conversion.review && (
         <ConvertReviewDialog name={conversion.review.name} table={conversion.review.table} ocr={conversion.review.ocr} onCancel={conversion.cancel} onImport={conversion.importReviewed} />
       )}
+      {mapping && <MappingDialog key={mapping.id} file={mapping} onClose={() => setMapping(undefined)} onConfirmed={mappingConfirmed} />}
       {preview && <PreviewModal file={preview} onClose={() => setPreview(undefined)} />}
       {confirmClear && <ClearDataModal onCancel={() => setConfirmClear(false)} onConfirm={clearData} />}
       {pending?.items ? (
