@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.9.0](https://github.com/lanestrin/icorium/compare/v2.8.1...v2.9.0) (2026-11-22)
+
+
+### Features
+
+* review and confirm column mapping in the app (19.5) ([#151](https://github.com/lanestrin/icorium/issues/151)) ([ddf1495](https://github.com/lanestrin/icorium/commit/ddf14958d0dc44a240a6aaf964dca27a8a94553c))
+
 ## [2.8.1](https://github.com/lanestrin/icorium/compare/v2.8.0...v2.8.1) (2026-11-22)
 
 
