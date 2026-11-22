@@ -1,4 +1,4 @@
-import type { ValidationIssue } from './ingestion';
+import type { CanonicalField, ValidationIssue } from './ingestion';
 
 // code: the fixed letter a result's File ID ends with (101010-V). Never change or reuse a code.
 export const PROCESSORS = [
@@ -161,6 +161,7 @@ interface AdapterEntry {
   name: string;
   description: string; // shown on the CSV generator page
   columns: readonly [id: string, date: string, mass: string, r32: string, r125: string, r134a: string];
+  units: { mass: 'kg' | 'lb' | 'g'; composition: 'percent' | 'fraction' }; // the units its columns state; must agree with the two factors
   massFactor: number; // source unit -> kg
   pctFactor: number; // source unit -> %
   digits: { mass: number; pct: number }; // decimal places the generator writes, matching the sample files
@@ -168,10 +169,54 @@ interface AdapterEntry {
 
 // To support a new partner format, add one entry here. Uploads, processing and the CSV generator all read it.
 export const ADAPTERS = [
-  { id: 'A', name: 'Partner A', description: 'Kilograms and percentages', columns: ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'], massFactor: 1, pctFactor: 1, digits: { mass: 3, pct: 2 } },
-  { id: 'B', name: 'Partner B', description: 'Pounds and percentages', columns: ['lot_number', 'collected_on', 'weight_lb', 'hfc32_percent', 'hfc125_percent', 'hfc134a_percent'], massFactor: 0.45359237, pctFactor: 1, digits: { mass: 3, pct: 2 } },
-  { id: 'C', name: 'Partner C', description: 'Grams and fractions (0–1)', columns: ['material_ref', 'collection_date', 'quantity_g', 'R32_fraction', 'R125_fraction', 'R134a_fraction'], massFactor: 0.001, pctFactor: 100, digits: { mass: 0, pct: 5 } },
+  { id: 'A', name: 'Partner A', description: 'Kilograms and percentages', units: { mass: 'kg', composition: 'percent' }, columns: ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'], massFactor: 1, pctFactor: 1, digits: { mass: 3, pct: 2 } },
+  { id: 'B', name: 'Partner B', description: 'Pounds and percentages', units: { mass: 'lb', composition: 'percent' }, columns: ['lot_number', 'collected_on', 'weight_lb', 'hfc32_percent', 'hfc125_percent', 'hfc134a_percent'], massFactor: 0.45359237, pctFactor: 1, digits: { mass: 3, pct: 2 } },
+  { id: 'C', name: 'Partner C', description: 'Grams and fractions (0–1)', units: { mass: 'g', composition: 'fraction' }, columns: ['material_ref', 'collection_date', 'quantity_g', 'R32_fraction', 'R125_fraction', 'R134a_fraction'], massFactor: 0.001, pctFactor: 100, digits: { mass: 0, pct: 5 } },
 ] as const satisfies readonly AdapterEntry[];
+
+/** The canonical field each position of an adapter's `columns` holds, in the same order. */
+export const ADAPTER_FIELDS = ['batchId', 'sampleDate', 'massKg', 'r32', 'r125', 'r134a'] as const satisfies readonly CanonicalField[];
+
+/** A unit a column name or alias states. Recorded for review; verified in 19.3. */
+export type StatedUnit = 'kg' | 'lb' | 'g' | '%' | 'fraction';
+
+/** The unit one of an adapter's columns states, or undefined for the batch ID and date. */
+export function adapterUnit(adapter: { units: AdapterEntry['units'] }, field: CanonicalField): StatedUnit | undefined {
+  if (field === 'massKg') return adapter.units.mass;
+  if (field === 'batchId' || field === 'sampleDate') return undefined;
+  return adapter.units.composition === 'percent' ? '%' : 'fraction';
+}
+
+/** A header name recognised as a field. A recognition candidate only: it proves neither the meaning nor the unit. */
+export interface FieldAlias { name: string; field: CanonicalField; unit?: StatedUnit }
+
+// To recognise another header name, add it here. Matching ignores case and separators (shared/mapping.ts).
+export const FIELD_ALIASES: readonly FieldAlias[] = [
+  // Every partner column, with its partner's unit.
+  ...ADAPTERS.flatMap((a) => a.columns.map((name, i): FieldAlias => ({ name, field: ADAPTER_FIELDS[i], unit: adapterUnit(a, ADAPTER_FIELDS[i]) }))),
+  { name: 'net_mass', field: 'massKg' },
+  { name: 'total_weight', field: 'massKg' },
+  { name: 'batch_weight', field: 'massKg' },
+  { name: 'quantity', field: 'massKg' },
+  { name: 'R32 %', field: 'r32', unit: '%' },
+  { name: 'R-32', field: 'r32' },
+  { name: 'R32', field: 'r32' },
+  { name: 'HFC32', field: 'r32' },
+  { name: 'HFC-32', field: 'r32' },
+  { name: 'Difluoromethane', field: 'r32' },
+  { name: 'R125 %', field: 'r125', unit: '%' },
+  { name: 'R-125', field: 'r125' },
+  { name: 'R125', field: 'r125' },
+  { name: 'HFC125', field: 'r125' },
+  { name: 'HFC-125', field: 'r125' },
+  { name: 'Pentafluoroethane', field: 'r125' },
+  { name: 'R134a %', field: 'r134a', unit: '%' },
+  { name: 'R-134a', field: 'r134a' },
+  { name: 'R134a', field: 'r134a' },
+  { name: 'HFC134a', field: 'r134a' },
+  { name: 'HFC-134a', field: 'r134a' },
+  { name: '1,1,1,2-Tetrafluoroethane', field: 'r134a' },
+];
 
 /** Partners the CSV generator can write for: every adapter. */
 export type GeneratorPartner = (typeof ADAPTERS)[number]['id'];

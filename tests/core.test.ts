@@ -4,10 +4,11 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from '../shared/csv';
 import { getAdapter } from '../shared/adapters';
+import { matchPartner, normalizeHeader, partnerMatchProblem, suggestMapping } from '../shared/mapping';
 import { detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from '../shared/processing';
 import { compareResults, matchRows } from '../shared/compare';
 import { GENERATE_MAX_ATTEMPTS, generateCsv, generatedName, generateFiles } from '../shared/generate';
-import { ADAPTERS, GENERATOR_PARTNERS, nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../shared/types';
+import { ADAPTER_FIELDS, ADAPTERS, FIELD_ALIASES, GENERATOR_PARTNERS, nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../shared/types';
 
 const A_HEADERS = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
 const A_CSV = `${A_HEADERS}
@@ -46,6 +47,126 @@ describe('adapters', () => {
   });
   it('rejects unknown schemas', () => {
     expect(() => getAdapter(['foo', 'bar'])).toThrow(/Unrecognized CSV schema/);
+  });
+});
+
+describe('header matching', () => {
+  const A = [...ADAPTERS[0].columns];
+  const B = [...ADAPTERS[1].columns];
+  const codes = (headers: string[], options?: Parameters<typeof suggestMapping>[1]) => suggestMapping(headers, options).issues.map((i) => `${i.code}:${i.field}`);
+
+  it.each(ADAPTERS)('matches $name exactly, approved, with its units', (adapter) => {
+    const out = suggestMapping([...adapter.columns]);
+    expect(out.partner).toBe(adapter.name);
+    expect(out.issues).toEqual([]);
+    expect(out.unusedColumns).toEqual([]);
+    expect(out.mappings.map((m) => [m.mapping.field, m.mapping.sourceColumn, m.mapping.origin, m.mapping.approved])).toEqual(
+      ADAPTER_FIELDS.map((field, i) => [field, adapter.columns[i], 'exact', true]));
+    expect(out.mappings.map((m) => m.statedUnit)).toEqual([undefined, undefined, adapter.units.mass, ...Array(3).fill(adapter.units.composition === 'percent' ? '%' : 'fraction')]);
+  });
+  it('still matches exactly when columns are reordered or extra ones are present', () => {
+    const out = suggestMapping(['notes', ...A].reverse());
+    expect(out.partner).toBe('Partner A');
+    expect(out.unusedColumns).toEqual(['notes']);
+  });
+  it('keeps the adapters\' units in step with their factors', () => {
+    for (const a of ADAPTERS) {
+      expect(a.massFactor).toBe({ kg: 1, lb: 0.45359237, g: 0.001 }[a.units.mass]);
+      expect(a.pctFactor).toBe(a.units.composition === 'percent' ? 1 : 100);
+    }
+  });
+
+  it('normalizes case, spacing and separators but keeps unit words', () => {
+    expect(normalizeHeader(' R32 % ')).toBe(normalizeHeader('r32_%'));
+    expect(normalizeHeader('Feed-Mass.KG')).toBe('feed mass kg');
+    expect(normalizeHeader('weight_lb')).not.toBe(normalizeHeader('weight_kg'));
+  });
+  it('maps a partner column written another way as normalized, not approved', () => {
+    const out = suggestMapping(['Batch_ID', 'SAMPLE DATE', ' FEED MASS KG', 'R32-PCT', 'r125.pct', 'r134a  pct']);
+    expect(out.issues).toEqual([]);
+    expect(out.partner).toBeUndefined();
+    expect(out.mappings.map((m) => [m.mapping.origin, m.mapping.approved])).toEqual(Array(6).fill(['normalized', false]));
+    expect(out.mappings.map((m) => m.statedUnit)).toEqual([undefined, undefined, 'kg', '%', '%', '%']);
+  });
+  it('does not let a different unit word match: weight_kg is not Partner B\'s weight_lb', () => {
+    expect(codes(['batch_id', 'sample_date', 'weight_kg', 'r32_pct', 'r125_pct', 'r134a_pct'])).toEqual(['mapping_missing:massKg']);
+    const lb = suggestMapping(['batch_id', 'sample_date', 'Weight LB', 'r32_pct', 'r125_pct', 'r134a_pct']).mappings;
+    expect(lb.find((m) => m.mapping.field === 'massKg')).toMatchObject({ statedUnit: 'lb', mapping: { origin: 'normalized' } });
+  });
+  it('recognises known aliases and records their stated unit', () => {
+    const out = suggestMapping(['batch_id', 'sample_date', 'quantity', 'R32 %', 'HFC-125', '1,1,1,2-Tetrafluoroethane']);
+    expect(out.issues).toEqual([]);
+    expect(out.mappings.map((m) => [m.mapping.field, m.mapping.origin, m.statedUnit])).toEqual([
+      ['batchId', 'normalized', undefined], ['sampleDate', 'normalized', undefined], ['massKg', 'alias', undefined],
+      ['r32', 'alias', '%'], ['r125', 'alias', undefined], ['r134a', 'alias', undefined],
+    ]);
+    expect(out.mappings.every((m) => !m.mapping.approved)).toBe(true);
+  });
+  it('lists every partner column among the aliases, with the field it holds', () => {
+    for (const a of ADAPTERS) a.columns.forEach((name, i) => expect(FIELD_ALIASES).toContainEqual(expect.objectContaining({ name, field: ADAPTER_FIELDS[i] })));
+  });
+
+  it('reports two columns for one field instead of taking the first', () => {
+    const out = suggestMapping(['batch_id', 'sample_date', 'net_mass', 'total_weight', 'r32_pct', 'r125_pct', 'r134a_pct']);
+    expect(out.issues).toEqual([{ severity: 'blocking', code: 'mapping_ambiguous', field: 'massKg', reason: 'mass: columns "net_mass" and "total_weight" both match; choose one' }]);
+    expect(out.mappings.map((m) => m.mapping.field)).not.toContain('massKg');
+    expect(codes(['batch_id', 'sample_date', 'feed_mass_kg', 'R-32', 'HFC32', 'r125_pct', 'r134a_pct'])).toEqual(['mapping_ambiguous:r32']);
+  });
+  it('treats a partner column and an alias for the same field as two candidates, unless a full partner schema matches', () => {
+    expect(codes(['batch_id', 'sample_date', 'weight_lb', 'quantity', 'r32_pct', 'r125_pct', 'r134a_pct'])).toEqual(['mapping_ambiguous:massKg']);
+    const full = suggestMapping(['batch_id', 'sample_date', 'feed_mass_kg', 'quantity', 'r32_pct', 'r125_pct', 'r134a_pct']);
+    expect(full.partner).toBe('Partner A');
+    expect(full.unusedColumns).toEqual(['quantity']);
+  });
+  it('reports one column chosen for two fields and drops both mappings', () => {
+    const out = suggestMapping(A, { manual: { r125: 'r32_pct' } });
+    expect(out.issues.map((i) => [i.code, i.field])).toEqual([['mapping_collision', 'r32'], ['mapping_collision', 'r125']]);
+    expect(out.issues[0].reason).toBe('R-32: column "r32_pct" is chosen for R-32 and R-125; each field needs its own column');
+    expect(out.mappings.map((m) => m.mapping.field)).toEqual(['batchId', 'sampleDate', 'massKg', 'r134a']);
+  });
+  it('cannot map a duplicated header', () => {
+    const out = suggestMapping(A, { duplicates: ['feed_mass_kg'] });
+    expect(out.partner).toBeUndefined();
+    expect(out.issues.map((i) => [i.code, i.field])).toEqual([['header_duplicate', 'massKg']]);
+    expect(out.mappings).toHaveLength(5);
+  });
+  it('reports every field missing for unknown headers', () => {
+    const out = suggestMapping(['foo', 'bar']);
+    expect(out.issues.map((i) => i.code)).toEqual(Array(6).fill('mapping_missing'));
+    expect(out.issues.map((i) => i.field)).toEqual([...ADAPTER_FIELDS]);
+    expect(out.mappings).toEqual([]);
+    expect(out.unusedColumns).toEqual(['foo', 'bar']);
+  });
+  it('takes the person\'s choice as manual and unapproved, and rejects a column that is not there', () => {
+    const headers = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const manual = { batchId: 'a', sampleDate: 'b', massKg: 'c', r32: 'd', r125: 'e', r134a: 'f' } as const;
+    const out = suggestMapping(headers, { manual });
+    expect(out.issues).toEqual([]);
+    expect(out.mappings.map((m) => [m.mapping.origin, m.mapping.approved])).toEqual(Array(6).fill(['manual', false]));
+    expect(codes(headers, { manual: { ...manual, r134a: 'zzz' } })).toEqual(['mapping_unknown_column:r134a']);
+    expect(codes(headers, { manual, duplicates: ['f'] })).toEqual(['header_duplicate:r134a']);
+  });
+  it('lets a manual choice replace an exact suggestion', () => {
+    const out = suggestMapping([...A, 'mass_total'], { manual: { massKg: 'mass_total' } });
+    expect(out.partner).toBe('Partner A');
+    expect(out.mappings.find((m) => m.mapping.field === 'massKg')?.mapping).toEqual({ field: 'massKg', sourceColumn: 'mass_total', origin: 'manual', approved: false });
+    expect(out.unusedColumns).toEqual(['feed_mass_kg']);
+  });
+
+  it('refuses to pick between two partner schemas or a duplicated partner column', () => {
+    const both = matchPartner([...A, ...B]);
+    expect(both).toEqual({ kind: 'several', names: ['Partner A', 'Partner B'] });
+    expect(partnerMatchProblem(both)).toBe('This file has the columns of more than one partner format (Partner A, Partner B); keep one set of columns.');
+    const dup = matchPartner(A, ['feed_mass_kg']);
+    expect(dup).toEqual({ kind: 'duplicate', column: 'feed_mass_kg' });
+    expect(partnerMatchProblem(dup)).toBe('The column feed_mass_kg appears more than once; keep one.');
+    expect(matchPartner(['foo'])).toBeNull();
+    expect(matchPartner(A, ['notes'])).toMatchObject({ kind: 'partner' });
+    expect([partnerMatchProblem(null), partnerMatchProblem(matchPartner(A))]).toEqual([undefined, undefined]);
+  });
+  it('lists the headers a CSV repeats', () => {
+    expect(parseCsv('a,b,a\n1,2,3').duplicateHeaders).toEqual(['a']);
+    expect(parseCsv('a,b,c\n1,2,3').duplicateHeaders).toEqual([]);
   });
 });
 

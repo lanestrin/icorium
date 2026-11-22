@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.2 - Layered header matching.**
+**Next: 19.3 - Unit verification and normalization.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -183,7 +183,7 @@ Rules for every M19 item:
   composition total counting missing components as zero.
   **Depends on:** none.
 
-- [ ] **19.2** Layered header matching — One matching engine used by
+- [x] **19.2** Layered header matching — One matching engine used by
   upload and conversion: exact partner match, then a normalized match
   (case, whitespace and separators folded, unit words kept), then known
   aliases with their stated units, then manual mapping. Report two

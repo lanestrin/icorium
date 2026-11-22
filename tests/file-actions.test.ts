@@ -56,6 +56,8 @@ describe('loading files', () => {
   it.each([
     ['notes.txt', sample('partner_a_baseline.csv'), 'Only .csv files are supported'],
     ['unknown.csv', 'foo,bar\n1,2\n', 'Unrecognized CSV schema'],
+    ['two-partners.csv', 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct,lot_number,collected_on,weight_lb,hfc32_percent,hfc125_percent,hfc134a_percent\nA-1,d,1,2,3,4,B-1,d,1,2,3,4\n', 'This file has the columns of more than one partner format (Partner A, Partner B); keep one set of columns.'],
+    ['repeated-column.csv', 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct,feed_mass_kg\nA-1,d,100,50,30,20,5\n', 'The column feed_mass_kg appears more than once; keep one.'],
     ['broken.csv', 'batch_id,sample_date\nA-1,2026-09-01,extra\n', 'CSV parse error on data row 1'],
     ['empty.csv', 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct\n', 'at least one data row'],
   ])('rejects %s with a clear message', async (name, text, message) => {
@@ -404,7 +406,7 @@ describe('current result contract', () => {
       }
     });
     const download = (await textOf(result.id));
-    expect(parseCsv(download)).toEqual({ headers: after.headers, rows: after.rows });
+    expect(parseCsv(download)).toMatchObject({ headers: after.headers, rows: after.rows, duplicateHeaders: [] });
     const imported = (await upload(`renamed_${name}_${id}.csv`, download)).json<FileMeta>();
     // An unchanged export of a sample's result links back to that sample.
     expect(imported).toMatchObject({ status: 'Processed', processor: id, generatedColumns: result.generatedColumns, imported: true, sourceId: source.id, importedFrom: source.id });
@@ -868,7 +870,7 @@ describe('generating CSVs', () => {
 /** What a stored input looks like: the uploaded CSV plus file_id (its File ID) on every row. */
 const storedInput = (text: string, id: string) => {
   const { headers, rows } = parseCsv(text);
-  return { headers: [...headers, 'file_id'], rows: rows.map((r) => ({ ...r, file_id: id })) };
+  return { headers: [...headers, 'file_id'], rows: rows.map((r) => ({ ...r, file_id: id })), duplicateHeaders: [] };
 };
 describe('file identity regression', () => {
   // One scenario per function, so every suffix (-V, -M, -C) is covered. Each run uploads its own files.
