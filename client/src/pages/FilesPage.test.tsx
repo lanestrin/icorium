@@ -1073,7 +1073,7 @@ describe('file identity regression', () => {
       vi.mocked(api.compare).mockResolvedValue({
         processor: 'validation',
         rowMatch: 'batch_id',
-        files: [resultA, resultB].map((f) => ({ id: f.id, name: f.name, source: 'Partner A', rows: 1, problems: { total: 0, items: [] } })),
+        files: [resultA, resultB].map((f) => ({ id: f.id, name: f.name, source: 'Partner A', rows: 1, validRows: 1, problems: { total: 0, items: [] } })),
         rows: [{ key: 'A-001', label: 'A-001', rowNumbers: [1, 1] }],
         columns: [{ name: 'composition_total_pct', kind: 'numeric', unit: '%', measure: 'mean', summary: [100, 100], values: [[100, 100]], rowsDiffering: 0, rowsCompared: 1 }],
       });
@@ -1356,9 +1356,9 @@ describe('comparing results', () => {
     processor: 'validation',
     rowMatch: 'position',
     files: [
-      { id: 'val-a', name: valA.name, source: 'Partner A', rows: 2, problems: { total: 1, items: [{ row: 2, batchId: 'A-002', message: 'mass missing', issues: [] }] } },
-      { id: 'val-b', name: valB.name, source: 'Partner B', rows: 2, problems: { total: 2, items: [] } },
-      { id: 'val-c', name: valC.name, source: 'Partner C', rows: 1, problems: { total: 0, items: [] } },
+      { id: 'val-a', name: valA.name, source: 'Partner A', rows: 2, validRows: 1, problems: { total: 1, items: [{ row: 2, batchId: 'A-002', message: 'mass missing', issues: [] }] } },
+      { id: 'val-b', name: valB.name, source: 'Partner B', rows: 2, validRows: 2, problems: { total: 2, items: [] } },
+      { id: 'val-c', name: valC.name, source: 'Partner C', rows: 1, validRows: 1, problems: { total: 0, items: [] } },
     ],
     rows: [{ key: '#1', label: '#1', rowNumbers: [1, 1, 1] }, { key: '#2', label: '#2', rowNumbers: [2, 2, null] }],
     columns: [
@@ -1444,6 +1444,8 @@ describe('comparing results', () => {
     expect(summaryRow('Partner A · Baseline')).toHaveTextContent('Partner A · Baseline(ref)100.00—1');
     expect(summaryRow('Partner B · Followup')).toHaveTextContent('98.73-1.27 pp2');
     expect(summaryRow('Partner C · Baseline')).toHaveTextContent('99.50-0.50 pp0');
+    expect(within(summary).getByRole('columnheader', { name: 'Mean (%) of valid rows' })).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('Rows with errors are left out: Partner A · Baseline: 1 of 2 rows valid');
 
     const glance = within(dialog).getByText('Comparison at a glance').parentElement!;
     expect(glance).toHaveTextContent('Reference filePartner A · Baseline');

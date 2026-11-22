@@ -1,5 +1,6 @@
 import { httpError } from '../../../shared/csv';
 import { nextBaseId, parseFileId, type FileMeta } from '../../../shared/types';
+import type { SupplierProfile } from '../../../shared/ingestion';
 import type { NewFile, Storage } from '../../../shared/storage';
 
 // Where the workspace's files live in the browser: IndexedDB, so files survive a refresh on this device,
@@ -7,7 +8,7 @@ import type { NewFile, Storage } from '../../../shared/storage';
 
 /** A browser storage, which can also be emptied (Clear my data). */
 export interface BrowserStorage extends Storage {
-  /** Deletes every file and its metadata. */
+  /** Deletes every file, its metadata and every supplier profile. */
   clear(): Promise<void>;
 }
 
@@ -42,28 +43,33 @@ function promised<T>(request: IDBRequest<T>) {
 
 /**
  * Opens (or creates) this IndexedDB database. Store "meta" holds each file's FileMeta keyed by its File ID,
- * store "files" holds its CSV text under the same key. Every operation is one transaction over both stores,
+ * store "files" holds its CSV text under the same key, and store "profiles" (added in version 2) holds saved supplier
+ * profiles keyed by their header key. Every operation is one transaction over the stores,
  * and IndexedDB runs read-write transactions one at a time, even across tabs, so picking a new File ID and
  * saving it can never race another upload.
  */
 export async function openBrowserStorage(name = 'reclaim-studio'): Promise<BrowserStorage> {
-  const request = indexedDB.open(name, 1);
+  const request = indexedDB.open(name, 2);
   request.onupgradeneeded = () => {
-    request.result.createObjectStore('meta', { keyPath: 'id' });
-    request.result.createObjectStore('files');
+    // Version 1 made meta and files; version 2 only adds profiles, leaving every saved file as it is.
+    const names = request.result.objectStoreNames;
+    if (!names.contains('meta')) request.result.createObjectStore('meta', { keyPath: 'id' });
+    if (!names.contains('files')) request.result.createObjectStore('files');
+    if (!names.contains('profiles')) request.result.createObjectStore('profiles', { keyPath: 'key' });
   };
   const db = await promised(request);
+  db.onversionchange = () => db.close(); // let a newer version of the app upgrade the database
 
   /** Runs work in one transaction and resolves with its result once the transaction has committed. */
-  async function transact<T>(mode: IDBTransactionMode, work: (meta: IDBObjectStore, files: IDBObjectStore) => Promise<T>): Promise<T> {
-    const tx = db.transaction(['meta', 'files'], mode);
+  async function transact<T>(mode: IDBTransactionMode, work: (meta: IDBObjectStore, files: IDBObjectStore, profiles: IDBObjectStore) => Promise<T>): Promise<T> {
+    const tx = db.transaction(['meta', 'files', 'profiles'], mode);
     const committed = new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onabort = () => reject(tx.error ?? new Error('The browser stopped saving this file.'));
     });
     let result: T;
     try {
-      result = await work(tx.objectStore('meta'), tx.objectStore('files'));
+      result = await work(tx.objectStore('meta'), tx.objectStore('files'), tx.objectStore('profiles'));
     } catch (error) {
       committed.catch(() => {}); // the abort below is the reason, already being thrown
       try { tx.abort(); } catch { /* already finished */ }
@@ -117,9 +123,12 @@ export async function openBrowserStorage(name = 'reclaim-studio'): Promise<Brows
     seed: (id, input) => transact('readwrite', async (meta, files) => {
       if (!(await promised(meta.getKey(id)))) await save(meta, files, id, input);
     }),
-    clear: () => transact('readwrite', async (meta, files) => {
+    listProfiles: () => transact('readonly', async (_meta, _files, profiles) => promised(profiles.getAll() as IDBRequest<SupplierProfile[]>)),
+    saveProfile: (profile) => transact('readwrite', async (_meta, _files, profiles) => { await promised(profiles.put(profile)); }),
+    clear: () => transact('readwrite', async (meta, files, profiles) => {
       await promised(meta.clear());
       await promised(files.clear());
+      await promised(profiles.clear());
     }),
   };
   return store;
@@ -128,6 +137,7 @@ export async function openBrowserStorage(name = 'reclaim-studio'): Promise<Brows
 /** The same storage kept in memory, for a browser that won't open IndexedDB. Everything is gone on refresh. */
 export function createMemoryStorage(): BrowserStorage {
   const saved = new Map<string, { meta: FileMeta; text: string }>();
+  const profiles = new Map<string, SupplierProfile>();
   const find = (id: string) => {
     const file = parseFileId(id) ? saved.get(id) : undefined;
     if (!file) throw notFound();
@@ -157,6 +167,8 @@ export function createMemoryStorage(): BrowserStorage {
     put: async (id, input) => put(id, input),
     createAt: async (id, input) => (saved.has(id) ? undefined : put(id, input)),
     seed: async (id, input) => { if (!saved.has(id)) put(id, input); },
-    clear: async () => { saved.clear(); },
+    listProfiles: async () => [...profiles.values()].map((p) => structuredClone(p)),
+    saveProfile: async (profile) => { profiles.set(profile.key, structuredClone(profile)); },
+    clear: async () => { saved.clear(); profiles.clear(); },
   };
 }

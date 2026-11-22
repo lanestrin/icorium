@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Layers, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react';
+import { Check, CircleAlert, Columns3, Layers, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { classNames } from '../../lib/class-names';
 import type { Status } from '../../lib/file-status';
 import styles from './files.module.scss';
@@ -7,6 +7,7 @@ import styles from './files.module.scss';
 const BADGES: Record<Status, { colors: string; icon: LucideIcon }> = {
   Ready: { colors: styles.badgeReady, icon: Check },
   'Needs Review': { colors: styles.badgeNeedsReview, icon: TriangleAlert },
+  'Needs Mapping': { colors: styles.badgeNeedsReview, icon: Columns3 },
   Processed: { colors: styles.badgeProcessed, icon: Layers },
   Processing: { colors: styles.badgeProcessing, icon: LoaderCircle },
   Error: { colors: styles.badgeError, icon: CircleAlert },

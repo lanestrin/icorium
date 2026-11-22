@@ -3,12 +3,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseCsv, toCsv } from '../shared/csv';
-import { getAdapter } from '../shared/adapters';
+import { getAdapter, readerFor, recordProblems, resolveReader } from '../shared/adapters';
 import { decideUnits, normalizeRow, parseMeasurement, partnerUnits, UNIT_FACTORS, unitRangeWarnings } from '../shared/units';
-import { matchPartner, normalizeHeader, partnerMatchProblem, suggestMapping } from '../shared/mapping';
+import { headerKey, matchPartner, normalizeHeader, partnerMatchProblem, suggestMapping } from '../shared/mapping';
 import { detectResult, embeddedSourceId, findProblems, issues, matchesInput, processors, processRows, stampFileIds } from '../shared/processing';
 import { compareResults, matchRows } from '../shared/compare';
 import { GENERATE_MAX_ATTEMPTS, generateCsv, generatedName, generateFiles } from '../shared/generate';
+import type { IngestionRecord, SupplierProfile } from '../shared/ingestion';
 import { ADAPTER_FIELDS, ADAPTERS, FIELD_ALIASES, GENERATOR_PARTNERS, nextBaseId, parseFileId, PROCESSORS, resultFileId, type FileMeta, type GeneratedError, type Row } from '../shared/types';
 
 const A_HEADERS = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';
@@ -856,5 +857,71 @@ describe('unit verification', () => {
     expect(issues(row('100', '1.234.5')).map((i) => i.reason)).toEqual(['R-32 has an ambiguous separator']);
     expect(issues(row('n/a')).map((i) => i.reason)).toEqual(['mass invalid']);
     expect(issues(row('100')).map((i) => i.reason)).toEqual([]);
+  });
+});
+
+describe('supplier profiles and readers (19.4)', () => {
+  const headers = ['Batch ID', 'Sample Date', 'net_mass', 'R32 %', 'R125', 'R134a', 'file_id'];
+  const profile = (over: Partial<SupplierProfile> = {}): SupplierProfile => ({
+    key: headerKey(headers),
+    name: 'Supplier X',
+    columns: { batchId: 'Batch ID', sampleDate: 'Sample Date', massKg: 'net_mass', r32: 'R32 %', r125: 'R125', r134a: 'R134a' },
+    units: { massKg: 'lb', r32: '%', r125: '%', r134a: '%' },
+    savedAt: '2026-11-22T00:00:00.000Z',
+    ...over,
+  });
+
+  it('keys a layout by its normalized column names, ignoring order, case and the ID columns', () => {
+    expect(headerKey(['B', 'a_b', 'file_id'])).toBe(headerKey(['A B', 'b']));
+    expect(headerKey(['a', 'b'])).not.toBe(headerKey(['a', 'c']));
+    expect(headerKey(['a', 'result_id', 'a'])).toBe(JSON.stringify(['a']));
+  });
+  it('uses a profile only for the same column names, as an unapproved profile mapping', () => {
+    const out = suggestMapping(headers.filter((h) => h !== 'file_id'), { profile: profile() });
+    expect(out.issues).toEqual([]);
+    expect(out.mappings.find((m) => m.mapping.field === 'massKg')?.mapping).toEqual({ field: 'massKg', sourceColumn: 'net_mass', origin: 'profile', approved: false });
+    expect(out.mappings.find((m) => m.mapping.field === 'r32')?.statedUnit).toBe('%');
+    const other = suggestMapping(['x', 'y'], { profile: profile() });
+    expect(other.issues.every((i) => i.code === 'mapping_missing')).toBe(true);
+  });
+  it('gives a manually mapped column the unit its name states', () => {
+    const out = suggestMapping(['a', 'b', 'weight_lb', 'd', 'e', 'f'], { manual: { batchId: 'a', sampleDate: 'b', massKg: 'weight_lb', r32: 'd', r125: 'e', r134a: 'f' } });
+    expect(out.mappings.find((m) => m.mapping.field === 'massKg')?.statedUnit).toBe('lb');
+    const units = decideUnits(out, { confirmed: { massKg: 'kg', r32: '%', r125: '%', r134a: '%' } });
+    expect(units.issues.map((i) => [i.code, i.field])).toEqual([['unit_conflict', 'massKg']]);
+  });
+
+  const record = (over: Partial<IngestionRecord> = {}): IngestionRecord => {
+    const s = suggestMapping(['a', 'b', 'c', 'd', 'e', 'f'], { manual: { batchId: 'a', sampleDate: 'b', massKg: 'c', r32: 'd', r125: 'e', r134a: 'f' } });
+    const units = decideUnits(s, { confirmed: { massKg: 'g', r32: 'fraction', r125: 'fraction', r134a: 'fraction' } }).decisions;
+    return { mappings: s.mappings.map((m) => ({ ...m.mapping, approved: true })), units, issues: [], duplicateHeaders: [], approved: true, ...over };
+  };
+  const H = ['a', 'b', 'c', 'd', 'e', 'f', 'file_id'];
+  it('reads an exact partner file, a file with an approved record, and nothing else', () => {
+    expect(readerFor({}, A_HEADERS.split(','))?.name).toBe('Partner A');
+    const mapped = readerFor({ ingestion: record() }, H)!;
+    expect(mapped.name).toBe('Mapped columns');
+    expect(mapped.normalize({ a: 'X', b: 'd', c: '2000', d: '0.5', e: '0.3', f: '0.2' })).toMatchObject({ batchId: 'X', massKg: 2, r32: 50, r125: 30, r134a: 20, source: 'Mapped columns' });
+    expect(readerFor({}, H)).toBeUndefined();
+    expect(resolveReader({}, H)).toEqual({ problems: ['its columns are not a known partner format and have not been mapped'] });
+    expect(readerFor({ ingestion: record({ approved: false }) }, H)).toBeUndefined();
+  });
+  it('re-checks an approved record against the stored headers', () => {
+    expect(recordProblems(record(), H)).toEqual([]);
+    expect(recordProblems(record({ approved: false }), H)).toEqual(['its columns and units have not been confirmed']);
+    expect(recordProblems(record(), ['a', 'b', 'd', 'e', 'f'])).toEqual(['the column "c" for mass is not in the file']);
+    expect(recordProblems(record({ duplicateHeaders: ['d'] }), H)).toEqual(['the column "d" for R-32 appears more than once in the file']);
+    const idMapped = record(); idMapped.mappings[0] = { ...idMapped.mappings[0], sourceColumn: 'file_id' };
+    expect(recordProblems(idMapped, H)).toEqual(['the column "file_id" cannot hold batch ID']);
+    const twice = record(); twice.mappings[1] = { ...twice.mappings[1], sourceColumn: 'a' };
+    expect(recordProblems(twice, H)).toEqual(['the column "a" is used for two fields']);
+    const wrongFactor = record(); wrongFactor.units[0] = { ...wrongFactor.units[0], factor: 1 };
+    expect(recordProblems(wrongFactor, H)).toEqual(['the unit for mass is not confirmed']);
+    const noUnit = record({ units: record().units.slice(1) });
+    expect(recordProblems(noUnit, H)).toEqual(['the unit for mass is not confirmed']);
+    const blocked = record({ issues: [{ severity: 'blocking', code: 'unit_unverified', reason: 'mass: no unit is stated' }] });
+    expect(recordProblems(blocked, H)).toEqual(['mass: no unit is stated']);
+    const warned = record({ issues: [{ severity: 'warning', code: 'unit_range_suspect', reason: 'only a warning' }] });
+    expect(recordProblems(warned, H)).toEqual([]);
   });
 });

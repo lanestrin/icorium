@@ -19,7 +19,7 @@ export const MEASUREMENT_FIELDS = ['massKg', 'r32', 'r125', 'r134a'] as const sa
 const LABEL: Record<MeasurementField, string> = { massKg: 'mass', r32: 'R-32', r125: 'R-125', r134a: 'R-134a' };
 const acceptedUnits = (field: MeasurementField) => (field === 'massKg' ? MASS_UNITS : COMPOSITION_UNITS);
 const unitList = (field: MeasurementField) => acceptedUnits(field).join(', ').replace(/, ([^,]+)$/, ' or $1');
-const isSupported = (field: MeasurementField, unit: string) => acceptedUnits(field).includes(unit);
+export const isSupportedUnit = (field: MeasurementField, unit: string) => acceptedUnits(field).includes(unit);
 const decision = (field: MeasurementField, unit: string, origin: UnitDecision['origin']): UnitDecision => ({
   field,
   unit,
@@ -52,7 +52,7 @@ export function decideUnits(suggestion: MappingSuggestion, evidence: UnitEvidenc
     const label = LABEL[field];
     const profile = evidence.profile?.[field];
     const confirmed = evidence.confirmed?.[field];
-    const unsupported = [profile, confirmed].filter((u): u is string => u !== undefined && !isSupported(field, u));
+    const unsupported = [profile, confirmed].filter((u): u is string => u !== undefined && !isSupportedUnit(field, u));
     if (unsupported.length) {
       issues.push(blockingIssue('unit_unsupported', `${label}: unit "${unsupported[0]}" is not supported; use ${unitList(field)}`, field));
       continue;

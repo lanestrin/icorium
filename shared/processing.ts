@@ -1,5 +1,5 @@
 import { FILE_ID_COLUMN, parseFileId, RESULT_ID_COLUMN, type Problem, type ProblemList, type ProcessorId, type Row } from './types';
-import { getAdapter, type Normalized } from './adapters';
+import { getAdapter, type Normalized, type Reader } from './adapters';
 import { httpError } from './csv';
 import { blockingIssue as blocking, type ValidationIssue } from './ingestion';
 
@@ -57,19 +57,22 @@ function rowIssues(n: Normalized, ctx: RowContext): ValidationIssue[] {
   return p.map((issue) => ({ ...issue, row: ctx.row }));
 }
 
-/** Normalizes every row and works out which batch IDs appear more than once. */
-function normalizeAll(headers: string[], rows: Row[]) {
-  const norm = rows.map(getAdapter(headers).normalize);
+/** Normalizes every row through the reader and works out which batch IDs appear more than once. */
+function normalizeAll(rows: Row[], reader: Reader) {
+  const norm = rows.map(reader.normalize);
   const idCounts = new Map<string, number>();
   for (const n of norm) if (n.batchId) idCounts.set(n.batchId, (idCounts.get(n.batchId) ?? 0) + 1);
   return norm.map((n, i) => ({ n, errors: rowIssues(n, { duplicate: (idCounts.get(n.batchId) ?? 0) > 1, row: i + 1 }) }));
 }
 
-/** Rows the Composition Validation rules flag, for any file (input or result). Lists the first `cap` in detail. */
-export function findProblems(headers: string[], rows: Row[], cap = 100): ProblemList {
+/**
+ * Rows the Composition Validation rules flag, for any file (input or result). Lists the first `cap` in detail.
+ * The reader says how the file's columns are read; it defaults to the partner format the headers match.
+ */
+export function findProblems(headers: string[], rows: Row[], cap = 100, reader: Reader = getAdapter(headers)): ProblemList {
   const items: Problem[] = [];
   let total = 0;
-  normalizeAll(headers, rows).forEach(({ n, errors: p }, i) => {
+  normalizeAll(rows, reader).forEach(({ n, errors: p }, i) => {
     if (!p.length) return;
     total++;
     if (items.length < cap) items.push({ row: i + 1, batchId: n.batchId, message: reasons(p), issues: p });
@@ -190,11 +193,11 @@ export function matchesInput(resultHeaders: string[], resultRows: Row[], generat
 }
 
 /** Runs a processor on every row; keeps all original columns and values and appends generated ones, starting with result_id. */
-export function processRows(headers: string[], rows: Row[], id: ProcessorId, resultId = '') {
+export function processRows(headers: string[], rows: Row[], id: ProcessorId, resultId = '', reader: Reader = getAdapter(headers)) {
   const p = processors[id];
   const collisions = p.columns.filter((c) => headers.includes(c));
   if (collisions.length) throw httpError(400, `Cannot process this file: source columns conflict with generated columns: ${collisions.join(', ')}. Rename the source columns before processing.`);
-  const norm = normalizeAll(headers, rows);
+  const norm = normalizeAll(rows, reader);
   const out = rows.map((r, i) => {
     const { n, errors } = norm[i];
     const res = {
