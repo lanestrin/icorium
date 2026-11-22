@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.0](https://github.com/lanestrin/icorium/compare/v2.7.0...v2.8.0) (2026-11-22)
+
+
+### Features
+
+* keep unmapped CSVs as Needs Mapping and gate processing (19.4) ([#147](https://github.com/lanestrin/icorium/issues/147)) ([69926b5](https://github.com/lanestrin/icorium/commit/69926b580c77cb6f28234848c12fde62361b95cb))
+
 ## [2.7.0](https://github.com/lanestrin/icorium/compare/v2.6.2...v2.7.0) (2026-11-22)
 
 
