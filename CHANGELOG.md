@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/lanestrin/icorium/compare/v2.4.1...v2.5.0) (2026-11-22)
+
+
+### Features
+
+* add structured validation issues and ingestion types (19.1) ([#137](https://github.com/lanestrin/icorium/issues/137)) ([f6d25ae](https://github.com/lanestrin/icorium/commit/f6d25aea0ed048e22e83bf4a41371df7c9746128))
+
 ## [2.4.1](https://github.com/lanestrin/icorium/compare/v2.4.0...v2.4.1) (2026-11-20)
 
 
