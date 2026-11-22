@@ -44,7 +44,8 @@ const PROFILE_POLICIES = [
 
 /** The rule (everything after the table name) of each `create policy` on public.profiles, normalized. */
 function profilePolicies(sql: string): string[] {
-  const statements = normalized(sql).matchAll(/\bcreate policy .+? on (?:public\.)?profiles (.+?);/g);
+  // [^;] keeps each match inside one statement, so a later `create index ... on public.profiles` is not read as a rule.
+  const statements = normalized(sql).matchAll(/\bcreate policy [^;]+? on (?:public\.)?profiles ([^;]+?);/g);
   return [...statements].map(([, rule]) => rule.trim());
 }
 
@@ -63,6 +64,8 @@ function sqlProblems(migration: string, bootstrap: string): string[] {
   const policies = profilePolicies(sql);
   if (policies.some((policy) => !PROFILE_POLICIES.includes(policy)) || PROFILE_POLICIES.some((policy) => !policies.includes(policy)))
     problems.push('profile policies are not exactly own-row read and rename');
+  // A later alter or drop would change the policies above after they are created.
+  if (/\b(alter|drop) policy [^;]* on (public\.)?profiles\b/.test(normalized(sql))) problems.push('a profile policy is altered or dropped');
 
   if (/grant[^;]*\bto\b[^;]*\banon\b/.test(normalized(sql))) problems.push('something is granted to anon');
 
@@ -137,7 +140,17 @@ describe('Supabase identity SQL', () => {
     ['a grant naming its grantor', (s) => `${s}\ngrant insert on public.profiles to authenticated granted by postgres;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | insert on public.profiles'],
     ['an uppercase hook grant', (s) => `${s}\nGRANT EXECUTE ON FUNCTION ${HOOK}(jsonb) TO authenticated;`, 'hook granted to another role'],
     ['an uppercase grant to anon', (s) => `${s}\nGRANT SELECT ON public.profiles TO ANON;`, 'something is granted to anon'],
+    ['a profile policy widened later', (s) => `${s}\nalter policy "Users can read their own profile" on public.profiles using (true);`, 'a profile policy is altered or dropped'],
+    ['a profile policy dropped later', (s) => `${s}\ndrop policy "Users can rename their own profile" on public.profiles;`, 'a profile policy is altered or dropped'],
   ];
+
+  // Harmless later statements on public.profiles must not be read as policies (F-40).
+  it.each([
+    ['an index', 'create index profiles_name on public.profiles (name);'],
+    ['a grant to the service role', 'grant select on public.profiles to service_role;'],
+  ])('accepts %s on public.profiles', (_label, statement) => {
+    expect(sqlProblems(`${MIGRATION}\n${statement}`, BOOTSTRAP)).toEqual([]);
+  });
   it.each(broken)('fails when %s', (_label, breakIt, problem) => {
     const changed = breakIt(MIGRATION);
     expect(changed).not.toBe(MIGRATION);

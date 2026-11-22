@@ -27,7 +27,11 @@ export function AccountStatus() {
 
   return (
     <span className={styles.account}>
-      <span aria-label="Account" className={styles.label}>{label}</span>
+      {/* A status region, so a failed account read is announced; the hidden prefix names it for screen readers. */}
+      <span role="status" className={styles.label}>
+        <span className={styles.hidden}>Account: </span>
+        {label}
+      </span>
       <Button variant="link" size="sm" onClick={() => void signOut()}>Sign out</Button>
       {actionError && <span role="alert" className={styles.error}>{actionError}</span>}
       {askForName && <NamePrompt onSave={saveName} onClose={() => setNamePromptDismissed(true)} />}

@@ -40,34 +40,37 @@ describe('AccountStatus', () => {
   it('shows the name and role of an active account, with Sign out', async () => {
     signedIn({ ...member, role: 'Admin' });
     render(<AccountStatus />);
-    expect(await screen.findByLabelText('Account')).toHaveTextContent('Ada · Admin');
+    // A status region named by its hidden "Account:" prefix, not by aria-label on a plain span (F-37).
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent('Account: Ada · Admin');
+    expect(status).not.toHaveAttribute('aria-label');
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 
   it('explains an account that is not activated yet', async () => {
     signedIn(null);
     render(<AccountStatus />);
-    expect(await screen.findByLabelText('Account')).toHaveTextContent('Account not active yet');
+    expect(await screen.findByRole('status')).toHaveTextContent('Account not active yet');
   });
 
   it('explains a deactivated account', async () => {
     signedIn({ ...member, active: false });
     render(<AccountStatus />);
-    expect(await screen.findByLabelText('Account')).toHaveTextContent('Account deactivated');
+    expect(await screen.findByRole('status')).toHaveTextContent('Account deactivated');
   });
 
   it('shows a failed account read, with Sign out', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     setUp({ session: fakeSession(), profileError: { message: 'boom' } });
     render(<AccountStatus />);
-    expect(await screen.findByLabelText('Account')).toHaveTextContent('Something went wrong. Try again.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Something went wrong. Try again.');
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 
   it('renders the name as text, not markup', async () => {
     signedIn({ ...member, name: '<b>Ada</b>' });
     render(<AccountStatus />);
-    expect(await screen.findByLabelText('Account')).toHaveTextContent('<b>Ada</b> · Member');
+    expect(await screen.findByRole('status')).toHaveTextContent('<b>Ada</b> · Member');
   });
 
   it('signs out on this device', async () => {
@@ -98,7 +101,7 @@ describe('AccountStatus', () => {
       await user.click(screen.getByRole('button', { name: 'Save' }));
       expect(fake.update).toHaveBeenCalledWith({ name: 'Ada Lovelace' });
       await waitFor(() => expect(dialog).not.toBeInTheDocument());
-      expect(screen.getByLabelText('Account')).toHaveTextContent('Ada Lovelace · Member');
+      expect(screen.getByRole('status')).toHaveTextContent('Ada Lovelace · Member');
     });
 
     it('keeps the dialog open with the message when saving fails', async () => {
@@ -127,7 +130,7 @@ describe('AccountStatus', () => {
       const { unmount } = render(<AccountStatus />);
       await user.click(await screen.findByRole('button', { name: 'Later' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.getByLabelText('Account')).toHaveTextContent('ada@example.com · Member');
+      expect(screen.getByRole('status')).toHaveTextContent('ada@example.com · Member');
       unmount();
 
       render(<AccountStatus />);
@@ -139,14 +142,14 @@ describe('AccountStatus', () => {
     it('does not ask an account that already has a name', async () => {
       signedIn(member);
       render(<AccountStatus />);
-      await screen.findByLabelText('Account');
+      await screen.findByRole('status');
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     it('does not ask a deactivated account', async () => {
       signedIn({ ...member, name: null, active: false });
       render(<AccountStatus />);
-      await screen.findByLabelText('Account');
+      await screen.findByRole('status');
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
