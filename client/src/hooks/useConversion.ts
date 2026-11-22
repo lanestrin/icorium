@@ -1,35 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { findExcelTables, readExcel } from '../lib/convert/excel';
 import { readImage, type ReadProgress } from '../lib/convert/ocr';
+import { allDecided, applyDecisions, findPageTable, type Decision, type PageRows } from '../lib/convert/pages';
 import { readPdf } from '../lib/convert/pdf';
-import { fileKind, findTable, toCsvFile, type FileKind, type FoundTable } from '../lib/convert/table';
+import { fileKind, toCsvFile, type FileKind, type FoundTable } from '../lib/convert/table';
 
 /** What was read by OCR: the whole image, or these PDF pages (1-based). Absent when nothing was. */
 export type ReadByOcr = 'image' | number[];
 
 /**
  * What the review dialog shows: the source file's name, every table found in it, which one the person chose
- * (null until they do, when there are several), and what OCR read.
+ * (null until they do, when there are several), what OCR read, and what they decided for each value of the
+ * chosen table to confirm (PDF and image), by the value's id.
  */
-export interface Review { name: string; tables: FoundTable[]; chosen: number | null; ocr?: ReadByOcr }
+export interface Review { name: string; tables: FoundTable[]; chosen: number | null; ocr?: ReadByOcr; decisions: Record<string, Decision> }
 
 /** A file kind that needs reading before upload. */
 type ReadableKind = Exclude<FileKind, 'csv'>;
 
-/** A reader's result: rows of cell text to search for the partner table (and what of them OCR read), or tables already found. */
-export type ReadOutcome = { rows: string[][]; ocr?: ReadByOcr } | { tables: FoundTable[] };
+/** A reader's result: pages of positioned cells to search for the partner table (and what OCR read), or tables already found. */
+export type ReadOutcome = { pages: PageRows[]; ocr?: ReadByOcr } | { tables: FoundTable[] };
 
 /**
- * Reads a source file into rows of cell text. signal stops a reader that supports it (pdf.js, Tesseract);
+ * Reads a source file into pages of positioned cells, or Excel tables. signal stops a reader that supports it (pdf.js, Tesseract);
  * onProgress hears which page is being read, or that OCR is getting ready.
  */
 export type ReadSource = (file: File, kind: ReadableKind, signal: AbortSignal, onProgress: (progress: ReadProgress) => void) => Promise<ReadOutcome>;
 
 const readSource: ReadSource = async (file, kind, signal, onProgress) => {
   if (kind === 'excel') return { tables: findExcelTables(await readExcel(file)) };
-  if (kind === 'image') return { rows: await readImage(file, signal, onProgress), ocr: 'image' };
-  const { rows, ocrPages } = await readPdf(file, signal, onProgress);
-  return ocrPages.length ? { rows, ocr: ocrPages } : { rows };
+  if (kind === 'image') return { pages: [{ ocr: true, rows: await readImage(file, signal, onProgress) }], ocr: 'image' };
+  const { pages } = await readPdf(file, signal, onProgress);
+  const ocrPages = pages.filter((p) => p.ocr).map((p) => p.page);
+  return ocrPages.length ? { pages, ocr: ocrPages } : { pages };
 };
 
 /** Where findTable looked, for its "no header row" message. */
@@ -51,7 +54,7 @@ interface Job { id: number; reader: AbortController; finish: (file: File | null)
 /**
  * Turns non-CSV uploads into CSVs in the browser, one file at a time, with a review before anything is
  * sent. prepare(file) is the upload loop's per-file step: a CSV passes through; an Excel, PDF or image file
- * is read, its table found (an Excel file may hold several, and the person picks one) and shown for review, and the promise resolves to the CSV to upload when
+ * is read, its table found (an Excel file may hold several, and the person picks one) and shown for review, with any values read from a PDF or image listed to keep or leave blank, and the promise resolves to the CSV to upload when
  * the person chooses Import as CSV, or to null when they cancel. It rejects with a ConvertError (a message
  * ready to show) for a file it can't convert. reading is the status line while a file is read.
  *
@@ -95,9 +98,9 @@ export function useConversion(read: ReadSource = readSource) {
         .then((outcome) => {
           if (job.current?.id !== id) return; // cancelled while reading
           setReading(null);
-          const tables = 'tables' in outcome ? outcome.tables : [findTable(outcome.rows, searchedPlace(kind))];
+          const tables = 'tables' in outcome ? outcome.tables : [findPageTable(outcome.pages, searchedPlace(kind))];
           const ocr = 'tables' in outcome ? undefined : outcome.ocr;
-          setReview({ name: file.name, tables, chosen: tables.length === 1 ? 0 : null, ...(ocr ? { ocr } : {}) });
+          setReview({ name: file.name, tables, chosen: tables.length === 1 ? 0 : null, decisions: {}, ...(ocr ? { ocr } : {}) });
         })
         .catch((error: unknown) => {
           if (job.current?.id !== id) return;
@@ -113,14 +116,24 @@ export function useConversion(read: ReadSource = readSource) {
     setReview((current) => (current && index >= 0 && index < current.tables.length ? { ...current, chosen: index } : current));
   }, []);
 
-  /** Import as CSV: hands the chosen table to the upload loop as a CSV file. Does nothing until one is chosen. */
+  /** Records the person's decision for one value to confirm: keep it as read, or leave it blank. */
+  const decide = useCallback((id: string, decision: Decision) => {
+    setReview((current) => (current ? { ...current, decisions: { ...current.decisions, [id]: decision } } : current));
+  }, []);
+
+  /**
+   * Import as CSV: hands the chosen table to the upload loop as a CSV file, with each value left blank emptied.
+   * Does nothing until a table is chosen and every one of its values to confirm has a decision.
+   */
   const importReviewed = useCallback(() => {
     const active = job.current;
     if (!active || !review || review.chosen === null) return;
+    const table = review.tables[review.chosen];
+    if (!allDecided(table, review.decisions)) return;
     job.current = null;
     setReview(null);
-    active.finish(toCsvFile(review.tables[review.chosen], review.name));
+    active.finish(toCsvFile(applyDecisions(table, review.decisions), review.name));
   }, [review]);
 
-  return { prepare, review, reading, cancel, choose, importReviewed };
+  return { prepare, review, reading, cancel, choose, decide, importReviewed };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupTextItems, type PlacedText } from './layout';
+import { groupTextCells, groupTextItems, type PlacedText } from './layout';
 
 /** A text item at (x, y), 10 units high, as wide as its text at 5 units a character. */
 const at = (text: string, x: number, y: number, height = 10): PlacedText => ({ text, x, y, width: text.length * 5, height });
@@ -35,5 +35,14 @@ describe('groupTextItems', () => {
   it('leaves a row with a missing cell shorter, for findTable to flag', () => {
     const items = [at('a', 0, 700), at('b', 100, 700), at('c', 200, 700), at('x', 0, 680), at('z', 200, 680)];
     expect(groupTextItems(items)).toEqual([['a', 'b', 'c'], ['x', 'z']]);
+  });
+
+  it('keeps cell edges, and a joined cell takes the lowest word confidence', () => {
+    const rows = groupTextCells([{ ...at('Batch', 0, 700), confidence: 95 }, { ...at('id', 27, 700), confidence: 60 }, { ...at('Mass', 100, 700), confidence: 88 }]);
+    expect(rows).toEqual([[{ text: 'Batch id', x: 0, right: 37, confidence: 60 }, { text: 'Mass', x: 100, right: 120, confidence: 88 }]]);
+  });
+
+  it('leaves confidence off cells that have none', () => {
+    expect(groupTextCells([at('a', 0, 700)])).toEqual([[{ text: 'a', x: 0, right: 5 }]]);
   });
 });

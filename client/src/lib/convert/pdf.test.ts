@@ -48,7 +48,7 @@ function fakeOcr(read: (canvas: HTMLCanvasElement | Blob, page?: number) => Prom
       if (!started) { started = true; vi.mocked(createOcrReader).mock.calls.at(-1)![1]?.(); }
       await loading;
     }),
-    read: vi.fn(read),
+    read: vi.fn(async (canvas: HTMLCanvasElement | Blob, page?: number, _scale?: number) => (await read(canvas, page)).map((row) => row.map((text, i) => ({ text, x: i * 100, right: i * 100 + 50 })))),
     close: vi.fn(() => Promise.resolve()),
   };
   vi.mocked(createOcrReader).mockReturnValue(ocr);
@@ -61,7 +61,7 @@ describe('readPdf', () => {
   it('reads every page in order, so a table continues across pages, and releases the document', async () => {
     const { destroy, cleanup } = fakePdf([[at('batch_id', 0, 700), at('X-1', 0, 680)], [at('X-2', 0, 700)]]);
     const progress = vi.fn();
-    expect(await readPdf(file(), undefined, progress)).toEqual({ rows: [['batch_id'], ['X-1'], ['X-2']], ocrPages: [] });
+    expect((await readPdf(file(), undefined, progress)).pages.map((p) => ({ page: p.page, ocr: p.ocr, rows: p.rows.map((r) => r.map((c) => c.text)) }))).toEqual([{ page: 1, ocr: false, rows: [['batch_id'], ['X-1']] }, { page: 2, ocr: false, rows: [['X-2']] }]);
     expect(pdfjs.GlobalWorkerOptions.workerSrc).toBe('/pdf.worker.min.mjs');
     expect(progress.mock.calls.map(([p]) => p)).toEqual([{ stage: 'page', page: 1, pages: 2 }, { stage: 'page', page: 2, pages: 2 }]);
     expect(cleanup).toHaveBeenCalledTimes(2);
@@ -73,9 +73,11 @@ describe('readPdf', () => {
     const { destroy, cleanup, render } = fakePdf([[at('batch_id', 0, 700), at('X-1', 0, 680)], [at(' ', 0, 700)], [at('X-3', 0, 700)]]);
     const ocr = fakeOcr(async () => [['X-2']]);
     const progress = vi.fn();
-    expect(await readPdf(file(), undefined, progress)).toEqual({ rows: [['batch_id'], ['X-1'], ['X-2'], ['X-3']], ocrPages: [2] });
+    const { pages } = await readPdf(file(), undefined, progress);
+    expect(pages.map((p) => [p.page, p.ocr, p.rows.map((r) => r.map((c) => c.text))])).toEqual([[1, false, [['batch_id'], ['X-1']]], [2, true, [['X-2']]], [3, false, [['X-3']]]]);
     expect(ocr.read).toHaveBeenCalledTimes(1);
-    const [canvas, page] = ocr.read.mock.calls[0] as [HTMLCanvasElement, number];
+    const [canvas, page, scale] = ocr.read.mock.calls[0] as [HTMLCanvasElement, number, number];
+    expect(scale).toBeCloseTo(OCR_RENDER_SCALE); // OCR is told the render scale, to give coordinates in PDF points
     expect(page).toBe(2);
     expect(render).toHaveBeenCalledWith({ canvas, viewport: { width: 612 * OCR_RENDER_SCALE, height: 792 * OCR_RENDER_SCALE } });
     expect(OCR_RENDER_SCALE).toBeCloseTo(300 / 72);

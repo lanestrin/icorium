@@ -1,6 +1,6 @@
 import type { PDFPageProxy } from 'pdfjs-dist';
 import { createOcrReader, releaseCanvas, type OcrReader, type ReadProgress } from './ocr';
-import { groupTextItems, type PlacedText } from './layout';
+import { groupTextCells, type PlacedCell, type PlacedText } from './layout';
 import { ConvertError } from './table';
 
 /** Largest PDF the browser will read, in pages. */
@@ -13,11 +13,14 @@ export const OCR_RENDER_SCALE = 300 / 72;
  */
 export const OCR_MAX_CANVAS_PIXELS = 16_000_000;
 
-/** A PDF's rows of cell text, and which pages (1-based) were scanned images read by OCR. */
-export interface PdfText { rows: string[][]; ocrPages: number[] }
+/** One PDF page (1-based): its rows of positioned cells, and whether it was a scanned image read by OCR. */
+export interface PdfPage { page: number; ocr: boolean; rows: PlacedCell[][] }
+
+/** A PDF's pages, in order. */
+export interface PdfText { pages: PdfPage[] }
 
 /**
- * Reads a PDF into rows of cell text, page after page, so a table can continue across pages. pdf.js is
+ * Reads a PDF into pages of positioned cells, so a table can continue across pages and each row keeps its page. pdf.js is
  * imported here, when a PDF is chosen, and parses in its own worker. A page with a text layer is read
  * from it; a page without one (a scanned image) is rendered at 300 DPI and read by OCR (ocr.ts), so a
  * file can mix both. A PDF over PDF_MAX_PAGES is refused. onProgress hears each page as it starts, and
@@ -45,8 +48,7 @@ export async function readPdf(file: File, signal: AbortSignal = new AbortControl
     }
     if (pdf.numPages > PDF_MAX_PAGES) throw new ConvertError(`It has ${pdf.numPages} pages; the PDF limit is ${PDF_MAX_PAGES} pages.`);
 
-    const rows: string[][] = [];
-    const ocrPages: number[] = [];
+    const pages: PdfPage[] = [];
     for (let number = 1; number <= pdf.numPages; number++) {
       signal.throwIfAborted();
       onProgress?.({ stage: 'page', page: number, pages: pdf.numPages });
@@ -58,26 +60,27 @@ export async function readPdf(file: File, signal: AbortSignal = new AbortControl
           if (!('str' in item)) continue; // marked-content markers carry no text
           items.push({ text: item.str, x: item.transform[4], y: item.transform[5], width: item.width, height: item.height });
         }
-        let pageRows = groupTextItems(items);
+        let pageRows = groupTextCells(items);
+        let ocrRead = false;
         if (pageRows.length === 0) {
           // No text layer: a scanned page. Render it and read it with OCR.
           ocr ??= createOcrReader(signal, () => onProgress?.({ stage: 'preparing' }));
           await ocr.ready(); // the first time, this is "getting OCR ready"
           onProgress?.({ stage: 'page', page: number, pages: pdf.numPages }); // ready: back to this page
-          const canvas = await renderPage(page, signal);
+          const { canvas, scale } = await renderPage(page, signal);
           try {
-            pageRows = await ocr.read(canvas, number);
+            pageRows = await ocr.read(canvas, number, scale);
           } finally {
             releaseCanvas(canvas);
           }
-          ocrPages.push(number);
+          ocrRead = true;
         }
-        rows.push(...pageRows);
+        pages.push({ page: number, ocr: ocrRead, rows: pageRows });
       } finally {
         page.cleanup();
       }
     }
-    return { rows, ocrPages };
+    return { pages };
   } finally {
     signal.removeEventListener('abort', stop);
     await ocr?.close();
@@ -85,8 +88,8 @@ export async function readPdf(file: File, signal: AbortSignal = new AbortControl
   }
 }
 
-/** Draws one page onto a new canvas at OCR_RENDER_SCALE, or smaller to stay within OCR_MAX_CANVAS_PIXELS; aborting cancels the render. */
-async function renderPage(page: PDFPageProxy, signal: AbortSignal): Promise<HTMLCanvasElement> {
+/** Draws one page onto a new canvas at OCR_RENDER_SCALE, or smaller to stay within OCR_MAX_CANVAS_PIXELS, and says which scale was used; aborting cancels the render. */
+async function renderPage(page: PDFPageProxy, signal: AbortSignal): Promise<{ canvas: HTMLCanvasElement; scale: number }> {
   const size = page.getViewport({ scale: 1 });
   const scale = Math.min(OCR_RENDER_SCALE, Math.sqrt(OCR_MAX_CANVAS_PIXELS / (size.width * size.height)));
   const viewport = page.getViewport({ scale });
@@ -98,7 +101,7 @@ async function renderPage(page: PDFPageProxy, signal: AbortSignal): Promise<HTML
   signal.addEventListener('abort', stop);
   try {
     await render.promise;
-    return canvas;
+    return { canvas, scale };
   } catch (error) {
     releaseCanvas(canvas);
     signal.throwIfAborted();

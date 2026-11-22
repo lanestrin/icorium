@@ -1,4 +1,4 @@
-import { groupTextItems, type PlacedText } from './layout';
+import { groupTextCells, type PlacedCell, type PlacedText } from './layout';
 import { ConvertError } from './table';
 
 // Reading text from images with Tesseract (tesseract.js), in a Web Worker so the page stays responsive.
@@ -24,8 +24,11 @@ export type OcrImage = Blob | HTMLCanvasElement;
 export interface OcrReader {
   /** Resolves once the worker and its language data are loaded, so the caller can say what it reads next. */
   ready(): Promise<void>;
-  /** Rows of cell text found in the image. page names the PDF page, for messages. */
-  read(image: OcrImage, page?: number): Promise<string[][]>;
+  /**
+   * Rows of positioned cells found in the image, each with its lowest word confidence. page names the PDF page,
+   * for messages; coordinates are divided by scale (a rendered PDF page's scale), so they are in PDF points.
+   */
+  read(image: OcrImage, page?: number, scale?: number): Promise<PlacedCell[][]>;
   close(): Promise<void>;
 }
 
@@ -138,7 +141,7 @@ export function createOcrReader(signal: AbortSignal, onPreparing?: () => void): 
     async ready() {
       await started();
     },
-    async read(image, page) {
+    async read(image, page, scale = 1) {
       const ocr = await started();
       let result: Awaited<ReturnType<typeof ocr.recognize>>;
       try {
@@ -154,9 +157,9 @@ export function createOcrReader(signal: AbortSignal, onPreparing?: () => void): 
             for (const word of line.words) {
               const { x0, y0, x1, y1 } = word.bbox;
               // Image y points down; PlacedText's y points up, with the word's bottom as its baseline.
-              words.push({ text: word.text, x: x0, y: -y1, width: x1 - x0, height: y1 - y0 });
+              words.push({ text: word.text, x: x0 / scale, y: -y1 / scale, width: (x1 - x0) / scale, height: (y1 - y0) / scale, confidence: word.confidence });
             }
-      const rows = groupTextItems(words);
+      const rows = groupTextCells(words);
       if (rows.length === 0) throw new ConvertError(noText(page));
       return rows;
     },
@@ -196,12 +199,12 @@ export function releaseCanvas(canvas: HTMLCanvasElement) {
 }
 
 /**
- * Reads a .png or .jpg image of a table into rows of cell text with OCR. An image over IMAGE_MAX_MEGAPIXELS
+ * Reads a .png or .jpg image of a table into rows of positioned cells with OCR. An image over IMAGE_MAX_MEGAPIXELS
  * is refused before it is decoded; otherwise the file itself goes to Tesseract, which decodes it in its
  * worker. onProgress hears "preparing" while OCR loads, then "reading". The worker is ended when the read
  * ends, however it ends.
  */
-export async function readImage(file: File, signal: AbortSignal, onProgress?: (progress: ReadProgress) => void): Promise<string[][]> {
+export async function readImage(file: File, signal: AbortSignal, onProgress?: (progress: ReadProgress) => void): Promise<PlacedCell[][]> {
   const { width, height } = await imageSize(file);
   if (width * height > IMAGE_MAX_MEGAPIXELS * 1_000_000) {
     const n = (x: number) => x.toLocaleString('en-US');
