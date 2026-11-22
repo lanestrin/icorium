@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileMeta, ReplaceConflict } from '../../../shared/types';
 import { createApi, DOWNLOAD_URL_LIFETIME_MS, openWorkspace } from './api';
+import { UPGRADE_BLOCKED_MESSAGE } from './browser-storage';
 import { SAMPLE_FILES } from './samples';
 
 // The real file service over a simulated IndexedDB (fake-indexeddb) and the real sample CSVs: nothing is mocked
@@ -110,6 +111,20 @@ describe('browser API', () => {
     expect(files.map((f) => f.id)).toEqual(['100001', '100002', '100003', '100004', '100005']);
     expect(files.every((f: FileMeta) => !f.archived)).toBe(true);
     expect((await api.upload(csvFile('again.csv', sample('partner_a_baseline.csv')))).id).toBe('100006');
+  });
+
+  it('reports a blocked upgrade instead of falling back to memory, and the next call tries again', async () => {
+    const name = `api-blocked-${++databases}`;
+    const oldTab = await new Promise<IDBDatabase>((resolve) => {
+      const request = indexedDB.open(name, 1);
+      request.onupgradeneeded = () => { request.result.createObjectStore('meta', { keyPath: 'id' }); request.result.createObjectStore('files'); };
+      request.onsuccess = () => resolve(request.result);
+    });
+    const blockedApi = createApi(() => openWorkspace(name));
+    await expect(blockedApi.list()).rejects.toThrow(UPGRADE_BLOCKED_MESSAGE);
+    oldTab.close();
+    expect(await blockedApi.list()).toHaveLength(5);
+    expect(await blockedApi.storageMode()).toBe('saved');
   });
 
   it('keeps files in memory, and says so, when the browser will not open IndexedDB', async () => {
