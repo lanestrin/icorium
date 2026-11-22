@@ -19,21 +19,40 @@ function ocrDetail(ocr: ReadByOcr) {
   return `${where} read by OCR, so digits and decimal points may be wrong. Compare them with the original before importing.`;
 }
 
+const tableTitle = (t: FoundTable) => t.partner || 'Columns to map';
+
+/** Where a table is: its sheet and range (Excel), and its header row. */
+const tableWhere = (t: FoundTable) => (t.sheet ? `${t.sheet} ${t.range} · header on row ${t.headerRow}` : `header on row ${t.headerRow}`);
+
 /**
  * Shows a converted file's table before it is uploaded: which partner's columns were found and where,
- * the first rows, and the rows that need checking. When any of it was read by OCR (ocr), a warning says so
- * and asks the person to check the numbers. Cell text is rendered as text only. Cancel, Escape or closing
- * the dialog uploads nothing.
+ * the first rows, and the rows that need checking. A file with several tables (Excel) lists them, and
+ * Import as CSV waits until the person chooses one; only the chosen table is uploaded. When any of it was
+ * read by OCR (ocr), a warning says so and asks the person to check the numbers. Cell text is rendered as
+ * text only. Cancel, Escape or closing the dialog uploads nothing.
  */
-export function ConvertReviewDialog({ name, table, ocr, onCancel, onImport }: {
-  name: string; table: FoundTable; ocr?: ReadByOcr; onCancel: () => void; onImport: () => void;
+export function ConvertReviewDialog({ name, tables, chosen, ocr, onChoose, onCancel, onImport }: {
+  name: string; tables: FoundTable[]; chosen: number | null; ocr?: ReadByOcr;
+  onChoose: (index: number) => void; onCancel: () => void; onImport: () => void;
 }) {
+  const table = chosen === null ? undefined : tables[chosen];
   const reasons = new Map<number, string[]>();
-  for (const flag of table.flags) reasons.set(flag.row, [...(reasons.get(flag.row) ?? []), flag.reason]);
-  const shown = table.rows.slice(0, REVIEW_ROWS);
+  for (const flag of table?.flags ?? []) reasons.set(flag.row, [...(reasons.get(flag.row) ?? []), flag.reason]);
+  const shown = table?.rows.slice(0, REVIEW_ROWS) ?? [];
 
   return (
-    <Modal title={`Review ${name}`} subtitle={`${table.partner} · header on row ${table.headerRow} · ${rowsWord(table.rows.length)}`} onClose={onCancel}>
+    <Modal title={`Review ${name}`} subtitle={table ? `${tableTitle(table)} · ${tableWhere(table)} · ${rowsWord(table.rows.length)}` : `${tables.length} tables found`} onClose={onCancel}>
+      {tables.length > 1 && (
+        <fieldset className={classNames(styles.tableChoice, styles.pinned)}>
+          <legend>Choose a table</legend>
+          {tables.map((t, i) => (
+            <label key={i} className={styles.tableOption}>
+              <input type="radio" name="table" checked={chosen === i} onChange={() => onChoose(i)} />
+              <span>{t.sheet} {t.range} · {tableTitle(t)} · {rowsWord(t.rows.length)}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
       {ocr && (
         <section aria-label="Read by OCR" className={classNames(styles.problems, styles.pinned)}>
           <h3 className={styles.problemsTitle}><TriangleAlert aria-hidden /> Read by OCR: check the numbers</h3>
@@ -52,7 +71,7 @@ export function ConvertReviewDialog({ name, table, ocr, onCancel, onImport }: {
           </ul>
         </section>
       )}
-      <table className={styles.table}>
+      {table && <table className={styles.table}>
         <thead className={styles.tableHead}>
           <tr>
             <th className={styles.rowNumberHead}>#</th>
@@ -73,13 +92,15 @@ export function ConvertReviewDialog({ name, table, ocr, onCancel, onImport }: {
             );
           })}
         </tbody>
-      </table>
-      <div className={classNames(styles.footer, styles.pinned)}>
-        <span>Showing {shown.length.toLocaleString()} of {rowsWord(table.rows.length)}</span>
-      </div>
+      </table>}
+      {table && (
+        <div className={classNames(styles.footer, styles.pinned)}>
+          <span>Showing {shown.length.toLocaleString()} of {rowsWord(table.rows.length)}</span>
+        </div>
+      )}
       <div className={classNames(styles.confirmButtons, styles.pinned)}>
         <Button variant="secondary" onClick={onCancel}>Cancel</Button>
-        <Button variant="success" onClick={onImport}>Import as CSV</Button>
+        <Button variant="success" disabled={!table} onClick={onImport}>Import as CSV</Button>
       </div>
     </Modal>
   );

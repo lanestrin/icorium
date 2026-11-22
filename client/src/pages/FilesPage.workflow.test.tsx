@@ -39,7 +39,7 @@ describe('the whole workflow with real files', () => {
     // Upload the Excel file: reviewed in the browser, then imported as a CSV.
     await user.upload(fileInput(), excelFile());
     const review = await screen.findByRole('dialog', { name: 'Review partner_b_baseline.xlsx' });
-    expect(review).toHaveTextContent('Partner B · header on row 2 · 25 rows');
+    expect(review).toHaveTextContent('Partner B · Lots A2:F27 · header on row 2 · 25 rows');
     await user.click(within(review).getByRole('button', { name: 'Import as CSV' }));
     await screen.findByRole('checkbox', { name: 'Select 100007 partner_b_baseline.csv' });
     expect(within(rowOf('100007')).getByText('Needs Review')).toBeInTheDocument();

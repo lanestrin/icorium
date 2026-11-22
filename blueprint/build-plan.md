@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.6 - Excel sheets, tables and formulas.**
+**Next: 19.7 - PDF and OCR safeguards.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -219,7 +219,7 @@ Rules for every M19 item:
   states. A confidently mapped, validated file needs no forced review.
   **Depends on:** 19.4.
 
-- [ ] **19.6** Excel sheets, tables and formulas — Read every sheet with
+- [x] **19.6** Excel sheets, tables and formulas — Read every sheet with
   correct cell coordinates, find candidate tables (the user chooses
   when there are several; never merged), tell header, data, total and
   note rows apart, flag duplicate or missing headers, and flag formula
