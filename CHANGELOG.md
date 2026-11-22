@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.1](https://github.com/lanestrin/icorium/compare/v2.8.0...v2.8.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* report a blocked database upgrade and test Needs Mapping files ([#149](https://github.com/lanestrin/icorium/issues/149)) ([4c96dc0](https://github.com/lanestrin/icorium/commit/4c96dc04124d9e95b45d6d01f13a501556a4aefb))
+
 ## [2.8.0](https://github.com/lanestrin/icorium/compare/v2.7.0...v2.8.0) (2026-11-22)
 
 
