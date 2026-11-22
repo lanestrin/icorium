@@ -58,11 +58,46 @@ describe('validation rules', () => {
     expect(issues(row('100', '50', '30', '20.4'))).toEqual([]);
   });
   it('flags missing, non-numeric, negative and inconsistent values', () => {
-    expect(issues(row('', '50', '30', '20'))).toContain('mass missing');
-    expect(issues(row('abc', '50', '30', '20'))).toContain('mass invalid');
-    expect(issues(row('100', 'x', '30', '20'))).toContain('R-32 not a number');
-    expect(issues(row('100', '50', '-2', '20'))).toContain('R-125 out of range');
-    expect(issues(row('100', '55', '30', '20'))).toEqual(['composition totals 105%']);
+    const reasons = (n: ReturnType<typeof row>) => issues(n).map((i) => i.reason);
+    expect(reasons(row('', '50', '30', '20'))).toContain('mass missing');
+    expect(reasons(row('abc', '50', '30', '20'))).toContain('mass invalid');
+    expect(reasons(row('100', 'x', '30', '20'))).toContain('R-32 not a number');
+    expect(reasons(row('100', '50', '-2', '20'))).toContain('R-125 out of range');
+    expect(reasons(row('100', '55', '30', '20'))).toEqual(['composition totals 105%']);
+  });
+  it('gives each issue a stable code, the field and a blocking severity', () => {
+    expect(issues(row('', '50', '30', '20'))).toEqual([{ severity: 'blocking', code: 'mass_missing', field: 'massKg', reason: 'mass missing' }]);
+    expect(issues(row('0', '50', '30', '20'))).toEqual([{ severity: 'blocking', code: 'mass_invalid', field: 'massKg', reason: 'mass invalid' }]);
+    expect(issues(row('100', '', '30', '20'))).toEqual([{ severity: 'blocking', code: 'component_missing', field: 'r32', reason: 'R-32 missing' }]);
+    expect(issues(row('100', '50', 'x', '20'))).toEqual([{ severity: 'blocking', code: 'component_not_number', field: 'r125', reason: 'R-125 not a number' }]);
+    expect(issues(row('100', '50', '30', '101'))).toEqual([{ severity: 'blocking', code: 'component_out_of_range', field: 'r134a', reason: 'R-134a out of range' }]);
+    expect(issues(row('100', '55', '30', '20'))).toEqual([{ severity: 'blocking', code: 'composition_total', reason: 'composition totals 105%' }]);
+  });
+  it('lists issues in the order batch ID, mass, R-32, R-125, R-134a, total, with the row on each', () => {
+    const { headers, rows } = parseCsv(`${A_HEADERS}
+A-1,d,,x,-1,
+A-1,d,100,50,30,20`);
+    const [first] = findProblems(headers, rows).items;
+    expect(first.issues.map((i) => i.code)).toEqual(['batch_id_duplicate', 'mass_missing', 'component_not_number', 'component_out_of_range', 'component_missing']);
+    expect(first.issues.every((i) => i.row === 1 && i.severity === 'blocking')).toBe(true);
+    expect(first.message).toBe('duplicate batch ID A-1; mass missing; R-32 not a number; R-125 out of range; R-134a missing');
+    expect(findProblems(headers, rows).items[1].issues.map((i) => [i.code, i.field, i.row])).toEqual([['batch_id_duplicate', 'batchId', 2]]);
+  });
+  it('reports a missing batch ID with its code and row', () => {
+    const { headers, rows } = parseCsv(`${A_HEADERS}
+,d,100,50,30,20`);
+    expect(findProblems(headers, rows).items[0].issues).toEqual([{ severity: 'blocking', code: 'batch_id_missing', field: 'batchId', row: 1, reason: 'batch ID missing' }]);
+  });
+  it('leaves composition_total_pct blank when a component is missing or not a number, never a partial sum', () => {
+    const { headers, rows } = parseCsv(`${A_HEADERS}
+A-1,d,100,50,30,
+A-2,d,100,50,x,20
+A-3,d,100,50,30,20
+A-4,d,100,50,-2,20`);
+    const out = processRows(headers, rows, 'validation').rows;
+    expect(out.map((r) => r.composition_total_pct)).toEqual(['', '', '100', '68']);
+    expect(out.map((r) => r.processing_status)).toEqual(['Invalid', 'Invalid', 'Valid', 'Invalid']);
+    expect(out[0].validation_errors).toBe('R-134a missing');
   });
   it('flags duplicate batch IDs', () => {
     const { headers, rows } = parseCsv(`${A_HEADERS}\nA-1,d,100,50,30,20\nA-1,d,100,50,30,20\nA-2,d,100,50,30,20`);
@@ -78,10 +113,10 @@ describe('problem rows', () => {
     expect(findProblems(headers, rows)).toEqual({
       total: 4,
       items: [
-        { row: 1, batchId: 'A-1', message: 'duplicate batch ID A-1' },
-        { row: 2, batchId: 'A-2', message: 'mass missing' },
-        { row: 3, batchId: 'A-1', message: 'duplicate batch ID A-1' },
-        { row: 4, batchId: '', message: 'batch ID missing' },
+        { row: 1, batchId: 'A-1', message: 'duplicate batch ID A-1', issues: [expect.objectContaining({ code: 'batch_id_duplicate', row: 1 })] },
+        { row: 2, batchId: 'A-2', message: 'mass missing', issues: [expect.objectContaining({ code: 'mass_missing', row: 2 })] },
+        { row: 3, batchId: 'A-1', message: 'duplicate batch ID A-1', issues: [expect.objectContaining({ code: 'batch_id_duplicate', row: 3 })] },
+        { row: 4, batchId: '', message: 'batch ID missing', issues: [expect.objectContaining({ code: 'batch_id_missing', row: 4 })] },
       ],
     });
   });
@@ -551,6 +586,24 @@ describe('linking an imported result to its original', () => {
   it('keeps the original base ID in file_id for a linked result', () => {
     expect(stampFileIds(resultHeaders, resultRows, '101012-V', true, '101010').rows[0]).toMatchObject({ file_id: '101010', result_id: '101012-V' });
     expect(stampFileIds(resultHeaders, resultRows, '101012-V', true).rows[0]).toMatchObject({ file_id: '101012', result_id: '101012-V' });
+  });
+});
+
+describe('structured issues on the sample files', () => {
+  const sampleDir = path.resolve(import.meta.dirname, '../sample-data');
+  const samples = readdirSync(sampleDir).filter((name) => name.endsWith('.csv'));
+
+  it.each(samples)('%s: validation_errors is the issues joined, and a blank total only follows a missing or non-numeric component', (name) => {
+    const { headers, rows } = parseCsv(readFileSync(path.join(sampleDir, name), 'utf8'));
+    const problems = new Map(findProblems(headers, rows).items.map((p) => [p.row, p]));
+    const out = processRows(headers, rows, 'validation').rows;
+    out.forEach((r, i) => {
+      const problem = problems.get(i + 1);
+      expect(r.validation_errors).toBe(problem?.message ?? '');
+      expect(problem?.message).toBe(problem?.issues.map((x) => x.reason).join('; '));
+      const brokenComponent = problem?.issues.some((x) => x.code === 'component_missing' || x.code === 'component_not_number') ?? false;
+      expect(r.composition_total_pct === '').toBe(brokenComponent);
+    });
   });
 });
 

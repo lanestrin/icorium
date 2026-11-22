@@ -247,7 +247,7 @@ describe('problem rows', () => {
     const result = await processSample('partner_a_followup.csv', 'classification');
     expect(result.problemRows).toBe(1);
     const { problems } = await rowsOf(result.id);
-    expect(problems).toEqual({ total: 1, items: [{ row: 13, batchId: expect.any(String), message: 'R-125 out of range' }] });
+    expect(problems).toEqual({ total: 1, items: [{ row: 13, batchId: expect.any(String), message: 'R-125 out of range', issues: [{ severity: 'blocking', code: 'component_out_of_range', field: 'r125', row: 13, reason: 'R-125 out of range' }] }] });
   });
 
   it('says which file of a comparison each problem row is in', async () => {

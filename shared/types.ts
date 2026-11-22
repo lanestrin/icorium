@@ -1,3 +1,5 @@
+import type { ValidationIssue } from './ingestion';
+
 // code: the fixed letter a result's File ID ends with (101010-V). Never change or reuse a code.
 export const PROCESSORS = [
   { id: 'validation', code: 'V', label: 'Composition Validation', short: 'Validation', tableLabel: 'Validation', description: 'Check mixture percentages (≈100%)' },
@@ -70,11 +72,12 @@ export interface ReplaceConflict {
 /** Both clean and invalid input files can be processed; result files cannot. */
 export const isInputFile = (file: FileMeta) => file.status === 'Ready' || file.status === 'Needs Review';
 
-/** A row the Composition Validation rules flag. row is 1-based. */
+/** A row the Composition Validation rules flag. row is 1-based. message is the issues' reasons joined with "; ". */
 export interface Problem {
   row: number;
   batchId: string;
   message: string;
+  issues: ValidationIssue[];
 }
 
 /** Problem rows in one file: the total, and the first ones in detail. */

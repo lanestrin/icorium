@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.1 - Structured validation issues and canonical ingestion types.**
+**Next: 19.2 - Layered header matching.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -173,7 +173,7 @@ Rules for every M19 item:
   API every caller uses (decided 2026-11-20). It cannot stop someone
   editing the browser's own code; trusted enforcement arrives with 17.4.
 
-- [ ] **19.1** Structured validation issues and canonical ingestion
+- [x] **19.1** Structured validation issues and canonical ingestion
   types — Add the ingestion types (source reference with sheet, page,
   row and column; field mapping and its origin; unit decision and
   factor; validation issue with severity blocking, warning or info, a
