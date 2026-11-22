@@ -1,6 +1,7 @@
 import { FILE_ID_COLUMN, parseFileId, RESULT_ID_COLUMN, type Problem, type ProblemList, type ProcessorId, type Row } from './types';
 import { getAdapter, type Normalized } from './adapters';
 import { httpError } from './csv';
+import type { CanonicalField, IssueCode, ValidationIssue } from './ingestion';
 
 const COMPONENTS = ['r32', 'r125', 'r134a'] as const;
 type Component = (typeof COMPONENTS)[number];
@@ -12,6 +13,8 @@ export const TOTAL_TOLERANCE_PCT = 0.5;
 const round = (v: number, d = 3) => Number(v.toFixed(d));
 const ok = (v: number | null): v is number => v !== null && Number.isFinite(v);
 const total = (n: Normalized) => COMPONENTS.reduce((s, c) => s + (ok(n[c]) ? n[c]! : 0), 0);
+/** True when all three components are numbers; only then does a composition total mean anything. */
+const hasAllComponents = (n: Normalized) => COMPONENTS.every((c) => ok(n[c]));
 /** Demo-only classification thresholds (%). Not real refrigerant specifications or Icorium policy. */
 const DEMO_CLASS_RULES = { r32RichMin: 40, r134aRichMin: 34 };
 /** Demo-only flag (%): Classification marks rows where R-32 + R-125 is strictly above this. */
@@ -19,32 +22,40 @@ const R32_R125_FLAG_ABOVE = 50;
 /** Classification's Yes/No column for R-32 + R-125 above R32_R125_FLAG_ABOVE. */
 export const R32_R125_FLAG_COLUMN = 'r32_r125_over_50';
 
+/** Every row check today stops the row from being calculated, so each is blocking. */
+const blocking = (code: IssueCode, reason: string, field?: CanonicalField): ValidationIssue =>
+  field ? { severity: 'blocking', code, field, reason } : { severity: 'blocking', code, reason };
+
 /** Field checks shared by all processors. Invalid values are reported, never replaced with zero. */
-export function issues(n: Normalized): string[] {
-  const out: string[] = [];
-  if (n.massKg === null) out.push('mass missing');
-  else if (!ok(n.massKg) || n.massKg <= 0) out.push('mass invalid');
+export function issues(n: Normalized): ValidationIssue[] {
+  const out: ValidationIssue[] = [];
+  if (n.massKg === null) out.push(blocking('mass_missing', 'mass missing', 'massKg'));
+  else if (!ok(n.massKg) || n.massKg <= 0) out.push(blocking('mass_invalid', 'mass invalid', 'massKg'));
   for (const c of COMPONENTS) {
     const v = n[c];
-    if (v === null) out.push(`${LABEL[c]} missing`);
-    else if (!Number.isFinite(v)) out.push(`${LABEL[c]} not a number`);
-    else if (v < 0 || v > 100) out.push(`${LABEL[c]} out of range`);
+    if (v === null) out.push(blocking('component_missing', `${LABEL[c]} missing`, c));
+    else if (!Number.isFinite(v)) out.push(blocking('component_not_number', `${LABEL[c]} not a number`, c));
+    else if (v < 0 || v > 100) out.push(blocking('component_out_of_range', `${LABEL[c]} out of range`, c));
   }
   const compsValid = COMPONENTS.every((c) => ok(n[c]) && n[c]! >= 0 && n[c]! <= 100);
-  if (compsValid && Math.abs(total(n) - 100) > TOTAL_TOLERANCE_PCT) out.push(`composition totals ${round(total(n), 2)}%`);
+  if (compsValid && Math.abs(total(n) - 100) > TOTAL_TOLERANCE_PCT) out.push(blocking('composition_total', `composition totals ${round(total(n), 2)}%`));
   return out;
 }
 
+/** The issues' reasons as one line, as shown to people and written to `validation_errors`. */
+const reasons = (list: ValidationIssue[]) => list.map((i) => i.reason).join('; ');
+
 interface RowContext {
   duplicate: boolean; // another row in the file has the same batch ID
+  row: number; // 1-based data row
 }
 
 /** Every problem with one row, including batch-ID checks that need the whole file. */
-function rowIssues(n: Normalized, ctx: RowContext): string[] {
+function rowIssues(n: Normalized, ctx: RowContext): ValidationIssue[] {
   const p = issues(n);
-  if (!n.batchId) p.unshift('batch ID missing');
-  else if (ctx.duplicate) p.unshift(`duplicate batch ID ${n.batchId}`);
-  return p;
+  if (!n.batchId) p.unshift(blocking('batch_id_missing', 'batch ID missing', 'batchId'));
+  else if (ctx.duplicate) p.unshift(blocking('batch_id_duplicate', `duplicate batch ID ${n.batchId}`, 'batchId'));
+  return p.map((issue) => ({ ...issue, row: ctx.row }));
 }
 
 /** Normalizes every row and works out which batch IDs appear more than once. */
@@ -52,7 +63,7 @@ function normalizeAll(headers: string[], rows: Row[]) {
   const norm = rows.map(getAdapter(headers).normalize);
   const idCounts = new Map<string, number>();
   for (const n of norm) if (n.batchId) idCounts.set(n.batchId, (idCounts.get(n.batchId) ?? 0) + 1);
-  return norm.map((n) => ({ n, errors: rowIssues(n, { duplicate: (idCounts.get(n.batchId) ?? 0) > 1 }) }));
+  return norm.map((n, i) => ({ n, errors: rowIssues(n, { duplicate: (idCounts.get(n.batchId) ?? 0) > 1, row: i + 1 }) }));
 }
 
 /** Rows the Composition Validation rules flag, for any file (input or result). Lists the first `cap` in detail. */
@@ -62,14 +73,14 @@ export function findProblems(headers: string[], rows: Row[], cap = 100): Problem
   normalizeAll(headers, rows).forEach(({ n, errors: p }, i) => {
     if (!p.length) return;
     total++;
-    if (items.length < cap) items.push({ row: i + 1, batchId: n.batchId, message: p.join('; ') });
+    if (items.length < cap) items.push({ row: i + 1, batchId: n.batchId, message: reasons(p), issues: p });
   });
   return { total, items };
 }
 
 interface Processor {
   columns: string[];
-  run(n: Normalized, errors: string[]): Record<string, string | number>;
+  run(n: Normalized, errors: ValidationIssue[]): Record<string, string | number>;
 }
 
 const STATUS_COLUMNS = ['processing_status', 'validation_errors'];
@@ -92,7 +103,8 @@ const PREVIOUS_COLUMNS: Partial<Record<ProcessorId, string[]>> = {
 export const processors: Record<ProcessorId, Processor> = {
   validation: {
     columns: [...ID_COLUMNS, 'composition_total_pct', ...STATUS_COLUMNS],
-    run: (n) => ({ composition_total_pct: round(total(n), 2) }),
+    // Blank, not a partial sum, when a component is missing or not a number.
+    run: (n) => ({ composition_total_pct: hasAllComponents(n) ? round(total(n), 2) : '' }),
   },
   mass: {
     columns: [...ID_COLUMNS, 'r32_mass_kg', 'r125_mass_kg', 'r134a_mass_kg', ...STATUS_COLUMNS],
@@ -190,7 +202,7 @@ export function processRows(headers: string[], rows: Row[], id: ProcessorId, res
       [RESULT_ID_COLUMN]: resultId,
       ...p.run(n, errors),
       processing_status: errors.length ? 'Invalid' : 'Valid',
-      validation_errors: errors.join('; '),
+      validation_errors: reasons(errors),
     };
     return { ...r, ...Object.fromEntries(Object.entries(res).map(([k, v]) => [k, String(v)])) };
   });

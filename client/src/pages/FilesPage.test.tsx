@@ -1198,7 +1198,7 @@ describe('preview', () => {
 
   it('keeps the problems and the row count in view while the wide table scrolls sideways', async () => {
     const user = await setup();
-    vi.mocked(api.rows).mockResolvedValueOnce({ ...page(0, 100), problems: { total: 1, items: [{ row: 2, batchId: 'A-2', message: 'mass missing' }] } });
+    vi.mocked(api.rows).mockResolvedValueOnce({ ...page(0, 100), problems: { total: 1, items: [{ row: 2, batchId: 'A-2', message: 'mass missing', issues: [] }] } });
     await previewRow(user, 'clean.csv');
     const dialog = await screen.findByRole('dialog', { name: 'clean.csv' });
     const footer = (await within(dialog).findByText('Showing 100 of 150 rows')).parentElement!;
@@ -1356,7 +1356,7 @@ describe('comparing results', () => {
     processor: 'validation',
     rowMatch: 'position',
     files: [
-      { id: 'val-a', name: valA.name, source: 'Partner A', rows: 2, problems: { total: 1, items: [{ row: 2, batchId: 'A-002', message: 'mass missing' }] } },
+      { id: 'val-a', name: valA.name, source: 'Partner A', rows: 2, problems: { total: 1, items: [{ row: 2, batchId: 'A-002', message: 'mass missing', issues: [] }] } },
       { id: 'val-b', name: valB.name, source: 'Partner B', rows: 2, problems: { total: 2, items: [] } },
       { id: 'val-c', name: valC.name, source: 'Partner C', rows: 1, problems: { total: 0, items: [] } },
     ],
