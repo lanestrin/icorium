@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.0](https://github.com/lanestrin/icorium/compare/v2.5.0...v2.6.0) (2026-11-22)
+
+
+### Features
+
+* add layered header matching (19.2) ([#139](https://github.com/lanestrin/icorium/issues/139)) ([4137330](https://github.com/lanestrin/icorium/commit/413733061481916530124cb4a2408ec20cc0a6f0))
+
 ## [2.5.0](https://github.com/lanestrin/icorium/compare/v2.4.1...v2.5.0) (2026-11-22)
 
 
