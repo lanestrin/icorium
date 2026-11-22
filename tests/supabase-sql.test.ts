@@ -20,13 +20,32 @@ function functions(sql: string): string[] {
   return [...code(sql).matchAll(/create function[\s\S]*?\$\$[\s\S]*?\$\$/g)].map((m) => m[0]);
 }
 
-/** Every `grant <privileges> on <object> to <roles>;` statement, with whitespace collapsed and roles split. */
+/**
+ * The SQL as Postgres compares it for these checks: lowercase, without identifier quotes and with whitespace
+ * collapsed, so `GRANT ... TO "authenticated"` is caught like `grant ... to authenticated`.
+ */
+const normalized = (sql: string) => sql.toLowerCase().replace(/"/g, '').replace(/\s+/g, ' ');
+
+/** Every `grant <privileges> on <object> to <roles>;` statement, normalized, with roles split. */
 function grants(sql: string): { privileges: string; object: string; roles: string[] }[] {
-  return [...sql.replace(/\s+/g, ' ').matchAll(/\bgrant (.+?) on (.+?) to (.+?);/g)].map(([, privileges, object, roles]) => ({
+  return [...normalized(sql).matchAll(/\bgrant (.+?) on (.+?) to (.+?);/g)].map(([, privileges, object, roles]) => ({
     privileges,
     object: object.replace(/^table /, ''),
-    roles: roles.split(',').map((role) => role.trim()),
+    // `with grant option` and `granted by <role>` follow the role list; they are not roles.
+    roles: roles.replace(/ (with grant option|granted by \S+)/g, '').split(',').map((role) => role.trim()),
   }));
+}
+
+/** The only two policies public.profiles may have: a signed-in user reads, and renames, their own row. */
+const PROFILE_POLICIES = [
+  'for select to authenticated using ((select auth.uid()) = user_id)',
+  'for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id)',
+];
+
+/** The rule (everything after the table name) of each `create policy` on public.profiles, normalized. */
+function profilePolicies(sql: string): string[] {
+  const statements = normalized(sql).matchAll(/\bcreate policy .+? on (?:public\.)?profiles (.+?);/g);
+  return [...statements].map(([, rule]) => rule.trim());
 }
 
 /** Every safety rule the migration and bootstrap must keep, as a list of the rules broken. */
@@ -37,7 +56,15 @@ function sqlProblems(migration: string, bootstrap: string): string[] {
   for (const [, table] of sql.matchAll(/create table (public\.\w+)/g))
     if (!sql.includes(`alter table ${table} enable row level security`)) problems.push(`no row level security on ${table}`);
 
-  if (/grant[^;]*\bto\b[^;]*\banon\b/.test(sql)) problems.push('something is granted to anon');
+  if (/disable row level security/.test(normalized(sql))) problems.push('row level security disabled');
+
+  // The profile grants reach every row, so these policies are the only row filter. Policies add up, so an
+  // extra or widened policy would expose every user's email and role.
+  const policies = profilePolicies(sql);
+  if (policies.some((policy) => !PROFILE_POLICIES.includes(policy)) || PROFILE_POLICIES.some((policy) => !policies.includes(policy)))
+    problems.push('profile policies are not exactly own-row read and rename');
+
+  if (/grant[^;]*\bto\b[^;]*\banon\b/.test(normalized(sql))) problems.push('something is granted to anon');
 
   // Broad grants would quietly reach every table or function, including the hook and invitations.
   if (grants(sql).some((grant) => /^all (tables|functions|routines|sequences) in schema /.test(grant.object))) problems.push('a schema-wide grant');
@@ -98,6 +125,18 @@ describe('Supabase identity SQL', () => {
     ['a grant to every role', (s) => `${s}\ngrant select on table public.invitations to public;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | select on public.invitations'],
     ['invitations readable by clients', (s) => `${s}\ngrant select on public.invitations to authenticated;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | select on public.invitations'],
     ['activation trigger removed', (s) => s.replace('after insert or update of email_confirmed_at on auth.users', 'after insert on auth.users'), 'activation trigger missing'],
+    ['row level security disabled later', (s) => `${s}\nalter table public.profiles disable row level security;`, 'row level security disabled'],
+    ['every profile readable', (s) => s.replace('for select\n  to authenticated\n  using ((select auth.uid()) = user_id)', 'for select\n  to authenticated\n  using (true)'), 'profile policies are not exactly own-row read and rename'],
+    ['the read policy given to every role', (s) => s.replace('for select\n  to authenticated', 'for select\n  to public'), 'profile policies are not exactly own-row read and rename'],
+    ['the rename check removed', (s) => s.replace('\n  with check ((select auth.uid()) = user_id)', ''), 'profile policies are not exactly own-row read and rename'],
+    ['an extra profile policy', (s) => `${s}\ncreate policy "Anyone signed in" on public.profiles for select to authenticated using (true);`, 'profile policies are not exactly own-row read and rename'],
+    ['the read policy removed', (s) => s.replace(/create policy "Users can read their own profile"[^;]*;/, ''), 'profile policies are not exactly own-row read and rename'],
+    ['an uppercase client grant', (s) => `${s}\nGRANT SELECT ON public.invitations TO authenticated;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | select on public.invitations'],
+    ['a quoted role name', (s) => `${s}\ngrant select on public.invitations to "authenticated";`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | select on public.invitations'],
+    ['a grant with grant option', (s) => `${s}\ngrant select on public.invitations to authenticated with grant option;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | select on public.invitations'],
+    ['a grant naming its grantor', (s) => `${s}\ngrant insert on public.profiles to authenticated granted by postgres;`, 'client table grants changed: select on public.profiles | update (name) on public.profiles | insert on public.profiles'],
+    ['an uppercase hook grant', (s) => `${s}\nGRANT EXECUTE ON FUNCTION ${HOOK}(jsonb) TO authenticated;`, 'hook granted to another role'],
+    ['an uppercase grant to anon', (s) => `${s}\nGRANT SELECT ON public.profiles TO ANON;`, 'something is granted to anon'],
   ];
   it.each(broken)('fails when %s', (_label, breakIt, problem) => {
     const changed = breakIt(MIGRATION);
