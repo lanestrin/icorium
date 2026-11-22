@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.0](https://github.com/lanestrin/icorium/compare/v2.6.2...v2.7.0) (2026-11-22)
+
+
+### Features
+
+* verify measurement units and flag ambiguous separators (19.3) ([#145](https://github.com/lanestrin/icorium/issues/145)) ([ad84627](https://github.com/lanestrin/icorium/commit/ad84627688743d9aaea4bd86b76f81f9799c765c))
+
 ## [2.6.2](https://github.com/lanestrin/icorium/compare/v2.6.1...v2.6.2) (2026-11-22)
 
 
