@@ -55,9 +55,6 @@ describe('loading files', () => {
 
   it.each([
     ['notes.txt', sample('partner_a_baseline.csv'), 'Only .csv files are supported'],
-    ['unknown.csv', 'foo,bar\n1,2\n', 'Unrecognized CSV schema'],
-    ['two-partners.csv', 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct,lot_number,collected_on,weight_lb,hfc32_percent,hfc125_percent,hfc134a_percent\nA-1,d,1,2,3,4,B-1,d,1,2,3,4\n', 'This file has the columns of more than one partner format (Partner A, Partner B); keep one set of columns.'],
-    ['repeated-column.csv', 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct,feed_mass_kg\nA-1,d,100,50,30,20,5\n', 'The column feed_mass_kg appears more than once; keep one.'],
     ['broken.csv', 'batch_id,sample_date\nA-1,2026-09-01,extra\n', 'CSV parse error on data row 1'],
     ['empty.csv', 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct\n', 'at least one data row'],
   ])('rejects %s with a clear message', async (name, text, message) => {
@@ -1072,3 +1069,134 @@ async function reply(action: () => unknown): Promise<Reply> {
     return { statusCode, json: () => ({ message }) as never };
   }
 }
+
+describe('Needs Mapping, confirmMapping and the processing gate (19.4)', () => {
+  const SUPPLIER = 'Batch ID,Sample Date,Net Mass,R32 %,R125,R134a\nX-1,2026-09-01,100,50,30,20\nX-2,2026-09-02,200,40,40,20\nX-3,2026-09-03,300,10,10,10\n';
+  const columns = { batchId: 'Batch ID', sampleDate: 'Sample Date', massKg: 'Net Mass', r32: 'R32 %', r125: 'R125', r134a: 'R134a' };
+  const units = { massKg: 'lb', r32: '%', r125: '%', r134a: '%' };
+  const confirm = (fileId: string, over: Record<string, unknown> = {}) => reply(() => service.confirmMapping({ fileId, columns, units, ...over }));
+  const metaOf = async (id: string) => (await listFiles()).find((f) => f.id === id)!;
+  const mapped = async (name: string, text = SUPPLIER) => {
+    const meta = (await upload(name, text)).json<FileMeta>();
+    expect((await confirm(meta.id)).statusCode).toBe(200);
+    return meta.id;
+  };
+
+  it('keeps a supplier CSV as Needs Mapping with its suggested mapping, adding only file_id', async () => {
+    const meta = (await upload('supplier.csv', SUPPLIER)).json<FileMeta>();
+    expect(meta).toMatchObject({ status: 'Needs Mapping', rows: 3, columns: 7, ingestion: { approved: false } });
+    expect(meta.ingestion!.mappings.map((m) => [m.field, m.sourceColumn, m.origin])).toEqual([
+      ['batchId', 'Batch ID', 'normalized'], ['sampleDate', 'Sample Date', 'normalized'], ['massKg', 'Net Mass', 'alias'],
+      ['r32', 'R32 %', 'alias'], ['r125', 'R125', 'alias'], ['r134a', 'R134a', 'alias'],
+    ]);
+    expect(meta.ingestion!.issues.map((i) => `${i.code}:${i.field}`)).toEqual(['unit_unverified:massKg', 'unit_unverified:r125', 'unit_unverified:r134a']);
+    expect(parseCsv(await textOf(meta.id))).toEqual(storedInput(SUPPLIER, meta.id));
+    expect((await rowsOf(meta.id)).problems.total).toBe(0); // previews without row checks
+  });
+  it('keeps two-partner and repeated-column CSVs as Needs Mapping, but still refuses such a result file', async () => {
+    const two = (await upload('two-partners.csv', 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct,lot_number,collected_on,weight_lb,hfc32_percent,hfc125_percent,hfc134a_percent\nA-1,d,1,2,3,4,B-1,d,1,2,3,4\n')).json<FileMeta>();
+    expect(two.ingestion!.issues.map((i) => i.code)).toContain('mapping_ambiguous');
+    const repeated = (await upload('repeated-column.csv', 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct,feed_mass_kg\nA-1,d,100,50,30,20,5\n')).json<FileMeta>();
+    expect(repeated.ingestion).toMatchObject({ duplicateHeaders: ['feed_mass_kg'] });
+    const result = await upload('result.csv', 'foo,bar,r32_mass_kg,r125_mass_kg,r134a_mass_kg,processing_status,validation_errors\n1,2,3,4,5,Valid,\n');
+    expect([result.statusCode, result.json().message]).toEqual([400, expect.stringContaining('Unrecognized CSV schema')]);
+  });
+
+  it('refuses to process a file whose mapping is not confirmed, creating no result', async () => {
+    const meta = (await upload('gate.csv', SUPPLIER)).json<FileMeta>();
+    for (const fn of PROCESSOR_IDS) {
+      const res = await processFile(meta.id, fn);
+      expect([res.statusCode, res.json().message]).toEqual([400, `File ${meta.id} can't be processed yet: its columns and units have not been confirmed`]);
+    }
+    expect((await listFiles()).some((f) => f.id.startsWith(`${meta.id}-`))).toBe(false);
+  });
+
+  it.each([
+    ['an unknown file', '999999', {}, 404, 'File not found'],
+    ['a blank column choice', undefined, { columns: { ...columns, batchId: '' } }, 400, 'Choose a column for batch ID'],
+    ['an unknown column', undefined, { columns: { ...columns, massKg: 'Nope' } }, 400, 'mass: there is no column "Nope"'],
+    ['the file_id column', undefined, { columns: { ...columns, massKg: 'file_id' } }, 400, 'is the File ID column and cannot be mapped'],
+    ['one column for two fields', undefined, { columns: { ...columns, r125: 'R32 %' } }, 400, 'column "R32 %" is chosen for R-32 and R-125'],
+    ['an unsupported unit', undefined, { units: { ...units, r32: 'oz' } }, 400, 'Choose a unit for R-32'],
+    ['a composition unit for mass', undefined, { units: { ...units, massKg: '%' } }, 400, 'mass: unit "%" is not supported; use kg, lb or g'],
+    ['a unit that contradicts the column', undefined, { units: { ...units, r32: 'fraction' } }, 400, 'R-32: the column states % but fraction was confirmed'],
+  ])('refuses %s and saves nothing', async (_what, fileId, over, status, message) => {
+    const meta = (await upload('refuse.csv', SUPPLIER)).json<FileMeta>();
+    const res = await confirm(fileId ?? meta.id, over);
+    expect([res.statusCode, res.json().message]).toEqual([status, expect.stringContaining(message)]);
+    expect(await metaOf(meta.id)).toEqual(meta);
+  });
+  it('refuses to map an exact partner input, a result and an archived file', async () => {
+    const partner = await fileNamed('partner_a_baseline.csv');
+    expect((await confirm(partner.id)).json().message).toBe(`File ${partner.id} already matches Partner A; its columns need no mapping`);
+    const result = (await processFile(partner.id, 'validation', true)).json<FileMeta>();
+    expect((await confirm(result.id)).json().message).toBe('Select an input file, not a result file');
+    const meta = (await upload('archived-map.csv', SUPPLIER)).json<FileMeta>();
+    await archiveFiles({ ids: [meta.id], archived: true });
+    expect((await confirm(meta.id)).json().message).toBe('Restore archived-map.csv before mapping it');
+  });
+
+  it('confirms a mapping, counts and previews its problem rows, and processes like the same rows in Partner B format', async () => {
+    const meta = (await upload('confirm.csv', SUPPLIER)).json<FileMeta>();
+    await rowsOf(meta.id); // cached while it still Needs Mapping
+    const done = (await confirm(meta.id)).json<FileMeta>();
+    expect(done).toMatchObject({ status: 'Needs Review', problemRows: 1, ingestion: { approved: true } }); // X-3 totals 30%
+    expect(done.ingestion!.units.map((u) => [u.field, u.unit, u.origin])).toEqual([['massKg', 'lb', 'confirmed'], ['r32', '%', 'header'], ['r125', '%', 'confirmed'], ['r134a', '%', 'confirmed']]);
+    expect((await rowsOf(meta.id)).problems.items[0]).toMatchObject({ row: 3, batchId: 'X-3', message: 'composition totals 30%' });
+
+    const b = (await upload('b-equivalent.csv', 'lot_number,collected_on,weight_lb,hfc32_percent,hfc125_percent,hfc134a_percent\nX-1,2026-09-01,100,50,30,20\nX-2,2026-09-02,200,40,40,20\nX-3,2026-09-03,300,10,10,10\n')).json<FileMeta>();
+    for (const fn of PROCESSOR_IDS) {
+      const ours = await rowsOf((await processFile(meta.id, fn)).json<FileMeta>().id);
+      const theirs = await rowsOf((await processFile(b.id, fn)).json<FileMeta>().id);
+      for (const [i, row] of ours.rows.entries()) for (const c of ours.generatedColumns.filter((g) => g !== 'result_id')) expect(row[c], `${fn} row ${i + 1} ${c}`).toBe(theirs.rows[i][c]);
+    }
+    const mass = await rowsOf(`${meta.id}-M`);
+    expect(mass.rows[0].r32_mass_kg).toBe('22.68');
+    expect(mass.rows[2]).toMatchObject({ r32_mass_kg: '', r125_mass_kg: '', r134a_mass_kg: '', processing_status: 'Invalid' }); // never a zero
+    expect((await rowsOf(`${meta.id}-V`)).rows[2].composition_total_pct).toBe('30'); // Validation keeps its total
+    expect((await metaOf(`${meta.id}-M`)).ingestion).toEqual(done.ingestion);
+  });
+  it('compares two mapped results by batch ID', async () => {
+    const a = (await processFile(await mapped('first.csv'), 'validation')).json<FileMeta>();
+    const b = (await processFile(await mapped('second.csv', SUPPLIER.replace('100,50,30,20', '110,50,30,20')), 'validation')).json<FileMeta>();
+    const compared = (await compare(a.id, b.id)).json<CompareResult>();
+    expect(compared).toMatchObject({ rowMatch: 'batch_id', files: [{ source: 'Mapped columns', rows: 3, validRows: 2 }, { source: 'Mapped columns', validRows: 2 }] });
+    expect(compared.columns.find((c) => c.name === 'composition_total_pct')?.summary).toEqual([100, 100]); // X-3's 30% is left out
+  });
+
+  it('re-checks an approved record against the stored file on every run', async () => {
+    const id = await mapped('tamper.csv');
+    const good = (await metaOf(id)).ingestion!;
+    const run = async (ingestion?: unknown) => {
+      await storage.patch(id, { ingestion: ingestion as never });
+      return processFile(id, 'mass');
+    };
+    const missing = await run({ ...good, mappings: good.mappings.map((m) => (m.field === 'massKg' ? { ...m, sourceColumn: 'Gone' } : m)) });
+    expect([missing.statusCode, missing.json().message]).toEqual([400, `File ${id} can't be processed yet: the column "Gone" for mass is not in the file`]);
+    expect((await run({ ...good, units: good.units.map((u) => (u.field === 'massKg' ? { ...u, factor: 1 } : u)) })).json().message).toContain('the unit for mass is not confirmed');
+    expect((await run({ ...good, approved: false })).json().message).toContain('have not been confirmed');
+    expect((await run(undefined)).json().message).toContain('not a known partner format'); // no record: read as a partner format, which this is not
+    expect((await listFiles()).some((f) => f.id === `${id}-M`)).toBe(false);
+    expect((await run(good)).statusCode).toBe(200);
+  });
+
+  it('saves a supplier profile that suggests for the next file with the same columns, which still needs confirming', async () => {
+    const meta = (await upload('profiled.csv', SUPPLIER)).json<FileMeta>();
+    expect((await confirm(meta.id, { profileName: ' Supplier X ' })).statusCode).toBe(200);
+    expect((await storage.listProfiles()).filter((p) => p.name === 'Supplier X')).toHaveLength(1);
+    const next = (await upload('profiled-2.csv', SUPPLIER.replace('X-1', 'Y-1'))).json<FileMeta>();
+    expect(next).toMatchObject({ status: 'Needs Mapping', ingestion: { approved: false, issues: [] } });
+    expect(next.ingestion!.mappings.map((m) => m.origin)).toEqual(Array(6).fill('profile'));
+    expect(next.ingestion!.units.map((u) => [u.field, u.origin])).toEqual([['massKg', 'profile'], ['r32', 'header'], ['r125', 'profile'], ['r134a', 'profile']]);
+    expect((await processFile(next.id, 'mass')).statusCode).toBe(400);
+  });
+  it('reports a profile that could not be saved after the mapping was saved', async () => {
+    const meta = (await upload('profile-fails.csv', SUPPLIER)).json<FileMeta>();
+    const spy = vi.spyOn(storage, 'saveProfile').mockRejectedValueOnce(new Error('disk full'));
+    try {
+      const res = await confirm(meta.id, { profileName: 'Supplier Y' });
+      expect([res.statusCode, res.json().message]).toEqual([500, 'The mapping was saved, but the supplier profile could not be saved: disk full']);
+    } finally { spy.mockRestore(); }
+    expect(await metaOf(meta.id)).toMatchObject({ status: 'Needs Review', ingestion: { approved: true } });
+  });
+});

@@ -1,4 +1,4 @@
-import type { CanonicalField, ValidationIssue } from './ingestion';
+import type { CanonicalField, IngestionRecord, ValidationIssue } from './ingestion';
 
 // code: the fixed letter a result's File ID ends with (101010-V). Never change or reuse a code.
 export const PROCESSORS = [
@@ -44,7 +44,8 @@ export function nextBaseId(ids: Iterable<string>): string {
   if (highest >= LAST_FILE_ID) throw new Error('No File IDs left: every six-digit ID is in use.');
   return String(highest + 1);
 }
-export type FileStatus = 'Ready' | 'Needs Review' | 'Processed';
+/** 'Needs Mapping': an input whose columns are not a partner's and are not confirmed yet. 'Needs Review': an input with problem rows, still processable. */
+export type FileStatus = 'Ready' | 'Needs Review' | 'Needs Mapping' | 'Processed';
 
 export interface FileMeta {
   id: string;
@@ -61,6 +62,7 @@ export interface FileMeta {
   archivedAt?: string; // ISO; when it was last archived, cleared on restore
   imported?: boolean; // an uploaded result; linked to an original only when sourceId is set
   importedFrom?: string; // provenance only: the source File ID an uploaded result named in its file_id column
+  ingestion?: IngestionRecord; // inputs that are not exactly a partner's (and their results); absent otherwise
 }
 
 /** What process() returns, instead of a saved result, when the result exists and replace: true was not sent. */
@@ -69,8 +71,8 @@ export interface ReplaceConflict {
   existing: Pick<FileMeta, 'id' | 'name' | 'archived'>;
 }
 
-/** Both clean and invalid input files can be processed; result files cannot. */
-export const isInputFile = (file: FileMeta) => file.status === 'Ready' || file.status === 'Needs Review';
+/** Every input file, whatever its status; result files are not. Processing refuses one that still Needs Mapping. */
+export const isInputFile = (file: FileMeta) => file.status === 'Ready' || file.status === 'Needs Review' || file.status === 'Needs Mapping';
 
 /** A row the Composition Validation rules flag. row is 1-based. message is the issues' reasons joined with "; ". */
 export interface Problem {
@@ -121,6 +123,7 @@ export interface CompareFile {
   name: string;
   source?: string; // partner adapter, e.g. 'Partner A'
   rows: number;
+  validRows: number; // rows a processor did not mark Invalid; numeric summaries cover only these
   problems: ProblemList;
 }
 

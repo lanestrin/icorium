@@ -17,7 +17,8 @@ export function SummaryByFile({ col, result, labels, refIndex }: { col: CompareC
   const isNumeric = col.kind === 'numeric';
   const summary = col.summary ?? [];
   const delta = deltas(summary, refIndex);
-  const valueHeader = `${col.measure === 'total' ? 'Total' : 'Mean'}${col.unit ? ` (${col.unit})` : ''}`;
+  const valueHeader = `${col.measure === 'total' ? 'Total' : 'Mean'}${col.unit ? ` (${col.unit})` : ''} of valid rows`;
+  const excluded = files.map((f, k) => ({ label: labels[k], file: f })).filter(({ file }) => file.validRows < file.rows);
   const rowsDiffering = files.map((_, k) => rows.filter((_, r) => differsFromRef(col, r, k, refIndex)).length);
   // Percentages show without a unit in the value column; the header already says (%).
   const valueUnit = col.unit === '%' ? undefined : col.unit;
@@ -53,6 +54,9 @@ export function SummaryByFile({ col, result, labels, refIndex }: { col: CompareC
           </tbody>
         </table>
       </div>
+      {isNumeric && excluded.length > 0 && (
+        <p className={styles.footnote}>Rows with errors are left out: {excluded.map(({ label, file }) => `${label}: ${file.validRows} of ${file.rows} rows valid`).join('; ')}.</p>
+      )}
       {isNumeric && col.unit === '%' && <p className={styles.footnote}>Δ is measured against the reference file. pp = percentage points.</p>}
     </Card>
   );

@@ -1,3 +1,4 @@
+import type { SupplierProfile } from './ingestion';
 import type { FileMeta, ProcessorCode } from './types';
 
 // Storage contract: what the app needs from wherever files are kept. The browser implements it with IndexedDB
@@ -26,4 +27,8 @@ export interface Storage {
   createAt(id: string, input: NewFile): Promise<FileMeta | undefined>;
   /** Saves a sample under its fixed ID unless that ID is already taken. */
   seed(id: string, input: NewFile): Promise<void>;
+  /** Every saved supplier profile. */
+  listProfiles(): Promise<SupplierProfile[]>;
+  /** Saves a supplier profile, replacing the one with the same key. */
+  saveProfile(profile: SupplierProfile): Promise<void>;
 }

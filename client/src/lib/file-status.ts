@@ -3,7 +3,7 @@ import { parseFileId, PROCESSORS, resultFileId, type FileMeta, type ProcessorId 
 // Rules for files in the workspace: statuses, warnings, replacements, function names, sorting and filtering.
 
 /** Every status a file row can show, in the order the Status filter lists them. */
-export const STATUSES = ['Ready', 'Needs Review', 'Processing', 'Processed', 'Error'] as const;
+export const STATUSES = ['Ready', 'Needs Review', 'Needs Mapping', 'Processing', 'Processed', 'Error'] as const;
 export type Status = (typeof STATUSES)[number];
 
 /** Stored status, overridden while this file is processing or after its processing failed. */

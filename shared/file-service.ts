@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { codeOf, COMPARE_MAX, FIRST_FILE_ID, COMPARE_MAX_ROWS, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ProcessorId, type ReplaceConflict, type Row } from './types';
-import { getAdapter } from './adapters';
+import { getAdapter, readerFor, resolveReader } from './adapters';
+import { FIELD_LABELS, headerKey, matchPartner, suggestMapping } from './mapping';
+import { decideUnits, UNIT_FACTORS, unitRangeWarnings } from './units';
+import type { IngestionRecord } from './ingestion';
 import { detectResult, embeddedSourceId, findProblems, matchesInput, processRows, stampFileIds } from './processing';
 import { compareResults } from './compare';
 import { httpError, parseCsv, toCsv } from './csv';
@@ -15,6 +18,18 @@ const processBody = z.object({
   fileId: z.string().min(1),
   processor: z.enum(PROCESSORS.map((p) => p.id) as [ProcessorId, ...ProcessorId[]]),
   replace: z.boolean().default(false), // must be true to overwrite an existing result
+});
+// The person's choices for a file that Needs Mapping: a source column for each field, a unit for each measurement.
+const columnChoice = (label: string) => z.string({ message: `Choose a column for ${label}` }).min(1, `Choose a column for ${label}`);
+const unitChoice = (label: string) => z.enum(Object.keys(UNIT_FACTORS) as [keyof typeof UNIT_FACTORS, ...(keyof typeof UNIT_FACTORS)[]], { message: `Choose a unit for ${label}: kg, lb, g, % or fraction` });
+const confirmBody = z.object({
+  fileId: z.string().min(1),
+  columns: z.object({
+    batchId: columnChoice(FIELD_LABELS.batchId), sampleDate: columnChoice(FIELD_LABELS.sampleDate), massKg: columnChoice(FIELD_LABELS.massKg),
+    r32: columnChoice(FIELD_LABELS.r32), r125: columnChoice(FIELD_LABELS.r125), r134a: columnChoice(FIELD_LABELS.r134a),
+  }),
+  units: z.object({ massKg: unitChoice(FIELD_LABELS.massKg), r32: unitChoice(FIELD_LABELS.r32), r125: unitChoice(FIELD_LABELS.r125), r134a: unitChoice(FIELD_LABELS.r134a) }),
+  profileName: z.string().trim().min(1, 'Name the supplier profile').max(80, 'A supplier profile name is at most 80 characters').optional(),
 });
 const archiveBody = z.object({ ids: z.array(z.string().min(1)).min(1), archived: z.boolean() });
 // 2 to 5 different results.
@@ -105,6 +120,25 @@ export function createFileService(storage: Storage) {
   function forget(id: string) {
     for (const key of parsed.keys()) if (key.startsWith(`${id}@`)) parsed.delete(key);
   }
+  /** Keeps an input whose columns are not a partner's as Needs Mapping, with the mapping and units suggested for it. */
+  async function storeForMapping(name: string, headers: string[], rows: Row[], duplicateHeaders: string[]) {
+    const profile = (await storage.listProfiles()).find((p) => p.key === headerKey(headers));
+    const suggestion = suggestMapping(headers, { duplicates: duplicateHeaders, profile });
+    const decided = decideUnits(suggestion, { profile: profile?.units });
+    const mappings = suggestion.mappings.map((m) => m.mapping);
+    const ingestion: IngestionRecord = {
+      mappings,
+      units: decided.decisions,
+      issues: [...suggestion.issues, ...decided.issues, ...unitRangeWarnings(rows, mappings, decided.decisions)],
+      duplicateHeaders,
+      approved: false,
+    };
+    const text = (id: string) => {
+      const stored = stampFileIds(headers, rows, id, false);
+      return toCsv(stored.headers, stored.rows);
+    };
+    return storage.create({ name, text, rows: rows.length, columns: headers.includes(FILE_ID_COLUMN) ? headers.length : headers.length + 1, status: 'Needs Mapping', ingestion });
+  }
   async function parsedFile(meta: FileMeta): Promise<ParsedFile> {
     const key = `${meta.id}@${meta.uploadedAt}`;
     const cached = parsed.get(key);
@@ -114,7 +148,9 @@ export function createFileService(storage: Storage) {
       return cached;
     }
     const { headers, rows } = parseCsv(await storage.read(meta.id));
-    const file = { headers, rows, problems: findProblems(headers, rows) };
+    // A file that cannot be read yet (it still Needs Mapping) has no row checks, rather than an error.
+    const reader = readerFor(meta, headers);
+    const file = { headers, rows, problems: reader ? findProblems(headers, rows, 100, reader) : { total: 0, items: [] } };
     parsed.set(key, file);
     if (parsed.size > PARSED_CACHE_FILES) parsed.delete(parsed.keys().next().value!);
     return file;
@@ -124,14 +160,20 @@ export function createFileService(storage: Storage) {
     // A pure read: listing never reads a CSV or writes anything.
     list: () => storage.list(),
 
-    /** Upload: parse + schema check always run here, regardless of processing function. */
+    /**
+     * Upload: parse + schema check always run here, regardless of processing function. An input that is not
+     * exactly one partner's columns is kept as Needs Mapping (see confirmMapping); an uploaded result must be.
+     */
     async upload({ name, text }: { name: string; text: string }) {
       if (!name.toLowerCase().endsWith('.csv')) throw httpError(400, 'Only .csv files are supported');
       const { headers, rows, duplicateHeaders } = parseCsv(text);
-      getAdapter(headers, { duplicates: duplicateHeaders });
       // Every upload gets a new base File ID. A previously exported result is registered as a result,
       // with that new base ID plus its function's code (e.g. 101012-M), and marked Imported.
       const result = detectResult(headers);
+      if (matchPartner(headers, duplicateHeaders)?.kind !== 'partner') {
+        if (result) getAdapter(headers, { duplicates: duplicateHeaders }); // refuses a result without a clean partner schema
+        return storeForMapping(name, headers, rows, duplicateHeaders);
+      }
       // The ID travels with the data: stored files carry it in their file_id / result_id columns,
       // replacing any IDs the uploaded CSV brought with it.
       // A result exported before File ID columns has none to stamp, so it is stored exactly as uploaded.
@@ -176,6 +218,49 @@ export function createFileService(storage: Storage) {
       return { name: meta.name, text: await storage.read(meta.id) };
     },
 
+    /**
+     * Confirms the columns and units of a file that Needs Mapping, and can save them as a supplier profile that
+     * only suggests. Every choice is checked again here; one blocking problem refuses all of it and saves nothing.
+     */
+    async confirmMapping(body: unknown) {
+      const { fileId, columns, units, profileName } = parseInput(confirmBody, body);
+      const meta = await storage.get(fileId);
+      if (!isInputFile(meta)) throw httpError(400, 'Select an input file, not a result file');
+      if (meta.archived) throw httpError(400, `Restore ${meta.name} before mapping it`);
+      const { headers, rows } = parseCsv(await storage.read(fileId));
+      if (!meta.ingestion) {
+        const partner = readerFor(meta, headers);
+        throw httpError(400, partner ? `File ${meta.id} already matches ${partner.name}; its columns need no mapping` : `File ${meta.id} has no mapping to confirm`);
+      }
+      const suggestion = suggestMapping(headers, { duplicates: meta.ingestion.duplicateHeaders, manual: columns });
+      const decided = decideUnits(suggestion, { confirmed: units });
+      const blocking = [...suggestion.issues, ...decided.issues].filter((i) => i.severity === 'blocking');
+      if (blocking.length) throw httpError(400, blocking.map((i) => i.reason).join('; '));
+      const mappings = suggestion.mappings.map((m) => ({ ...m.mapping, approved: true }));
+      const ingestion: IngestionRecord = {
+        mappings,
+        units: decided.decisions,
+        issues: [...decided.issues, ...unitRangeWarnings(rows, mappings, decided.decisions)], // warnings only
+        duplicateHeaders: meta.ingestion.duplicateHeaders,
+        approved: true,
+        confirmedAt: new Date().toISOString(),
+      };
+      const found = resolveReader({ ingestion }, headers);
+      if ('problems' in found) throw httpError(400, found.problems.join('; '));
+      const problemRows = findProblems(headers, rows, 100, found.reader).total;
+      const updated = await storage.patch(fileId, { status: problemRows > 0 ? 'Needs Review' : 'Ready', problemRows, ingestion });
+      forget(fileId); // the cached parse of this file has no row checks yet
+      if (profileName) {
+        try {
+          await storage.saveProfile({ key: headerKey(headers), name: profileName, columns, units, savedAt: new Date().toISOString() });
+        } catch (error) {
+          const { statusCode = 500, message } = error as { statusCode?: number; message?: string };
+          throw httpError(statusCode, `The mapping was saved, but the supplier profile could not be saved: ${message ?? 'unknown error'}`);
+        }
+      }
+      return updated;
+    },
+
     /** Archive or restore several files at once. Only the flag changes; no CSV is moved or deleted. */
     async archive(body: unknown) {
       const { ids, archived } = parseInput(archiveBody, body);
@@ -192,6 +277,11 @@ export function createFileService(storage: Storage) {
       const meta = await storage.get(fileId);
       if (meta.status === 'Processed') throw httpError(400, 'Select an input file, not a result file');
       if (meta.archived) throw httpError(400, `Restore ${meta.name} before processing it`);
+      // The gate: an input is read only through an approved mapping (checked again against its stored CSV) or
+      // as exactly one partner's columns. Nothing is created or replaced before this passes.
+      const { headers, rows } = parseCsv(await storage.read(fileId));
+      const found = resolveReader(meta, headers);
+      if ('problems' in found) throw httpError(400, `File ${meta.id} can't be processed yet: ${found.problems.join('; ')}`);
       // The result's File ID is the input's ID plus the function's code. Running the same function on the
       // same input again replaces that result and keeps its ID, but only when the request confirms it,
       // so another tab or a stale file list can never overwrite a result silently.
@@ -202,8 +292,7 @@ export function createFileService(storage: Storage) {
       });
       const existing = await findFile(storage, id);
       if (existing && !replace) return { conflict: conflict(existing) };
-      const { headers, rows } = parseCsv(await storage.read(fileId));
-      const out = processRows(headers, rows, processor, id);
+      const out = processRows(headers, rows, processor, id, found.reader);
       const base = meta.name.replace(/\.csv$/i, '');
       const result = {
         name: `result_${base}_${processor}.csv`,
@@ -215,6 +304,7 @@ export function createFileService(storage: Storage) {
         sourceId: meta.id,
         generatedColumns: out.generated,
         problemRows: out.problemRows,
+        ...(meta.ingestion ? { ingestion: meta.ingestion } : {}), // the mapping the result was calculated with
       };
       // A confirmed re-run overwrites, saving new metadata, so an archived result returns to Active Files.
       if (replace) {

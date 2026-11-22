@@ -69,6 +69,8 @@ export function createApi(open: () => Promise<Workspace>) {
       if ('conflict' in outcome) throw Object.assign(new Error(outcome.conflict.message), { conflict: outcome.conflict });
       return outcome.file;
     },
+    /** Confirms the columns and units of a file that Needs Mapping; profileName also saves them as a supplier profile. */
+    confirmMapping: async (body: Parameters<FileService['confirmMapping']>[0]) => (await files()).confirmMapping(body),
     archive: async (ids: string[], archived: boolean) => (await files()).archive({ ids, archived }),
     generate: async (body: { partner: GeneratorPartner; rows: number; errorRows: number; files: number }) => (await files()).generate(body),
     compare: async (ids: string[]) => (await files()).compare(ids),

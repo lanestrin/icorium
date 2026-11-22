@@ -81,5 +81,33 @@ export const blockingIssue = (code: IssueCode, reason: string, field?: Canonical
 export const warningIssue = (code: IssueCode, reason: string, field?: CanonicalField): ValidationIssue =>
   field ? { severity: 'warning', code, field, reason } : { severity: 'warning', code, reason };
 
+/**
+ * What upload and confirmMapping store on a file that is not exactly a partner's (build-plan 19.4), and what a
+ * result copies from its input. `approved` is never trusted alone: the processing gate checks the record
+ * against the stored CSV's headers every time.
+ */
+export interface IngestionRecord {
+  /** One per mapped field; approved only after confirmMapping. */
+  mappings: FieldMapping[];
+  units: UnitDecision[];
+  /** File-level issues: blocking and warnings before approval, warnings only after. */
+  issues: ValidationIssue[];
+  /** Original header names the upload repeated (Papa Parse renames the later copies, which the stored CSV keeps). */
+  duplicateHeaders: string[];
+  approved: boolean;
+  /** ISO time confirmMapping approved it. */
+  confirmedAt?: string;
+}
+
+/** A saved mapping that only suggests. `key` is headerKey() of the file it came from; one profile per key. */
+export interface SupplierProfile {
+  key: string;
+  name: string;
+  columns: Record<CanonicalField, string>;
+  units: Record<MeasurementField, string>;
+  /** ISO time. */
+  savedAt: string;
+}
+
 /** Where a file is in import, apart from its stored status. */
 export type IngestionState = 'Needs Mapping' | 'Needs Review' | 'Ready for Processing';

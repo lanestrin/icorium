@@ -1,9 +1,12 @@
 import { COMPARE_MAX, COMPARE_MIN, PROCESSORS, RESULT_ID_COLUMN, type CompareColumn, type CompareResult, type FileMeta, type MatchedRow, type Row, type RowMatch } from './types';
-import { getAdapter } from './adapters';
+import { readerFor } from './adapters';
 import { httpError } from './csv';
 import { R32_R125_FLAG_COLUMN } from './processing';
 
 interface Loaded { meta: FileMeta; headers: string[]; rows: Row[] }
+
+/** Rows a processor marked Invalid are left out of numeric summaries; a file without the column (an old export) counts every row. */
+const isValidRow = (row: Row) => row.processing_status === undefined || row.processing_status === 'Valid';
 
 const label = (id?: string) => PROCESSORS.find((p) => p.id === id)?.label ?? 'unknown';
 const unitOf = (name: string) => (name.endsWith('_kg') ? 'kg' : name.endsWith('_pct') ? '%' : undefined);
@@ -11,10 +14,8 @@ const present = (xs: (number | null)[]) => xs.filter((x): x is number => x !== n
 const sum = (xs: (number | null)[]) => present(xs).reduce((s, x) => s + x, 0);
 const mean = (xs: (number | null)[]) => (present(xs).length ? sum(xs) / present(xs).length : null);
 
-/** The partner adapter for a file's columns, or undefined when none matches. */
-function adapterFor(headers: string[]) {
-  try { return getAdapter(headers); } catch { return undefined; }
-}
+/** How a file's columns are read (partner format or approved mapping), or undefined when they cannot be yet. */
+const readerOf = (f: Loaded) => readerFor(f.meta, f.headers);
 
 /**
  * Lines rows up across files. Batch IDs are used only when every pair of files shares at least one,
@@ -24,7 +25,7 @@ function adapterFor(headers: string[]) {
  * (the occurrence number comes first); the label is only for display, so two rows may share one.
  */
 export function matchRows(files: Loaded[]): { rowMatch: RowMatch; rows: MatchedRow[] } {
-  const adapters = files.map((f) => adapterFor(f.headers));
+  const adapters = files.map(readerOf);
   const ids = adapters.every(Boolean) ? files.map((f, k) => f.rows.map((r) => adapters[k]!.normalize(r).batchId)) : undefined;
   const shares = (a: string[], b: string[]) => { const set = new Set(a.filter(Boolean)); return b.some((id) => id && set.has(id)); };
   const byId = !!ids && ids.every((a, i) => ids.every((b, j) => i === j || shares(a, b)));
@@ -96,8 +97,8 @@ export function compareResults(files: Loaded[]): Omit<CompareResult, 'files'> & 
       const unit = unitOf(name);
       // Masses add up meaningfully; percentages only average.
       const measure = unit === 'kg' ? 'total' : 'mean';
-      const summary = files.map((_, k) => {
-        const xs = values.map((vals) => vals[k]);
+      const summary = files.map((f, k) => {
+        const xs = values.map((vals, r) => { const n = rows[r].rowNumbers[k]; return n !== null && isValidRow(f.rows[n - 1]) ? vals[k] : null; });
         return measure === 'total' ? (present(xs).length ? sum(xs) : null) : mean(xs);
       });
       return { name, kind: 'numeric', unit, measure, summary, values, rowsDiffering, rowsCompared: rows.length };
@@ -112,7 +113,7 @@ export function compareResults(files: Loaded[]): Omit<CompareResult, 'files'> & 
     processor: first.meta.processor!,
     rowMatch,
     rows,
-    files: files.map((f) => ({ id: f.meta.id, name: f.meta.name, source: adapterFor(f.headers)?.name, rows: f.rows.length })),
+    files: files.map((f) => ({ id: f.meta.id, name: f.meta.name, source: readerOf(f)?.name, rows: f.rows.length, validRows: f.rows.filter(isValidRow).length })),
     columns,
   };
 }

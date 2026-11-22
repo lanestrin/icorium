@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.4 - Stored mapping and the processing gate.**
+**Next: 19.5 - Import review and mapping UI.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -200,7 +200,7 @@ Rules for every M19 item:
   are blocking.
   **Depends on:** 19.2.
 
-- [ ] **19.4** Stored mapping and the processing gate — Store an
+- [x] **19.4** Stored mapping and the processing gate — Store an
   unrecognized or ambiguous upload unchanged as Needs Mapping instead
   of refusing it. Add a validated action to confirm a mapping and its
   units, optionally saved as a supplier profile that only suggests.

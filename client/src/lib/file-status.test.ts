@@ -6,7 +6,7 @@ const file: FileMeta = { id: 'input', name: 'input.csv', rows: 25, columns: 7,
   uploadedAt: '2026-11-06T12:00:00Z', status: 'Needs Review', problemRows: 1 };
 
 describe('file eligibility and feedback', () => {
-  it.each(['Ready', 'Needs Review', 'Processed'] as const)('%s eligibility', (status) => {
+  it.each(['Ready', 'Needs Review', 'Needs Mapping', 'Processed'] as const)('%s eligibility', (status) => {
     expect(isInputFile({ ...file, status })).toBe(status !== 'Processed');
   });
   it('prioritizes processing over failure and restores persistent status', () => {

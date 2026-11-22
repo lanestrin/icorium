@@ -34,7 +34,7 @@ function StorageOptions() {
         ))}
       </div>
       <p className={styles.storageNote}>
-        One interface (list · get · read · patch · create · createAt · put) in <Path>shared/storage.ts</Path>, so another backend changes nothing else.
+        One interface (list · get · read · patch · create · createAt · put · supplier profiles) in <Path>shared/storage.ts</Path>, so another backend changes nothing else.
       </p>
     </div>
   );

@@ -1,10 +1,11 @@
-import { ADAPTERS, ADAPTER_FIELDS, adapterUnit, FIELD_ALIASES, type StatedUnit } from './types';
-import { blockingIssue, type CanonicalField, type FieldMapping, type IssueCode, type MappingOrigin, type ValidationIssue } from './ingestion';
+import { ADAPTERS, ADAPTER_FIELDS, adapterUnit, FIELD_ALIASES, FILE_ID_COLUMN, RESULT_ID_COLUMN, type StatedUnit } from './types';
+import { blockingIssue, type CanonicalField, type FieldMapping, type IssueCode, type MappingOrigin, type SupplierProfile, type ValidationIssue } from './ingestion';
 
 // Header matching (build-plan 19.2): which source column holds each field. Levels, best first:
 //   exact      the columns of one partner schema (approved)
 //   normalized a partner column written with other case, spacing or separators
 //   alias      a known other name (FIELD_ALIASES in shared/types.ts)
+//   profile    a column a saved supplier profile names, when the file has the same column names
 //   manual     a column the person chose
 // Every suggestion except an exact partner match still needs approval (19.4). Two columns for one field, or one
 // column for two fields, is reported, never resolved by taking the first. Nothing here reads values or checks units.
@@ -13,6 +14,13 @@ export type Adapter = (typeof ADAPTERS)[number];
 
 /** Lower case, with each run of spaces, underscores, hyphens and dots as one space. Unit words (kg, lb, g, %, pct, fraction) are kept. */
 export const normalizeHeader = (name: string) => name.trim().toLowerCase().replace(/[\s_.-]+/g, ' ').trim();
+
+/**
+ * What identifies a file's layout for supplier profiles: its column names (without the ID columns) folded by
+ * normalizeHeader, de-duplicated and sorted, as JSON text. The same names in another order or case give the same key.
+ */
+export const headerKey = (headers: readonly string[]) =>
+  JSON.stringify([...new Set(headers.filter((h) => h !== FILE_ID_COLUMN && h !== RESULT_ID_COLUMN).map(normalizeHeader))].sort());
 
 export type PartnerMatch =
   | { kind: 'partner'; adapter: Adapter }
@@ -49,7 +57,7 @@ export interface MappingSuggestion {
   unusedColumns: string[];
 }
 
-const LABEL: Record<CanonicalField, string> = { batchId: 'batch ID', sampleDate: 'sample date', massKg: 'mass', r32: 'R-32', r125: 'R-125', r134a: 'R-134a' };
+export const FIELD_LABELS: Record<CanonicalField, string> = { batchId: 'batch ID', sampleDate: 'sample date', massKg: 'mass', r32: 'R-32', r125: 'R-125', r134a: 'R-134a' };
 
 const quoted = (names: string[]) => {
   const q = names.map((n) => `"${n}"`);
@@ -79,24 +87,27 @@ function candidatesFor(field: CanonicalField, headers: readonly string[]): Pick[
 /**
  * Suggests a column for each of the six fields. `duplicates` names headers that appeared more than once (such a
  * column cannot be mapped). `manual` is the person's choice per field and replaces the suggestion for that field.
+ * `profile` is used only when its key is this file's headerKey (the same column names).
  */
 export function suggestMapping(
   headers: readonly string[],
-  options: { duplicates?: readonly string[]; manual?: Partial<Record<CanonicalField, string>> } = {},
+  options: { duplicates?: readonly string[]; manual?: Partial<Record<CanonicalField, string>>; profile?: SupplierProfile } = {},
 ): MappingSuggestion {
   const duplicates = options.duplicates ?? [];
   const exact = matchPartner(headers, duplicates);
   const adapter = exact?.kind === 'partner' ? exact.adapter : undefined;
   const issues: ValidationIssue[] = [];
-  const issue = (code: IssueCode, field: CanonicalField, why: string) => issues.push(blockingIssue(code, `${LABEL[field]}: ${why}`, field));
+  const issue = (code: IssueCode, field: CanonicalField, why: string) => issues.push(blockingIssue(code, `${FIELD_LABELS[field]}: ${why}`, field));
   const picks = new Map<CanonicalField, Pick>();
+  const profileKey = options.profile?.key;
 
   ADAPTER_FIELDS.forEach((field, i) => {
     const chosen = options.manual?.[field];
     if (chosen !== undefined) {
       if (!headers.includes(chosen)) issue('mapping_unknown_column', field, `there is no column "${chosen}"`);
+      else if (chosen === FILE_ID_COLUMN || chosen === RESULT_ID_COLUMN) issue('mapping_unknown_column', field, `"${chosen}" is the File ID column and cannot be mapped`);
       else if (duplicates.includes(chosen)) issue('header_duplicate', field, `column "${chosen}" appears more than once; keep one`);
-      else picks.set(field, { column: chosen, origin: 'manual' });
+      else picks.set(field, { column: chosen, origin: 'manual', statedUnit: candidatesFor(field, [chosen])[0]?.statedUnit });
       return;
     }
     if (adapter) {
@@ -104,6 +115,14 @@ export function suggestMapping(
       return;
     }
     const all = candidatesFor(field, headers);
+    const saved = profileKey === headerKey(headers) ? options.profile?.columns[field] : undefined;
+    if (saved !== undefined) {
+      const column = headers.find((h) => normalizeHeader(h) === normalizeHeader(saved));
+      if (column && !duplicates.includes(column)) {
+        picks.set(field, { column, origin: 'profile', statedUnit: all.find((c) => c.column === column)?.statedUnit });
+        return;
+      }
+    }
     const usable = all.filter((c) => !duplicates.includes(c.column));
     if (usable.length > 1) issue('mapping_ambiguous', field, `columns ${quoted(usable.map((c) => c.column))} both match; choose one`);
     else if (usable.length === 1) picks.set(field, usable[0]);
@@ -116,7 +135,7 @@ export function suggestMapping(
   for (const [field, { column }] of chosen) {
     const sharing = ADAPTER_FIELDS.filter((f) => chosen.get(f)?.column === column);
     if (sharing.length < 2) continue;
-    issue('mapping_collision', field, `column "${column}" is chosen for ${sharing.map((f) => LABEL[f]).join(' and ')}; each field needs its own column`);
+    issue('mapping_collision', field, `column "${column}" is chosen for ${sharing.map((f) => FIELD_LABELS[f]).join(' and ')}; each field needs its own column`);
     picks.delete(field);
   }
 
