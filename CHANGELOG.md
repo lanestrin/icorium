@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.2](https://github.com/lanestrin/icorium/compare/v2.6.1...v2.6.2) (2026-11-22)
+
+
+### Bug Fixes
+
+* name the account status region and keep policy checks per statement ([#143](https://github.com/lanestrin/icorium/issues/143)) ([6082d95](https://github.com/lanestrin/icorium/commit/6082d9569f1f476f65add011fb2b04964ad55031))
+
 ## [2.6.1](https://github.com/lanestrin/icorium/compare/v2.6.0...v2.6.1) (2026-11-22)
 
 
