@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.10.0](https://github.com/lanestrin/icorium/compare/v2.9.0...v2.10.0) (2026-11-22)
+
+
+### Features
+
+* read every Excel sheet and choose between its tables (19.6) ([#153](https://github.com/lanestrin/icorium/issues/153)) ([7da2515](https://github.com/lanestrin/icorium/commit/7da25151c9e1e54f3c5e7b1bad249d1bf6dfdbf8))
+
 ## [2.9.0](https://github.com/lanestrin/icorium/compare/v2.8.1...v2.9.0) (2026-11-22)
 
 
