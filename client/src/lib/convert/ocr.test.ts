@@ -16,7 +16,9 @@ vi.mock('tesseract.js-core/tesseract-core-simd-lstm.wasm.js?url', () => ({ defau
 vi.mock('tesseract.js-core/tesseract-core-lstm.wasm.js?url', () => ({ default: '/assets/core-lstm.wasm.js' }));
 
 /** A recognized word at a box in image pixels (y down). */
-const word = (text: string, x0: number, y0: number, x1 = x0 + 40, y1 = y0 + 12) => ({ text, bbox: { x0, y0, x1, y1 } });
+const word = (text: string, x0: number, y0: number, x1 = x0 + 40, y1 = y0 + 12, confidence = 95) => ({ text, confidence, bbox: { x0, y0, x1, y1 } });
+/** The text of each cell, row by row. */
+const texts = (rows: { text: string }[][]) => rows.map((row) => row.map((cell) => cell.text));
 /** Tesseract's blocks output holding these lines of words. */
 const blocks = (...lines: ReturnType<typeof word>[][]) => ({ data: { blocks: [{ paragraphs: [{ lines: lines.map((words) => ({ words })) }] }] } });
 /** A promise that never settles, as tesseract.js 7 leaves a job whose worker was terminated. */
@@ -40,10 +42,21 @@ describe('createOcrReader', () => {
       [word('A-1', 10, 40), word('100', 200, 41)],
     ));
     const ocr = createOcrReader(new AbortController().signal);
-    expect(await ocr.read(canvas())).toEqual([['batch_id', 'feed_mass_kg'], ['A-1', '100']]);
+    expect(texts(await ocr.read(canvas()))).toEqual([['batch_id', 'feed_mass_kg'], ['A-1', '100']]);
     expect(worker.recognize).toHaveBeenCalledWith(expect.any(HTMLCanvasElement), {}, { blocks: true });
     await ocr.close();
     await vi.waitFor(() => expect(worker.terminate).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps each cell's edges and lowest word confidence, divided by the scale it was rendered at", async () => {
+    worker.recognize.mockResolvedValue(blocks([word('Mass', 100, 200, 140, 224, 91), word('kg', 145, 200, 165, 224, 62)], [word('12.5', 100, 260, 160, 284, 88)]));
+    const ocr = createOcrReader(new AbortController().signal);
+    const rows = await ocr.read(canvas(), 1, 2);
+    expect(rows).toEqual([
+      [{ text: 'Mass kg', x: 50, right: 82.5, confidence: 62 }],
+      [{ text: '12.5', x: 50, right: 80, confidence: 88 }],
+    ]);
+    await ocr.close();
   });
 
   it('loads the worker and the core from this site, picking the core build this browser supports', async () => {
@@ -231,7 +244,7 @@ describe('readImage', () => {
     await vi.waitFor(() => expect(tesseract.createWorker).toHaveBeenCalled());
     expect(progress).toEqual([{ stage: 'preparing' }]); // only "getting ready" while the worker loads
     loaded(worker);
-    expect(await reading).toEqual([['lot_number'], ['B-001']]);
+    expect(texts(await reading)).toEqual([['lot_number'], ['B-001']]);
     expect(progress).toEqual([{ stage: 'preparing' }, { stage: 'reading' }]);
     expect(worker.recognize.mock.calls[0][0]).toBe(file); // no full-size canvas: Tesseract decodes the file
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:image');

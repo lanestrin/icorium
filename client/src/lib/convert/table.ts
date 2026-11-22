@@ -31,20 +31,38 @@ export function fileKind(file: { name: string; size: number }): FileKind {
 }
 
 /** A row the person should look at before importing: its row number in the source, and why. */
-export interface RowFlag { row: number; reason: string }
+export interface RowFlag { row: number; reason: string; /** PDF only: the page, and the row on that page. */ page?: number; pageRow?: number }
+
+/** A value read from a PDF or image that the person must keep as read or leave blank before import. */
+export interface ValueCheck {
+  /** Stable within one review: `${sourceRow}:${column}`. */
+  id: string;
+  sourceRow: number;
+  /** 0-based column. */
+  column: number;
+  /** The value exactly as read. */
+  value: string;
+  reasons: string[];
+  page?: number;
+  pageRow?: number;
+}
 
 /** A partner table found in a source file, ready to review and import. */
 export interface FoundTable {
   partner: string;
   /** 1-based row number of the header in the source (a sheet row, for Excel). */
   headerRow: number;
+  /** PDF only: the page the header is on; headerRow is then its row on that page. */
+  headerPage?: number;
   headers: string[];
   /** Excel only: the sheet's name, and the A1 range from the header through the last row of the table (B3:G20). */
   sheet?: string;
   range?: string;
   /** Data rows, each exactly as wide as the header; sourceRow is its 1-based row number in the source. */
-  rows: { sourceRow: number; cells: string[] }[];
+  rows: { sourceRow: number; cells: string[]; page?: number; pageRow?: number }[];
   flags: RowFlag[];
+  /** PDF and image only: values to confirm before import. */
+  checks?: ValueCheck[];
 }
 
 const s = (n: number) => (n === 1 ? '' : 's');
@@ -59,19 +77,8 @@ const s = (n: number) => (n === 1 ? '' : 's');
  */
 export function findTable(source: string[][], where = 'the first sheet'): FoundTable {
   const cleaned = source.map((row) => row.map((cell) => (cell ?? '').trim()));
-  const headerIndex = cleaned.slice(0, HEADER_SEARCH_ROWS).findIndex((row) => ADAPTERS.some((a) => a.columns.every((c) => row.includes(c))));
-  if (headerIndex < 0) {
-    const expected = ADAPTERS.map((a) => `${a.name} (${a.columns.join(', ')})`).join('; ');
-    throw new ConvertError(`No header row with a partner's columns was found in ${where}. Expected the columns of one of: ${expected}`);
-  }
-  const headerCells = cleaned[headerIndex];
-  const width = headerCells.reduce((last, cell, i) => (cell !== '' ? i + 1 : last), 0);
-  const headers = headerCells.slice(0, width);
-  const duplicates = headers.filter((h, i) => h !== '' && headers.indexOf(h) !== i);
-  const match = matchPartner(headers, duplicates);
-  const problem = partnerMatchProblem(match);
-  if (problem) throw new ConvertError(problem);
-  const partner = match?.kind === 'partner' ? match.adapter.name : '';
+  const { headerIndex, headers, partner } = locateHeader(cleaned, where);
+  const width = headers.length;
 
   const rows: FoundTable['rows'] = [];
   const flags: RowFlag[] = [];
@@ -104,3 +111,25 @@ export const csvName = (name: string) => `${name.includes('.') ? name.slice(0, n
 /** The CSV file uploaded in place of the source file. */
 export const toCsvFile = (table: FoundTable, sourceName: string) =>
   new File([toCsvText(table)], csvName(sourceName), { type: 'text/csv' });
+/**
+ * Finds the header in rows of trimmed cell text: the first row (within HEADER_SEARCH_ROWS) holding all of one
+ * adapter's columns, matched exactly as uploads match them (a header holding two partners' columns, or
+ * repeating one, is refused with a ConvertError). `where` names the place searched.
+ */
+export function locateHeader(cleaned: string[][], where: string): { headerIndex: number; headers: string[]; partner: string } {
+  const headerIndex = cleaned.slice(0, HEADER_SEARCH_ROWS).findIndex((row) => ADAPTERS.some((a) => a.columns.every((c) => row.includes(c))));
+  if (headerIndex < 0) {
+    const expected = ADAPTERS.map((a) => `${a.name} (${a.columns.join(', ')})`).join('; ');
+    throw new ConvertError(`No header row with a partner's columns was found in ${where}. Expected the columns of one of: ${expected}`);
+  }
+  const headerCells = cleaned[headerIndex];
+  const width = headerCells.reduce((last, cell, i) => (cell !== '' ? i + 1 : last), 0);
+  const headers = headerCells.slice(0, width);
+  const duplicates = headers.filter((h, i) => h !== '' && headers.indexOf(h) !== i);
+  const match = matchPartner(headers, duplicates);
+  const problem = partnerMatchProblem(match);
+  if (problem) throw new ConvertError(problem);
+  return { headerIndex, headers, partner: match?.kind === 'partner' ? match.adapter.name : '' };
+}
+
+

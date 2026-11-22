@@ -6,6 +6,8 @@ import { useConversion, type ReadByOcr, type ReadOutcome } from './useConversion
 
 const A = ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'];
 const sheet = [A, ['X-1', '2026-09-01', '100', '40', '30', '30']];
+/** Rows of cell text as one page of cells laid out in columns 100 apart; an image has no page. */
+const pages = (rows: string[][], image = false) => [{ ...(image ? {} : { page: 1 }), ocr: image, rows: rows.map((r) => r.map((text, c) => ({ text, x: c * 100, right: c * 100 + text.length * 5 }))) }];
 
 type Kind = 'excel' | 'pdf' | 'image';
 /** A reader whose results arrive only when the test calls finish, oldest call first. */
@@ -17,7 +19,7 @@ function slowReader() {
   const signal = (call = 0) => read.mock.calls[call][2];
   /** Reports progress from the reader's nth call, as a reader does while it works. */
   const progress = (value: ReadProgress, call = 0) => act(() => read.mock.calls[call][3](value));
-  const finish = (rows: string[][], ocr?: ReadByOcr) => act(async () => pending.shift()?.(ocr ? { rows, ocr } : { rows }));
+  const finish = (rows: string[][], ocr?: ReadByOcr) => act(async () => pending.shift()?.({ pages: pages(rows, ocr === 'image'), ...(ocr ? { ocr } : {}) }));
   const finishTables = (tables: FoundTable[]) => act(async () => pending.shift()?.({ tables }));
   return { read, signal, progress, finish, finishTables };
 }
@@ -99,7 +101,7 @@ describe('useConversion', () => {
     let fail!: (error: Error) => void;
     const read = vi.fn()
       .mockReturnValueOnce(new Promise((_, reject) => { fail = reject; }))
-      .mockResolvedValueOnce({ rows: sheet });
+      .mockResolvedValueOnce({ pages: pages(sheet) });
     const { result } = renderHook(() => useConversion(read));
     let first!: Promise<File | null>;
     act(() => { first = result.current.prepare(new File(['x'], 'one.pdf')); });
@@ -208,6 +210,46 @@ describe('useConversion', () => {
       const file = await outcome;
       expect(file?.name).toBe('report.csv');
       expect(await file?.text()).toBe('Lot,Mass\nTwo,1\n');
+    });
+  });
+
+  describe('values to confirm in a PDF or image', () => {
+    // The second row's mass has a lost minus sign, so it is listed; the first row has nothing to confirm.
+    const doubtful = [A, ['X-1', '2026-09-01', '100', '40', '30', '30'], ['X-2', '2026-09-02', '12.5-', '40', '30', '30']];
+
+    async function openPdf() {
+      const reader = slowReader();
+      const hook = renderHook(() => useConversion(reader.read));
+      let outcome!: Promise<File | null>;
+      act(() => { outcome = hook.result.current.prepare(new File(['x'], 'report.pdf')); });
+      await reader.finish(doubtful);
+      return { result: hook.result, outcome };
+    }
+
+    it('does not import while a value is undecided', async () => {
+      const { result } = await openPdf();
+      const [check] = result.current.review!.tables[0].checks!;
+      expect(check).toMatchObject({ id: '3:2', value: '12.5-' });
+      act(() => result.current.importReviewed());
+      expect(result.current.review).not.toBeNull();
+      act(() => result.current.decide(check.id, 'keep'));
+      expect(result.current.review?.decisions).toEqual({ '3:2': 'keep' });
+    });
+
+    it('uploads a kept value exactly as read', async () => {
+      const { result, outcome } = await openPdf();
+      act(() => result.current.decide('3:2', 'keep'));
+      act(() => result.current.importReviewed());
+      expect(await (await outcome)?.text()).toContain('X-2,2026-09-02,12.5-,40,30,30');
+    });
+
+    it('uploads a value left blank as an empty cell, never zero', async () => {
+      const { result, outcome } = await openPdf();
+      act(() => result.current.decide('3:2', 'blank'));
+      act(() => result.current.importReviewed());
+      const csv = await (await outcome)?.text();
+      expect(csv).toContain('X-2,2026-09-02,,40,30,30');
+      expect(csv).toContain('X-1,2026-09-01,100,40,30,30'); // other values stay as read
     });
   });
 });

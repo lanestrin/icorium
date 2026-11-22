@@ -5,6 +5,7 @@ import type { FileMeta } from '../../../shared/types';
 import { FilesPage } from './FilesPage';
 import { api } from '../lib/api';
 import { readExcel, type SheetCell, type SheetData } from '../lib/convert/excel';
+import type { PlacedCell } from '../lib/convert/layout';
 import { readImage } from '../lib/convert/ocr';
 import { readPdf } from '../lib/convert/pdf';
 import { ConvertError } from '../lib/convert/table';
@@ -29,6 +30,13 @@ function grid(rows: string[][], name = 'Sheet1'): SheetData {
 // A first sheet with a title row above the header, two rows (the second missing two values) and a total row.
 const sheet = [grid([['Partner A export'], A, ['X-1', '2026-09-01', '100', '40', '30', '30'], ['X-2', '2026-09-01', '200', '40'], ['Total', '', '300']])];
 const xlsx = (name = 'report.xlsx') => new File(['not read: the reader is mocked'], name);
+/** Rows of text as positioned cells, in columns 100 apart; a cell's confidence is given as [text, confidence]. */
+const placed = (rows: (string | [string, number])[][]): PlacedCell[][] => rows.map((r) => r.map((c, i) => {
+  const [text, confidence] = typeof c === 'string' ? [c, undefined] : c;
+  return { text, x: i * 100, right: i * 100 + text.length * 5, ...(confidence === undefined ? {} : { confidence }) };
+}));
+/** What readPdf gives for these rows as page 1 (text), or as scanned pages. */
+const onePage = (rows: (string | [string, number])[][], ocr = false) => ({ pages: [{ page: 1, ocr, rows: placed(rows) }] });
 const fileInput = () => document.querySelector<HTMLInputElement>('input[type="file"]')!;
 const uploadedNames = () => vi.mocked(api.upload).mock.calls.map(([f]) => f.name);
 
@@ -211,12 +219,12 @@ describe('converting PDF uploads', () => {
 
   it('reviews the table found in a PDF, leaving out its repeated header, then uploads it as a CSV', async () => {
     const user = await setup();
-    vi.mocked(readPdf).mockResolvedValue({ rows: [A, ['X-1', '2026-09-01', '100', '40', '30', '30'], A, ['X-2', '2026-09-01', '200', '40', '30', '30']], ocrPages: [] });
+    vi.mocked(readPdf).mockResolvedValue(onePage([A, ['X-1', '2026-09-01', '100', '40', '30', '30'], A, ['X-2', '2026-09-01', '200', '40', '30', '30']]));
     await user.upload(fileInput(), pdf());
 
     const review = await screen.findByRole('dialog', { name: 'Review report.pdf' });
-    expect(review).toHaveTextContent('Partner A · header on row 1 · 2 rows');
-    expect(within(review).getByRole('region', { name: 'Rows to check' })).toHaveTextContent('Row 3: repeated header, left out');
+    expect(review).toHaveTextContent('Partner A · header on page 1, row 1 · 2 rows');
+    expect(within(review).getByRole('region', { name: 'Rows to check' })).toHaveTextContent('Page 1, row 3: repeated header on page 1, left out');
     expect(within(review).queryByRole('region', { name: 'Read by OCR' })).not.toBeInTheDocument(); // a text PDF needs no OCR warning
     await user.click(within(review).getByRole('button', { name: 'Import as CSV' }));
     await waitFor(() => expect(api.upload).toHaveBeenCalledTimes(1));
@@ -231,7 +239,7 @@ X-2,2026-09-01,200,40,30,30
     const user = await setup();
     vi.mocked(readPdf)
       .mockRejectedValueOnce(new ConvertError('No text was found on page 2.'))
-      .mockResolvedValueOnce({ rows: [A, ['X-1', '2026-09-01', '100', '40', '30', '30']], ocrPages: [] });
+      .mockResolvedValueOnce(onePage([A, ['X-1', '2026-09-01', '100', '40', '30', '30']]));
     await user.upload(fileInput(), [pdf('scan.pdf'), pdf('text.pdf')]);
     const review = await screen.findByRole('dialog', { name: 'Review text.pdf' });
     await user.click(within(review).getByRole('button', { name: 'Import as CSV' }));
@@ -242,7 +250,7 @@ X-2,2026-09-01,200,40,30,30
 
   it('cancelling a PDF review uploads nothing and moves on to the next file', async () => {
     const user = await setup();
-    vi.mocked(readPdf).mockResolvedValue({ rows: [A, ['X-1', '2026-09-01', '100', '40', '30', '30']], ocrPages: [] });
+    vi.mocked(readPdf).mockResolvedValue(onePage([A, ['X-1', '2026-09-01', '100', '40', '30', '30']]));
     await user.upload(fileInput(), [pdf('one.pdf'), pdf('two.pdf')]);
     await user.click(within(await screen.findByRole('dialog', { name: 'Review one.pdf' })).getByRole('button', { name: 'Cancel' }));
     await user.click(within(await screen.findByRole('dialog', { name: 'Review two.pdf' })).getByRole('button', { name: 'Import as CSV' }));
@@ -264,7 +272,7 @@ describe('converting scanned PDFs and images with OCR', () => {
 
   it('shows each page as it is read, then warns that the scanned pages were read by OCR', async () => {
     const user = await setup();
-    let finish!: (value: { rows: string[][]; ocrPages: number[] }) => void;
+    let finish!: (value: ReturnType<typeof onePage>) => void;
     vi.mocked(readPdf).mockImplementation((_file, _signal, onProgress) => {
       onProgress?.({ stage: 'page', page: 1, pages: 3 });
       return new Promise((resolve) => { finish = resolve; });
@@ -277,7 +285,7 @@ describe('converting scanned PDFs and images with OCR', () => {
     act(() => onProgress({ stage: 'page', page: 2, pages: 3 }));
     // The status line is a live region, so screen readers hear each page.
     expect(screen.getByText('Reading scan.pdf: page 2 of 3…').closest('[aria-live="polite"]')).not.toBeNull();
-    await act(async () => finish({ rows, ocrPages: [2, 3] }));
+    await act(async () => finish({ pages: [{ page: 1, ocr: false, rows: placed(rows) }, { page: 2, ocr: true, rows: [] }, { page: 3, ocr: true, rows: [] }] }));
 
     const review = await screen.findByRole('dialog', { name: 'Review scan.pdf' });
     const warning = within(review).getByRole('region', { name: 'Read by OCR' });
@@ -289,7 +297,7 @@ describe('converting scanned PDFs and images with OCR', () => {
 
   it('reads an image with OCR and says the whole image was read that way', async () => {
     const user = await setup();
-    vi.mocked(readImage).mockResolvedValue(rows);
+    vi.mocked(readImage).mockResolvedValue(placed(rows));
     await user.upload(fileInput(), png());
     const review = await screen.findByRole('dialog', { name: 'Review table.png' });
     expect(within(review).getByRole('region', { name: 'Read by OCR' })).toHaveTextContent('This image was read by OCR, so digits and decimal points may be wrong.');
@@ -299,10 +307,10 @@ describe('converting scanned PDFs and images with OCR', () => {
 
   it('Cancel while reading stops the reader, uploads nothing, ignores its late result and goes on to the next file', async () => {
     const user = await setup();
-    let late!: (value: string[][]) => void;
+    let late!: (value: PlacedCell[][]) => void;
     vi.mocked(readImage)
       .mockImplementationOnce(() => new Promise((resolve) => { late = resolve; }))
-      .mockResolvedValueOnce(rows);
+      .mockResolvedValueOnce(placed(rows));
     await user.upload(fileInput(), [png('slow.png'), png('next.png')]);
     await screen.findByText('Reading slow.png…');
     expect(vi.mocked(readImage).mock.calls[0][1].aborted).toBe(false);
@@ -311,7 +319,7 @@ describe('converting scanned PDFs and images with OCR', () => {
     await user.click(cancel);
     expect(vi.mocked(readImage).mock.calls[0][1].aborted).toBe(true); // the OCR worker is told to stop
     const next = await screen.findByRole('dialog', { name: 'Review next.png' });
-    await act(async () => late(rows)); // the cancelled image finishes late: ignored
+    await act(async () => late(placed(rows))); // the cancelled image finishes late: ignored
     expect(screen.queryByRole('dialog', { name: 'Review slow.png' })).not.toBeInTheDocument();
     await user.click(within(next).getByRole('button', { name: 'Import as CSV' }));
     await waitFor(() => expect(uploadedNames()).toEqual(['next.csv']));
@@ -332,10 +340,62 @@ describe('converting scanned PDFs and images with OCR', () => {
     const user = await setup();
     vi.mocked(readImage)
       .mockRejectedValueOnce(new ConvertError("The text-reading data couldn't be downloaded. Check your connection and try again."))
-      .mockResolvedValueOnce(rows);
+      .mockResolvedValueOnce(placed(rows));
     await user.upload(fileInput(), [png('first.png'), png('second.png')]);
     await user.click(within(await screen.findByRole('dialog', { name: 'Review second.png' })).getByRole('button', { name: 'Import as CSV' }));
     await waitFor(() => expect(uploadedNames()).toEqual(['second.csv']));
     expect(await screen.findByRole('alert')).toHaveTextContent("first.png: The text-reading data couldn't be downloaded. Check your connection and try again.");
+  });
+});
+
+describe('confirming values read from a PDF or image', () => {
+  const pdf = () => new File(['not read: the reader is mocked'], 'report.pdf', { type: 'application/pdf' });
+  const png = () => new File(['not read: the reader is mocked'], 'table.png', { type: 'image/png' });
+
+  it('keeps Import as CSV disabled until every doubtful value is kept or left blank, then uploads them as decided', async () => {
+    const user = await setup();
+    vi.mocked(readPdf).mockResolvedValue({ pages: [
+      { page: 1, ocr: false, rows: placed([A, ['X-1', '2026-09-01', '12.5-', '40', '30', '30']]) },
+      { page: 2, ocr: false, rows: placed([['X-2', '2026-09-02', '—', '40', '30', '30']]) },
+    ] });
+    await user.upload(fileInput(), pdf());
+
+    const review = await screen.findByRole('dialog', { name: 'Review report.pdf' });
+    const section = within(review).getByRole('region', { name: 'Values to confirm' });
+    expect(section).toHaveTextContent('0 of 2 decided');
+    const first = within(section).getByRole('group', { name: 'Page 1, row 2 · feed_mass_kg: 12.5-' });
+    const second = within(section).getByRole('group', { name: 'Page 2, row 1 · feed_mass_kg: —' });
+    expect(first).toHaveTextContent('minus sign may be lost or misplaced');
+    expect(within(review).getByRole('columnheader', { name: 'Page' })).toBeInTheDocument();
+    const importButton = within(review).getByRole('button', { name: 'Import as CSV' });
+    expect(importButton).toBeDisabled();
+    expect(importButton).toHaveAccessibleDescription('Decide all 2 values to confirm to import.');
+
+    await user.click(within(first).getByRole('radio', { name: 'Keep as read' }));
+    expect(section).toHaveTextContent('1 of 2 decided');
+    expect(importButton).toBeDisabled();
+    await user.click(within(second).getByRole('radio', { name: 'Leave blank' }));
+    expect(within(review).getByText('left blank')).toBeInTheDocument();
+    expect(importButton).toBeEnabled();
+    await user.click(importButton);
+
+    await waitFor(() => expect(api.upload).toHaveBeenCalledTimes(1));
+    expect(await vi.mocked(api.upload).mock.calls[0][0].text()).toBe(`${A.join(',')}
+X-1,2026-09-01,12.5-,40,30,30
+X-2,2026-09-02,,40,30,30
+`);
+  });
+
+  it('lists a low-confidence value of an image by its row, and cancelling uploads nothing', async () => {
+    const user = await setup();
+    vi.mocked(readImage).mockResolvedValue(placed([A, ['X-1', '2026-09-01', ['100', 62], '40', '30', '30']]));
+    await user.upload(fileInput(), png());
+    const review = await screen.findByRole('dialog', { name: 'Review table.png' });
+    const group = within(review).getByRole('group', { name: 'Row 2 · feed_mass_kg: 100' });
+    expect(group).toHaveTextContent('OCR confidence 62 (below 80)');
+    expect(within(review).queryByRole('columnheader', { name: 'Page' })).not.toBeInTheDocument(); // an image has no pages
+    expect(within(review).getByRole('button', { name: 'Import as CSV' })).toBeDisabled();
+    await user.click(within(review).getByRole('button', { name: 'Cancel' }));
+    expect(api.upload).not.toHaveBeenCalled();
   });
 });

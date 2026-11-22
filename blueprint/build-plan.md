@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.7 - PDF and OCR safeguards.**
+**Next: 19.7b - PDF and image tables with other headers.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -92,7 +92,7 @@ the cloud in 17.4.
 Build in this order:
 
 17.1 -> 17.2 -> 19.1 -> 19.2 -> 19.3 -> 19.4 -> 19.5 -> 19.6 -> 19.7
--> 19.8 -> 19.9 -> 17.3 -> 17.4 -> 17.5 -> 17.6 -> 17.7
+-> 19.7b -> 19.8 -> 19.9 -> 17.3 -> 17.4 -> 17.5 -> 17.6 -> 17.7
 -> 18.1 -> 18.2 -> 18.3
 
 Select only an unchecked item whose dependencies are satisfied.
@@ -227,7 +227,7 @@ Rules for every M19 item:
   provenance.
   **Depends on:** 19.5.
 
-- [ ] **19.7** PDF and OCR safeguards — Keep page numbers per row,
+- [x] **19.7** PDF and OCR safeguards — Keep page numbers per row,
   detect repeated headers across pages, place empty cells and detect
   misalignment from cell positions, keep OCR confidence, and flag
   ambiguous numbers (O/0, I/1, S/5, lost decimals or minus signs,
@@ -235,13 +235,20 @@ Rules for every M19 item:
   extracted values beside their source page and row.
   **Depends on:** 19.5.
 
+- [ ] **19.7b** PDF and image tables with other headers — Find a header row
+  that is not a partner's in PDF and image text, using the same
+  positioned cells as 19.7, and import it as Needs Mapping so the Map
+  columns dialog opens, as it does for Excel and CSV. Values to confirm
+  from 19.7 still block until decided. Split from 19.7 on 2026-11-22.
+  **Depends on:** 19.7.
+
 - [ ] **19.8** Provenance and result traceability — Keep the original
   source file and per-row source references in browser storage (with
   a storage upgrade), and record on each result its input File ID,
   source type, mapping, units, factors, validation decision and
   processing function version. Explain a calculated value from its raw
   source cell. Exported CSV columns stay unchanged.
-  **Depends on:** 19.6, 19.7.
+  **Depends on:** 19.6, 19.7b.
 
 - [ ] **19.9** Ingestion regression, acceptance and documentation —
   One automated test per acceptance criterion in project-plan section
