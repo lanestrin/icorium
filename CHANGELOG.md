@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.0](https://github.com/lanestrin/icorium/compare/v2.12.0...v2.13.0) (2026-11-23)
+
+
+### Features
+
+* keep original files and explain result values (19.8) ([#159](https://github.com/lanestrin/icorium/issues/159)) ([703c336](https://github.com/lanestrin/icorium/commit/703c3360bf7056e50c015fa65aab83bd2f2321f0))
+
 ## [2.12.0](https://github.com/lanestrin/icorium/compare/v2.11.0...v2.12.0) (2026-11-23)
 
 
