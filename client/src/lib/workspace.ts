@@ -1,6 +1,9 @@
 import type { AccountState } from '../hooks/useAccount';
 import { UNAVAILABLE_FILES_MESSAGE } from './cloud-storage';
 
+/** Shown when a run or upload stopped because the account's workspace changed (sign-out, another account) while it was going. */
+export const WORKSPACE_CHANGED_MESSAGE = 'Your workspace changed, so this was stopped before it finished. Files not yet handled were left alone.';
+
 /**
  * Which workspace the file actions use. pending: the account isn't known yet, so nothing opens (the browser's
  * samples must not appear and then vanish). unavailable: the account couldn't be confirmed, so no workspace opens.

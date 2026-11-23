@@ -1,6 +1,7 @@
 import { useState, type MutableRefObject } from 'react';
 import type { FileMeta, ProcessorId, ReplaceConflict } from '../../../shared/types';
 import { api } from '../lib/api';
+import { WORKSPACE_CHANGED_MESSAGE } from '../lib/workspace';
 import { qualityWarning, replacements, type QualityWarning, type Replacement } from '../lib/file-status';
 import { errorMessage, plural, type Report } from '../lib/format';
 
@@ -55,7 +56,11 @@ export function useProcessing({ files, busy, refresh, setSelectedIds, onError, o
     const errors: string[] = [];
     const made: FileMeta[] = [];
     const conflicts: { input: FileMeta; conflict: ReplaceConflict }[] = [];
+    const workspace = api.workspaceId();
+    let stopped = false;
     for (const f of batch) {
+      // File IDs repeat across workspaces, so after a switch the next call would act on a different file.
+      if (api.workspaceId() !== workspace) { stopped = true; break; }
       setProcessingId(f.id);
       try {
         made.push(await (replaceIds.has(f.id) ? api.process(f.id, processor, true) : api.process(f.id, processor)));
@@ -72,6 +77,7 @@ export function useProcessing({ files, busy, refresh, setSelectedIds, onError, o
     }
     busy.current = false; // per-file errors are caught above, so this always runs
     setProcessingId(undefined);
+    if (stopped) return onError(WORKSPACE_CHANGED_MESSAGE); // no selection, preview or dialog for files of the old workspace
     setFailedIds(failed);
     // Failed and conflicting files stay checked so they can be retried. After a clean batch, the new
     // results are checked instead, so they can be compared straight away.

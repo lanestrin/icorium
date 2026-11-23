@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SourceRecord } from '../../../shared/ingestion';
 import type { NewFile } from '../../../shared/storage';
-import { CAPACITY_MESSAGE, createCloudStorage, INACTIVE_MESSAGE, NOT_PROCESSABLE_MESSAGE, NO_SAMPLES_MESSAGE, UNAVAILABLE_FILES_MESSAGE } from './cloud-storage';
+import { CAPACITY_MESSAGE, createCloudStorage, IDS_EXHAUSTED_MESSAGE, INACTIVE_MESSAGE, NOT_PROCESSABLE_MESSAGE, NO_SAMPLES_MESSAGE, TOO_LARGE_MESSAGE, UNAVAILABLE_FILES_MESSAGE } from './cloud-storage';
 
 const USER = '11111111-1111-1111-1111-111111111111';
 type Row = Record<string, unknown>;
@@ -24,6 +24,11 @@ function fake() {
     const hit = Object.entries(state.fail).find(([k, v]) => v && key.includes(k));
     return hit?.[1];
   };
+  /** A failed table or RPC call as postgrest-js returns it: the HTTP status beside the error, never on it. */
+  const rejected = (f: { code?: string; message?: string; status?: number }) => {
+    const { status, ...error } = f;
+    return { data: null, error, status };
+  };
 
   function query(table: string) {
     let op: 'select' | 'insert' | 'update' = 'select';
@@ -36,7 +41,7 @@ function fake() {
       log.push(`${op}:${table}`);
       const failed = failure(`${op}:${table}`);
       if (failed instanceof Error) throw failed;
-      if (failed) return { data: null, error: failed };
+      if (failed) return rejected(failed);
       let rows = tables[table].filter((r) => filters.every(([k, v]) => r[k] === v));
       if (state.blind > 0 && op !== 'insert') { state.blind--; rows = []; }
       if (op === 'insert') {
@@ -99,7 +104,8 @@ function fake() {
     rpc: async (name: string) => {
       log.push(`rpc:${name}`);
       const failed = failure(`rpc:${name}`);
-      if (failed) return { data: null, error: failed };
+      if (failed instanceof Error) throw failed;
+      if (failed) return rejected(failed);
       if (name === 'allocate_file_id') return { data: String(++state.counter), error: null };
       return { data: state.room, error: null };
     },
@@ -200,6 +206,32 @@ describe('create', () => {
     f.state.fail['insert:files'] = { message: 'processing_not_allowed' };
     await expect(store.create(upload())).rejects.toMatchObject({ statusCode: 400, message: NOT_PROCESSABLE_MESSAGE });
   });
+
+  it('maps an inactive account, an exhausted File ID range and an oversized metadata check', async () => {
+    f.state.fail['rpc:allocate_file_id'] = { message: 'not_active' };
+    await expect(store.create(upload())).rejects.toMatchObject({ statusCode: 403, message: INACTIVE_MESSAGE });
+    f.state.fail['rpc:allocate_file_id'] = { message: 'file_ids_exhausted' };
+    await expect(store.create(upload())).rejects.toMatchObject({ statusCode: 507, message: IDS_EXHAUSTED_MESSAGE });
+    f.state.fail['rpc:allocate_file_id'] = undefined;
+    f.state.fail['insert:files'] = { code: '23514', message: 'violates check constraint' };
+    await expect(store.create(upload())).rejects.toMatchObject({ statusCode: 400, message: TOO_LARGE_MESSAGE });
+    expect(f.objects.size).toBe(0);
+  });
+
+  it('reports the workspace unavailable when the room check itself cannot be made after a refusal', async () => {
+    f.state.fail['upload:'] = { message: 'new row violates row-level security policy', status: 403 };
+    f.state.fail['rpc:file_storage_has_room'] = { message: 'down', status: 503 };
+    await expect(store.create(upload())).rejects.toMatchObject({ statusCode: 503, message: UNAVAILABLE_FILES_MESSAGE });
+  });
+
+  it('reports a database answer with a 5xx status as unavailable, as postgrest-js puts the status beside the error', async () => {
+    for (const status of [502, 503, 504]) {
+      f.state.fail['select:files'] = { code: 'PGRST002', message: 'Could not query the database for the schema cache', status };
+      await expect(store.list()).rejects.toMatchObject({ statusCode: 503, message: UNAVAILABLE_FILES_MESSAGE });
+    }
+    f.state.fail['select:files'] = { message: 'something odd', status: 400 };
+    await expect(store.list()).rejects.not.toMatchObject({ statusCode: 503 });
+  });
 });
 
 describe('createAt', () => {
@@ -245,6 +277,12 @@ describe('put', () => {
     f.state.room = false;
     await expect(store.put('100001', upload({ name: 'other.csv' }))).rejects.toMatchObject({ statusCode: 507, message: CAPACITY_MESSAGE });
     expect((await store.get('100001')).name).toBe('a.csv');
+  });
+
+  it('reports an inactive account when replacing changes no row', async () => {
+    await store.create(upload());
+    f.state.inactive = true;
+    await expect(store.put('100001', upload({ name: 'other.csv' }))).rejects.toMatchObject({ statusCode: 403, message: INACTIVE_MESSAGE });
   });
 
   it('inserts when there is no such file yet', async () => {

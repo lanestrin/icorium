@@ -50,9 +50,9 @@ export function FilesPage() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
 
-  const { files, refresh, reset, upload, uploading, loading, loadFailed } = useFileList(setError);
   const account = useAccount();
   const workspace = useWorkspace(account.account);
+  const { files, refresh, reset, upload, uploading, loading, loadFailed } = useFileList(setError, workspace.choice.kind === 'pending');
   const conversion = useConversion();
   const { selectedIds, setSelectedIds, toggle, toggleAll } = useSelection();
   const {
@@ -94,10 +94,14 @@ export function FilesPage() {
   // screen, selected or open, and the list is read again from the new one.
   const shownWorkspace = useRef(workspace.key);
   useEffect(() => {
+    let current = true; // a late answer for the workspace we just left must not replace this one's
     setStorageMode(undefined);
-    api.storageMode().then(setStorageMode, () => {});
-    if (shownWorkspace.current === workspace.key) return;
+    api.storageMode().then((mode) => { if (current) setStorageMode(mode); }, () => {});
+    const previous = shownWorkspace.current;
     shownWorkspace.current = workspace.key;
+    if (previous === workspace.key) return () => { current = false; };
+    // The account was still loading, so no files were shown and the list's first load was held until now.
+    if (previous === 'pending') return () => { current = false; };
     reset();
     setSelectedIds(new Set());
     setPreview(undefined);
@@ -109,6 +113,7 @@ export function FilesPage() {
     setError(undefined);
     setNotice(undefined);
     void refresh();
+    return () => { current = false; };
   }, [workspace.key]);
 
   // Try again after the list could not be loaded. An account that couldn't be confirmed is read again by reloading.

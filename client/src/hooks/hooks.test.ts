@@ -7,7 +7,7 @@ import { useFileList } from './useFileList';
 import { useFilters } from './useFilters';
 import { useSelection } from './useSelection';
 
-vi.mock('../lib/api', () => ({ api: { list: vi.fn(), archive: vi.fn(), upload: vi.fn() } }));
+vi.mock('../lib/api', () => ({ api: { list: vi.fn(), archive: vi.fn(), upload: vi.fn(), workspaceId: vi.fn() } }));
 
 const file = (id: string): FileMeta => ({ id, name: `${id}.csv`, rows: 1, columns: 6, uploadedAt: '2026-11-06T12:00:00Z', status: 'Ready' });
 

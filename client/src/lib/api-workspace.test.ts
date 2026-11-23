@@ -58,6 +58,18 @@ describe('workspace choice', () => {
     expect(openCloud).toHaveBeenCalledTimes(1);
   });
 
+  it('changes its workspace id with every switch, so a loop can tell its workspace is gone', async () => {
+    const { api } = choose({ kind: 'browser' });
+    const first = api.workspaceId();
+    api.setWorkspace({ kind: 'browser' });
+    expect(api.workspaceId()).toBe(first);
+    api.setWorkspace({ kind: 'cloud', userId: 'user-1' });
+    expect(api.workspaceId()).not.toBe(first);
+    const second = api.workspaceId();
+    api.setWorkspace({ kind: 'cloud', userId: 'user-1' });
+    expect(api.workspaceId()).toBe(second);
+  });
+
   it('opens no workspace when the account could not be confirmed', async () => {
     const { api, openCloud } = choose({ kind: 'unavailable', message: 'Workspace unavailable' });
     await expect(api.list()).rejects.toMatchObject({ statusCode: 503, message: 'Workspace unavailable' });

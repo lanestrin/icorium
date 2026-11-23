@@ -11,6 +11,7 @@ import { Card } from '../components/ui/Card';
 import styles from '../components/generator/generator.module.scss';
 import page from '../styles/page.module.scss';
 import { api } from '../lib/api';
+import { WORKSPACE_CHANGED_MESSAGE } from '../lib/workspace';
 import { errorMessage, plural } from '../lib/format';
 import { flaggedRows, withCsv } from '../lib/generated-files';
 import { AppShell } from '../components/layout/AppShell';
@@ -72,8 +73,11 @@ export function GeneratorPage() {
     setAdded(undefined);
     const done: string[] = [];
     const failed: string[] = [];
+    const workspace = api.workspaceId();
     for (const [i, f] of files.entries()) {
       const fileName = nameOf(i);
+      // File IDs repeat across workspaces: after a switch the rest must not be added to the other one.
+      if (api.workspaceId() !== workspace) { failed.push(WORKSPACE_CHANGED_MESSAGE); break; }
       try {
         await api.upload(new File([f.text], fileName, { type: 'text/csv' }));
         done.push(fileName);

@@ -25,7 +25,7 @@ const COLUMNS = 'id, file_id, source_id, uploaded_at, meta';
 
 type StoredMeta = Omit<FileMeta, 'id' | 'uploadedAt' | 'sourceId'>;
 interface Row { id: string; file_id: string; source_id: string | null; uploaded_at: string; meta: StoredMeta }
-interface Result<T> { data: T; error: unknown }
+interface Result<T> { data: T; error: unknown; /** postgrest-js puts the HTTP status here, not on the error. */ status?: number }
 interface ErrorLike { code?: string; message?: string; status?: number | string; statusCode?: number | string }
 
 const notFound = () => httpError(404, 'File not found');
@@ -68,6 +68,12 @@ export function createCloudStorage(supabase: SupabaseClient, userId: string): St
     return new Error('Something went wrong with your cloud workspace. Try again.');
   }
 
+  /** A failed result's error, with the HTTP status the library reported beside it. */
+  const failure = (result: Result<unknown>): ErrorLike => {
+    const e = (typeof result.error === 'object' && result.error !== null ? result.error : {}) as ErrorLike;
+    return { code: e.code, message: e.message, status: e.status ?? e.statusCode ?? result.status };
+  };
+
   /** The data of a Supabase call, or a thrown, mapped error. */
   async function ok<T>(call: PromiseLike<Result<T>>): Promise<T> {
     let result: Result<T>;
@@ -76,7 +82,7 @@ export function createCloudStorage(supabase: SupabaseClient, userId: string): St
     } catch (error) {
       throw await cloudError(error);
     }
-    if (result.error) throw await cloudError(result.error);
+    if (result.error) throw await cloudError(failure(result));
     return result.data;
   }
 
@@ -152,11 +158,11 @@ export function createCloudStorage(supabase: SupabaseClient, userId: string): St
       } catch (error) {
         throw await cloudError(error);
       }
-      if ((result.error as ErrorLike | null)?.code === '23505') {
+      if (result.error && failure(result).code === '23505') {
         await removeObjects(written);
         return 'exists';
       }
-      if (result.error) throw await cloudError(result.error);
+      if (result.error) throw await cloudError(failure(result));
       return toMeta(result.data!, sourceId);
     } catch (error) {
       await removeObjects(written);

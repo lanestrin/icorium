@@ -9,8 +9,8 @@ import { workspaceKey, type WorkspaceChoice } from './workspace';
 import { SAMPLE_FILES } from './samples';
 import { getSupabase, isAuthConfigured } from './supabase';
 
-// The app's file actions, run in the browser: the shared file service over browser storage. Nothing is
-// sent to a server.
+// The app's file actions, run in the browser: the shared file service over the account's workspace, which is
+// browser storage (nothing is sent to a server) or, for a signed-in active account, its private Supabase workspace.
 
 /** Largest CSV upload, in megabytes. */
 export const UPLOAD_MAX_MB = 10;
@@ -65,6 +65,7 @@ export function createApi(
   let settled = new Promise<void>((resolve) => { release = resolve; });
   if (choice.kind !== 'pending') release();
   let opening: Promise<{ workspace: Workspace; files: FileService }> | undefined;
+  let generation = 0; // changes with every workspace switch
 
   function opened(): Promise<{ workspace: Workspace; files: FileService }> {
     if (choice.kind === 'pending') return settled.then(opened); // actions wait for the account
@@ -91,7 +92,13 @@ export function createApi(
       else release();
       choice = next;
       opening = undefined;
+      generation++;
     },
+    /**
+     * Changes whenever the workspace does. A loop that makes one call per file reads it before each call and stops when it
+     * differs, because File IDs repeat across workspaces and a later call would act on a different file.
+     */
+    workspaceId: () => generation,
     list: async () => (await files()).list(),
     rows: async (id: string, offset = 0, limit = 100) => (await files()).rows(id, { offset, limit }),
     /** Saves the file's CSV to the person's downloads under its name. */
