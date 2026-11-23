@@ -97,7 +97,7 @@ export const TECH: Tech[] = [
   {
     name: 'pdf.js', label: 'pdf.js', role: 'PDF import', icon: FileText, packages: [['client', 'pdfjs-dist']],
     why: [
-      'Reads the text of a partner\x27s PDF in the browser; text is grouped into rows by its height on the page and into cells by the gaps between it. Each row keeps its page, a header repeated on a later page is left out, and cells are placed in the header\x27s columns by position, so an empty cell stays empty. Values that may be misread are listed to keep or leave blank before the CSV is uploaded.',
+      'Reads the text of a partner\x27s PDF in the browser; text is grouped into rows by its height on the page and into cells by the gaps between it. Each row keeps its page, a header repeated on a later page is left out, and cells are placed in the header\x27s columns by position, so an empty cell stays empty. Values that may be misread are listed to keep or leave blank before the CSV is uploaded. A table with other column names is found too (a row of names above a row of values) and, once uploaded, goes to Map columns.',
       'Loaded only when a PDF is chosen, and parses in its own worker so the page stays responsive.',
     ],
     tradeoff: 'Rows and cells are inferred from where the text sits, so unusual layouts need the review; a scanned page has no text, so it is drawn and passed to OCR.',
@@ -299,7 +299,7 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
       { id: '19.4', title: 'Stored mapping and processing gate', status: 'Done', text: 'CSVs with other columns are kept as Needs Mapping; confirming their columns and units (optionally saved as a suggest-only supplier profile) unlocks processing, and the file service checks the mapping on every run.' },
       { id: '19.5', title: 'Import review and mapping', status: 'Done', text: 'One review step for every file type: headers, suggested mapping, units, row counts, and why processing is blocked.' },
       { id: '19.6', title: 'Excel sheets, tables and formulas', status: 'Done', text: 'Every sheet, a choice between candidate tables, total and note rows told apart, and formula values flagged.' },
-      { id: '19.7', title: 'PDF and OCR safeguards', status: 'Done', text: 'Page and row per value, repeated headers, cells placed by position, OCR confidence, and doubtful numbers listed to keep or leave blank. PDF and image tables with other headers follow in 19.7b.' },
+      { id: '19.7', title: 'PDF and OCR safeguards', status: 'Done', text: 'Page and row per value, repeated headers, cells placed by position, OCR confidence, and doubtful numbers listed to keep or leave blank. A PDF or image table with other column names is found too and goes to Map columns (19.7b).' },
       { id: '19.8', title: 'Provenance and traceability', status: 'Next', text: 'The original file and source cells are kept, and a calculated value can be explained from its raw source value.' },
       { id: '19.9', title: 'Ingestion regression and docs', status: 'Planned', text: 'A test for every acceptance criterion, regression for existing files and results, and updated documentation.' },
     ],

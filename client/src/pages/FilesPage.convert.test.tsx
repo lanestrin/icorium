@@ -235,6 +235,30 @@ X-2,2026-09-01,200,40,30,30
 `);
   });
 
+  it('converts a PDF table with other headers, and Map columns opens for the uploaded CSV', async () => {
+    const user = await setup();
+    const other = ['Batch ID', 'Sample Date', 'Net Mass', 'R32', 'R125', 'R134a'];
+    vi.mocked(readPdf).mockResolvedValue(onePage([other, ['X-1', '2026-09-01', '100', '40', '30', '30']]));
+    const mapping = (field: string, sourceColumn: string) => ({ field, sourceColumn, origin: 'normalized', approved: false });
+    const ingestion = {
+      mappings: [mapping('batchId', 'Batch ID'), mapping('sampleDate', 'Sample Date'), mapping('massKg', 'Net Mass'), mapping('r32', 'R32'), mapping('r125', 'R125'), mapping('r134a', 'R134a')],
+      units: [{ field: 'massKg', unit: 'kg', factor: 1, origin: 'confirmed' }, ...['r32', 'r125', 'r134a'].map((field) => ({ field, unit: '%', factor: 1, origin: 'confirmed' }))],
+      issues: [], duplicateHeaders: [], approved: false,
+    } as unknown as FileMeta['ingestion'];
+    vi.mocked(api.upload).mockResolvedValue({ ...clean, id: 'pdfmap', name: 'report.csv', status: 'Needs Mapping', ingestion });
+    vi.mocked(api.rows).mockResolvedValue({ headers: [...other, 'file_id'], rows: [], offset: 0, totalRows: 0, generatedColumns: [], problems: { total: 0, items: [] } });
+    await user.upload(fileInput(), pdf());
+
+    const review = await screen.findByRole('dialog', { name: 'Review report.pdf' });
+    expect(review).toHaveTextContent('Columns to map · header on page 1, row 1 · 1 row');
+    await user.click(within(review).getByRole('button', { name: 'Import as CSV' }));
+    await waitFor(() => expect(api.upload).toHaveBeenCalledTimes(1));
+    expect(await vi.mocked(api.upload).mock.calls[0][0].text()).toBe(`${other.join(',')}
+X-1,2026-09-01,100,40,30,30
+`);
+    expect(await screen.findByRole('dialog', { name: 'Map columns: report.csv' })).toBeInTheDocument();
+  });
+
   it('names a PDF it cannot read, and still converts the next file', async () => {
     const user = await setup();
     vi.mocked(readPdf)

@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.7b - PDF and image tables with other headers.**
+**Next: 19.8 - Provenance and result traceability.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -235,7 +235,7 @@ Rules for every M19 item:
   extracted values beside their source page and row.
   **Depends on:** 19.5.
 
-- [ ] **19.7b** PDF and image tables with other headers — Find a header row
+- [x] **19.7b** PDF and image tables with other headers — Find a header row
   that is not a partner's in PDF and image text, using the same
   positioned cells as 19.7, and import it as Needs Mapping so the Map
   columns dialog opens, as it does for Excel and CSV. Values to confirm

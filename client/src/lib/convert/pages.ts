@@ -1,5 +1,6 @@
+import { ADAPTERS } from '../../../../shared/types';
 import type { PlacedCell } from './layout';
-import { locateHeader, type FoundTable, type RowFlag, type ValueCheck } from './table';
+import { ConvertError, HEADER_SEARCH_ROWS, locateHeader, type FoundTable, type RowFlag, type ValueCheck } from './table';
 
 // Finding the partner table in a PDF or an image, where every cell has a position. Cells are placed in the
 // header's columns by where they sit, so an empty cell stays in its own column, and every value the reader
@@ -17,6 +18,8 @@ const list = (names: string[]) => (names.length < 2 ? names.join('') : `${names.
 const PLAIN_INTEGER = /^[+-]?\d+$/;
 const NUMBER = /^[+-]?\d+(?:[.,]\d+)?$/;
 const NUMBERISH = /^[+-]?[\d.,]*\d[\d.,]*%?$/;
+const DATE = /^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}$/;
+const isValue = (text: string) => NUMBERISH.test(text) || DATE.test(text);
 
 /**
  * Why a value read from a PDF or image may be wrong, as a list of reasons (empty when no rule applies).
@@ -52,8 +55,24 @@ const boundaries = (header: PlacedCell[]) => header.slice(1).map((cell, i) => (h
 const columnAt = (bounds: number[], position: number) => bounds.filter((b) => position >= b).length;
 
 /**
- * Finds the partner table in pages of positioned rows. The header is found as findTable finds it (the first
- * row within HEADER_SEARCH_ROWS of the start, refused when it mixes partners), and the rows after it are data.
+ * The header of a table that is not a partner's, as an index into the flat rows: the first row within
+ * HEADER_SEARCH_ROWS with two or more cells and no number or date, followed by a row with a number or date
+ * under it. -1 when there is none.
+ */
+function findGenericHeader(flat: { cells: PlacedCell[] }[]): number {
+  return flat.slice(0, HEADER_SEARCH_ROWS).findIndex(({ cells }, i) => {
+    if (cells.length < 2 || cells.some((cell) => isValue(cell.text.trim()))) return false;
+    const left = cells[0].x;
+    const right = cells[cells.length - 1].right;
+    return (flat[i + 1]?.cells ?? []).some((cell) => isValue(cell.text.trim()) && cell.x <= right && cell.right >= left);
+  });
+}
+
+/**
+ * Finds the table in pages of positioned rows. When a row within HEADER_SEARCH_ROWS holds all of one
+ * partner's columns, the first such row is the header, as findTable finds it (refused when it mixes
+ * partners). Otherwise the header is the first row of column names above a row of values (findGenericHeader)
+ * and the table has no partner, so it is imported as Needs Mapping. The rows after the header are data.
  *
  * A row with exactly as many cells as headers is taken in order. In a row with missing or extra cells, which
  * is flagged, each cell goes in the header column that holds its middle; the boundaries are the midpoints
@@ -67,7 +86,14 @@ const columnAt = (bounds: number[], position: number) => bounds.filter((b) => po
  */
 export function findPageTable(pages: PageRows[], where: string): FoundTable {
   const flat = pages.flatMap((page) => page.rows.map((cells, i) => ({ page, cells, pageRow: i + 1 })));
-  const { headerIndex, headers, partner } = locateHeader(flat.map((row) => row.cells.map((cell) => cell.text.trim())), where);
+  const texts = flat.map((row) => row.cells.map((cell) => cell.text.trim()));
+  const hasPartnerHeader = texts.slice(0, HEADER_SEARCH_ROWS).some((row) => ADAPTERS.some((a) => a.columns.every((c) => row.includes(c))));
+  const generic = hasPartnerHeader ? -1 : findGenericHeader(flat);
+  if (!hasPartnerHeader && generic < 0) {
+    const expected = ADAPTERS.map((a) => `${a.name} (${a.columns.join(', ')})`).join('; ');
+    throw new ConvertError(`No header row was found in ${where}. Expected a row of column names above a row of values, or the columns of one of: ${expected}`);
+  }
+  const { headerIndex, headers, partner } = hasPartnerHeader ? locateHeader(texts, where) : { headerIndex: generic, headers: texts[generic], partner: '' };
   const width = headers.length;
   const paged = (row: (typeof flat)[number]) => (row.page.page === undefined ? {} : { page: row.page.page, pageRow: row.pageRow });
 
@@ -75,6 +101,11 @@ export function findPageTable(pages: PageRows[], where: string): FoundTable {
   const flags: RowFlag[] = [];
   const placed: { row: (typeof flat)[number]; sourceRow: number; values: { text: string; confidence?: number; reasons: string[] }[] }[] = [];
 
+  if (!hasPartnerHeader) {
+    for (const name of new Set(headers.filter((h, i) => headers.indexOf(h) !== i))) {
+      flags.push({ row: headerIndex + 1, reason: `the header "${name}" appears more than once; mapping will ask which column to keep`, ...paged(flat[headerIndex]) });
+    }
+  }
   let header = flat[headerIndex].cells;
   let positions = boundaries(header);
   flat.slice(headerIndex + 1).forEach((row, i) => {
