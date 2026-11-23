@@ -136,6 +136,50 @@ describe('findPageTable', () => {
 
   it('refuses a header mixing two partners, and says when there is no header', () => {
     expect(() => findPageTable([page([row([...A, ...B])])], 'the PDF')).toThrow(ConvertError);
-    expect(() => findPageTable([page([row(['x', 'y'])])], 'the PDF')).toThrow("No header row with a partner's columns was found in the PDF");
+    expect(() => findPageTable([page([row(['x', 'y'])])], 'the PDF')).toThrow('No header row was found in the PDF. Expected a row of column names above a row of values');
+    expect(() => findPageTable([page([row(['x', 'y']), row(['z', 'w'])])], 'the image')).toThrow('No header row was found in the image.');
+    expect(() => findPageTable([page([row(['only']), row(['1'])])], 'the PDF')).toThrow(ConvertError); // one cell is not a header
+  });
+
+  describe("a header that is not a partner's", () => {
+    const other = ['Lot', 'R-32 %', 'Mass (lb)'];
+    it('is found above a row of values, with no partner and page and row labels', () => {
+      const table = findPageTable([page([[cell('Site: Plant 4', 0)], row(['Site', 'Period']), row(other), row(['L-1', '34.7', '120.5'])]), page([row(['L-2', '35.1', '98.2'])], { page: 2 })], 'the PDF');
+      expect(table.partner).toBe('');
+      expect(table.headers).toEqual(other);
+      expect([table.headerPage, table.headerRow]).toEqual([1, 3]);
+      expect(table.rows.map((r) => [r.page, r.pageRow, r.cells])).toEqual([[1, 4, ['L-1', '34.7', '120.5']], [2, 1, ['L-2', '35.1', '98.2']]]);
+      expect(table.checks).toEqual([]);
+    });
+
+    it('accepts a date as the value under the header, also on the next page', () => {
+      const table = findPageTable([page([row(['Lot', 'Date'])]), page([row(['L-1', '2026-09-01'])], { page: 2 })], 'the PDF');
+      expect(table.headers).toEqual(['Lot', 'Date']);
+      expect(table.rows).toHaveLength(1);
+    });
+
+    it('leaves out a repeated header and keeps listing doubtful values from OCR', () => {
+      const table = findPageTable([{ ocr: true, rows: [row(other), row(['L-1', '1O.5', '120.5']), row(other), row(['L-2', '35.1', '98.2'])] }], 'the image');
+      expect(table.flags).toEqual([{ row: 3, reason: 'repeated header, left out' }]);
+      expect(table.rows.map((r) => r.cells[0])).toEqual(['L-1', 'L-2']);
+      expect(table.checks?.map((c) => [c.value, c.column])).toEqual([['1O.5', 1]]);
+    });
+
+    it('flags a repeated header name once', () => {
+      const table = findPageTable([page([row(['Lot', 'Mass', 'Mass']), row(['L-1', '1', '2'])])], 'the PDF');
+      expect(table.flags).toEqual([{ row: 1, reason: 'the header "Mass" appears more than once; mapping will ask which column to keep', page: 1, pageRow: 1 }]);
+      expect(table.headers).toEqual(['Lot', 'Mass', 'Mass']);
+    });
+
+    it('does not take a header beyond the search window', () => {
+      const filler = Array.from({ length: 50 }, () => [cell('note', 0)]);
+      expect(() => findPageTable([page([...filler, row(other), row(['L-1', '1', '2'])])], 'the PDF')).toThrow(ConvertError);
+    });
+
+    it('never loses to a generic header: a later partner header wins', () => {
+      const table = findPageTable([page([row(other), row(['L-1', '1', '2']), row(A), row(good)])], 'the PDF');
+      expect(table.partner).toBe('Partner A');
+      expect(table.headerRow).toBe(3);
+    });
   });
 });

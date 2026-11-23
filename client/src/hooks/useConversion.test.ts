@@ -79,7 +79,7 @@ describe('useConversion', () => {
     let outcome!: Promise<File | null>;
     act(() => { outcome = result.current.prepare(new File(['x'], 'report.xlsx')); });
     // Attach the expectation first, as the upload loop awaits prepare, so the rejection is always handled.
-    const rejected = expect(outcome).rejects.toThrow("No header row with a partner's columns was found in the workbook.");
+    const rejected = expect(outcome).rejects.toThrow("No header row was found in the workbook.");
     await reader.finish([['name'], ['a']]);
     await rejected;
     expect(result.current.reading).toBeNull();
@@ -92,7 +92,7 @@ describe('useConversion', () => {
     const pdf = new File(['x'], 'scan.PDF');
     act(() => { outcome = result.current.prepare(pdf); });
     expect(reader.read).toHaveBeenCalledWith(pdf, 'pdf', expect.any(AbortSignal), expect.any(Function));
-    const rejected = expect(outcome).rejects.toThrow("No header row with a partner's columns was found in the PDF.");
+    const rejected = expect(outcome).rejects.toThrow("No header row was found in the PDF.");
     await reader.finish([['name'], ['a']]);
     await rejected;
   });
@@ -157,7 +157,7 @@ describe('useConversion', () => {
 
     let outcome!: Promise<File | null>;
     act(() => { outcome = result.current.prepare(new File(['x'], 'blank.png')); });
-    const rejected = expect(outcome).rejects.toThrow("No header row with a partner's columns was found in the image.");
+    const rejected = expect(outcome).rejects.toThrow("No header row was found in the image.");
     await reader.finish([['name'], ['a']], 'image');
     await rejected;
   });
@@ -241,6 +241,20 @@ describe('useConversion', () => {
       act(() => result.current.decide('3:2', 'keep'));
       act(() => result.current.importReviewed());
       expect(await (await outcome)?.text()).toContain('X-2,2026-09-02,12.5-,40,30,30');
+    });
+
+    it('imports a table with other headers as CSV only after its doubtful value is decided', async () => {
+      const reader = slowReader();
+      const hook = renderHook(() => useConversion(reader.read));
+      let outcome!: Promise<File | null>;
+      act(() => { outcome = hook.result.current.prepare(new File(['x'], 'report.pdf')); });
+      await reader.finish([['Lot', 'Mass (lb)'], ['L-1', '10.5'], ['L-2', '12.5-']]);
+      expect(hook.result.current.review?.tables[0]).toMatchObject({ partner: '', headers: ['Lot', 'Mass (lb)'] });
+      act(() => hook.result.current.importReviewed());
+      expect(hook.result.current.review).not.toBeNull(); // undecided
+      act(() => hook.result.current.decide('3:1', 'keep'));
+      act(() => hook.result.current.importReviewed());
+      expect(await (await outcome)?.text()).toBe('Lot,Mass (lb)\nL-1,10.5\nL-2,12.5-\n');
     });
 
     it('uploads a value left blank as an empty cell, never zero', async () => {
