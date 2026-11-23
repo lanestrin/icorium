@@ -105,6 +105,67 @@ describe('cloud workspace', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('opens no preview when the workspace changes during the only file of a run', async () => {
+    vi.mocked(api.process).mockImplementation(async (id) => {
+      generation++; // signed out while the single file was being processed
+      return { ...mine, id: `${id}-V`, name: 'result.csv', status: 'Processed' as const, processor: 'validation' as const };
+    });
+    render(<FilesPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('checkbox', { name: /^Select 100001 mine.csv$/ }));
+    await user.click(screen.getByRole('button', { name: 'Run Processing' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your workspace changed');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(api.rows).not.toHaveBeenCalled(); // no read of a same-ID file in the new workspace
+  });
+
+  it('opens no mapping dialog when the workspace changes during the only upload', async () => {
+    vi.mocked(api.upload).mockImplementation(async () => {
+      generation++;
+      return { ...mine, id: '100009', name: 'x.csv', status: 'Needs Mapping' as const };
+    });
+    render(<FilesPage />);
+    await screen.findByText('mine.csv');
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.setup().upload(input, new File(['a'], 'one.csv', { type: 'text/csv' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your workspace changed');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows no Undo toast when an archive finishes after the workspace changed', async () => {
+    vi.mocked(api.archive).mockImplementation(async () => {
+      generation++;
+      return [{ ...mine, archived: true }];
+    });
+    render(<FilesPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('checkbox', { name: /^Select 100001 mine.csv$/ }));
+    await user.click(screen.getByRole('button', { name: /^Archive/ }));
+    await waitFor(() => expect(api.archive).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Archive/ })).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/archived$/)).not.toBeInTheDocument();
+  });
+
+  it('does not open a comparison that finishes after the workspace changed', async () => {
+    const r1: FileMeta = { ...mine, id: '100001-V', name: 'r1.csv', status: 'Processed', processor: 'validation' };
+    const r2: FileMeta = { ...mine, id: '100002-V', name: 'r2.csv', status: 'Processed', processor: 'validation' };
+    vi.mocked(api.list).mockResolvedValue([r1, r2]);
+    vi.mocked(api.compare).mockImplementation(async () => {
+      generation++;
+      return {} as never;
+    });
+    render(<FilesPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('checkbox', { name: /^Select 100001-V r1.csv$/ }));
+    await user.click(screen.getByRole('checkbox', { name: /^Select 100002-V r2.csv$/ }));
+    await user.click(screen.getByRole('button', { name: /^Compare/ }));
+    await waitFor(() => expect(api.compare).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Compare/ })).toBeEnabled());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('stops a multi-file upload when the workspace changes and offers no mapping dialog for it', async () => {
     vi.mocked(api.upload).mockImplementation(async () => {
       generation++;

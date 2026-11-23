@@ -75,6 +75,7 @@ export function useProcessing({ files, busy, refresh, setSelectedIds, onError, o
         }
       }
     }
+    if (api.workspaceId() !== workspace) stopped = true; // a switch during the only or last call counts too
     busy.current = false; // per-file errors are caught above, so this always runs
     setProcessingId(undefined);
     if (stopped) return onError(WORKSPACE_CHANGED_MESSAGE); // no selection, preview or dialog for files of the old workspace

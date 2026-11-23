@@ -174,11 +174,12 @@ export function FilesPage() {
       () => undefined,
       () => { throw new Error(COMPARE_CODE_FAILED); },
     );
+    const workspace = api.workspaceId();
     try {
       const [result] = await Promise.all([api.compare(selectedInView.map((f) => f.id)), code]);
-      setComparison(result);
+      if (api.workspaceId() === workspace) setComparison(result); // another workspace's account must not see this one's data
     } catch (e) {
-      setError(`Comparison failed: ${errorMessage(e)}`);
+      if (api.workspaceId() === workspace) setError(`Comparison failed: ${errorMessage(e)}`);
     }
     setComparing(false);
   }

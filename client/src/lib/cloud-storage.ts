@@ -188,9 +188,11 @@ export function createCloudStorage(supabase: SupabaseClient, userId: string): St
 
   return {
     async list() {
-      const rows = await allRows<Row>((from, to) => supabase.from('files').select(COLUMNS).order('uploaded_at').order('id').range(from, to));
+      // Paged by the internal ID, which never changes: a replace on another device moves uploaded_at and could
+      // otherwise list a file twice or skip one between two pages.
+      const rows = await allRows<Row>((from, to) => supabase.from('files').select(COLUMNS).order('id').range(from, to));
       const names = new Map(rows.map((row) => [row.id, row.file_id]));
-      return rows.map((row) => toMeta(row, row.source_id ? names.get(row.source_id) : undefined));
+      return rows.map((row) => toMeta(row, row.source_id ? names.get(row.source_id) : undefined)).sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt) || a.id.localeCompare(b.id));
     },
 
     async get(id) {

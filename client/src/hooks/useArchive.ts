@@ -31,8 +31,11 @@ export function useArchive({ busy, refresh, deselect, onError }: {
     setArchiving(true);
     onError(undefined);
     setToast(undefined);
+    const workspace = api.workspaceId();
     try {
       await api.archive(ids, archive);
+      // File IDs repeat across workspaces: after a switch, neither the toast (its Undo names these IDs) nor a deselect applies.
+      if (api.workspaceId() !== workspace) { await refresh(); busy.current = false; setArchiving(false); return; }
       deselect(ids);
       setToast({
         title: `${plural(ids.length)} ${archive ? 'archived' : 'restored'}`,
@@ -40,7 +43,7 @@ export function useArchive({ busy, refresh, deselect, onError }: {
         undo: undoable ? { ids, archive: !archive } : undefined,
       });
     } catch (e) {
-      onError(`${archive ? 'Archive' : 'Restore'} failed: ${errorMessage(e)}`);
+      if (api.workspaceId() === workspace) onError(`${archive ? 'Archive' : 'Restore'} failed: ${errorMessage(e)}`);
     }
     await refresh();
     busy.current = false;

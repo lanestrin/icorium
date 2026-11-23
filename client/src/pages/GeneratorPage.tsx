@@ -85,7 +85,8 @@ export function GeneratorPage() {
         failed.push(`${fileName}: ${errorMessage(err)}`);
       }
     }
-    if (done.length) setAdded(done.length === 1 ? `Added ${done[0]} to CSV Files.` : `Added ${done.length} files to CSV Files.`);
+    if (api.workspaceId() !== workspace && !failed.includes(WORKSPACE_CHANGED_MESSAGE)) failed.push(WORKSPACE_CHANGED_MESSAGE);
+    if (done.length && api.workspaceId() === workspace) setAdded(done.length === 1 ? `Added ${done[0]} to CSV Files.` : `Added ${done.length} files to CSV Files.`);
     if (failed.length) setError(`Could not add to CSV Files\n${failed.join('\n')}`);
     setBusy(undefined);
   }

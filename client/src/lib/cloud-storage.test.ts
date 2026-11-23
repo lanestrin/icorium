@@ -301,6 +301,14 @@ describe('reads', () => {
     expect(all[1204].id).toBe('101205');
   });
 
+  it('orders the list by upload time even though it pages by internal ID', async () => {
+    f.tables.files.push(
+      { id: 'a', file_id: '100001', source_id: null, uploaded_at: '2026-01-03T00:00:00.000Z', meta: { name: 'late.csv', status: 'Ready' } },
+      { id: 'b', file_id: '100002', source_id: null, uploaded_at: '2026-01-01T00:00:00.000Z', meta: { name: 'early.csv', status: 'Ready' } },
+    );
+    expect((await store.list()).map((m) => m.name)).toEqual(['early.csv', 'late.csv']);
+  });
+
   it('normalises the upload time to ISO', async () => {
     f.tables.files.push({ id: 'u', file_id: '100001', source_id: null, uploaded_at: '2026-01-01T00:00:00+00:00', meta: { name: 'a.csv', status: 'Ready' } });
     expect((await store.get('100001')).uploadedAt).toBe('2026-01-01T00:00:00.000Z');

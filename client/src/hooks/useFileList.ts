@@ -57,6 +57,7 @@ export function useFileList(onError: Report, hold = false) {
         errors.push(`${f.name}: ${errorMessage(e)}`);
       }
     }
+    if (api.workspaceId() !== workspace) stopped = true; // a switch during the only or last call counts too
     setUploading(false);
     if (stopped) errors.push(WORKSPACE_CHANGED_MESSAGE);
     if (errors.length) onError(`Upload failed\n${errors.join('\n')}`);
