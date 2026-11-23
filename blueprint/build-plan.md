@@ -351,7 +351,7 @@ Rules for every M19 item:
   so overwriting cannot grow storage); mapping, archive/restore and
   supplier profiles still work.
 
-  - [ ] **17.4a** Cloud file schema, ownership and capacity rules —
+  - [x] **17.4a** Cloud file schema, ownership and capacity rules —
     Add the Supabase SQL migration for file metadata and supplier
     profiles, the per-owner atomic File ID counter, the private
     Storage bucket and owner/active-account policies on every table
