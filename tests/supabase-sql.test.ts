@@ -330,12 +330,30 @@ function cloudProblems(migration: string): string[] {
   if (!gate.includes("'processing_not_allowed'") || !gate.includes("'Ready', 'Needs Review'") || !gate.includes('input.owner_id = new.owner_id') || !gate.includes("'archived'")) problems.push('gate does not check owner, status and archive');
   if (!gate.includes("'imported'")) problems.push('gate does not exempt imported results');
   if (!flat.includes('before insert or update of source_id, meta on public.files')) problems.push('gate trigger events changed');
+  // Only a real JSON true exempts a result; a string such as "yes" must not.
+  if (!gate.includes("new.meta -> 'imported' = 'true'::jsonb")) problems.push('gate exemption is not a strict JSON true');
+
+  // Value checks. A CHECK passes on NULL, so the meta tests must turn a missing key into false.
+  for (const check of [
+    "jsonb_typeof(meta) = 'object'",
+    "coalesce(jsonb_typeof(meta -> 'name') = 'string', false)",
+    "coalesce(meta ->> 'status' in ('ready', 'needs review', 'needs mapping', 'processed'), false)",
+    'octet_length(meta::text) <= 1048576',
+    "file_id ~ '^[1-9][0-9]{5}(-[vmc])?$' and left(file_id, 6)::integer >= 100001",
+    "jsonb_typeof(profile) = 'object' and octet_length(profile::text) <= 65536",
+    'char_length(key) between 1 and 10000',
+    'last_base between 100001 and 999999',
+  ]) if (!flat.includes(check)) problems.push(`value check missing: ${check}`);
 
   // The bucket and object policies.
   if (!flat.includes("values ('workspace-files', 'workspace-files', false, 52428800)")) problems.push('bucket is not private with the 50 MB limit');
   const objects = policiesOn(sql, 'storage.objects');
   if (objects.length !== 4 || objects.some((rule) => !rule.includes('to authenticated') || !rule.includes("bucket_id = 'workspace-files'") || !rule.includes(OBJECT_FOLDER) || !rule.includes('(select public.is_active_account())')))
     problems.push('object policies are not owner folder and active only');
+  // Reading, adding and replacing an object each require the exact <uuid>/<uuid>.<kind> name.
+  const NAME_PATTERN = "name ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}\\.(csv|original|source\\.json)$'";
+  for (const kind of ['for select', 'for insert', 'for update'])
+    if (!objects.find((rule) => rule.startsWith(kind))?.includes(NAME_PATTERN)) problems.push(`object name pattern missing on ${kind}`);
   const needsRoom = objects.filter((rule) => rule.includes('file_storage_has_room'));
   if (needsRoom.length !== 1 || !needsRoom[0].startsWith('for insert')) problems.push('only adding an object may need capacity');
   if (sql.match(/900000000/g)?.length !== 1) problems.push('capacity threshold is not one constant of 900000000');
@@ -373,6 +391,15 @@ describe('Supabase cloud files SQL', () => {
     ['a public bucket', (s) => s.replace("'workspace-files', 'workspace-files', false", "'workspace-files', 'workspace-files', true"), 'bucket is not private with the 50 MB limit'],
     ['an object policy without the owner folder', (s) => s.replace(/(create policy "Owners remove their file objects"[\s\S]*?)and \(storage\.foldername\(name\)\)\[1\] = \(select auth\.uid\(\)\)::text\n\s*/, '$1'), 'object policies are not owner folder and active only'],
     ['a second threshold', (s) => `${s}\n-- x\nselect 900000000;`, 'capacity threshold is not one constant of 900000000'],
+    ['a missing name or status accepted', (s) => s.replace("coalesce(jsonb_typeof(meta -> 'name') = 'string', false)", "jsonb_typeof(meta -> 'name') = 'string'"), "value check missing: coalesce(jsonb_typeof(meta -> 'name') = 'string', false)"],
+    ['a missing status accepted', (s) => s.replace("coalesce(meta ->> 'status' in ('Ready', 'Needs Review', 'Needs Mapping', 'Processed'), false)", "meta ->> 'status' in ('Ready', 'Needs Review', 'Needs Mapping', 'Processed')"), "value check missing: coalesce(meta ->> 'status' in ('ready', 'needs review', 'needs mapping', 'processed'), false)"],
+    ['the metadata size cap removed', (s) => s.replace('octet_length(meta::text) <= 1048576', 'true'), 'value check missing: octet_length(meta::text) <= 1048576'],
+    ['the File ID format check weakened', (s) => s.replace("'^[1-9][0-9]{5}(-[VMC])?$'", "'^[0-9]+$'"), "value check missing: file_id ~ '^[1-9][0-9]{5}(-[vmc])?$' and left(file_id, 6)::integer >= 100001"],
+    ['the supplier profile size cap removed', (s) => s.replace('octet_length(profile::text) <= 65536', 'true'), "value check missing: jsonb_typeof(profile) = 'object' and octet_length(profile::text) <= 65536"],
+    ['the counter range removed', (s) => s.replace('last_base between 100001 and 999999', 'last_base > 0'), 'value check missing: last_base between 100001 and 999999'],
+    ['the object name pattern dropped from reading', (s) => s.replace(/(create policy "Owners read their file objects"[\s\S]*?)\n\s*and name ~ [^\n]*/, '$1'), 'object name pattern missing on for select'],
+    ['the object name pattern dropped from replacing', (s) => s.replace(/(create policy "Owners replace their file objects"[\s\S]*?with check \([\s\S]*?)\n\s*and name ~ [^\n]*/, '$1'), 'object name pattern missing on for update'],
+    ['any imported value skipping the gate', (s) => s.replace("new.meta -> 'imported' = 'true'::jsonb", "(new.meta ->> 'imported')::boolean"), 'gate exemption is not a strict JSON true'],
   ];
   it.each(broken)('fails when %s', (_label, breakIt, problem) => {
     const changed = breakIt(CLOUD);

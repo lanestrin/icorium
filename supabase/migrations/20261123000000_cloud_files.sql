@@ -103,8 +103,9 @@ create table public.files (
   uploaded_at timestamptz not null default now(),
   meta jsonb not null check (
     jsonb_typeof(meta) = 'object'
-    and jsonb_typeof(meta -> 'name') = 'string'
-    and meta ->> 'status' in ('Ready', 'Needs Review', 'Needs Mapping', 'Processed')
+    -- coalesce: a CHECK passes on NULL, so a missing key would otherwise be accepted.
+    and coalesce(jsonb_typeof(meta -> 'name') = 'string', false)
+    and coalesce(meta ->> 'status' in ('Ready', 'Needs Review', 'Needs Mapping', 'Processed'), false)
     and octet_length(meta::text) <= 1048576
   ),
   unique (owner_id, file_id),
@@ -143,14 +144,16 @@ create policy "Owners update their files"
 -- A calculated result (a File ID with a function code, not imported) must come from the same owner's
 -- input with that base ID which is Ready or Needs Review and not archived. Runs as the caller, so
 -- the owner policies apply to the lookup. The mapping itself is still checked against the CSV in
--- shared/file-service.ts; this trigger relies on the input's stored status.
+-- shared/file-service.ts; this trigger relies on the input's stored status. Limit: meta is written by the
+-- browser, so a modified client can mark a result imported (a real JSON true) and skip this check; it
+-- guards against mistakes and stale lists, not against someone editing the app's own code.
 create function public.check_processing_gate()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
 begin
-  if length(new.file_id) > 6 and not coalesce((new.meta ->> 'imported')::boolean, false) then
+  if length(new.file_id) > 6 and not coalesce(new.meta -> 'imported' = 'true'::jsonb, false) then
     if new.source_id is null or not exists (
       select 1
       from public.files input
