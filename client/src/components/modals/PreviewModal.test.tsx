@@ -72,6 +72,18 @@ describe('explaining a calculated value', () => {
     expect(cell).toHaveFocus();
   });
 
+  it('shows a loading state and drops the old answer when another cell is chosen', async () => {
+    const user = userEvent.setup();
+    render(<PreviewModal file={result} onClose={() => {}} />);
+    await user.click(await screen.findByRole('button', { name: 'Explain r32_mass_kg, row 1' }));
+    await screen.findByText(/Calculated by Component Mass Calculation/);
+    vi.mocked(api.explain).mockReturnValue(new Promise(() => {}));
+    await user.click(screen.getByRole('button', { name: 'Explain r32_mass_kg, row 2' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading…');
+    expect(screen.queryByText(/Calculated by Component Mass Calculation/)).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: PANEL })).toHaveFocus();
+  });
+
   it('says an excluded row was never set to zero', async () => {
     vi.mocked(api.explain).mockResolvedValue({ ...explanation, row: 2, value: '', rowStatus: 'excluded', reasons: 'mass missing' });
     const user = userEvent.setup();

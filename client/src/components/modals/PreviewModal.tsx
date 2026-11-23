@@ -146,7 +146,7 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
       {!data && !error && <p className={classNames(styles.message, styles.loading)}>Loading…</p>}
       {data && data.problems.total > 0 && <ProblemRows list={data.problems} />}
       {noTrace && data && <p className={styles.explainMuted}>{noTrace}</p>}
-      {explaining && <ExplainPanel fileId={file.id} row={explaining.row} column={explaining.column} onClose={closeExplanation} />}
+      {explaining && <ExplainPanel key={`${explaining.row}:${explaining.column}`} fileId={file.id} row={explaining.row} column={explaining.column} onClose={closeExplanation} />}
       {data && <RowsTable data={data} onExplain={traced ? (row, column, button) => { trigger.current = button; setExplaining({ row, column }); } : undefined} />}
       {data && (
         <div className={classNames(styles.footer, styles.pinned)}>
