@@ -131,7 +131,8 @@ create policy "Owners add their files"
   to authenticated
   with check (owner_id = (select auth.uid()) and (select public.is_active_account()) and (select public.file_storage_has_room()));
 
--- Replacing a result, confirming a mapping and archiving still work at capacity.
+-- Replacing a result's metadata, confirming a mapping and archiving still work at capacity; the bytes of a
+-- replaced result are checked by the Storage update policy below.
 create policy "Owners update their files"
   on public.files for update
   to authenticated
@@ -153,6 +154,14 @@ language plpgsql
 set search_path = ''
 as $$
 begin
+  -- Archiving or restoring a result changes only archived and archivedAt. It must not depend on the
+  -- input's state, or archiving an input and then its result would stop halfway.
+  if tg_op = 'UPDATE' then
+    if new.source_id is not distinct from old.source_id
+      and (new.meta - 'archived' - 'archivedAt') = (old.meta - 'archived' - 'archivedAt') then
+      return new;
+    end if;
+  end if;
   if length(new.file_id) > 6 and not coalesce(new.meta -> 'imported' = 'true'::jsonb, false) then
     if new.source_id is null or not exists (
       select 1
@@ -169,6 +178,9 @@ begin
   return new;
 end;
 $$;
+
+-- Only the trigger runs it; nobody calls it directly.
+revoke execute on function public.check_processing_gate() from public, anon, authenticated;
 
 create trigger files_processing_gate
   before insert or update of source_id, meta on public.files
@@ -235,7 +247,8 @@ create policy "Owners add their file objects"
     and (select public.file_storage_has_room())
   );
 
--- Replacing an object (a re-run result) still works at capacity.
+-- Replacing an object (a re-run result) is refused at capacity too, so overwriting cannot grow stored bytes past the
+-- threshold. The check sees the bytes already stored, so one replacement just below the threshold can overshoot it.
 create policy "Owners replace their file objects"
   on storage.objects for update
   to authenticated
@@ -249,6 +262,7 @@ create policy "Owners replace their file objects"
     and (storage.foldername(name))[1] = (select auth.uid())::text
     and name ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}\.(csv|original|source\.json)$'
     and (select public.is_active_account())
+    and (select public.file_storage_has_room())
   );
 
 -- Only so the app can remove objects left by a failed save; deleting files is a later feature (18.1).

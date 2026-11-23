@@ -191,8 +191,10 @@ rules.
      with an actionable message when stored bytes reach an app threshold
      below 1 GB. 17.4a defines it: new files, objects and File IDs are
      refused once stored objects total 900,000,000 bytes, checked in
-     `file_storage_has_room()`. Replacing a result, mapping, archive and
-     supplier profiles still work. Existing files stay readable.
+     `file_storage_has_room()`. Replacing a stored object is refused at
+     capacity too (decided 2026-11-23, so overwriting cannot grow storage).
+     Mapping, archive and supplier profiles still work. Existing files
+     stay readable.
    - Invitations are refused, and the failure reported, when email sending
      fails or is rate-limited.
    - A paused project is shown as temporarily unavailable, not as missing

@@ -346,9 +346,10 @@ Rules for every M19 item:
   Decided 2026-11-23: a new cloud workspace starts empty (no samples);
   new files are refused once stored files reach 900 MB of the 1 GB
   Free limit; at capacity anything that adds a file (upload, imported
-  result, new processing result) is refused, while replacing an
-  existing result, mapping, archive/restore and supplier profiles
-  still work.
+  result, new processing result) is refused, and so is replacing a
+  stored result's file (decided 2026-11-23, after review finding F-63,
+  so overwriting cannot grow storage); mapping, archive/restore and
+  supplier profiles still work.
 
   - [ ] **17.4a** Cloud file schema, ownership and capacity rules —
     Add the Supabase SQL migration for file metadata and supplier

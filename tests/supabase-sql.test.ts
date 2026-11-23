@@ -327,9 +327,14 @@ function cloudProblems(migration: string): string[] {
 
   // The processing gate trigger.
   const gate = functions(migration).find((fn) => fn.includes('public.check_processing_gate')) ?? '';
-  if (!gate.includes("'processing_not_allowed'") || !gate.includes("'Ready', 'Needs Review'") || !gate.includes('input.owner_id = new.owner_id') || !gate.includes("'archived'")) problems.push('gate does not check owner, status and archive');
+  if (!gate.includes("'processing_not_allowed'") || !gate.includes("'Ready', 'Needs Review'") || !gate.includes('input.owner_id = new.owner_id') || !gate.includes("coalesce((input.meta ->> 'archived')::boolean, false) = false")) problems.push('gate does not check owner, status and archive');
   if (!gate.includes("'imported'")) problems.push('gate does not exempt imported results');
   if (!flat.includes('before insert or update of source_id, meta on public.files')) problems.push('gate trigger events changed');
+  // An update that changes only archived or archivedAt is never gated (archive and restore of a result with an archived input).
+  for (const part of ["tg_op = 'UPDATE'", 'new.source_id is not distinct from old.source_id', "(new.meta - 'archived' - 'archivedAt') = (old.meta - 'archived' - 'archivedAt')"])
+    if (!gate.includes(part)) problems.push(`gate does not skip archive-only updates: ${part}`);
+  // Only the trigger runs the gate function.
+  if (!flat.includes('revoke execute on function public.check_processing_gate() from public, anon, authenticated;')) problems.push('gate function not revoked from clients');
   // Only a real JSON true exempts a result; a string such as "yes" must not.
   if (!gate.includes("new.meta -> 'imported' = 'true'::jsonb")) problems.push('gate exemption is not a strict JSON true');
 
@@ -350,12 +355,20 @@ function cloudProblems(migration: string): string[] {
   const objects = policiesOn(sql, 'storage.objects');
   if (objects.length !== 4 || objects.some((rule) => !rule.includes('to authenticated') || !rule.includes("bucket_id = 'workspace-files'") || !rule.includes(OBJECT_FOLDER) || !rule.includes('(select public.is_active_account())')))
     problems.push('object policies are not owner folder and active only');
+  // Replacing an object checks the old and the new name: both halves need the owner folder and the active account,
+  // or an owner could move an object into another user's folder.
+  const replaceRule = objects.find((rule) => rule.startsWith('for update')) ?? '';
+  const [replaceUsing = '', replaceCheck = ''] = replaceRule.split(' with check ');
+  for (const half of [replaceUsing, replaceCheck])
+    if (!half.includes(OBJECT_FOLDER) || !half.includes('(select public.is_active_account())')) problems.push('object update policy lacks the owner folder or active check in using or with check');
   // Reading, adding and replacing an object each require the exact <uuid>/<uuid>.<kind> name.
   const NAME_PATTERN = "name ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}\\.(csv|original|source\\.json)$'";
   for (const kind of ['for select', 'for insert', 'for update'])
     if (!objects.find((rule) => rule.startsWith(kind))?.includes(NAME_PATTERN)) problems.push(`object name pattern missing on ${kind}`);
   const needsRoom = objects.filter((rule) => rule.includes('file_storage_has_room'));
-  if (needsRoom.length !== 1 || !needsRoom[0].startsWith('for insert')) problems.push('only adding an object may need capacity');
+  // Adding and replacing an object need room (replacing must not grow storage); reading and deleting never do.
+  if (needsRoom.map((rule) => rule.slice(0, 10)).join('|') !== 'for insert|for update') problems.push('only adding or replacing an object may need capacity');
+  if (!replaceCheck.includes('(select public.file_storage_has_room())')) problems.push('replacing an object ignores capacity');
   if (sql.match(/900000000/g)?.length !== 1) problems.push('capacity threshold is not one constant of 900000000');
 
   return problems;
@@ -390,6 +403,8 @@ describe('Supabase cloud files SQL', () => {
     ['the gate trigger narrowed', (s) => s.replace('before insert or update of source_id, meta on public.files', 'before insert on public.files'), 'gate trigger events changed'],
     ['a public bucket', (s) => s.replace("'workspace-files', 'workspace-files', false", "'workspace-files', 'workspace-files', true"), 'bucket is not private with the 50 MB limit'],
     ['an object policy without the owner folder', (s) => s.replace(/(create policy "Owners remove their file objects"[\s\S]*?)and \(storage\.foldername\(name\)\)\[1\] = \(select auth\.uid\(\)\)::text\n\s*/, '$1'), 'object policies are not owner folder and active only'],
+    ['capacity dropped from replacing objects', (s) => s.replace("    and (select public.is_active_account())\n    and (select public.file_storage_has_room())\n  );\n\n-- Only so the app", "    and (select public.is_active_account())\n  );\n\n-- Only so the app"), 'replacing an object ignores capacity'],
+    ['capacity blocking reading objects', (s) => s.replace(/(create policy "Owners read their file objects"[\s\S]*?and \(select public\.is_active_account\(\)\))/, '$1\n    and (select public.file_storage_has_room())'), 'only adding or replacing an object may need capacity'],
     ['a second threshold', (s) => `${s}\n-- x\nselect 900000000;`, 'capacity threshold is not one constant of 900000000'],
     ['a missing name or status accepted', (s) => s.replace("coalesce(jsonb_typeof(meta -> 'name') = 'string', false)", "jsonb_typeof(meta -> 'name') = 'string'"), "value check missing: coalesce(jsonb_typeof(meta -> 'name') = 'string', false)"],
     ['a missing status accepted', (s) => s.replace("coalesce(meta ->> 'status' in ('Ready', 'Needs Review', 'Needs Mapping', 'Processed'), false)", "meta ->> 'status' in ('Ready', 'Needs Review', 'Needs Mapping', 'Processed')"), "value check missing: coalesce(meta ->> 'status' in ('ready', 'needs review', 'needs mapping', 'processed'), false)"],
@@ -399,6 +414,10 @@ describe('Supabase cloud files SQL', () => {
     ['the counter range removed', (s) => s.replace('last_base between 100001 and 999999', 'last_base > 0'), 'value check missing: last_base between 100001 and 999999'],
     ['the object name pattern dropped from reading', (s) => s.replace(/(create policy "Owners read their file objects"[\s\S]*?)\n\s*and name ~ [^\n]*/, '$1'), 'object name pattern missing on for select'],
     ['the object name pattern dropped from replacing', (s) => s.replace(/(create policy "Owners replace their file objects"[\s\S]*?with check \([\s\S]*?)\n\s*and name ~ [^\n]*/, '$1'), 'object name pattern missing on for update'],
+    ['the gate checking archive-only updates', (s) => s.replace("      and (new.meta - 'archived' - 'archivedAt') = (old.meta - 'archived' - 'archivedAt') then", "      and new.meta = old.meta then"), "gate does not skip archive-only updates: (new.meta - 'archived' - 'archivedAt') = (old.meta - 'archived' - 'archivedAt')"],
+    ['the gate function left callable', (s) => s.replace('revoke execute on function public.check_processing_gate() from public, anon, authenticated;', ''), 'gate function not revoked from clients'],
+    ['the object update check without the owner folder', (s) => s.replace(/(create policy "Owners replace their file objects"[\s\S]*?with check \(\n\s*bucket_id = 'workspace-files'\n)\s*and \(storage\.foldername\(name\)\)\[1\] = \(select auth\.uid\(\)\)::text\n/, '$1'), 'object update policy lacks the owner folder or active check in using or with check'],
+    ['the object update check without the active account', (s) => s.replace(/(create policy "Owners replace their file objects"[\s\S]*?with check \([\s\S]*?)\n\s*and \(select public\.is_active_account\(\)\)(\n\s*and \(select public\.file_storage_has_room\(\)\))/, '$1$2'), 'object update policy lacks the owner folder or active check in using or with check'],
     ['any imported value skipping the gate', (s) => s.replace("new.meta -> 'imported' = 'true'::jsonb", "(new.meta ->> 'imported')::boolean"), 'gate exemption is not a strict JSON true'],
   ];
   it.each(broken)('fails when %s', (_label, breakIt, problem) => {
