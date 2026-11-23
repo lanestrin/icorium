@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.11.0](https://github.com/lanestrin/icorium/compare/v2.10.0...v2.11.0) (2026-11-22)
+
+
+### Features
+
+* flag doubtful PDF and OCR values for confirmation (19.7) ([#155](https://github.com/lanestrin/icorium/issues/155)) ([2d910cf](https://github.com/lanestrin/icorium/commit/2d910cfb3281ccbd95dda7ff219c7939dec42e7f))
+
 ## [2.10.0](https://github.com/lanestrin/icorium/compare/v2.9.0...v2.10.0) (2026-11-22)
 
 
