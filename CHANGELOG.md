@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.17.1](https://github.com/lanestrin/icorium/compare/v2.17.0...v2.17.1) (2026-11-23)
+
+
+### Bug Fixes
+
+* hide ID columns in CSV previews ([#171](https://github.com/lanestrin/icorium/issues/171)) ([49f0c54](https://github.com/lanestrin/icorium/commit/49f0c5456cd2ad8ceec3f8133904d86b47f208cf))
+
 ## [2.17.0](https://github.com/lanestrin/icorium/compare/v2.16.0...v2.17.0) (2026-11-23)
 
 
