@@ -87,3 +87,49 @@
 .notice {
   color: var(--app-color-text-secondary);
 }
+
+// An input with an optional leading icon and a show/hide button inside it.
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.icon,
+.reveal {
+  position: absolute;
+  display: inline-flex;
+  color: var(--app-color-text-muted);
+
+  svg {
+    width: var(--app-space-5);
+    height: var(--app-space-5);
+  }
+}
+
+.icon {
+  left: var(--app-space-3);
+  pointer-events: none;
+}
+
+.withIcon {
+  padding-left: calc(var(--app-space-3) + var(--app-space-5) + var(--app-space-2));
+}
+
+.withToggle {
+  padding-right: calc(var(--app-space-3) + var(--app-space-5) + var(--app-space-2));
+}
+
+.reveal {
+  right: var(--app-space-2);
+  border: 0;
+  border-radius: var(--app-radius-sm);
+  background: none;
+  padding: var(--app-space-1);
+  cursor: pointer;
+  @include focus-ring;
+}
+
+.hiddenLabel {
+  @include visually-hidden;
+}

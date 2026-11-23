@@ -1,0 +1,217 @@
+// The two-column /sign-in page (17.8): the top bar, a panel saying what the workspace offers, and the
+// "Welcome back" card. One column on phones, with the sign-in card first.
+@use '../../styles/mixins' as *;
+
+.page {
+  padding: var(--app-space-6) var(--app-space-4) calc(var(--app-space-unit) * 12);
+
+  @include up(md) {
+    padding: var(--app-space-8) var(--app-space-6) calc(var(--app-space-unit) * 12);
+  }
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-6);
+  max-width: 76rem;
+  margin: 0 auto;
+}
+
+.topBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-2) var(--app-space-6);
+}
+
+.brand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--app-space-1) var(--app-space-3);
+}
+
+.brandName {
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-bold);
+  color: var(--app-color-text);
+  text-decoration: none;
+  border-radius: var(--app-radius-sm);
+  @include focus-ring;
+}
+
+.tagline {
+  font-size: var(--app-text-sm);
+  color: var(--app-color-text-muted);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--app-space-6);
+  align-items: start;
+
+  @include up(lg) {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  }
+}
+
+.signInCard {
+  order: -1; // the form comes first on phones
+
+  @include up(lg) {
+    order: 0;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-4);
+}
+
+.intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-4);
+}
+
+.illustration {
+  display: none;
+  color: var(--app-color-primary-border);
+
+  svg {
+    width: calc(var(--app-space-unit) * 20);
+    height: calc(var(--app-space-unit) * 20);
+  }
+
+  @include up(md) {
+    display: block;
+  }
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-4);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-color-surface);
+  padding: var(--app-space-3) var(--app-space-4);
+}
+
+.featureIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--app-space-unit) * 11);
+  height: calc(var(--app-space-unit) * 11);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-color-primary-surface);
+  color: var(--app-color-primary);
+
+  svg {
+    width: var(--app-space-5);
+    height: var(--app-space-5);
+  }
+}
+
+.featureTitle {
+  display: block;
+  font-weight: var(--app-weight-semibold);
+}
+
+.featureText {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: var(--app-color-text-muted);
+}
+
+.note {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-color-primary-surface);
+  padding: var(--app-space-3) var(--app-space-4);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+
+  svg {
+    flex-shrink: 0;
+    width: var(--app-space-5);
+    height: var(--app-space-5);
+    color: var(--app-color-primary);
+  }
+}
+
+.welcome {
+  font-size: var(--app-text-2xl);
+  line-height: var(--app-leading-2xl);
+  font-weight: var(--app-weight-bold);
+  letter-spacing: var(--app-tracking-tight);
+}
+
+.forgot {
+  align-self: flex-end;
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  font-weight: var(--app-weight-medium);
+}
+
+// Try Demo is a link that looks like the outline button.
+.demo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--app-space-2);
+  border: var(--app-border-width) solid var(--app-color-primary-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-color-surface);
+  padding: var(--app-space-2) var(--app-space-4);
+  font-weight: var(--app-weight-medium);
+  color: var(--app-color-link);
+  text-decoration: none;
+  @include focus-ring;
+
+  &:hover {
+    background: var(--app-color-primary-surface);
+  }
+
+  svg {
+    width: var(--app-space-4);
+    height: var(--app-space-4);
+  }
+}
+
+.invitation {
+  align-self: center;
+  font-weight: var(--app-weight-medium);
+}
+
+.expiry {
+  text-align: center;
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: var(--app-color-text-muted);
+}
+
+.access {
+  composes: note;
+  border-top: 0;
+  background: var(--app-color-surface-subtle);
+}
