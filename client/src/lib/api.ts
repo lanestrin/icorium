@@ -1,3 +1,4 @@
+import type { UploadSource } from '../../../shared/ingestion';
 import type { GeneratorPartner, ProcessorId } from '../../../shared/types';
 import { createFileService, seedSampleFiles, type FileService } from '../../../shared/file-service';
 import { createMemoryStorage, openBrowserStorage, UPGRADE_BLOCKED_STATUS, type BrowserStorage } from './browser-storage';
@@ -61,10 +62,11 @@ export function createApi(open: () => Promise<Workspace>) {
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_LIFETIME_MS);
     },
-    upload: async (file: File) => {
+    /** source is what a converted file brings: its original and where each row came from. */
+    upload: async (file: File, source?: UploadSource) => {
       if (file.size > UPLOAD_MAX_MB * 1024 * 1024) throw new Error(`This file is larger than the ${UPLOAD_MAX_MB} MB upload limit.`);
       const service = await files();
-      return service.upload({ name: file.name, text: await file.text() });
+      return service.upload({ name: file.name, text: await file.text(), source });
     },
     /** replace: true only after the person confirmed replacing this input's existing result. */
     process: async (fileId: string, processor: ProcessorId, replace?: boolean) => {
@@ -78,6 +80,8 @@ export function createApi(open: () => Promise<Workspace>) {
     archive: async (ids: string[], archived: boolean) => (await files()).archive({ ids, archived }),
     generate: async (body: { partner: GeneratorPartner; rows: number; errorRows: number; files: number }) => (await files()).generate(body),
     compare: async (ids: string[]) => (await files()).compare(ids),
+    /** Explains one calculated value of a result from its raw source cells. */
+    explain: async (body: Parameters<FileService['explain']>[0]) => (await files()).explain(body),
     storageMode: async (): Promise<StorageMode> => (await opened()).workspace.mode,
     /** Clear my data: deletes every file and result, then brings the five samples back. */
     clearData: async () => {

@@ -1,11 +1,12 @@
 import { ADAPTERS } from '../../../../shared/types';
 import { matchPartner, partnerMatchProblem } from '../../../../shared/mapping';
+import { ORIGINAL_MAX_MB, type SourceOcr, type UploadSource } from '../../../../shared/ingestion';
 
 // Turning a non-CSV partner file into a CSV, after a reader (Excel, PDF, or OCR for images and scans) has
 // produced rows of cell text. Nothing here knows which reader ran, so every reader shares these rules.
 
 /** Largest source file the browser will try to convert. */
-export const CONVERT_MAX_MB = 20;
+export const CONVERT_MAX_MB = ORIGINAL_MAX_MB;
 /** The header row must be within this many rows of the top. */
 export const HEADER_SEARCH_ROWS = 50;
 
@@ -58,6 +59,8 @@ export interface FoundTable {
   /** Excel only: the sheet's name, and the A1 range from the header through the last row of the table (B3:G20). */
   sheet?: string;
   range?: string;
+  /** Excel only: the column letter of each header, in order (a column with no header and no data is skipped). */
+  columns?: string[];
   /** Data rows, each exactly as wide as the header; sourceRow is its 1-based row number in the source. */
   rows: { sourceRow: number; cells: string[]; page?: number; pageRow?: number }[];
   flags: RowFlag[];
@@ -96,6 +99,31 @@ export function findTable(source: string[][], where = 'the first sheet'): FoundT
     rows.push({ sourceRow, cells: [...row.slice(0, width), ...Array<string>(missing).fill('')] });
   });
   return { partner, headerRow: headerIndex + 1, headers, rows, flags };
+}
+
+/**
+ * What is kept with a converted upload (build-plan 19.8): the original file, and where each row of the CSV came from. table is the
+ * table as chosen, before decisions are applied; every decision has been made by then, and is recorded. The original is read here,
+ * so a file that cannot be read fails this upload alone.
+ */
+export async function toUploadSource(table: FoundTable, original: File, decisions: Record<string, 'keep' | 'blank'>, ocr?: SourceOcr): Promise<UploadSource> {
+  const kind = fileKind(original);
+  if (kind === 'csv') throw new ConvertError('A CSV needs no conversion');
+  const dataRow = new Map(table.rows.map((row, i) => [row.sourceRow, i + 1]));
+  return {
+    kind,
+    original: { name: original.name, mediaType: original.type, bytes: await original.arrayBuffer() },
+    ...(table.sheet ? { sheet: table.sheet } : {}),
+    ...(table.range ? { range: table.range } : {}),
+    ...(table.columns ? { columns: table.columns } : {}),
+    rows: table.rows.map(({ sourceRow, page, pageRow }) => ({ row: sourceRow, ...(page !== undefined ? { page } : {}), ...(pageRow !== undefined ? { pageRow } : {}) })),
+    checks: (table.checks ?? []).flatMap((check) => {
+      const decision = decisions[check.id];
+      const row = dataRow.get(check.sourceRow);
+      return decision && row ? [{ row, column: check.column, asRead: check.value, reasons: check.reasons, decision }] : [];
+    }),
+    ...(ocr ? { ocr } : {}),
+  };
 }
 
 /** One CSV field, quoted when it holds a comma, quote or line break, with quotes doubled. */

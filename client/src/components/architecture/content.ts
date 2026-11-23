@@ -88,7 +88,7 @@ export const TECH: Tech[] = [
   {
     name: 'SheetJS', label: 'SheetJS', role: 'Excel import', icon: FileSpreadsheet, packages: [['client', 'xlsx']],
     why: [
-      'Reads every sheet of a .xlsx or .xls file in the browser and finds its tables below any introduction rows. If there are several, you choose one; they are never merged. Total and note rows are left out and listed, and formula and merged cells are flagged. The chosen table is reviewed, then uploaded as a CSV, so the file service stays CSV-only.',
+      'Reads every sheet of a .xlsx or .xls file in the browser and finds its tables below any introduction rows. If there are several, you choose one; they are never merged. Total and note rows are left out and listed, and formula and merged cells are flagged. The chosen table is reviewed, then uploaded as a CSV, so the file service stays CSV-only. The original file and each row\x27s sheet and cell are kept beside it.',
       'Loaded only when an Excel file is chosen, so opening the file page does not download it.',
     ],
     tradeoff: 'Installed from SheetJS\x27s own download site (cdn.sheetjs.com), because the npm release is older and has security advisories; installs need that site to be reachable.',
@@ -164,9 +164,10 @@ export const TECH: Tech[] = [
     why: [
       'Files and results stay in the person\x27s browser, so the demo costs nothing to run and no file leaves the device.',
       'Built into every browser, and it survives a refresh; memory is the fallback when a browser blocks it.',
+      'Each file keeps its original (the Excel, PDF or image it came from, or the CSV itself) and where each row came from, in a separate sources store (database version 3), so a calculated value can be explained from its raw source cell.',
       'Every storage implements one Storage interface, so the planned Supabase backend (17.4) can sit behind it without changing processing or the UI.',
     ],
-    tradeoff: 'Files live on one device only: there is no sharing, and clearing browser data (or Clear my data) removes them. Tests use fake-indexeddb, not a real browser.',
+    tradeoff: 'Files live on one device only: there is no sharing, and clearing browser data (or Clear my data) removes them and their originals. Tests use fake-indexeddb, not a real browser.',
     files: ['shared/storage.ts', 'client/src/lib/browser-storage.ts'],
   },
 ];
@@ -199,7 +200,7 @@ export const PROCESSING_LOCATION = {
   title: 'Processing location (browser only)',
   icon: Laptop,
   tradeoffTitle: 'one device only',
-  text: 'The browser does everything: it parses, normalizes, validates and processes every CSV, keeps the files in IndexedDB, and converts Excel and PDF files to CSV before upload. No server is involved.',
+  text: 'The browser does everything: it parses, normalizes, validates and processes every CSV, keeps the files (and the original of each) in IndexedDB, and converts Excel, PDF and image files to CSV before upload. No server is involved.',
   benefits: ['Free to host: any static site works', 'No file ever leaves the person\x27s device', 'Nothing to run or maintain besides the page'],
   tradeoff: 'Files live in one browser on one device, and they are lost when the person clears their browser data. Planned in 17.4: invited accounts keep their files in private Supabase storage, so they reach every device, while processing stays in the browser.',
 };
@@ -300,8 +301,8 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
       { id: '19.5', title: 'Import review and mapping', status: 'Done', text: 'One review step for every file type: headers, suggested mapping, units, row counts, and why processing is blocked.' },
       { id: '19.6', title: 'Excel sheets, tables and formulas', status: 'Done', text: 'Every sheet, a choice between candidate tables, total and note rows told apart, and formula values flagged.' },
       { id: '19.7', title: 'PDF and OCR safeguards', status: 'Done', text: 'Page and row per value, repeated headers, cells placed by position, OCR confidence, and doubtful numbers listed to keep or leave blank. A PDF or image table with other column names is found too and goes to Map columns (19.7b).' },
-      { id: '19.8', title: 'Provenance and traceability', status: 'Next', text: 'The original file and source cells are kept, and a calculated value can be explained from its raw source value.' },
-      { id: '19.9', title: 'Ingestion regression and docs', status: 'Planned', text: 'A test for every acceptance criterion, regression for existing files and results, and updated documentation.' },
+      { id: '19.8', title: 'Provenance and traceability', status: 'Done', text: 'The original file and source cells are kept, and a calculated value can be explained from its raw source value.' },
+      { id: '19.9', title: 'Ingestion regression and docs', status: 'Next', text: 'A test for every acceptance criterion, regression for existing files and results, and updated documentation.' },
     ],
   },
   {

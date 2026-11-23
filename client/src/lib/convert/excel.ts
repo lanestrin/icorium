@@ -189,7 +189,7 @@ function buildTable(sheet: SheetData, header: number, end: number): FoundTable |
 
   const partner = match?.kind === 'partner' ? match.adapter.name : '';
   const range = `${address(headerRow, firstCol + first)}:${address(lastRow, firstCol + last)}`;
-  return { partner, headerRow, headers, sheet: sheet.name, range, rows, flags };
+  return { partner, headerRow, headers, sheet: sheet.name, range, columns: columns.map((c) => columnLetter(firstCol + c.index)), rows, flags };
 }
 
 /**

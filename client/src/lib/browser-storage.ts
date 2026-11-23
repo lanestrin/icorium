@@ -1,6 +1,6 @@
 import { httpError } from '../../../shared/csv';
 import { nextBaseId, parseFileId, type FileMeta } from '../../../shared/types';
-import type { SupplierProfile } from '../../../shared/ingestion';
+import type { SourceRecord, SupplierProfile } from '../../../shared/ingestion';
 import type { NewFile, Storage } from '../../../shared/storage';
 
 // Where the workspace's files live in the browser: IndexedDB, so files survive a refresh on this device,
@@ -8,7 +8,7 @@ import type { NewFile, Storage } from '../../../shared/storage';
 
 /** A browser storage, which can also be emptied (Clear my data). */
 export interface BrowserStorage extends Storage {
-  /** Deletes every file, its metadata and every supplier profile. */
+  /** Deletes every file, its metadata, its source record and every supplier profile. */
   clear(): Promise<void>;
 }
 
@@ -28,8 +28,8 @@ export const UPGRADE_BLOCKED_STATUS = 409;
 
 /** The metadata and text to save for this file. Fields set to undefined (archivedAt on restore) are left out. */
 function toSaved(id: string, input: NewFile) {
-  const { text, ...rest } = input;
-  return { meta: withoutUndefined({ ...rest, id, uploadedAt: new Date().toISOString() }), text };
+  const { text, record, ...rest } = input;
+  return { meta: withoutUndefined({ ...rest, id, uploadedAt: new Date().toISOString() }), text, record };
 }
 
 function withoutUndefined(meta: FileMeta): FileMeta {
@@ -49,18 +49,20 @@ function promised<T>(request: IDBRequest<T>) {
 /**
  * Opens (or creates) this IndexedDB database. Store "meta" holds each file's FileMeta keyed by its File ID,
  * store "files" holds its CSV text under the same key, and store "profiles" (added in version 2) holds saved supplier
- * profiles keyed by their header key. Every operation is one transaction over the stores,
+ * profiles keyed by their header key, and store "sources" (added in version 3) holds each file's SourceRecord under its
+ * File ID. Every operation is one transaction over the stores,
  * and IndexedDB runs read-write transactions one at a time, even across tabs, so picking a new File ID and
  * saving it can never race another upload.
  */
 export async function openBrowserStorage(name = 'reclaim-studio'): Promise<BrowserStorage> {
-  const request = indexedDB.open(name, 2);
+  const request = indexedDB.open(name, 3);
   request.onupgradeneeded = () => {
-    // Version 1 made meta and files; version 2 only adds profiles, leaving every saved file as it is.
+    // Version 1 made meta and files; versions 2 and 3 only add profiles and sources, leaving every saved file as it is.
     const names = request.result.objectStoreNames;
     if (!names.contains('meta')) request.result.createObjectStore('meta', { keyPath: 'id' });
     if (!names.contains('files')) request.result.createObjectStore('files');
     if (!names.contains('profiles')) request.result.createObjectStore('profiles', { keyPath: 'key' });
+    if (!names.contains('sources')) request.result.createObjectStore('sources');
   };
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
     let gaveUp = false;
@@ -71,15 +73,15 @@ export async function openBrowserStorage(name = 'reclaim-studio'): Promise<Brows
   db.onversionchange = () => db.close(); // let a newer version of the app upgrade the database
 
   /** Runs work in one transaction and resolves with its result once the transaction has committed. */
-  async function transact<T>(mode: IDBTransactionMode, work: (meta: IDBObjectStore, files: IDBObjectStore, profiles: IDBObjectStore) => Promise<T>): Promise<T> {
-    const tx = db.transaction(['meta', 'files', 'profiles'], mode);
+  async function transact<T>(mode: IDBTransactionMode, work: (meta: IDBObjectStore, files: IDBObjectStore, profiles: IDBObjectStore, sources: IDBObjectStore) => Promise<T>): Promise<T> {
+    const tx = db.transaction(['meta', 'files', 'profiles', 'sources'], mode);
     const committed = new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onabort = () => reject(tx.error ?? new Error('The browser stopped saving this file.'));
     });
     let result: T;
     try {
-      result = await work(tx.objectStore('meta'), tx.objectStore('files'), tx.objectStore('profiles'));
+      result = await work(tx.objectStore('meta'), tx.objectStore('files'), tx.objectStore('profiles'), tx.objectStore('sources'));
     } catch (error) {
       committed.catch(() => {}); // the abort below is the reason, already being thrown
       try { tx.abort(); } catch { /* already finished */ }
@@ -99,11 +101,12 @@ export async function openBrowserStorage(name = 'reclaim-studio'): Promise<Brows
     return found;
   }
 
-  async function save(meta: IDBObjectStore, files: IDBObjectStore, id: string, input: NewFile) {
+  async function save(meta: IDBObjectStore, files: IDBObjectStore, sources: IDBObjectStore, id: string, input: NewFile) {
     if (!parseFileId(id)) throw new Error(`Not a File ID: ${id}`);
     const saved = toSaved(id, input);
     await promised(meta.put(saved.meta));
     await promised(files.put(saved.text, id));
+    if (saved.record) await promised(sources.put(saved.record, id));
     return saved.meta;
   }
 
@@ -120,25 +123,30 @@ export async function openBrowserStorage(name = 'reclaim-studio'): Promise<Brows
       return updated;
     }),
     // Picking the number and saving it happen in the same transaction, so two uploads never get the same one.
-    create: (input, code) => transact('readwrite', async (meta, files) => {
+    create: (input, code) => transact('readwrite', async (meta, files, _profiles, sources) => {
       const base = nextBaseId((await promised(meta.getAllKeys())).map(String));
       const id = code ? `${base}-${code}` : base;
-      return save(meta, files, id, { ...input, text: typeof input.text === 'function' ? input.text(id) : input.text });
+      return save(meta, files, sources, id, { ...input, text: typeof input.text === 'function' ? input.text(id) : input.text });
     }),
-    put: (id, input) => transact('readwrite', (meta, files) => save(meta, files, id, input)),
-    createAt: (id, input) => transact('readwrite', async (meta, files) => {
+    put: (id, input) => transact('readwrite', (meta, files, _profiles, sources) => save(meta, files, sources, id, input)),
+    createAt: (id, input) => transact('readwrite', async (meta, files, _profiles, sources) => {
       if (await promised(meta.getKey(id))) return undefined;
-      return save(meta, files, id, input);
+      return save(meta, files, sources, id, input);
     }),
-    seed: (id, input) => transact('readwrite', async (meta, files) => {
-      if (!(await promised(meta.getKey(id)))) await save(meta, files, id, input);
+    seed: (id, input) => transact('readwrite', async (meta, files, _profiles, sources) => {
+      if (!(await promised(meta.getKey(id)))) await save(meta, files, sources, id, input);
+    }),
+    readSource: (id) => transact('readonly', async (meta, _files, _profiles, sources) => {
+      await findMeta(meta, id);
+      return promised(sources.get(id) as IDBRequest<SourceRecord | undefined>);
     }),
     listProfiles: () => transact('readonly', async (_meta, _files, profiles) => promised(profiles.getAll() as IDBRequest<SupplierProfile[]>)),
     saveProfile: (profile) => transact('readwrite', async (_meta, _files, profiles) => { await promised(profiles.put(profile)); }),
-    clear: () => transact('readwrite', async (meta, files, profiles) => {
+    clear: () => transact('readwrite', async (meta, files, profiles, sources) => {
       await promised(meta.clear());
       await promised(files.clear());
       await promised(profiles.clear());
+      await promised(sources.clear());
     }),
   };
   return store;
@@ -146,7 +154,7 @@ export async function openBrowserStorage(name = 'reclaim-studio'): Promise<Brows
 
 /** The same storage kept in memory, for a browser that won't open IndexedDB. Everything is gone on refresh. */
 export function createMemoryStorage(): BrowserStorage {
-  const saved = new Map<string, { meta: FileMeta; text: string }>();
+  const saved = new Map<string, { meta: FileMeta; text: string; record?: SourceRecord }>();
   const profiles = new Map<string, SupplierProfile>();
   const find = (id: string) => {
     const file = parseFileId(id) ? saved.get(id) : undefined;
@@ -156,7 +164,7 @@ export function createMemoryStorage(): BrowserStorage {
   const put = (id: string, input: NewFile) => {
     if (!parseFileId(id)) throw new Error(`Not a File ID: ${id}`);
     const file = toSaved(id, input);
-    saved.set(id, file);
+    saved.set(id, { ...file, record: structuredClone(file.record) });
     return structuredClone(file.meta);
   };
 
@@ -164,6 +172,7 @@ export function createMemoryStorage(): BrowserStorage {
     list: async () => [...saved.values()].map((f) => structuredClone(f.meta)).sort(byUploadTime),
     get: async (id) => structuredClone(find(id).meta),
     read: async (id) => find(id).text,
+    readSource: async (id) => structuredClone(find(id).record),
     patch: async (id, fields) => {
       const file = find(id);
       file.meta = withoutUndefined({ ...file.meta, ...fields });

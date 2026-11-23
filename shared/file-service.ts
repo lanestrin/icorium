@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { codeOf, COMPARE_MAX, FIRST_FILE_ID, COMPARE_MAX_ROWS, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ProcessorId, type ReplaceConflict, type Row } from './types';
+import { ADAPTER_FIELDS, codeOf, COMPARE_MAX, FIRST_FILE_ID, COMPARE_MAX_ROWS, COMPARE_MIN, FILE_ID_COLUMN, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, GENERATOR_PARTNERS, PROCESSORS, RESULT_ID_COLUMN, isInputFile, parseFileId, resultFileId, type FileMeta, type ProcessorId, type ReplaceConflict, type Row } from './types';
 import { getAdapter, readerFor, resolveReader } from './adapters';
 import { FIELD_LABELS, headerKey, matchPartner, suggestMapping } from './mapping';
-import { decideUnits, UNIT_FACTORS, unitRangeWarnings } from './units';
-import type { IngestionRecord } from './ingestion';
+import { decideUnits, normalizeRow, UNIT_FACTORS, unitRangeWarnings } from './units';
+import { NO_TRACE_OLD, NO_TRACE_UPLOADED, ORIGINAL_MAX_MB, type ExplainOutcome, type FieldExplanation, type IngestionRecord, type ResultTrace, type SourceRecord, type SourceSummary } from './ingestion';
 import { detectResult, embeddedSourceId, findProblems, matchesInput, processRows, stampFileIds } from './processing';
 import { compareResults } from './compare';
 import { httpError, parseCsv, toCsv } from './csv';
@@ -31,6 +31,25 @@ const confirmBody = z.object({
   units: z.object({ massKg: unitChoice(FIELD_LABELS.massKg), r32: unitChoice(FIELD_LABELS.r32), r125: unitChoice(FIELD_LABELS.r125), r134a: unitChoice(FIELD_LABELS.r134a) }),
   profileName: z.string().trim().min(1, 'Name the supplier profile').max(80, 'A supplier profile name is at most 80 characters').optional(),
 });
+// The original file and row references a converted upload (Excel, PDF, image) brings with its CSV (build-plan 19.8).
+// It comes from the browser's own converter, but is checked like any input, and against the table it came with.
+const positive = z.number().int().min(1);
+const uploadSource = z.object({
+  kind: z.enum(['excel', 'pdf', 'image']),
+  original: z.object({
+    name: z.string().min(1).max(255),
+    mediaType: z.string().max(100),
+    bytes: z.custom<ArrayBuffer>((v) => Object.prototype.toString.call(v) === '[object ArrayBuffer]', 'The original file is not valid')
+      .refine((b) => b.byteLength <= ORIGINAL_MAX_MB * 1024 * 1024, `The original file is larger than the ${ORIGINAL_MAX_MB} MB limit`),
+  }),
+  sheet: z.string().max(255).optional(),
+  range: z.string().max(50).optional(),
+  columns: z.array(z.string().max(10)).optional(),
+  rows: z.array(z.object({ row: positive, page: positive.optional(), pageRow: positive.optional() })),
+  checks: z.array(z.object({ row: positive, column: z.number().int().min(0), asRead: z.string(), reasons: z.array(z.string()), decision: z.enum(['keep', 'blank']) })),
+  ocr: z.union([z.literal('image'), z.array(positive)]).optional(),
+});
+const explainBody = z.object({ fileId: z.string().min(1), row: positive, column: z.string().min(1) });
 const archiveBody = z.object({ ids: z.array(z.string().min(1)).min(1), archived: z.boolean() });
 // 2 to 5 different results.
 const compareIds = z.array(z.string())
@@ -95,9 +114,48 @@ export async function seedSampleFiles(store: Pick<Storage, 'seed'>, samples: { n
     const problemRows = findProblems(headers, rows).total;
     const stored = stampFileIds(headers, rows, id, false);
     const input = { name, text: toCsv(stored.headers, stored.rows), rows: rows.length, columns: stored.headers.length,
-      status: problemRows > 0 ? 'Needs Review' as const : 'Ready' as const, problemRows };
+      status: problemRows > 0 ? 'Needs Review' as const : 'Ready' as const, problemRows, ...csvSource(name, text) };
     await store.seed(id, input);
   }
+}
+
+/** What storage keeps for an upload: its summary on the file, and the original with its row references beside it. */
+interface KeptSource { source: SourceSummary; record: SourceRecord }
+
+/** The record of a converted upload, refused unless it matches the table it came with. */
+function convertedSource(value: unknown, headers: string[], rowCount: number): KeptSource {
+  const record: SourceRecord = parseInput(uploadSource, value);
+  const matches = record.rows.length === rowCount
+    && (!record.columns || record.columns.length === headers.length)
+    && record.checks.every((c) => c.column < headers.length && c.row <= rowCount);
+  if (!matches) throw httpError(400, 'The source record does not match the converted table');
+  return summarized(record);
+}
+
+/** A CSV is its own original: the text as uploaded. Its source row is its data row plus one. */
+export function csvSource(name: string, text: string): KeptSource {
+  const bytes = new TextEncoder().encode(text);
+  return summarized({ kind: 'csv', original: { name, mediaType: 'text/csv', bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer }, rows: [], checks: [] });
+}
+
+function summarized(record: SourceRecord): KeptSource {
+  const { kind, original, sheet, range, ocr } = record;
+  return { record, source: { kind, name: original.name, size: original.bytes.byteLength, ...(sheet ? { sheet } : {}), ...(range ? { range } : {}), ...(ocr ? { ocr } : {}) } };
+}
+
+/** Where a stored row's cell is in the original file, or undefined when the source record does not say. idx is the column's position. */
+function locate(record: SourceRecord | undefined, row: number, idx: number, column: string): string | undefined {
+  if (!record || idx < 0) return undefined;
+  if (record.kind === 'csv') return `row ${row + 1}, column "${column}"`;
+  const ref = record.rows[row - 1];
+  if (!ref) return undefined;
+  if (record.kind === 'excel') {
+    const letter = record.columns?.[idx];
+    if (!letter || !record.sheet) return undefined;
+    const sheet = /^[A-Za-z0-9_]+$/.test(record.sheet) ? record.sheet : `'${record.sheet.replace(/'/g, "''")}'`;
+    return `${sheet}!${letter}${ref.row}`;
+  }
+  return record.kind === 'pdf' && ref.page ? `page ${ref.page}, row ${ref.pageRow ?? ref.row}` : `row ${ref.pageRow ?? ref.row}`;
 }
 
 /** How many parsed files previews and comparisons keep in memory. */
@@ -121,7 +179,7 @@ export function createFileService(storage: Storage) {
     for (const key of parsed.keys()) if (key.startsWith(`${id}@`)) parsed.delete(key);
   }
   /** Keeps an input whose columns are not a partner's as Needs Mapping, with the mapping and units suggested for it. */
-  async function storeForMapping(name: string, headers: string[], rows: Row[], duplicateHeaders: string[]) {
+  async function storeForMapping(name: string, headers: string[], rows: Row[], duplicateHeaders: string[], kept: KeptSource) {
     const profile = (await storage.listProfiles()).find((p) => p.key === headerKey(headers));
     const suggestion = suggestMapping(headers, { duplicates: duplicateHeaders, profile });
     const decided = decideUnits(suggestion, { profile: profile?.units });
@@ -137,7 +195,7 @@ export function createFileService(storage: Storage) {
       const stored = stampFileIds(headers, rows, id, false);
       return toCsv(stored.headers, stored.rows);
     };
-    return storage.create({ name, text, rows: rows.length, columns: headers.includes(FILE_ID_COLUMN) ? headers.length : headers.length + 1, status: 'Needs Mapping', ingestion });
+    return storage.create({ name, text, rows: rows.length, columns: headers.includes(FILE_ID_COLUMN) ? headers.length : headers.length + 1, status: 'Needs Mapping', ingestion, ...kept });
   }
   async function parsedFile(meta: FileMeta): Promise<ParsedFile> {
     const key = `${meta.id}@${meta.uploadedAt}`;
@@ -164,15 +222,17 @@ export function createFileService(storage: Storage) {
      * Upload: parse + schema check always run here, regardless of processing function. An input that is not
      * exactly one partner's columns is kept as Needs Mapping (see confirmMapping); an uploaded result must be.
      */
-    async upload({ name, text }: { name: string; text: string }) {
+    async upload({ name, text, source }: { name: string; text: string; source?: unknown }) {
       if (!name.toLowerCase().endsWith('.csv')) throw httpError(400, 'Only .csv files are supported');
       const { headers, rows, duplicateHeaders } = parseCsv(text);
+      // The original is kept with the file: the converted source's file, or this CSV's own text.
+      const kept = source === undefined ? csvSource(name, text) : convertedSource(source, headers, rows.length);
       // Every upload gets a new base File ID. A previously exported result is registered as a result,
       // with that new base ID plus its function's code (e.g. 101012-M), and marked Imported.
       const result = detectResult(headers);
       if (matchPartner(headers, duplicateHeaders)?.kind !== 'partner') {
         if (result) getAdapter(headers, { duplicates: duplicateHeaders }); // refuses a result without a clean partner schema
-        return storeForMapping(name, headers, rows, duplicateHeaders);
+        return storeForMapping(name, headers, rows, duplicateHeaders, kept);
       }
       // The ID travels with the data: stored files carry it in their file_id / result_id columns,
       // replacing any IDs the uploaded CSV brought with it.
@@ -192,9 +252,9 @@ export function createFileService(storage: Storage) {
       const base = { name, text: textFor, rows: rows.length, columns, problemRows: findProblems(headers, rows).total };
       if (result) {
         const lineage = { ...(importedFrom ? { importedFrom } : {}), ...(linkedTo ? { sourceId: linkedTo } : {}) };
-        return storage.create({ ...base, status: 'Processed', imported: true, ...result, ...lineage }, codeOf(result.processor));
+        return storage.create({ ...base, status: 'Processed', imported: true, ...result, ...lineage, ...kept }, codeOf(result.processor));
       }
-      return storage.create({ ...base, status: base.problemRows > 0 ? 'Needs Review' : 'Ready' });
+      return storage.create({ ...base, status: base.problemRows > 0 ? 'Needs Review' : 'Ready', ...kept });
     },
 
     /** One page of a file's rows; query holds offset and limit. */
@@ -293,6 +353,22 @@ export function createFileService(storage: Storage) {
       const existing = await findFile(storage, id);
       if (existing && !replace) return { conflict: conflict(existing) };
       const out = processRows(headers, rows, processor, id, found.reader);
+      const spec = PROCESSORS.find((p) => p.id === processor)!;
+      const trace: ResultTrace = {
+        inputFileId: meta.id,
+        ...(meta.source ? { source: meta.source } : {}),
+        mappings: found.reader.mappings,
+        units: found.reader.units,
+        validation: {
+          approval: meta.ingestion ? 'confirmed' : 'partner',
+          ...(meta.ingestion?.confirmedAt ? { confirmedAt: meta.ingestion.confirmedAt } : {}),
+          rows: out.rows.length,
+          excludedRows: out.problemRows,
+          warnings: (meta.ingestion?.issues ?? []).filter((i) => i.severity === 'warning').map((i) => i.reason),
+        },
+        processor,
+        processorVersion: spec.version,
+      };
       const base = meta.name.replace(/\.csv$/i, '');
       const result = {
         name: `result_${base}_${processor}.csv`,
@@ -304,6 +380,7 @@ export function createFileService(storage: Storage) {
         sourceId: meta.id,
         generatedColumns: out.generated,
         problemRows: out.problemRows,
+        trace,
         ...(meta.ingestion ? { ingestion: meta.ingestion } : {}), // the mapping the result was calculated with
       };
       // A confirmed re-run overwrites, saving new metadata, so an archived result returns to Active Files.
@@ -317,6 +394,62 @@ export function createFileService(storage: Storage) {
       const created = await storage.createAt(id, result);
       if (created) forget(id);
       return created ? { file: created } : { conflict: conflict(await storage.get(id)) };
+    },
+
+    /**
+     * Explains one calculated value of a result from its raw source cells: the mapped fields of that row, where each
+     * came from in the original file, and the unit and factor applied. A pure read.
+     */
+    async explain(body: unknown): Promise<ExplainOutcome> {
+      const { fileId, row, column } = parseInput(explainBody, body);
+      const meta = await storage.get(fileId);
+      if (meta.status !== 'Processed') throw httpError(400, 'Select a result file, not an input file');
+      if (meta.imported) return { traced: false, reason: NO_TRACE_UPLOADED };
+      const trace = meta.trace;
+      if (!trace) return { traced: false, reason: NO_TRACE_OLD };
+      const { headers, rows } = parseCsv(await storage.read(fileId));
+      const generated = meta.generatedColumns ?? [];
+      if (row > rows.length) throw httpError(400, `This result has ${rows.length} rows; there is no row ${row}`);
+      if (column === RESULT_ID_COLUMN || !generated.includes(column)) throw httpError(400, `${column} is not a calculated column of this result`);
+      const stored = rows[row - 1];
+      const originalHeaders = headers.slice(0, headers.length - generated.length);
+      const input = await findFile(storage, trace.inputFileId);
+      const record = input ? await storage.readSource(input.id) : undefined;
+      const normalized = normalizeRow(stored, trace.mappings, trace.units, 'trace');
+      const fields: FieldExplanation[] = [];
+      for (const field of ADAPTER_FIELDS) {
+        const mapping = trace.mappings.find((m) => m.field === field);
+        if (!mapping) continue;
+        const idx = originalHeaders.indexOf(mapping.sourceColumn);
+        const check = record?.checks.find((c) => c.row === row && c.column === idx);
+        const out: FieldExplanation = { field, label: FIELD_LABELS[field], column: mapping.sourceColumn, origin: mapping.origin, raw: stored[mapping.sourceColumn] ?? '' };
+        const where = locate(record, row, idx, mapping.sourceColumn);
+        if (where) out.location = where;
+        if (check) out.confirmed = { asRead: check.asRead, reasons: check.reasons, decision: check.decision };
+        const unit = trace.units.find((u) => u.field === field);
+        if (unit) {
+          const value = normalized[unit.field];
+          out.unit = unit.unit;
+          out.factor = unit.factor;
+          out.normalized = value !== null && Number.isFinite(value) ? value : null;
+          if (value === null) out.problem = 'missing';
+          else if (!Number.isFinite(value)) out.problem = normalized.ambiguous?.includes(unit.field) ? 'ambiguous separator' : 'not a number';
+        }
+        fields.push(out);
+      }
+      const spec = PROCESSORS.find((p) => p.id === trace.processor);
+      return {
+        traced: true,
+        fileId,
+        row,
+        column,
+        value: stored[column] ?? '',
+        processor: { id: trace.processor, label: spec?.label ?? trace.processor, version: trace.processorVersion },
+        rowStatus: stored.processing_status === 'Valid' ? 'calculated' : 'excluded',
+        reasons: stored.validation_errors ?? '',
+        input: { fileId: trace.inputFileId, ...(input ? { name: input.name } : {}), ...(trace.source ? { source: trace.source } : {}) },
+        fields,
+      };
     },
 
     /** Generates 1–10 synthetic partner CSVs with different data. Nothing is saved: the page downloads them or uploads them like any CSV. */

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, TriangleAlert } from 'lucide-react';
-import { PROCESSORS, type FileMeta, type FileRows, type ProblemList } from '../../../../shared/types';
+import { NO_TRACE_OLD, NO_TRACE_UPLOADED } from '../../../../shared/ingestion';
+import { PROCESSORS, RESULT_ID_COLUMN, type FileMeta, type FileRows, type ProblemList } from '../../../../shared/types';
 import { api } from '../../lib/api';
 import { classNames } from '../../lib/class-names';
 import { importedLineage } from '../../lib/file-status';
 import { errorMessage, rowsWord } from '../../lib/format';
 import { Button } from '../ui/Button';
+import { ExplainPanel } from './ExplainPanel';
 import { Modal } from './Modal';
 import styles from './modals.module.scss';
 
@@ -46,7 +48,7 @@ function ProblemRows({ list }: { list: ProblemList }) {
 }
 
 /** The loaded rows: generated columns tinted blue, problem rows amber with a marker, invalid values red. */
-function RowsTable({ data }: { data: FileRows }) {
+function RowsTable({ data, onExplain }: { data: FileRows; onExplain?: (row: number, column: string, button: HTMLButtonElement) => void }) {
   const generated = new Set(data.generatedColumns);
   const problemByRow = new Map(data.problems.items.map((p) => [p.row, p.message]));
 
@@ -72,7 +74,11 @@ function RowsTable({ data }: { data: FileRows }) {
               </td>
               {data.headers.map((h) => (
                 <td key={h} className={classNames(styles.cell, generated.has(h) && styles.generatedCell, isErrorCell(h, row[h]) && styles.errorCell)}>
-                  {row[h]}
+                  {onExplain && generated.has(h) && h !== RESULT_ID_COLUMN ? (
+                    <button type="button" className={styles.explainCell} aria-label={`Explain ${h}, row ${rowNumber}`} onClick={(e) => onExplain(rowNumber, h, e.currentTarget)}>
+                      {row[h]}
+                    </button>
+                  ) : row[h]}
                 </td>
               ))}
             </tr>
@@ -90,11 +96,18 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
   const [loadingMore, setLoadingMore] = useState(false);
   // The file currently shown. A response for any other file (or after closing) is ignored.
   const shown = useRef(file.id);
+  // The generated value being explained, and the cell button to give focus back to when its panel closes.
+  const [explaining, setExplaining] = useState<{ row: number; column: string }>();
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  // A result calculated since traces were recorded can explain its values; any other result says why it cannot.
+  const traced = file.status === 'Processed' && !file.imported && !!file.trace;
+  const noTrace = file.status === 'Processed' && !traced ? (file.imported ? NO_TRACE_UPLOADED : NO_TRACE_OLD) : undefined;
 
   useEffect(() => {
     shown.current = file.id;
     setData(undefined);
     setError(undefined);
+    setExplaining(undefined);
     api.rows(file.id, 0, PAGE)
       .then((d) => { if (shown.current === file.id) setData(d); })
       .catch((e) => { if (shown.current === file.id) setError(errorMessage(e)); });
@@ -115,6 +128,11 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
     }
   }
 
+  function closeExplanation() {
+    setExplaining(undefined);
+    trigger.current?.focus();
+  }
+
   const remaining = data ? data.totalRows - data.rows.length : 0;
   const downloadButton = (
     <button type="button" className={styles.downloadLink} onClick={() => api.download(file.id).catch((e) => setError(errorMessage(e)))}>
@@ -127,7 +145,9 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
       {error && <p className={classNames(styles.message, styles.error)}>{error}</p>}
       {!data && !error && <p className={classNames(styles.message, styles.loading)}>Loading…</p>}
       {data && data.problems.total > 0 && <ProblemRows list={data.problems} />}
-      {data && <RowsTable data={data} />}
+      {noTrace && data && <p className={styles.explainMuted}>{noTrace}</p>}
+      {explaining && <ExplainPanel key={`${explaining.row}:${explaining.column}`} fileId={file.id} row={explaining.row} column={explaining.column} onClose={closeExplanation} />}
+      {data && <RowsTable data={data} onExplain={traced ? (row, column, button) => { trigger.current = button; setExplaining({ row, column }); } : undefined} />}
       {data && (
         <div className={classNames(styles.footer, styles.pinned)}>
           <span>Showing {data.rows.length.toLocaleString()} of {data.totalRows.toLocaleString()} rows</span>
