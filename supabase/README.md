@@ -18,6 +18,7 @@ Sign-in is not required until 17.6, and cloud files arrive in 17.4.
 | --- | --- |
 | `migrations/20261118000000_identity.sql` | The `invitations` and `profiles` tables, row-level security, the invite-only sign-up hook and the trigger that activates an invited account |
 | `migrations/20261122000000_admin_access.sql` | The Admin functions (17.3): list, invite, extend, revoke, change role, activate or deactivate. Only the service role can run them; each checks the caller is an active Admin |
+| `migrations/20261123000000_cloud_files.sql` | Cloud files (17.4a): the `files` and `supplier_profiles` tables, the per-owner File ID counter, the private `workspace-files` bucket, owner and active-account policies, the 900 MB capacity check and the processing gate for results |
 | `functions/admin/` | The Edge Function the Admin page calls (17.3): `handler.ts` holds the logic, `index.ts` wires the services |
 | `bootstrap-first-admin.sql` | The one-time step that makes the project owner the first Admin |
 
@@ -101,6 +102,14 @@ the PKCE flow keeps its code verifier there. The reset page says so.
 
 How it works: the page sends the signed-in person's access token to the function. The function verifies it, passes that user's ID to the SQL functions as `actor`, and they refuse anyone who is not an active Admin. An invitation email holds a link to `/activate?email=...` and no secret: the invitation record, the sign-up hook and email confirmation (or Google) bind the invitation to the address. Deactivating an account sets `active = false`, which row-level checks read on the next request, and then bans the user in Auth so their sessions cannot refresh. Reactivating reverses both. Files are kept.
 
+## Cloud files setup (17.4a; not done, each step needs authorization)
+
+1. **Apply the migration.** Run `migrations/20261123000000_cloud_files.sql` once in the SQL editor, after the identity and admin migrations. It creates the private `workspace-files` bucket (50 MB per object).
+
+How it works: every file row and Storage object belongs to the signed-in user (`auth.uid()`), and every policy also requires an active profile, so deactivation applies on the next request. Nobody else, Admins included, can read them, and the admin function never touches these tables. `allocate_file_id()` returns the caller's next six-digit base ID (first `100001`, never reused) in one atomic statement. A calculated result (a File ID with a function code, not imported) must name the same owner's input that is Ready or Needs Review and not archived. The full mapping check still runs in `shared/file-service.ts`, and this database check is not a defence against a modified copy of the app: `meta` is written by the browser, so a result marked `imported` (a real JSON `true`) skips it. Adding a file or object is refused once all stored files reach 900,000,000 bytes; mapping, archive and restore, and supplier profiles still work, and replacing a result's metadata does too. Replacing a stored object is refused at capacity as well, so a re-run of a result is refused once storage is full. The processing check is skipped when an update changes only `archived` or `archivedAt`, so archiving or restoring a result always works. The capacity check reads the bytes already stored, so one object written just below the threshold can overshoot it; the number of `files` rows per owner is not capped, which only invited, active accounts can use (finding F-63). Files cannot be deleted yet (18.1); Storage delete exists only to clean up a failed save.
+
+For 17.4b: allocate the ID, upload the objects (`<owner uuid>/<file uuid>.csv`, `.original`, `.source.json`), insert the `files` row last (delete the objects if it fails), replace a result with Storage `update` rather than upsert (upsert needs the insert policy as well), and map `storage_full`, an RLS refusal on a Storage write at capacity, `not_active`, `file_ids_exhausted` and `processing_not_allowed` errors to messages.
+
 ## Not verified yet (17.7)
 
 These are recorded as assumptions until hosted evidence exists:
@@ -116,6 +125,7 @@ These are recorded as assumptions until hosted evidence exists:
 - the admin function on a real project: its gateway JWT check, the service-role key name, CORS from the site, and the service role's execute rights on the SQL functions;
 - that Gmail SMTP on port 465 is reachable from an Edge Function and that nodemailer runs there;
 - that a ban stops an already signed-in user's token refresh, and that sign-in then reports "user_banned";
+- cloud files (17.4a): Storage sets `metadata.size` on each object; the capacity function can sum every user's objects despite their row-level security; Storage `update` is checked only against the update policy; the policies, the counter, the metadata value checks, the processing gate (advisory against a modified client) and the 900 MB refusal behave as the SQL describes;
 - the sign-in pages against a real project: password and Google sign-in, the
   confirmation and reset emails, and the PKCE redirects back to the site.
 

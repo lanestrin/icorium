@@ -257,3 +257,172 @@ describe('Supabase admin access SQL', () => {
     expect(adminProblems(changed)).toContain(problem);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cloud files (17.4a). Static text checks, like the ones above: the rules are proven on a real project in 17.7.
+// ---------------------------------------------------------------------------
+const CLOUD = readSql('../supabase/migrations/20261123000000_cloud_files.sql');
+
+const OWNER_ACTIVE = 'owner_id = (select auth.uid()) and (select public.is_active_account())';
+const OBJECT_FOLDER = '(storage.foldername(name))[1] = (select auth.uid())::text';
+const CLIENT_GRANTS = [
+  'select, insert on public.files',
+  'update (meta, source_id, uploaded_at) on public.files',
+  'select, insert on public.supplier_profiles',
+  'update (profile, saved_at) on public.supplier_profiles',
+].join(' | ');
+
+/** The rule (everything after the table name) of each `create policy` on one table, normalized. */
+function policiesOn(sql: string, table: string): string[] {
+  return [...normalized(code(sql)).matchAll(/\bcreate policy [^;]+? on ([\w.]+) ([^;]+?);/g)]
+    .filter(([, name]) => name === table)
+    .map(([, , rule]) => rule.trim());
+}
+
+/** Every safety rule the cloud files migration must keep, as a list of the rules broken. */
+function cloudProblems(migration: string): string[] {
+  const sql = code(migration);
+  const flat = normalized(sql);
+  const problems: string[] = [];
+
+  for (const [, table] of sql.matchAll(/create table (public\.\w+)/g))
+    if (!sql.includes(`alter table ${table} enable row level security`)) problems.push(`no row level security on ${table}`);
+  if (/disable row level security/.test(flat)) problems.push('row level security disabled');
+  if (/grant[^;]*\bto\b[^;]*\banon\b/.test(flat)) problems.push('something is granted to anon');
+  if (grants(sql).some((grant) => /^all (tables|functions|routines|sequences) in schema /.test(grant.object))) problems.push('a schema-wide grant');
+
+  // Browsers get exactly these table privileges: no delete, and no write to id, owner_id or file_id.
+  const clientGrants = grants(sql)
+    .filter((grant) => !grant.object.startsWith('function ') && grant.roles.some((role) => role === 'authenticated' || role === 'public'))
+    .map((grant) => `${grant.privileges} on ${grant.object}`);
+  if (clientGrants.join(' | ') !== CLIENT_GRANTS) problems.push(`client table grants changed: ${clientGrants.join(' | ')}`);
+  if (!flat.includes('revoke all on table public.file_id_counters from public, anon, authenticated;')) problems.push('counter not closed to clients');
+
+  // Every function is security definer with an empty search_path, except the gate trigger, which runs as the caller.
+  for (const fn of functions(migration)) {
+    const isGate = fn.includes('public.check_processing_gate');
+    if (isGate === /\bsecurity definer\b/.test(fn)) problems.push(`wrong security mode: ${fn.slice(0, 60)}`);
+    if (!fn.includes("set search_path = ''")) problems.push('function without empty search_path');
+  }
+  for (const name of ['is_active_account', 'file_storage_has_room', 'allocate_file_id'])
+    if (!flat.includes(`revoke execute on function public.${name}() from public, anon, authenticated;`) || !flat.includes(`grant execute on function public.${name}() to authenticated;`))
+      problems.push(`${name} execute grants wrong`);
+
+  // Every table policy is owner-only, for signed-in users, and needs an active account.
+  for (const table of ['public.files', 'public.supplier_profiles']) {
+    const rules = policiesOn(sql, table);
+    if (rules.length !== 3 || rules.some((rule) => !rule.includes('to authenticated') || !rule.includes(OWNER_ACTIVE))) problems.push(`${table} policies are not owner and active only`);
+  }
+  const fileRules = policiesOn(sql, 'public.files');
+  if (!fileRules.find((rule) => rule.startsWith('for insert'))?.includes('(select public.file_storage_has_room())')) problems.push('file insert ignores capacity');
+  if (fileRules.filter((rule) => !rule.startsWith('for insert')).some((rule) => rule.includes('file_storage_has_room'))) problems.push('capacity blocks more than adding files');
+  if (/\b(role|admin)\b/.test(fileRules.join(' '))) problems.push('a file policy mentions roles');
+  if (!sql.includes('unique (owner_id, file_id)')) problems.push('file ID not unique per owner');
+  if (!sql.includes('foreign key (owner_id, source_id) references public.files (owner_id, id)')) problems.push('source link not owner-scoped');
+
+  // The counter is one atomic statement and refuses inactive, full and exhausted cases.
+  const allocate = functions(migration).find((fn) => fn.includes('public.allocate_file_id')) ?? '';
+  for (const refusal of ["'not_active'", "'storage_full'", "'file_ids_exhausted'"]) if (!allocate.includes(refusal)) problems.push(`allocate lacks ${refusal}`);
+  if (!normalized(allocate).includes('on conflict (owner_id) do update set last_base = counter.last_base + 1 returning')) problems.push('allocation is not one atomic upsert');
+
+  // The processing gate trigger.
+  const gate = functions(migration).find((fn) => fn.includes('public.check_processing_gate')) ?? '';
+  if (!gate.includes("'processing_not_allowed'") || !gate.includes("'Ready', 'Needs Review'") || !gate.includes('input.owner_id = new.owner_id') || !gate.includes("coalesce((input.meta ->> 'archived')::boolean, false) = false")) problems.push('gate does not check owner, status and archive');
+  if (!gate.includes("'imported'")) problems.push('gate does not exempt imported results');
+  if (!flat.includes('before insert or update of source_id, meta on public.files')) problems.push('gate trigger events changed');
+  // An update that changes only archived or archivedAt is never gated (archive and restore of a result with an archived input).
+  for (const part of ["tg_op = 'UPDATE'", 'new.source_id is not distinct from old.source_id', "(new.meta - 'archived' - 'archivedAt') = (old.meta - 'archived' - 'archivedAt')"])
+    if (!gate.includes(part)) problems.push(`gate does not skip archive-only updates: ${part}`);
+  // Only the trigger runs the gate function.
+  if (!flat.includes('revoke execute on function public.check_processing_gate() from public, anon, authenticated;')) problems.push('gate function not revoked from clients');
+  // Only a real JSON true exempts a result; a string such as "yes" must not.
+  if (!gate.includes("new.meta -> 'imported' = 'true'::jsonb")) problems.push('gate exemption is not a strict JSON true');
+
+  // Value checks. A CHECK passes on NULL, so the meta tests must turn a missing key into false.
+  for (const check of [
+    "jsonb_typeof(meta) = 'object'",
+    "coalesce(jsonb_typeof(meta -> 'name') = 'string', false)",
+    "coalesce(meta ->> 'status' in ('ready', 'needs review', 'needs mapping', 'processed'), false)",
+    'octet_length(meta::text) <= 1048576',
+    "file_id ~ '^[1-9][0-9]{5}(-[vmc])?$' and left(file_id, 6)::integer >= 100001",
+    "jsonb_typeof(profile) = 'object' and octet_length(profile::text) <= 65536",
+    'char_length(key) between 1 and 10000',
+    'last_base between 100001 and 999999',
+  ]) if (!flat.includes(check)) problems.push(`value check missing: ${check}`);
+
+  // The bucket and object policies.
+  if (!flat.includes("values ('workspace-files', 'workspace-files', false, 52428800)")) problems.push('bucket is not private with the 50 MB limit');
+  const objects = policiesOn(sql, 'storage.objects');
+  if (objects.length !== 4 || objects.some((rule) => !rule.includes('to authenticated') || !rule.includes("bucket_id = 'workspace-files'") || !rule.includes(OBJECT_FOLDER) || !rule.includes('(select public.is_active_account())')))
+    problems.push('object policies are not owner folder and active only');
+  // Replacing an object checks the old and the new name: both halves need the owner folder and the active account,
+  // or an owner could move an object into another user's folder.
+  const replaceRule = objects.find((rule) => rule.startsWith('for update')) ?? '';
+  const [replaceUsing = '', replaceCheck = ''] = replaceRule.split(' with check ');
+  for (const half of [replaceUsing, replaceCheck])
+    if (!half.includes(OBJECT_FOLDER) || !half.includes('(select public.is_active_account())')) problems.push('object update policy lacks the owner folder or active check in using or with check');
+  // Reading, adding and replacing an object each require the exact <uuid>/<uuid>.<kind> name.
+  const NAME_PATTERN = "name ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}\\.(csv|original|source\\.json)$'";
+  for (const kind of ['for select', 'for insert', 'for update'])
+    if (!objects.find((rule) => rule.startsWith(kind))?.includes(NAME_PATTERN)) problems.push(`object name pattern missing on ${kind}`);
+  const needsRoom = objects.filter((rule) => rule.includes('file_storage_has_room'));
+  // Adding and replacing an object need room (replacing must not grow storage); reading and deleting never do.
+  if (needsRoom.map((rule) => rule.slice(0, 10)).join('|') !== 'for insert|for update') problems.push('only adding or replacing an object may need capacity');
+  if (!replaceCheck.includes('(select public.file_storage_has_room())')) problems.push('replacing an object ignores capacity');
+  if (sql.match(/900000000/g)?.length !== 1) problems.push('capacity threshold is not one constant of 900000000');
+
+  return problems;
+}
+
+describe('Supabase cloud files SQL', () => {
+  it('keeps every safety rule', () => {
+    expect(cloudProblems(CLOUD)).toEqual([]);
+  });
+
+  it('is never reached by the admin Edge Function', () => {
+    for (const file of ['handler.ts', 'index.ts']) {
+      const source = readSql(`../supabase/functions/admin/${file}`);
+      expect(source).not.toMatch(/file_id_counters|supplier_profiles|workspace-files|\.storage\b|from\(\s*['"]files['"]/);
+    }
+  });
+
+  const broken: [string, (sql: string) => string, string][] = [
+    ['row level security removed', (s) => s.replace('alter table public.files enable row level security;', ''), 'no row level security on public.files'],
+    ['a grant to anon', (s) => `${s}\ngrant select on table public.files to anon;`, 'something is granted to anon'],
+    ['a delete grant', (s) => s.replace('grant select, insert on table public.files', 'grant select, insert, delete on table public.files'), 'client table grants changed: select, insert, delete on public.files | update (meta, source_id, uploaded_at) on public.files | select, insert on public.supplier_profiles | update (profile, saved_at) on public.supplier_profiles'],
+    ['owner_id writable', (s) => s.replace('update (meta, source_id, uploaded_at)', 'update (owner_id, meta, source_id, uploaded_at)'), 'client table grants changed: select, insert on public.files | update (owner_id, meta, source_id, uploaded_at) on public.files | select, insert on public.supplier_profiles | update (profile, saved_at) on public.supplier_profiles'],
+    ['the counter opened to clients', (s) => s.replace('revoke all on table public.file_id_counters from public, anon, authenticated;', ''), 'counter not closed to clients'],
+    ['the active check dropped from reading files', (s) => s.replace('using (owner_id = (select auth.uid()) and (select public.is_active_account()));\n\n-- Adding a file', 'using (owner_id = (select auth.uid()));\n\n-- Adding a file'), 'public.files policies are not owner and active only'],
+    ['every file readable', (s) => s.replace('using (owner_id = (select auth.uid()) and (select public.is_active_account()));\n\n-- Adding a file', 'using (true);\n\n-- Adding a file'), 'public.files policies are not owner and active only'],
+    ['capacity dropped from adding files', (s) => s.replace(' and (select public.file_storage_has_room()));\n\n-- Replacing', ');\n\n-- Replacing'), 'file insert ignores capacity'],
+    ['file ID unique across owners', (s) => s.replace('unique (owner_id, file_id)', 'unique (file_id)'), 'file ID not unique per owner'],
+    ['source link not owner-scoped', (s) => s.replace('foreign key (owner_id, source_id) references public.files (owner_id, id)', 'foreign key (source_id) references public.files (id)'), 'source link not owner-scoped'],
+    ['allocation not atomic', (s) => s.replace('on conflict (owner_id) do update set last_base = counter.last_base + 1', 'on conflict (owner_id) do nothing'), 'allocation is not one atomic upsert'],
+    ['allocation ignores capacity', (s) => s.replace("raise exception 'storage_full';", "raise exception 'other';"), "allocate lacks 'storage_full'"],
+    ['the gate ignores archived inputs', (s) => s.replace("        and coalesce((input.meta ->> 'archived')::boolean, false) = false\n", ''), 'gate does not check owner, status and archive'],
+    ['the gate trigger narrowed', (s) => s.replace('before insert or update of source_id, meta on public.files', 'before insert on public.files'), 'gate trigger events changed'],
+    ['a public bucket', (s) => s.replace("'workspace-files', 'workspace-files', false", "'workspace-files', 'workspace-files', true"), 'bucket is not private with the 50 MB limit'],
+    ['an object policy without the owner folder', (s) => s.replace(/(create policy "Owners remove their file objects"[\s\S]*?)and \(storage\.foldername\(name\)\)\[1\] = \(select auth\.uid\(\)\)::text\n\s*/, '$1'), 'object policies are not owner folder and active only'],
+    ['capacity dropped from replacing objects', (s) => s.replace("    and (select public.is_active_account())\n    and (select public.file_storage_has_room())\n  );\n\n-- Only so the app", "    and (select public.is_active_account())\n  );\n\n-- Only so the app"), 'replacing an object ignores capacity'],
+    ['capacity blocking reading objects', (s) => s.replace(/(create policy "Owners read their file objects"[\s\S]*?and \(select public\.is_active_account\(\)\))/, '$1\n    and (select public.file_storage_has_room())'), 'only adding or replacing an object may need capacity'],
+    ['a second threshold', (s) => `${s}\n-- x\nselect 900000000;`, 'capacity threshold is not one constant of 900000000'],
+    ['a missing name or status accepted', (s) => s.replace("coalesce(jsonb_typeof(meta -> 'name') = 'string', false)", "jsonb_typeof(meta -> 'name') = 'string'"), "value check missing: coalesce(jsonb_typeof(meta -> 'name') = 'string', false)"],
+    ['a missing status accepted', (s) => s.replace("coalesce(meta ->> 'status' in ('Ready', 'Needs Review', 'Needs Mapping', 'Processed'), false)", "meta ->> 'status' in ('Ready', 'Needs Review', 'Needs Mapping', 'Processed')"), "value check missing: coalesce(meta ->> 'status' in ('ready', 'needs review', 'needs mapping', 'processed'), false)"],
+    ['the metadata size cap removed', (s) => s.replace('octet_length(meta::text) <= 1048576', 'true'), 'value check missing: octet_length(meta::text) <= 1048576'],
+    ['the File ID format check weakened', (s) => s.replace("'^[1-9][0-9]{5}(-[VMC])?$'", "'^[0-9]+$'"), "value check missing: file_id ~ '^[1-9][0-9]{5}(-[vmc])?$' and left(file_id, 6)::integer >= 100001"],
+    ['the supplier profile size cap removed', (s) => s.replace('octet_length(profile::text) <= 65536', 'true'), "value check missing: jsonb_typeof(profile) = 'object' and octet_length(profile::text) <= 65536"],
+    ['the counter range removed', (s) => s.replace('last_base between 100001 and 999999', 'last_base > 0'), 'value check missing: last_base between 100001 and 999999'],
+    ['the object name pattern dropped from reading', (s) => s.replace(/(create policy "Owners read their file objects"[\s\S]*?)\n\s*and name ~ [^\n]*/, '$1'), 'object name pattern missing on for select'],
+    ['the object name pattern dropped from replacing', (s) => s.replace(/(create policy "Owners replace their file objects"[\s\S]*?with check \([\s\S]*?)\n\s*and name ~ [^\n]*/, '$1'), 'object name pattern missing on for update'],
+    ['the gate checking archive-only updates', (s) => s.replace("      and (new.meta - 'archived' - 'archivedAt') = (old.meta - 'archived' - 'archivedAt') then", "      and new.meta = old.meta then"), "gate does not skip archive-only updates: (new.meta - 'archived' - 'archivedAt') = (old.meta - 'archived' - 'archivedAt')"],
+    ['the gate function left callable', (s) => s.replace('revoke execute on function public.check_processing_gate() from public, anon, authenticated;', ''), 'gate function not revoked from clients'],
+    ['the object update check without the owner folder', (s) => s.replace(/(create policy "Owners replace their file objects"[\s\S]*?with check \(\n\s*bucket_id = 'workspace-files'\n)\s*and \(storage\.foldername\(name\)\)\[1\] = \(select auth\.uid\(\)\)::text\n/, '$1'), 'object update policy lacks the owner folder or active check in using or with check'],
+    ['the object update check without the active account', (s) => s.replace(/(create policy "Owners replace their file objects"[\s\S]*?with check \([\s\S]*?)\n\s*and \(select public\.is_active_account\(\)\)(\n\s*and \(select public\.file_storage_has_room\(\)\))/, '$1$2'), 'object update policy lacks the owner folder or active check in using or with check'],
+    ['any imported value skipping the gate', (s) => s.replace("new.meta -> 'imported' = 'true'::jsonb", "(new.meta ->> 'imported')::boolean"), 'gate exemption is not a strict JSON true'],
+  ];
+  it.each(broken)('fails when %s', (_label, breakIt, problem) => {
+    const changed = breakIt(CLOUD);
+    expect(changed).not.toBe(CLOUD);
+    expect(cloudProblems(changed)).toContain(problem);
+  });
+});
