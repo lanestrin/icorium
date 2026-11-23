@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.15.0](https://github.com/lanestrin/icorium/compare/v2.14.0...v2.15.0) (2026-11-23)
+
+
+### Features
+
+* add admin invitations and account access (17.3) ([#163](https://github.com/lanestrin/icorium/issues/163)) ([dc10c0d](https://github.com/lanestrin/icorium/commit/dc10c0dcbc55497e915af74befaf3ccfa140e231))
+
 ## [2.14.0](https://github.com/lanestrin/icorium/compare/v2.13.0...v2.14.0) (2026-11-23)
 
 
