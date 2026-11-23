@@ -202,7 +202,7 @@ export const PROCESSING_LOCATION = {
   tradeoffTitle: 'one device only',
   text: 'The browser does everything: it parses, normalizes, validates and processes every CSV, keeps the files (and the original of each) in IndexedDB, and converts Excel, PDF and image files to CSV before upload. No server is involved.',
   benefits: ['Free to host: any static site works', 'No file ever leaves the person\x27s device', 'Nothing to run or maintain besides the page'],
-  tradeoff: 'Files live in one browser on one device, and they are lost when the person clears their browser data. Planned in 17.4: invited accounts keep their files in private Supabase storage, so they reach every device, while processing stays in the browser.',
+  tradeoff: 'Files live in one browser on one device, and they are lost when the person clears their browser data. The processing check (approved mapping, confirmed units) runs in the file service in the browser, so it can\x27t stop someone who edits the app\x27s own code; trusted enforcement arrives with cloud files. Planned in 17.4: invited accounts keep their files in private Supabase storage, so they reach every device, while processing stays in the browser.',
 };
 
 export const CONVERSION = {
@@ -302,7 +302,7 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
       { id: '19.6', title: 'Excel sheets, tables and formulas', status: 'Done', text: 'Every sheet, a choice between candidate tables, total and note rows told apart, and formula values flagged.' },
       { id: '19.7', title: 'PDF and OCR safeguards', status: 'Done', text: 'Page and row per value, repeated headers, cells placed by position, OCR confidence, and doubtful numbers listed to keep or leave blank. A PDF or image table with other column names is found too and goes to Map columns (19.7b).' },
       { id: '19.8', title: 'Provenance and traceability', status: 'Done', text: 'The original file and source cells are kept, and a calculated value can be explained from its raw source value.' },
-      { id: '19.9', title: 'Ingestion regression and docs', status: 'Next', text: 'A test for every acceptance criterion, regression for existing files and results, and updated documentation.' },
+      { id: '19.9', title: 'Ingestion regression and docs', status: 'Done', text: 'A test for every acceptance criterion, regression for existing files and results, and updated documentation.' },
     ],
   },
   {
@@ -311,7 +311,7 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
     items: [
       { id: '17.1', title: 'Free hosted-service design', status: 'Done', text: 'Supabase chosen over Firebase and Appwrite: the only free plan that met invite-only sign-in, private files and access to existing files without a card.' },
       { id: '17.2', title: 'Sign-in and activation', status: 'Done', text: 'Invite-only database rules, then sign-in, activation, password recovery and sign-out pages. Sign-in is optional until 17.6.' },
-      { id: '17.3', title: 'Admin invitations and access', status: 'Planned', text: 'Invite by email (30-day expiry, resend, extend, revoke), change roles, deactivate and reactivate. An Admin cannot read members\x27 files.' },
+      { id: '17.3', title: 'Admin invitations and access', status: 'Next', text: 'Invite by email (30-day expiry, resend, extend, revoke), change roles, deactivate and reactivate. An Admin cannot read members\x27 files.' },
       { id: '17.4', title: 'Private cross-device files', status: 'Planned', text: 'Files, results and metadata in Supabase, checked against the signed-in owner on every action; uploads refused at capacity.' },
       { id: '17.5', title: 'Guest demo and export', status: 'Planned', text: 'Try the demo signs in with demo credentials; each demo gets isolated, temporary browser data with sample files, cleared when it ends. Files already in the browser can be exported.' },
       { id: '17.6', title: 'Require sign-in', status: 'Planned', text: 'The file workspace needs an invited account or a demo session; Admin, Architecture and Generator pages are Admin-only.' },

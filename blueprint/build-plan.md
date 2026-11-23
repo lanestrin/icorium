@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.9 - Ingestion regression, acceptance and documentation.**
+**Next: 17.3 - Admin invitations and account access.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -250,7 +250,7 @@ Rules for every M19 item:
   source cell. Exported CSV columns stay unchanged.
   **Depends on:** 19.6, 19.7b.
 
-- [ ] **19.9** Ingestion regression, acceptance and documentation —
+- [x] **19.9** Ingestion regression, acceptance and documentation —
   One automated test per acceptance criterion in project-plan section
   14, regression for all samples, existing results and comparison, and
   updated Architecture page, sample-data notes and extension guide,
