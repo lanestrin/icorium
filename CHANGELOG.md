@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.14.0](https://github.com/lanestrin/icorium/compare/v2.13.0...v2.14.0) (2026-11-23)
+
+
+### Features
+
+* add ingestion acceptance tests and documentation (19.9) ([#161](https://github.com/lanestrin/icorium/issues/161)) ([77aaba9](https://github.com/lanestrin/icorium/commit/77aaba97d6bf250cd5152876be45b90b80e22d6b))
+
 ## [2.13.0](https://github.com/lanestrin/icorium/compare/v2.12.0...v2.13.0) (2026-11-23)
 
 
