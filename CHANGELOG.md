@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.16.0](https://github.com/lanestrin/icorium/compare/v2.15.0...v2.16.0) (2026-11-23)
+
+
+### Features
+
+* redesign the sign-in page (17.8) ([#166](https://github.com/lanestrin/icorium/issues/166)) ([4934433](https://github.com/lanestrin/icorium/commit/49344334dec20208be1dcfd51e5dc4d6ed99fb46))
+
 ## [2.15.0](https://github.com/lanestrin/icorium/compare/v2.14.0...v2.15.0) (2026-11-23)
 
 
