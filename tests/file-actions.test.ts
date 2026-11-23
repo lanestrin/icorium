@@ -1354,3 +1354,15 @@ describe('result traces and explain (19.8)', () => {
     expect(JSON.stringify(await listFiles())).toBe(before);
   });
 });
+
+describe('sample result regression (19.9)', () => {
+  // tests/fixtures/sample-results holds each sample's three results exactly as release v2.4.1 (before M19) made them.
+  const FIXTURES = path.resolve(import.meta.dirname, 'fixtures/sample-results');
+  const samples = fs.readdirSync(SAMPLES).filter((name) => name.endsWith('.csv'));
+
+  it.each(samples.flatMap((name) => (['validation', 'mass', 'classification'] as const).map((processor) => [name, processor] as const)))(
+    '%s %s matches the pre-M19 result byte for byte', async (name, processor) => {
+      const result = await processSample(name, processor);
+      expect(await textOf(result.id)).toBe(fs.readFileSync(path.join(FIXTURES, `${name.replace('.csv', '')}.${processor}.csv`), 'utf8'));
+    });
+});
