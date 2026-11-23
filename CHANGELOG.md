@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.17.0](https://github.com/lanestrin/icorium/compare/v2.16.0...v2.17.0) (2026-11-23)
+
+
+### Features
+
+* add cloud file schema, ownership and capacity rules (17.4a) ([#169](https://github.com/lanestrin/icorium/issues/169)) ([ab94a15](https://github.com/lanestrin/icorium/commit/ab94a1511781d371e40d47b75e7b753740308dde))
+
 ## [2.16.0](https://github.com/lanestrin/icorium/compare/v2.15.0...v2.16.0) (2026-11-23)
 
 
