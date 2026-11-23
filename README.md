@@ -141,8 +141,9 @@ Composition totals within ±0.5 percentage points of 100% count as valid. Batch 
 ```
 client/        React + Vite UI, styled with SCSS Modules on design tokens
   src/App.tsx      picks the page from the URL
-  src/pages/       FilesPage (the file workspace), GeneratorPage (/generator), ArchitecturePage (/architecture)
+  src/pages/       FilesPage (the file workspace, shown as "Dashboard"), GeneratorPage (/generator), ArchitecturePage (/architecture), AdminPage (/admin), and the sign-in pages
   src/components/  Banner (shared message box), and one folder per feature, one component per file:
+    layout/        the app header, account menu and left navigation every app page shares (AppShell)
     files/         the CSV Files workspace: sidebar, filters, tabs, sort menu, file table, row menu, toolbars
     compare/       the comparison dialog and its charts and tables
     modals/        the dialog shell, the run confirmations and the file preview

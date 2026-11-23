@@ -791,7 +791,7 @@ describe('archive and restore', () => {
     expect(check('invalid.csv')).not.toBeChecked(); // menu clicks never toggle the row
 
     await user.click(trigger);
-    await user.click(screen.getByRole('heading', { name: 'CSV Files' }));
+    await user.click(screen.getByRole('heading', { name: 'Dashboard' }));
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(api.archive).not.toHaveBeenCalled();
   });
@@ -1838,10 +1838,10 @@ describe('first load', () => {
 });
 
 describe('layout at phone width', () => {
-  it('puts the page title before the upload and processing controls, all in the main landmark', async () => {
+  it('puts the page title in the header, before the upload and processing controls in the main landmark', async () => {
     await setup();
     const main = screen.getByRole('main');
-    const heading = within(main).getByRole('heading', { level: 1, name: 'CSV Files' });
+    const heading = within(screen.getByRole('banner')).getByRole('heading', { level: 1, name: 'Dashboard' });
     const upload = within(main).getByRole('button', { name: 'browse files' });
     // DOCUMENT_POSITION_FOLLOWING: the upload control comes after the heading, so reading and Tab order start at the title.
     expect(heading.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -1870,5 +1870,64 @@ describe('layout at phone width', () => {
     } finally {
       window.matchMedia = desktop;
     }
+  });
+});
+
+describe('workspace navigation (17.9)', () => {
+  afterEach(() => window.history.pushState({}, '', '/'));
+  const navigate = async (user: Awaited<ReturnType<typeof setup>>, name: string) => {
+    await user.click(screen.getByRole('button', { name: 'Open navigation' }));
+    await user.click(within(screen.getByRole('navigation', { name: 'App' })).getByRole('link', { name }));
+  };
+
+  it('shows Dashboard with its intro in the header', async () => {
+    await setup();
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+    expect(within(header).getByText('Your file workspace for refrigerant analysis.')).toBeInTheDocument();
+  });
+
+  it('Results shows only processed files, with the Status filter set, even after other filters or the Archived tab', async () => {
+    const user = await setup();
+    await user.click(screen.getByRole('tab', { name: /Archived/ }));
+    await user.type(screen.getByRole('textbox', { name: 'Search file ID or name' }), 'clean');
+    await navigate(user, 'Results');
+    expect(screen.getByRole('tab', { name: /Active Files/ })).toHaveAttribute('aria-selected', 'true');
+    expect(statusFilter()).toHaveDisplayValue('Processed');
+    expect(screen.getByRole('textbox', { name: 'Search file ID or name' })).toHaveValue('');
+    expect(screen.getByRole('tabpanel')).toHaveFocus();
+    expect(screen.getByRole('row', { name: /result.csv/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /clean.csv/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /invalid.csv/ })).not.toBeInTheDocument();
+  });
+
+  it('My Files clears the filters and shows every active file', async () => {
+    const user = await setup();
+    await navigate(user, 'Results');
+    expect(statusFilter()).toHaveDisplayValue('Processed');
+    await navigate(user, 'My Files');
+    expect(statusFilter()).toHaveDisplayValue('All statuses');
+    expect(screen.getByRole('row', { name: /clean.csv/ })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /result.csv/ })).toBeInTheDocument();
+  });
+
+  it('Processing moves focus to the processing panel', async () => {
+    const user = await setup();
+    await navigate(user, 'Processing');
+    expect(screen.getByRole('heading', { name: 'Processing Function' })).toHaveFocus();
+  });
+
+  it('applies #results from the address on load', async () => {
+    window.history.pushState({}, '', '/#results');
+    render(<FilesPage />);
+    await screen.findByRole('row', { name: /result.csv/ });
+    await waitFor(() => expect(statusFilter()).toHaveDisplayValue('Processed'));
+  });
+
+  it('ignores an unknown hash', async () => {
+    window.history.pushState({}, '', '/#nonsense');
+    await setup();
+    expect(statusFilter()).toHaveDisplayValue('All statuses');
+    expect(screen.getByRole('row', { name: /clean.csv/ })).toBeInTheDocument();
   });
 });

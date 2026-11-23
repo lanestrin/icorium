@@ -8,7 +8,7 @@ import page from './styles/page.module.scss';
 // default page, so it stays in the main bundle.
 const GeneratorPage = lazy(() => import('./pages/GeneratorPage').then((m) => ({ default: m.GeneratorPage })));
 const ArchitecturePage = lazy(() => import('./pages/ArchitecturePage').then((m) => ({ default: m.ArchitecturePage })));
-// The sign-in pages (17.2b) and the Admin page (17.3) also download only when opened. No link leads to them until 17.6.
+// The sign-in pages (17.2b) and the Admin page (17.3) also download only when opened. The header and navigation link to them from 17.9 (Admin entries for Admins only); access is enforced in 17.6.
 const SignInPage = lazy(() => import('./pages/SignInPage').then((m) => ({ default: m.SignInPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then((m) => ({ default: m.AdminPage })));
 const ActivatePage = lazy(() => import('./pages/ActivatePage').then((m) => ({ default: m.ActivatePage })));

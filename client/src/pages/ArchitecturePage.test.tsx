@@ -196,7 +196,7 @@ describe('navigation to the Architecture page', () => {
     const page = render(<App />);
     // The page is loaded on demand, so it appears after a moment.
     expect(await screen.findByRole('heading', { level: 1, name: 'Architecture & Tech Stack' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Back to CSV Files/ })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'CSV Files' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
     page.unmount();
 

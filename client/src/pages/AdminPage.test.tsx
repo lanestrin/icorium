@@ -127,7 +127,7 @@ describe('AdminPage: invitations', () => {
     expect(screen.getByLabelText('Role')).toHaveValue('Member');
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Invitation sent to Fresh@Example.com');
+    expect(await within(screen.getByRole('main')).findByRole('status')).toHaveTextContent('Invitation sent to Fresh@Example.com');
     expect(actions()).toEqual([{ action: 'invite', email: 'Fresh@Example.com', role: 'Member' }]);
     expect(requests.filter((request) => request.action === 'list')).toHaveLength(2);
     expect(screen.getByLabelText('Email')).toHaveValue('');
@@ -162,10 +162,10 @@ describe('AdminPage: invitations', () => {
     const user = userEvent.setup();
     render(<AdminPage />);
     await user.click(await within(await waitFor(() => row('Invitations', 'new@example.com'))).findByRole('button', { name: /Resend/ }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Invitation sent again to new@example.com');
+    expect(await within(screen.getByRole('main')).findByRole('status')).toHaveTextContent('Invitation sent again to new@example.com');
 
     await user.click(within(row('Invitations', 'late@example.com')).getByRole('button', { name: /Extend/ }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Invitation to late@example.com now expires on 5 Jan 2027'));
+    await waitFor(() => expect(within(screen.getByRole('main')).getByRole('status')).toHaveTextContent('Invitation to late@example.com now expires on 5 Jan 2027'));
     expect(actions()).toEqual([{ action: 'resend', id: 'i-pending' }, { action: 'extend', id: 'i-expired' }]);
   });
 
@@ -283,5 +283,41 @@ describe('AdminPage: access and busy state', () => {
 
     finish(ok({}));
     await waitFor(() => expect(button).toBeEnabled());
+  });
+});
+
+describe('AdminPage: navigation (17.9)', () => {
+  afterEach(() => window.history.pushState({}, '', '/admin'));
+
+  it('names the account list "Users" and shows the header and navigation', async () => {
+    setUp();
+    render(<AdminPage />);
+    expect(await screen.findByRole('heading', { name: 'Users' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Back to CSV Files/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Help (opens in a new tab)' })).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Open navigation' }));
+    expect(within(screen.getByRole('navigation', { name: 'App' })).getByRole('link', { name: 'Access & Roles' })).toHaveAttribute('href', '/admin#access');
+  });
+
+  it.each([['#invitations', 'Invite someone'], ['#users', 'Users'], ['#access', 'Users']])('focuses the section for %s once the lists have loaded', async (hash, heading) => {
+    window.history.pushState({}, '', `/admin${hash}`);
+    setUp();
+    render(<AdminPage />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: heading })).toHaveFocus());
+  });
+
+  it('ignores a section address for a Member and for an unknown name', async () => {
+    window.history.pushState({}, '', '/admin#users');
+    setUp({ role: 'Member' });
+    const member = render(<AdminPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Admins only');
+    expect(document.body).toHaveFocus();
+    member.unmount();
+
+    window.history.pushState({}, '', '/admin#nonsense');
+    setUp();
+    render(<AdminPage />);
+    await screen.findByRole('heading', { name: 'Users' });
+    expect(screen.getByRole('heading', { name: 'Users' })).not.toHaveFocus();
   });
 });
