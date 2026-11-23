@@ -9,7 +9,7 @@ import generatorStyles from '../components/generator/generator.module.scss';
 
 vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
-  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(),
+  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(), setWorkspace: vi.fn(),
 } }));
 
 const header = 'batch_id,sample_date,feed_mass_kg,r32_pct,r125_pct,r134a_pct';

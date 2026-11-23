@@ -9,6 +9,7 @@ export function useFileList(onError: Report) {
   const [files, setFiles] = useState<FileMeta[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false); // the latest list request failed, so an empty list isn't "no files"
 
   // Each request is numbered and only the latest one's answer is used, so a slow older response
   // (e.g. from an upload during a processing batch) never overwrites newer data.
@@ -16,8 +17,8 @@ export function useFileList(onError: Report) {
   const refresh = () => {
     const request = ++listRequest.current;
     return api.list()
-      .then((list) => { if (request === listRequest.current) setFiles(list); })
-      .catch((e) => { if (request === listRequest.current) onError(errorMessage(e)); });
+      .then((list) => { if (request === listRequest.current) { setFiles(list); setLoadFailed(false); } })
+      .catch((e) => { if (request === listRequest.current) { setLoadFailed(true); onError(errorMessage(e)); } });
   };
   // Only the first load shows "Loading files…"; later refreshes keep the current rows on screen.
   // refresh never rejects (failures go to onError), so this ends even after an error.
@@ -52,5 +53,8 @@ export function useFileList(onError: Report) {
     return { accepted, needsMapping };
   }
 
-  return { files, refresh, upload, uploading, loading };
+  /** Forgets the files shown, for a different workspace: the old list must never appear under the new one. */
+  const reset = () => { listRequest.current++; setFiles([]); setLoadFailed(false); };
+
+  return { files, refresh, reset, upload, uploading, loading, loadFailed };
 }

@@ -2,7 +2,8 @@ import type { SourceRecord, SupplierProfile } from './ingestion';
 import type { FileMeta, ProcessorCode } from './types';
 
 // Storage contract: what the app needs from wherever files are kept. The browser implements it with IndexedDB
-// or memory in client/src/lib/browser-storage.ts; a cloud backend would be another Storage. Types only.
+// or memory in client/src/lib/browser-storage.ts; a signed-in account's Supabase workspace implements it in
+// client/src/lib/cloud-storage.ts. Types only.
 
 /** What saving a file needs; the ID and upload time are set by storage. */
 export type NewFile = Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string; /** The original file and its row references, saved in the same transaction. */ record?: SourceRecord };

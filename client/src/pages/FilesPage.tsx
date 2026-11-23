@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Archive } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta } from '../../../shared/types';
 import { Banner } from '../components/Banner';
+import { Button } from '../components/ui/Button';
 import { ClearDataModal } from '../components/modals/ClearDataModal';
 import { ConvertReviewDialog } from '../components/modals/ConvertReviewDialog';
 import { MappingDialog } from '../components/modals/MappingDialog';
@@ -21,6 +22,7 @@ import { useFileList } from '../hooks/useFileList';
 import { useFilters } from '../hooks/useFilters';
 import { useProcessing } from '../hooks/useProcessing';
 import { useSelection } from '../hooks/useSelection';
+import { useWorkspace } from '../hooks/useWorkspace';
 import { api, type StorageMode } from '../lib/api';
 import { compareBlocker } from '../lib/compare-view';
 import { filterFiles } from '../lib/file-status';
@@ -48,8 +50,9 @@ export function FilesPage() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
 
-  const { files, refresh, upload, uploading, loading } = useFileList(setError);
+  const { files, refresh, reset, upload, uploading, loading, loadFailed } = useFileList(setError);
   const account = useAccount();
+  const workspace = useWorkspace(account.account);
   const conversion = useConversion();
   const { selectedIds, setSelectedIds, toggle, toggleAll } = useSelection();
   const {
@@ -87,9 +90,32 @@ export function FilesPage() {
   useHashSection(WORKSPACE_HASHES, goToSection);
 
   // Where files are kept, for the note under the upload area. If storage can't open, the file list reports it.
+  // A different workspace (signing in or out, another account) starts clean: nothing from the old one stays on
+  // screen, selected or open, and the list is read again from the new one.
+  const shownWorkspace = useRef(workspace.key);
   useEffect(() => {
+    setStorageMode(undefined);
     api.storageMode().then(setStorageMode, () => {});
-  }, []);
+    if (shownWorkspace.current === workspace.key) return;
+    shownWorkspace.current = workspace.key;
+    reset();
+    setSelectedIds(new Set());
+    setPreview(undefined);
+    setMapping(undefined);
+    setComparison(undefined);
+    setConfirmClear(false);
+    cancelPending();
+    dismissToast();
+    setError(undefined);
+    setNotice(undefined);
+    void refresh();
+  }, [workspace.key]);
+
+  // Try again after the list could not be loaded. An account that couldn't be confirmed is read again by reloading.
+  function retryLoad() {
+    if (workspace.choice.kind === 'unavailable') window.location.reload();
+    else void refresh();
+  }
 
   // Clear my data: every upload and result in this browser is deleted and the five samples come back.
   // It holds busy like a run or archive, so nothing else starts meanwhile, and it closes the archive toast
@@ -170,7 +196,7 @@ export function FilesPage() {
           selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
           storageMode={storageMode}
           onClearData={() => setConfirmClear(true)}
-          clearDisabled={uploading || !!conversion.reading || !!processingId || archiving || clearing}
+          clearDisabled={workspace.choice.kind !== 'browser' || uploading || !!conversion.reading || !!processingId || archiving || clearing}
         />
 
         <div className={styles.main}>
@@ -182,6 +208,7 @@ export function FilesPage() {
 
           {notice && <Banner tone="success" className={styles.banner} onDismiss={() => setNotice(undefined)}>{notice}</Banner>}
           {error && <Banner tone="error" className={styles.banner} onDismiss={() => setError(undefined)}>{error}</Banner>}
+          {loadFailed && <Button variant="secondary" className={styles.banner} onClick={retryLoad}>Try again</Button>}
 
           <FileTabs
             tab={tab}
@@ -226,6 +253,7 @@ export function FilesPage() {
               onRestore={viewArchived ? (f) => setArchived([f.id], false) : undefined}
               restoreDisabled={archiving || clearing}
               emptyMessage={loading ? 'Loading files…'
+                : loadFailed && !files.length ? "Your files couldn't be loaded."
                 : viewArchived && !archivedCount ? 'No archived files. Select files in Active Files and click Archive to move them here.' : undefined}
             />
           </div>

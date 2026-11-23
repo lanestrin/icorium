@@ -68,6 +68,8 @@ describe('Architecture page content', () => {
     expect(read('client/src/lib/api.ts')).toContain('UPLOAD_MAX_MB = 10;'); // 10 MB uploads
     expect(read('shared/storage.ts')).toMatch(/interface Storage \{[\s\S]*createAt\(id: string/); // the storage operations named
     expect(read('client/src/lib/browser-storage.ts')).toContain('indexedDB.open('); // files are kept in IndexedDB
+    expect(read('client/src/lib/cloud-storage.ts')).toContain("BUCKET = 'workspace-files'"); // signed-in accounts keep files in the private bucket
+    expect(read('supabase/migrations/20261123000000_cloud_files.sql')).toContain('workspace-files'); // the same bucket the SQL creates
     expect(read('shared/types.ts')).toContain('export const ADAPTERS = ['); // partner formats live in the shared file
     expect(read('shared/file-service.ts')).toContain('z.enum(PROCESSORS.map('); // allowed functions come from the shared list
     expect(read('shared/processing.ts')).toContain('TOTAL_TOLERANCE_PCT = 0.5'); // ±0.5 points

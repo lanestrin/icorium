@@ -15,6 +15,7 @@ import { errorMessage, plural } from '../lib/format';
 import { flaggedRows, withCsv } from '../lib/generated-files';
 import { AppShell } from '../components/layout/AppShell';
 import { useAccount } from '../hooks/useAccount';
+import { useWorkspace } from '../hooks/useWorkspace';
 
 const ERROR_ROWS_HELP = 'In each file. Each of these rows fails Composition Validation: missing or non-numeric mass, a negative percentage, '
   + 'a composition total off by 15 points, a missing batch ID, or a duplicate batch ID (which marks two rows).';
@@ -32,6 +33,7 @@ function batchSummary(files: GeneratedFile[]) {
 /** The CSV Generator (/generator): make synthetic partner CSVs, preview and download them, or add them to CSV Files. */
 export function GeneratorPage() {
   const account = useAccount();
+  useWorkspace(account.account); // adds generated files to the account's workspace
   const [partner, setPartner] = useState<GeneratorPartner>('A');
   const [rows, setRows] = useState('25');
   const [count, setCount] = useState('1');
