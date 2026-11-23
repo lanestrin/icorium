@@ -68,6 +68,7 @@ const MESSAGES: Record<string, string> = {
   over_email_send_rate_limit: 'Too many attempts. Wait a few minutes and try again.',
   over_request_rate_limit: 'Too many attempts. Wait a few minutes and try again.',
   same_password: 'Choose a different password from your current one.',
+  user_banned: 'This account is deactivated. Ask an administrator.',
 };
 
 /** Supabase's password-strength reasons (AuthWeakPasswordError.reasons), as words a person can act on. */

@@ -4,6 +4,7 @@ import type { Plugin } from 'vite';
 export const PAGES = {
   generator: '/generator',
   architecture: '/architecture',
+  admin: '/admin',
   signIn: '/sign-in',
   activate: '/activate',
   resetPassword: '/reset-password',

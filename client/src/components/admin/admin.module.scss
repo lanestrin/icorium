@@ -1,0 +1,161 @@
+// The Admin page (17.3): a wide centred column of cards; invitations and accounts are lists whose rows
+// stack on phones, so the page never scrolls sideways.
+@use '../../styles/mixins' as *;
+
+.page {
+  padding: var(--app-space-8) var(--app-space-4) calc(var(--app-space-unit) * 16);
+
+  @include up(md) {
+    padding: var(--app-space-10) var(--app-space-6) calc(var(--app-space-unit) * 16);
+  }
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-6);
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-2);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-4);
+}
+
+.heading {
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-semibold);
+}
+
+.notice {
+  color: var(--app-color-text-secondary);
+}
+
+.inviteForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-4);
+
+  @include up(md) {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-1-5);
+}
+
+.label {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  font-weight: var(--app-weight-semibold);
+}
+
+.select {
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-lg);
+  background: var(--app-color-surface);
+  padding: var(--app-space-2) var(--app-space-3);
+  color: var(--app-color-text);
+  box-shadow: var(--app-shadow-sm);
+  @include focus-ring;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-2) var(--app-space-4);
+  padding: var(--app-space-3) 0;
+  border-top: var(--app-border-width) solid var(--app-color-border-subtle);
+
+  &:first-child {
+    border-top: 0;
+  }
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.primary {
+  font-weight: var(--app-weight-medium);
+}
+
+.meta {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  color: var(--app-color-text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+}
+
+.badge {
+  display: inline-flex;
+  align-self: flex-start;
+  border-radius: var(--app-radius-full);
+  padding: var(--app-space-0-5) var(--app-space-3);
+  font-size: var(--app-text-sm);
+  font-weight: var(--app-weight-medium);
+}
+
+.badgePending,
+.badgeActive {
+  background: var(--app-color-success-surface);
+  color: var(--app-color-success-text);
+}
+
+.badgeExpired {
+  background: var(--app-color-warning-surface);
+  color: var(--app-color-warning-text);
+}
+
+.badgeAccepted {
+  background: var(--app-color-primary-surface);
+  color: var(--app-color-primary-text);
+}
+
+.badgeRevoked,
+.badgeDeactivated {
+  background: var(--app-color-danger-surface);
+  color: var(--app-color-danger-text);
+}
+
+.error {
+  font-size: var(--app-text-sm);
+  color: var(--app-color-danger-text);
+}

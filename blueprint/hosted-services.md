@@ -161,16 +161,25 @@ rules.
      Google, whose email has no pending, unexpired, unrevoked invitation
      [S6]. Accepting an invitation marks it accepted, so it cannot create a
      second account.
-   - Token format, resend and extend semantics are decided in the 17.3
-     spec, and they must keep expiry and revocation.
+   - 17.3 decisions (the person, 2026-11-22). The Admin function sends the
+     invitation email through Gmail SMTP, linking to `/activate?email=...`.
+     It carries no token: the invitation record, the hook and email
+     confirmation (or Google) bind it to the address. Resend emails a
+     pending invitation and keeps its expiry. Extend sets `expires_at` to
+     now plus 30 days for a pending or expired invitation and sends
+     nothing. Revoke works on pending or expired invitations; accepted and
+     revoked ones never change. If the first email fails, the new
+     invitation is discarded and the failure reported.
    - Role changes and deactivations that would leave no active Admin are
      refused inside the same transaction.
 
 7. **Deactivation.** Setting `active = false` takes effect on the next
    request, because every row-level security policy requires an active
    account, whatever the remaining access-token lifetime (up to one hour
-   [S9]). The deactivation function also ends the user's sessions with the
-   admin sign-out API [S11], so refresh stops. Reactivation sets `active = true`.
+   [S9]). The deactivation function then bans the user with
+   `auth.admin.updateUserById` (`ban_duration`), so refresh stops (the person,
+   2026-11-22; the admin sign-out API [S11] needs the user's own access
+   token, so it cannot be called with only a user ID). Reactivation sets `active = true` and lifts the ban.
    Files are kept throughout.
 
 8. **Capacity.**
