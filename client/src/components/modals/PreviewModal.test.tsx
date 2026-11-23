@@ -36,6 +36,33 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+it('hides the file_id and result_id columns, whose ID the subtitle already shows', async () => {
+  render(<PreviewModal file={result} onClose={() => {}} />);
+  await screen.findByText('A-1');
+  expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['#', 'batch_id', 'r32_mass_kg']);
+  expect(screen.queryByRole('cell', { name: '100001-M' })).not.toBeInTheDocument();
+  cleanup();
+
+  vi.mocked(api.rows).mockResolvedValue({
+    ...data, headers: ['batch_id', 'file_id'], generatedColumns: [],
+    rows: [{ batch_id: 'A-1', file_id: '100001' }],
+  });
+  render(<PreviewModal file={{ ...result, id: '100001', status: 'Ready', trace: undefined, processor: undefined }} onClose={() => {}} />);
+  await screen.findByText('A-1');
+  expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['#', 'batch_id']);
+  expect(screen.queryByRole('cell', { name: '100001' })).not.toBeInTheDocument();
+});
+
+it('counts only the columns shown, once the rows have loaded', async () => {
+  let load!: (d: FileRows) => void;
+  vi.mocked(api.rows).mockReturnValue(new Promise((resolve) => { load = resolve; }));
+  render(<PreviewModal file={result} onClose={() => {}} />);
+  expect(screen.getByText(/^File ID /)).toHaveTextContent('File ID 100001-M · Component Mass Calculation result · 2 rows · generated columns highlighted');
+  load(data);
+  await screen.findByText('A-1');
+  expect(screen.getByText(/^File ID /)).toHaveTextContent('File ID 100001-M · Component Mass Calculation result · 2 rows · 2 columns · generated columns highlighted');
+});
+
 describe('explaining a calculated value', () => {
   it('opens only from a generated value of a traced result, never from result_id or an original column', async () => {
     render(<PreviewModal file={result} onClose={() => {}} />);
