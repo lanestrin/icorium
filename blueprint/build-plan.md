@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 19.8 - Provenance and result traceability.**
+**Next: 19.9 - Ingestion regression, acceptance and documentation.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -242,7 +242,7 @@ Rules for every M19 item:
   from 19.7 still block until decided. Split from 19.7 on 2026-11-22.
   **Depends on:** 19.7.
 
-- [ ] **19.8** Provenance and result traceability — Keep the original
+- [x] **19.8** Provenance and result traceability — Keep the original
   source file and per-row source references in browser storage (with
   a storage upgrade), and record on each result its input File ID,
   source type, mapping, units, factors, validation decision and

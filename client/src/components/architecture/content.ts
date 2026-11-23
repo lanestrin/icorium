@@ -301,8 +301,8 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
       { id: '19.5', title: 'Import review and mapping', status: 'Done', text: 'One review step for every file type: headers, suggested mapping, units, row counts, and why processing is blocked.' },
       { id: '19.6', title: 'Excel sheets, tables and formulas', status: 'Done', text: 'Every sheet, a choice between candidate tables, total and note rows told apart, and formula values flagged.' },
       { id: '19.7', title: 'PDF and OCR safeguards', status: 'Done', text: 'Page and row per value, repeated headers, cells placed by position, OCR confidence, and doubtful numbers listed to keep or leave blank. A PDF or image table with other column names is found too and goes to Map columns (19.7b).' },
-      { id: '19.8', title: 'Provenance and traceability', status: 'Next', text: 'The original file and source cells are kept, and a calculated value can be explained from its raw source value.' },
-      { id: '19.9', title: 'Ingestion regression and docs', status: 'Planned', text: 'A test for every acceptance criterion, regression for existing files and results, and updated documentation.' },
+      { id: '19.8', title: 'Provenance and traceability', status: 'Done', text: 'The original file and source cells are kept, and a calculated value can be explained from its raw source value.' },
+      { id: '19.9', title: 'Ingestion regression and docs', status: 'Next', text: 'A test for every acceptance criterion, regression for existing files and results, and updated documentation.' },
     ],
   },
   {
