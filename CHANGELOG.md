@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.0](https://github.com/lanestrin/icorium/compare/v2.11.0...v2.12.0) (2026-11-23)
+
+
+### Features
+
+* import PDF and image tables with other headers (19.7b) ([#157](https://github.com/lanestrin/icorium/issues/157)) ([9a17f30](https://github.com/lanestrin/icorium/commit/9a17f30e7062ebc7155d2feda915931e95b5f089))
+
 ## [2.11.0](https://github.com/lanestrin/icorium/compare/v2.10.0...v2.11.0) (2026-11-22)
 
 
