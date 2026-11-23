@@ -212,6 +212,12 @@
 
 .access {
   composes: note;
-  border-top: 0;
   background: var(--app-color-surface-subtle);
+}
+
+.divider {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: var(--app-border-width) solid var(--app-color-border);
 }

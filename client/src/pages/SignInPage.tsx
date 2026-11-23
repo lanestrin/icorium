@@ -130,6 +130,7 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
               <a href="/" className={layout.demo}><Play aria-hidden /> Try Demo</a>
               <a href={PAGES.activate} className={layout.invitation}>Use invitation link</a>
               <p className={layout.expiry}>Invitations expire after 30 days unless an admin extends them.</p>
+              <hr className={layout.divider} />
               <p className={layout.access}><User aria-hidden /> <span><strong>Need access?</strong> Contact your administrator for an invitation.</span></p>
             </Card>
           </div>
