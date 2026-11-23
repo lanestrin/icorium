@@ -257,3 +257,126 @@ describe('Supabase admin access SQL', () => {
     expect(adminProblems(changed)).toContain(problem);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Cloud files (17.4a). Static text checks, like the ones above: the rules are proven on a real project in 17.7.
+// ---------------------------------------------------------------------------
+const CLOUD = readSql('../supabase/migrations/20261123000000_cloud_files.sql');
+
+const OWNER_ACTIVE = 'owner_id = (select auth.uid()) and (select public.is_active_account())';
+const OBJECT_FOLDER = '(storage.foldername(name))[1] = (select auth.uid())::text';
+const CLIENT_GRANTS = [
+  'select, insert on public.files',
+  'update (meta, source_id, uploaded_at) on public.files',
+  'select, insert on public.supplier_profiles',
+  'update (profile, saved_at) on public.supplier_profiles',
+].join(' | ');
+
+/** The rule (everything after the table name) of each `create policy` on one table, normalized. */
+function policiesOn(sql: string, table: string): string[] {
+  return [...normalized(code(sql)).matchAll(/\bcreate policy [^;]+? on ([\w.]+) ([^;]+?);/g)]
+    .filter(([, name]) => name === table)
+    .map(([, , rule]) => rule.trim());
+}
+
+/** Every safety rule the cloud files migration must keep, as a list of the rules broken. */
+function cloudProblems(migration: string): string[] {
+  const sql = code(migration);
+  const flat = normalized(sql);
+  const problems: string[] = [];
+
+  for (const [, table] of sql.matchAll(/create table (public\.\w+)/g))
+    if (!sql.includes(`alter table ${table} enable row level security`)) problems.push(`no row level security on ${table}`);
+  if (/disable row level security/.test(flat)) problems.push('row level security disabled');
+  if (/grant[^;]*\bto\b[^;]*\banon\b/.test(flat)) problems.push('something is granted to anon');
+  if (grants(sql).some((grant) => /^all (tables|functions|routines|sequences) in schema /.test(grant.object))) problems.push('a schema-wide grant');
+
+  // Browsers get exactly these table privileges: no delete, and no write to id, owner_id or file_id.
+  const clientGrants = grants(sql)
+    .filter((grant) => !grant.object.startsWith('function ') && grant.roles.some((role) => role === 'authenticated' || role === 'public'))
+    .map((grant) => `${grant.privileges} on ${grant.object}`);
+  if (clientGrants.join(' | ') !== CLIENT_GRANTS) problems.push(`client table grants changed: ${clientGrants.join(' | ')}`);
+  if (!flat.includes('revoke all on table public.file_id_counters from public, anon, authenticated;')) problems.push('counter not closed to clients');
+
+  // Every function is security definer with an empty search_path, except the gate trigger, which runs as the caller.
+  for (const fn of functions(migration)) {
+    const isGate = fn.includes('public.check_processing_gate');
+    if (isGate === /\bsecurity definer\b/.test(fn)) problems.push(`wrong security mode: ${fn.slice(0, 60)}`);
+    if (!fn.includes("set search_path = ''")) problems.push('function without empty search_path');
+  }
+  for (const name of ['is_active_account', 'file_storage_has_room', 'allocate_file_id'])
+    if (!flat.includes(`revoke execute on function public.${name}() from public, anon, authenticated;`) || !flat.includes(`grant execute on function public.${name}() to authenticated;`))
+      problems.push(`${name} execute grants wrong`);
+
+  // Every table policy is owner-only, for signed-in users, and needs an active account.
+  for (const table of ['public.files', 'public.supplier_profiles']) {
+    const rules = policiesOn(sql, table);
+    if (rules.length !== 3 || rules.some((rule) => !rule.includes('to authenticated') || !rule.includes(OWNER_ACTIVE))) problems.push(`${table} policies are not owner and active only`);
+  }
+  const fileRules = policiesOn(sql, 'public.files');
+  if (!fileRules.find((rule) => rule.startsWith('for insert'))?.includes('(select public.file_storage_has_room())')) problems.push('file insert ignores capacity');
+  if (fileRules.filter((rule) => !rule.startsWith('for insert')).some((rule) => rule.includes('file_storage_has_room'))) problems.push('capacity blocks more than adding files');
+  if (/\b(role|admin)\b/.test(fileRules.join(' '))) problems.push('a file policy mentions roles');
+  if (!sql.includes('unique (owner_id, file_id)')) problems.push('file ID not unique per owner');
+  if (!sql.includes('foreign key (owner_id, source_id) references public.files (owner_id, id)')) problems.push('source link not owner-scoped');
+
+  // The counter is one atomic statement and refuses inactive, full and exhausted cases.
+  const allocate = functions(migration).find((fn) => fn.includes('public.allocate_file_id')) ?? '';
+  for (const refusal of ["'not_active'", "'storage_full'", "'file_ids_exhausted'"]) if (!allocate.includes(refusal)) problems.push(`allocate lacks ${refusal}`);
+  if (!normalized(allocate).includes('on conflict (owner_id) do update set last_base = counter.last_base + 1 returning')) problems.push('allocation is not one atomic upsert');
+
+  // The processing gate trigger.
+  const gate = functions(migration).find((fn) => fn.includes('public.check_processing_gate')) ?? '';
+  if (!gate.includes("'processing_not_allowed'") || !gate.includes("'Ready', 'Needs Review'") || !gate.includes('input.owner_id = new.owner_id') || !gate.includes("'archived'")) problems.push('gate does not check owner, status and archive');
+  if (!gate.includes("'imported'")) problems.push('gate does not exempt imported results');
+  if (!flat.includes('before insert or update of source_id, meta on public.files')) problems.push('gate trigger events changed');
+
+  // The bucket and object policies.
+  if (!flat.includes("values ('workspace-files', 'workspace-files', false, 52428800)")) problems.push('bucket is not private with the 50 MB limit');
+  const objects = policiesOn(sql, 'storage.objects');
+  if (objects.length !== 4 || objects.some((rule) => !rule.includes('to authenticated') || !rule.includes("bucket_id = 'workspace-files'") || !rule.includes(OBJECT_FOLDER) || !rule.includes('(select public.is_active_account())')))
+    problems.push('object policies are not owner folder and active only');
+  const needsRoom = objects.filter((rule) => rule.includes('file_storage_has_room'));
+  if (needsRoom.length !== 1 || !needsRoom[0].startsWith('for insert')) problems.push('only adding an object may need capacity');
+  if (sql.match(/900000000/g)?.length !== 1) problems.push('capacity threshold is not one constant of 900000000');
+
+  return problems;
+}
+
+describe('Supabase cloud files SQL', () => {
+  it('keeps every safety rule', () => {
+    expect(cloudProblems(CLOUD)).toEqual([]);
+  });
+
+  it('is never reached by the admin Edge Function', () => {
+    for (const file of ['handler.ts', 'index.ts']) {
+      const source = readSql(`../supabase/functions/admin/${file}`);
+      expect(source).not.toMatch(/file_id_counters|supplier_profiles|workspace-files|\.storage\b|from\(\s*['"]files['"]/);
+    }
+  });
+
+  const broken: [string, (sql: string) => string, string][] = [
+    ['row level security removed', (s) => s.replace('alter table public.files enable row level security;', ''), 'no row level security on public.files'],
+    ['a grant to anon', (s) => `${s}\ngrant select on table public.files to anon;`, 'something is granted to anon'],
+    ['a delete grant', (s) => s.replace('grant select, insert on table public.files', 'grant select, insert, delete on table public.files'), 'client table grants changed: select, insert, delete on public.files | update (meta, source_id, uploaded_at) on public.files | select, insert on public.supplier_profiles | update (profile, saved_at) on public.supplier_profiles'],
+    ['owner_id writable', (s) => s.replace('update (meta, source_id, uploaded_at)', 'update (owner_id, meta, source_id, uploaded_at)'), 'client table grants changed: select, insert on public.files | update (owner_id, meta, source_id, uploaded_at) on public.files | select, insert on public.supplier_profiles | update (profile, saved_at) on public.supplier_profiles'],
+    ['the counter opened to clients', (s) => s.replace('revoke all on table public.file_id_counters from public, anon, authenticated;', ''), 'counter not closed to clients'],
+    ['the active check dropped from reading files', (s) => s.replace('using (owner_id = (select auth.uid()) and (select public.is_active_account()));\n\n-- Adding a file', 'using (owner_id = (select auth.uid()));\n\n-- Adding a file'), 'public.files policies are not owner and active only'],
+    ['every file readable', (s) => s.replace('using (owner_id = (select auth.uid()) and (select public.is_active_account()));\n\n-- Adding a file', 'using (true);\n\n-- Adding a file'), 'public.files policies are not owner and active only'],
+    ['capacity dropped from adding files', (s) => s.replace(' and (select public.file_storage_has_room()));\n\n-- Replacing', ');\n\n-- Replacing'), 'file insert ignores capacity'],
+    ['file ID unique across owners', (s) => s.replace('unique (owner_id, file_id)', 'unique (file_id)'), 'file ID not unique per owner'],
+    ['source link not owner-scoped', (s) => s.replace('foreign key (owner_id, source_id) references public.files (owner_id, id)', 'foreign key (source_id) references public.files (id)'), 'source link not owner-scoped'],
+    ['allocation not atomic', (s) => s.replace('on conflict (owner_id) do update set last_base = counter.last_base + 1', 'on conflict (owner_id) do nothing'), 'allocation is not one atomic upsert'],
+    ['allocation ignores capacity', (s) => s.replace("raise exception 'storage_full';", "raise exception 'other';"), "allocate lacks 'storage_full'"],
+    ['the gate ignores archived inputs', (s) => s.replace("        and coalesce((input.meta ->> 'archived')::boolean, false) = false\n", ''), 'gate does not check owner, status and archive'],
+    ['the gate trigger narrowed', (s) => s.replace('before insert or update of source_id, meta on public.files', 'before insert on public.files'), 'gate trigger events changed'],
+    ['a public bucket', (s) => s.replace("'workspace-files', 'workspace-files', false", "'workspace-files', 'workspace-files', true"), 'bucket is not private with the 50 MB limit'],
+    ['an object policy without the owner folder', (s) => s.replace(/(create policy "Owners remove their file objects"[\s\S]*?)and \(storage\.foldername\(name\)\)\[1\] = \(select auth\.uid\(\)\)::text\n\s*/, '$1'), 'object policies are not owner folder and active only'],
+    ['a second threshold', (s) => `${s}\n-- x\nselect 900000000;`, 'capacity threshold is not one constant of 900000000'],
+  ];
+  it.each(broken)('fails when %s', (_label, breakIt, problem) => {
+    const changed = breakIt(CLOUD);
+    expect(changed).not.toBe(CLOUD);
+    expect(cloudProblems(changed)).toContain(problem);
+  });
+});

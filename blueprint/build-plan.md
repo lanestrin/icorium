@@ -342,7 +342,28 @@ Rules for every M19 item:
   applying the approved identity contract and trusted owner checks
   to every file operation. Refuse affected new uploads at capacity
   with clear feedback.
-  **Depends on:** 17.1, 17.2.
+  **Depends on:** 17.1, 17.2. Split into 17.4a and 17.4b (decided 2026-11-23).
+  Decided 2026-11-23: a new cloud workspace starts empty (no samples);
+  new files are refused once stored files reach 900 MB of the 1 GB
+  Free limit; at capacity anything that adds a file (upload, imported
+  result, new processing result) is refused, while replacing an
+  existing result, mapping, archive/restore and supplier profiles
+  still work.
+
+  - [ ] **17.4a** Cloud file schema, ownership and capacity rules —
+    Add the Supabase SQL migration for file metadata and supplier
+    profiles, the per-owner atomic File ID counter, the private
+    Storage bucket and owner/active-account policies on every table
+    and object, and the trusted capacity check. No client change.
+    Hosted evidence is deferred to 17.7.
+    **Depends on:** 17.1, 17.2a.
+
+  - [ ] **17.4b** Cloud workspace in the app — Add the cloud Storage
+    implementation and use it for signed-in active accounts, keeping
+    the browser workspace for everyone else until 17.6. Show capacity
+    refusals and a temporarily unavailable workspace clearly. Keep
+    the Architecture page accurate.
+    **Depends on:** 17.4a.
 
 - [ ] **17.5** Isolated guest demo and existing-file export — Add
   Try the demo credential autofill followed by login submission.

@@ -189,8 +189,10 @@ rules.
      converted source file).
    - Because Free over-quota behavior is undocumented, uploads are refused
      with an actionable message when stored bytes reach an app threshold
-     below 1 GB. The threshold value and the check are defined in 17.4.
-     Existing files stay readable.
+     below 1 GB. 17.4a defines it: new files, objects and File IDs are
+     refused once stored objects total 900,000,000 bytes, checked in
+     `file_storage_has_room()`. Replacing a result, mapping, archive and
+     supplier profiles still work. Existing files stay readable.
    - Invitations are refused, and the failure reported, when email sending
      fails or is rate-limited.
    - A paused project is shown as temporarily unavailable, not as missing
