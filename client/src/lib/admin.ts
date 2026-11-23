@@ -44,6 +44,7 @@ const MESSAGES: Record<string, string> = {
   invitation_closed: 'This invitation was already accepted or revoked.',
   account_not_found: 'That account no longer exists.',
   last_admin: 'At least one active Admin must remain.',
+  email_failed_pending: "The invitation email couldn't be sent, and the invitation couldn't be removed. It is still listed as pending: resend or revoke it.",
   sessions_not_ended: "Account deactivated, but its open sessions couldn't be ended. Try again.",
   still_banned: 'Account reactivated, but sign-in is still blocked. Try again.',
 };

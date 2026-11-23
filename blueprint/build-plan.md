@@ -81,9 +81,9 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 17.3 - Admin invitations and account access.**
+**Next: 17.4 - Private cross-device file workspace.**
 
-The demonstration milestone through 9.15 is complete, and 17.1 and 17.2
+The demonstration milestone through 9.15 is complete, and 17.1 to 17.3
 are done. M19 (universal file ingestion) comes before the rest of M17
 (decided 2026-11-20): it is browser-side, shares no code with 17.3, and
 its mapping and provenance metadata should exist before files move to
@@ -294,7 +294,7 @@ Rules for every M19 item:
     profile. Keep the existing demo usable; sign-in is not required yet.
     **Depends on:** 17.2a.
 
-- [ ] **17.3** Admin invitations and account access — Add the Admin
+- [x] **17.3** Admin invitations and account access — Add the Admin
   page for email invitations with Member as the default role.
   Support the agreed 30-day expiry, resend, extend and revoke
   controls, role changes, deactivation and reactivation. Retain files

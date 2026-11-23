@@ -144,6 +144,18 @@ describe('admin function: invitations', () => {
     expect(deps.rpc).toHaveBeenLastCalledWith('admin_discard_unsent_invitation', { target_id: INVITATION.id, actor: ACTOR });
   });
 
+  it('reports email_failed_pending when the discard after a failed first send also fails', async () => {
+    const { deps, post } = setup({
+      rpc: async (name) => (name === 'admin_discard_unsent_invitation' ? { data: null, error: { message: 'connection reset (detail)' } } : { data: INVITATION, error: null }),
+      sendEmail: async () => { throw new Error('down'); },
+    });
+    const result = await post({ action: 'invite', email: 'new@example.com' });
+    expect(result.status).toBe(502);
+    expect(result.json).toEqual({ error: 'email_failed_pending' });
+    expect(result.text).not.toContain('detail');
+    expect(deps.rpc.mock.calls.map(([name]) => name)).toEqual(['admin_create_invitation', 'admin_discard_unsent_invitation']);
+  });
+
   it('keeps the invitation when a resend fails', async () => {
     const { deps, post } = setup({ sendEmail: async () => { throw new Error('down'); } });
     const result = await post({ action: 'resend', id: INVITATION.id });

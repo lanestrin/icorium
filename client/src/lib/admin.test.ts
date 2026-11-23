@@ -23,8 +23,17 @@ describe('callAdmin', () => {
 
   it.each([
     ['not_admin', 'You no longer have Admin access.'],
-    ['last_admin', 'At least one active Admin must remain.'],
+    ['unauthorized', 'Sign in again to continue.'],
+    ['invalid_email', 'Enter a valid email address.'],
+    ['invalid_role', 'Choose Admin or Member.'],
+    ['invalid_request', UNEXPECTED_MESSAGE],
     ['account_exists', 'An account with this email already exists.'],
+    ['invitation_exists', 'This email already has an open invitation. Resend or extend it instead.'],
+    ['invitation_not_pending', 'This invitation is no longer pending. Extend it first.'],
+    ['invitation_closed', 'This invitation was already accepted or revoked.'],
+    ['account_not_found', 'That account no longer exists.'],
+    ['last_admin', 'At least one active Admin must remain.'],
+    ['email_failed_pending', "The invitation email couldn't be sent, and the invitation couldn't be removed. It is still listed as pending: resend or revoke it."],
     ['sessions_not_ended', "Account deactivated, but its open sessions couldn't be ended. Try again."],
     ['still_banned', 'Account reactivated, but sign-in is still blocked. Try again.'],
     ['something_new', UNEXPECTED_MESSAGE],

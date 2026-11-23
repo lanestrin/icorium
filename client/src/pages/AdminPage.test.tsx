@@ -194,6 +194,19 @@ describe('AdminPage: invitations', () => {
 });
 
 describe('AdminPage: accounts', () => {
+  it.each([
+    ['a role change', /Make Admin/],
+    ['a deactivation', /^Deactivate bo@example.com$/],
+  ])('sends nothing when %s is cancelled', async (_label, name) => {
+    const { actions } = setUp();
+    const user = userEvent.setup();
+    render(<AdminPage />);
+    await user.click(within(await waitFor(() => row('Accounts', 'bo@example.com'))).getByRole('button', { name }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(actions()).toEqual([]);
+  });
+
   it('changes a role after confirmation', async () => {
     const { actions } = setUp();
     const user = userEvent.setup();

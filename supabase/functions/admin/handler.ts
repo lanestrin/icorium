@@ -130,8 +130,9 @@ export async function handleAdminRequest(request: Request, deps: Deps): Promise<
         await deps.sendEmail({ to: invitation.email, ...invitationEmail(invitation, deps.siteUrl) });
       } catch {
         // No email went out, so no invitation should exist for the Admin to wonder about.
-        await call('admin_discard_unsent_invitation', { target_id: invitation.id });
-        return fail(502, 'email_failed');
+        // If that also fails, say so: the unsent invitation is still listed as pending (F-50).
+        const discarded = await call('admin_discard_unsent_invitation', { target_id: invitation.id });
+        return fail(502, discarded instanceof Response ? 'email_failed_pending' : 'email_failed');
       }
       return reply(200, { data: invitation });
     }
