@@ -41,31 +41,33 @@ export function AppNav({ isAdmin, path, hash, withPages, onChoose }: {
 
   return (
     <nav aria-label="App" className={styles.appNav}>
-      <ul className={styles.navList}>{WORKSPACE_ENTRIES.map(link)}</ul>
-      {isAdmin && (
-        <>
-          <hr className={styles.navDivider} />
-          <h2 className={styles.navGroup}>Admin</h2>
-          <ul className={styles.navList}>{ADMIN_ENTRIES.map(link)}</ul>
-        </>
-      )}
-      {withPages && (
-        <>
-          <hr className={styles.navDivider} />
-          <ul className={styles.navList}>
-            <li>
-              <a href={PAGES.generator} aria-current={path === PAGES.generator ? 'page' : undefined} className={styles.navItem} onClick={(e) => onChoose(e)}>
-                <Wand2 aria-hidden /> CSV Generator
-              </a>
-            </li>
-            <li>
-              <a href={PAGES.architecture} aria-current={path === PAGES.architecture ? 'page' : undefined} className={styles.navItem} onClick={(e) => onChoose(e)}>
-                <Network aria-hidden /> Architecture
-              </a>
-            </li>
-          </ul>
-        </>
-      )}
+      <div className={styles.navLinks}>
+        <ul className={styles.navList}>{WORKSPACE_ENTRIES.map(link)}</ul>
+        {isAdmin && (
+          <>
+            <hr className={styles.navDivider} />
+            <h2 className={styles.navGroup}>Admin</h2>
+            <ul className={styles.navList}>{ADMIN_ENTRIES.map(link)}</ul>
+          </>
+        )}
+        {withPages && (
+          <>
+            <hr className={styles.navDivider} />
+            <ul className={styles.navList}>
+              <li>
+                <a href={PAGES.generator} aria-current={path === PAGES.generator ? 'page' : undefined} className={styles.navItem} onClick={(e) => onChoose(e)}>
+                  <Wand2 aria-hidden /> CSV Generator
+                </a>
+              </li>
+              <li>
+                <a href={PAGES.architecture} aria-current={path === PAGES.architecture ? 'page' : undefined} className={styles.navItem} onClick={(e) => onChoose(e)}>
+                  <Network aria-hidden /> Architecture
+                </a>
+              </li>
+            </ul>
+          </>
+        )}
+      </div>
       <div className={styles.navFoot}>
         <AppVersion />
       </div>

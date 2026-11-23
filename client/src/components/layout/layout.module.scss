@@ -248,18 +248,27 @@
 }
 .sidebar {
   display: none;
-  // A white column with a full border, so it stands apart from the page background. It fills the window's
-  // height below the header, so the version sits at the bottom; the first entry lines up
-  // with the top of the page's content (both start space-6 below the header).
+  // A white column with a full border, so it stands apart from the page background. The column runs the
+  // whole page height (at least the window's height below the header), so no gap opens under it on long
+  // pages. While scrolling, the links stay at the top of the window and the version at its bottom. The
+  // first entry lines up with the top of the page's content (both start space-6 below the header).
   @include up(xl) {
     display: flex;
     flex-direction: column;
-    position: sticky;
-    top: 0;
+    align-self: stretch;
     min-height: calc(100vh - var(--app-space-unit) * 16);
     border-right: var(--app-border-width) solid var(--app-color-border);
     background: var(--app-color-surface);
     padding: var(--app-space-6) var(--app-space-4);
+
+    .navLinks {
+      position: sticky;
+      top: var(--app-space-6);
+    }
+    .navFoot {
+      position: sticky;
+      bottom: var(--app-space-6);
+    }
   }
 }
 .content {
@@ -270,6 +279,11 @@
 .appNav {
   display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: var(--app-space-1);
+}
+.navLinks {
+  display: flex;
   flex-direction: column;
   gap: var(--app-space-1);
 }
