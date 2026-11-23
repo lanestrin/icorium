@@ -1270,17 +1270,21 @@ describe('compact file table', () => {
   it('keeps the row and column counts in the preview header, for inputs and results', async () => {
     const imported: FileMeta = { ...result, id: '101012-M', name: 'copy.csv', imported: true };
     vi.mocked(api.list).mockResolvedValue([clean, result, imported]);
+    // Seven columns in each file; the preview shows them without file_id and result_id.
+    const headers = ['batch_id', 'mass_kg', 'r32', 'r125', 'file_id', 'result_id', 'r32_mass_kg'];
+    vi.mocked(api.rows).mockResolvedValue({ headers, rows: [], offset: 0, totalRows: 0, generatedColumns: [], problems: { total: 0, items: [] } });
     const user = await setup();
     const preview = async (name: string) => {
       await previewRow(user, name);
       const dialog = await screen.findByRole('dialog');
+      await within(dialog).findByText(/5 columns/);
       const text = subtitle(dialog);
       await user.click(within(dialog).getByRole('button', { name: /Close/ }));
       return text;
     };
-    expect(await preview('clean.csv')).toBe('File ID clean · 25 rows · 7 columns');
-    expect(await preview('result.csv')).toBe('File ID result · Component Mass Calculation result · 25 rows · 7 columns · generated columns highlighted');
-    expect(await preview('copy.csv')).toBe('File ID 101012-M · Component Mass Calculation result · 25 rows · 7 columns · generated columns highlighted · Imported: original input not linked');
+    expect(await preview('clean.csv')).toBe('File ID clean · 25 rows · 5 columns');
+    expect(await preview('result.csv')).toBe('File ID result · Component Mass Calculation result · 25 rows · 5 columns · generated columns highlighted');
+    expect(await preview('copy.csv')).toBe('File ID 101012-M · Component Mass Calculation result · 25 rows · 5 columns · generated columns highlighted · Imported: original input not linked');
   });
 });
 

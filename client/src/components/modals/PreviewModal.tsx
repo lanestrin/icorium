@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, TriangleAlert } from 'lucide-react';
 import { NO_TRACE_OLD, NO_TRACE_UPLOADED } from '../../../../shared/ingestion';
-import { PROCESSORS, RESULT_ID_COLUMN, type FileMeta, type FileRows, type ProblemList } from '../../../../shared/types';
+import { FILE_ID_COLUMN, PROCESSORS, RESULT_ID_COLUMN, type FileMeta, type FileRows, type ProblemList } from '../../../../shared/types';
 import { api } from '../../lib/api';
 import { classNames } from '../../lib/class-names';
 import { importedLineage } from '../../lib/file-status';
@@ -16,12 +16,17 @@ const PAGE = 100; // rows loaded per "Show more"
 // Invalid rows in current results, and the ERROR text older exports wrote, stand out in the preview.
 const isErrorCell = (header: string, value: string) => (header === 'processing_status' && value === 'Invalid') || value === 'ERROR';
 
-/** "File ID 101010-M · Mass result · 25 rows · 9 columns · generated columns highlighted · Imported…". */
-function previewSubtitle(file: FileMeta) {
+// The ID columns stay in the downloaded CSV, but the preview leaves them out: the subtitle already shows the ID.
+const visibleHeaders = (data: FileRows) => data.headers.filter((h) => h !== FILE_ID_COLUMN && h !== RESULT_ID_COLUMN);
+
+/**
+ * "File ID 101010-M · Mass result · 25 rows · 9 columns · generated columns highlighted · Imported…".
+ * The column count is of the columns shown, so it appears once the rows have loaded.
+ */
+function previewSubtitle(file: FileMeta, columns?: number) {
   const processor = PROCESSORS.find((p) => p.id === file.processor)?.label ?? '';
-  const shape = file.status === 'Processed'
-    ? `${processor} result · ${file.rows} rows · ${file.columns} columns · generated columns highlighted`
-    : `${file.rows} rows · ${file.columns} columns`;
+  const size = [`${file.rows} rows`, ...(columns === undefined ? [] : [`${columns} ${columns === 1 ? 'column' : 'columns'}`])].join(' · ');
+  const shape = file.status === 'Processed' ? `${processor} result · ${size} · generated columns highlighted` : size;
   const lineage = file.imported ? ` · ${importedLineage(file).short}` : '';
   return `File ID ${file.id} · ${shape}${lineage}`;
 }
@@ -51,13 +56,14 @@ function ProblemRows({ list }: { list: ProblemList }) {
 function RowsTable({ data, onExplain }: { data: FileRows; onExplain?: (row: number, column: string, button: HTMLButtonElement) => void }) {
   const generated = new Set(data.generatedColumns);
   const problemByRow = new Map(data.problems.items.map((p) => [p.row, p.message]));
+  const headers = visibleHeaders(data);
 
   return (
     <table className={styles.table}>
       <thead className={styles.tableHead}>
         <tr>
           <th className={styles.rowNumberHead}>#</th>
-          {data.headers.map((h) => (
+          {headers.map((h) => (
             <th key={h} className={classNames(styles.columnHead, generated.has(h) && styles.generatedHead)}>{h}</th>
           ))}
         </tr>
@@ -72,9 +78,9 @@ function RowsTable({ data, onExplain }: { data: FileRows; onExplain?: (row: numb
                 {isFlagged && <TriangleAlert className={styles.problemIcon} aria-label="Problem row" />}
                 {rowNumber}
               </td>
-              {data.headers.map((h) => (
+              {headers.map((h) => (
                 <td key={h} className={classNames(styles.cell, generated.has(h) && styles.generatedCell, isErrorCell(h, row[h]) && styles.errorCell)}>
-                  {onExplain && generated.has(h) && h !== RESULT_ID_COLUMN ? (
+                  {onExplain && generated.has(h) ? (
                     <button type="button" className={styles.explainCell} aria-label={`Explain ${h}, row ${rowNumber}`} onClick={(e) => onExplain(rowNumber, h, e.currentTarget)}>
                       {row[h]}
                     </button>
@@ -141,7 +147,7 @@ export function PreviewModal({ file, onClose }: { file: FileMeta; onClose: () =>
   );
 
   return (
-    <Modal title={file.name} subtitle={previewSubtitle(file)} onClose={onClose} actions={downloadButton}>
+    <Modal title={file.name} subtitle={previewSubtitle(file, data && visibleHeaders(data).length)} onClose={onClose} actions={downloadButton}>
       {error && <p className={classNames(styles.message, styles.error)}>{error}</p>}
       {!data && !error && <p className={classNames(styles.message, styles.loading)}>Loading…</p>}
       {data && data.problems.total > 0 && <ProblemRows list={data.problems} />}

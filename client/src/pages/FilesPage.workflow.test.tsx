@@ -74,9 +74,11 @@ describe('the whole workflow with real files', () => {
     await user.click(within(rowOf('100007-V')).getByRole('button', { name: /^Actions for / }));
     await user.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Preview file' }));
     const preview = await screen.findByRole('dialog', { name: 'result_partner_b_baseline_validation.csv' });
-    for (const column of ['result_id', 'composition_total_pct', 'processing_status', 'validation_errors']) {
+    for (const column of ['composition_total_pct', 'processing_status', 'validation_errors']) {
       expect(await within(preview).findByRole('columnheader', { name: column }, slow)).toBeInTheDocument();
     }
+    // The ID columns stay in the download (checked below) but not in the preview.
+    for (const column of ['file_id', 'result_id']) expect(within(preview).queryByRole('columnheader', { name: column })).not.toBeInTheDocument();
     const flagged = within(preview).getAllByLabelText('Problem row').map((icon) => icon.closest('tr')!);
     expect(flagged).toHaveLength(1);
     expect(flagged[0]).toHaveTextContent('B-005');
