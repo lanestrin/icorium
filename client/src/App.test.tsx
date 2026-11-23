@@ -37,6 +37,7 @@ describe('App', () => {
     ['/activate', 'Activate your account'],
     ['/reset-password', 'Reset your password'],
     ['/sign-in/', 'Sign in'],
+    ['/admin', 'Admin'],
   ])('opens the page at %s', async (path, heading) => {
     window.history.replaceState(null, '', path);
 

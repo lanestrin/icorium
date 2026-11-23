@@ -17,6 +17,8 @@ Sign-in is not required until 17.6, and cloud files arrive in 17.4.
 | File | What it does |
 | --- | --- |
 | `migrations/20261118000000_identity.sql` | The `invitations` and `profiles` tables, row-level security, the invite-only sign-up hook and the trigger that activates an invited account |
+| `migrations/20261122000000_admin_access.sql` | The Admin functions (17.3): list, invite, extend, revoke, change role, activate or deactivate. Only the service role can run them; each checks the caller is an active Admin |
+| `functions/admin/` | The Edge Function the Admin page calls (17.3): `handler.ts` holds the logic, `index.ts` wires the services |
 | `bootstrap-first-admin.sql` | The one-time step that makes the project owner the first Admin |
 
 The migration file name follows the Supabase CLI convention, so the folder
@@ -90,6 +92,15 @@ confirm them there before entering anything.
 Password reset links work only in the browser that asked for them, because
 the PKCE flow keeps its code verifier there. The reset page says so.
 
+## Admin setup (17.3; not done, each step needs authorization)
+
+1. **Apply the migration.** Run `migrations/20261122000000_admin_access.sql` once in the SQL editor, after the identity migration.
+2. **Set the function's secrets** (Edge Functions > Secrets). Supabase provides `SUPABASE_URL` and the service-role key to every function; confirm the key's name in the dashboard, because `index.ts` reads `SUPABASE_SERVICE_ROLE_KEY`. Add `SITE_URL` (the site's address, no path), `SMTP_USER` (the Gmail account), `SMTP_PASSWORD` (its app password) and `SMTP_FROM` (the sender address). Real values go only in the dashboard, never in this repository or the browser.
+3. **Deploy the function** named `admin` from `functions/admin/`. Keep the default setting that checks a JWT, and confirm that a signed-in browser's call passes the gateway.
+4. The `/admin` page is not linked anywhere until 17.6. Open it by its address while signed in as an Admin.
+
+How it works: the page sends the signed-in person's access token to the function. The function verifies it, passes that user's ID to the SQL functions as `actor`, and they refuse anyone who is not an active Admin. An invitation email holds a link to `/activate?email=...` and no secret: the invitation record, the sign-up hook and email confirmation (or Google) bind the invitation to the address. Deactivating an account sets `active = false`, which row-level checks read on the next request, and then bans the user in Auth so their sessions cannot refresh. Reactivating reverses both. Files are kept.
+
 ## Not verified yet (17.7)
 
 These are recorded as assumptions until hosted evidence exists:
@@ -102,6 +113,9 @@ These are recorded as assumptions until hosted evidence exists:
   invitation creates none;
 - a user can read only their own profile and update only its name;
 - the grants `supabase_auth_admin` needs to read `invitations` are complete;
+- the admin function on a real project: its gateway JWT check, the service-role key name, CORS from the site, and the service role's execute rights on the SQL functions;
+- that Gmail SMTP on port 465 is reachable from an Edge Function and that nodemailer runs there;
+- that a ban stops an already signed-in user's token refresh, and that sign-in then reports "user_banned";
 - the sign-in pages against a real project: password and Google sign-in, the
   confirmation and reset emails, and the PKCE redirects back to the site.
 

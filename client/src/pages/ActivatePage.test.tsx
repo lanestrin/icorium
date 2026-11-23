@@ -30,6 +30,19 @@ afterEach(() => {
 const NEUTRAL = 'If this address has an invitation, check your email to confirm it, then sign in. Nothing arrived? Ask an administrator for an invitation.';
 
 describe('ActivatePage', () => {
+  it('fills the email from the invitation link and lets the person change it', async () => {
+    setUp();
+    window.history.replaceState(null, '', '/activate?email=ada%2Btest%40example.com');
+    const user = userEvent.setup();
+    render(<ActivatePage />);
+    expect(screen.getByLabelText('Email')).toHaveValue('ada+test@example.com');
+    await user.clear(screen.getByLabelText('Email'));
+    await user.type(screen.getByLabelText('Email'), 'other@example.com');
+    expect(screen.getByLabelText('Email')).toHaveValue('other@example.com');
+    window.history.replaceState(null, '', '/');
+  });
+
+
   it('creates the account with the trimmed name and asks the person to confirm their email', async () => {
     const fake = setUp();
     const user = userEvent.setup();

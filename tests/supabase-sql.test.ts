@@ -167,3 +167,93 @@ describe('Supabase identity SQL', () => {
     expect(sqlProblems(commentedOut, BOOTSTRAP)).toContain('no row level security on public.invitations');
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// Admin access SQL (build-plan 17.3): trusted functions called only by the Admin Edge Function.
+// ---------------------------------------------------------------------------------------------
+const ADMIN = readSql('../supabase/migrations/20261122000000_admin_access.sql');
+
+/** The name and `(argument types)` of each function the migration creates, for grant matching. */
+function adminSignatures(sql: string): { name: string; types: string }[] {
+  return [...code(sql).matchAll(/create function public\.(\w+)\(([^)]*)\)/g)].map(([, name, args]) => ({
+    name,
+    types: args.split(',').map((arg) => arg.trim().split(/\s+/)[1]).join(', '),
+  }));
+}
+
+/** Every safety rule the admin migration must keep, as a list of the rules broken. */
+function adminProblems(sql: string): string[] {
+  const problems: string[] = [];
+  const text = code(sql);
+  const norm = normalized(sql);
+  const signatures = adminSignatures(sql);
+  const callable = signatures.filter((fn) => fn.name !== 'admin_assert');
+
+  for (const fn of functions(sql)) {
+    if (!/\bsecurity definer\b/.test(fn) || !fn.includes("set search_path = ''")) problems.push('admin function is not security definer with an empty search_path');
+  }
+  for (const fn of signatures) {
+    const target = `function public.${fn.name}(${fn.types})`;
+    if (!text.includes(`revoke execute on ${target} from public, anon, authenticated;`)) problems.push(`${fn.name} not revoked from clients`);
+  }
+  for (const fn of callable)
+    if (!text.includes(`grant execute on function public.${fn.name}(${fn.types}) to service_role;`)) problems.push(`${fn.name} not granted to service_role`);
+  if (grants(sql).some((grant) => grant.roles.some((role) => role !== 'service_role'))) problems.push('a grant to a role other than service_role');
+  if (grants(sql).some((grant) => grant.object.startsWith('function public.admin_assert'))) problems.push('the internal check is granted');
+  if (/\b(create|alter|drop) policy\b|\bcreate table\b|\bdisable row level security\b/.test(norm)) problems.push('tables or policies changed');
+
+  // Every callable function starts with the Admin check, before touching any table.
+  for (const fn of functions(sql)) {
+    if (fn.includes('create function public.admin_assert')) continue;
+    const body = fn.slice(fn.indexOf('begin'));
+    const check = body.indexOf('public.admin_assert(actor)');
+    const firstTable = body.search(/\b(from|insert into|update|delete from) public\./);
+    if (check === -1) problems.push('a function skips the Admin check');
+    // Role and access changes lock the Admin profiles first; the check still precedes every write.
+    else if (firstTable !== -1 && firstTable < check && !/for update;\s*perform public\.admin_assert/.test(body)) problems.push('a function reads a table before the Admin check');
+  }
+  const assertion = functions(sql).find((fn) => fn.includes('create function public.admin_assert'));
+  if (!assertion?.includes("profile.role = 'Admin' and profile.active") || !assertion.includes("raise exception 'not_admin'")) problems.push('the Admin check is not an active Admin test');
+
+  for (const name of ['admin_set_role', 'admin_set_active']) {
+    const fn = functions(sql).find((f) => f.includes(`create function public.${name}`)) ?? '';
+    if (!fn.includes("profile.role = 'Admin' and profile.active for update") || !fn.includes("raise exception 'last_admin'")) problems.push(`${name} lacks the locked last-Admin guard`);
+  }
+  const discard = functions(sql).find((f) => f.includes('admin_discard_unsent_invitation')) ?? '';
+  if (!/invitation\.accepted_at is null/.test(discard)) problems.push('discard can remove an accepted invitation');
+  if (/\bstorage\.|\bfiles\b/.test(text)) problems.push('touches files or storage');
+  return problems;
+}
+
+describe('Supabase admin access SQL', () => {
+  it('keeps every safety rule', () => {
+    expect(adminProblems(ADMIN)).toEqual([]);
+  });
+
+  it('lists the nine functions', () => {
+    expect(adminSignatures(ADMIN).map((fn) => fn.name)).toEqual([
+      'admin_assert', 'admin_list', 'admin_create_invitation', 'admin_discard_unsent_invitation', 'admin_pending_invitation',
+      'admin_extend_invitation', 'admin_revoke_invitation', 'admin_set_role', 'admin_set_active',
+    ]);
+  });
+
+  const broken: [string, (sql: string) => string, string][] = [
+    ['empty search_path removed', (s) => s.replace("security definer\nset search_path = ''", 'security definer'), 'admin function is not security definer with an empty search_path'],
+    ['a function granted to clients', (s) => `${s}\ngrant execute on function public.admin_list(uuid) to authenticated;`, 'a grant to a role other than service_role'],
+    ['the internal check granted', (s) => `${s}\ngrant execute on function public.admin_assert(uuid) to service_role;`, 'the internal check is granted'],
+    ['a revoke removed', (s) => s.replace('revoke execute on function public.admin_list(uuid) from public, anon, authenticated;', ''), 'admin_list not revoked from clients'],
+    ['service_role grant removed', (s) => s.replace('grant execute on function public.admin_set_role(uuid, uuid, text) to service_role;', ''), 'admin_set_role not granted to service_role'],
+    ['the Admin check skipped', (s) => s.replace(/(create function public\.admin_list[\s\S]*?)perform public\.admin_assert\(actor\);/, '$1'), 'a function skips the Admin check'],
+    ['the Admin check ignores active', (s) => s.replace("profile.role = 'Admin' and profile.active\n", "profile.role = 'Admin'\n"), 'the Admin check is not an active Admin test'],
+    ['the last-Admin guard removed', (s) => s.replace(/(create function public\.admin_set_active[\s\S]*?)raise exception 'last_admin';/, "$1raise exception 'other';"), 'admin_set_active lacks the locked last-Admin guard'],
+    ['the Admin lock removed', (s) => s.replace(/(create function public\.admin_set_role[\s\S]*?profile\.active) for update;/, '$1;'), 'admin_set_role lacks the locked last-Admin guard'],
+    ['discard of accepted invitations', (s) => s.replace('where invitation.id = target_id and invitation.accepted_at is null;', 'where invitation.id = target_id;'), 'discard can remove an accepted invitation'],
+    ['a policy added', (s) => `${s}\ncreate policy "Admins read" on public.profiles for select to authenticated using (true);`, 'tables or policies changed'],
+    ['a function reading Storage', (s) => `${s}\n-- x\ncreate function public.peek() returns void language sql as $$ select 1 from storage.objects $$;`, 'touches files or storage'],
+  ];
+  it.each(broken)('fails when %s', (_label, breakIt, problem) => {
+    const changed = breakIt(ADMIN);
+    expect(changed).not.toBe(ADMIN);
+    expect(adminProblems(changed)).toContain(problem);
+  });
+});

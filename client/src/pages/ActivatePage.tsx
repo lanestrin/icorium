@@ -16,7 +16,8 @@ import { PAGES } from '../lib/pages';
  */
 export function ActivatePage() {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  // An invitation email links to /activate?email=<address>; it only fills the field, the person can change it.
+  const [email, setEmail] = useState(() => (new URLSearchParams(window.location.search).get('email') ?? '').trim().slice(0, 254));
   const [password, setPassword] = useState('');
   const [nameError, setNameError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

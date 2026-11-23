@@ -42,7 +42,7 @@ export const TECH: Tech[] = [
       'Fast dev server with hot reload, and a small config: React and built-in Sass support.',
       'A plain static build that any static host can serve, without the conventions of a larger full-stack framework.',
     ],
-    tradeoff: 'No built-in router. The app picks its pages from the URL itself, so the build copies index.html for /generator, /architecture and the sign-in pages to keep them loading on a static host.',
+    tradeoff: 'No built-in router. The app picks its pages from the URL itself, so the build copies index.html for /generator, /architecture, /admin and the sign-in pages to keep them loading on a static host.',
     files: ['client/vite.config.ts', 'client/src/lib/pages.ts'],
   },
   {
@@ -311,8 +311,8 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
     items: [
       { id: '17.1', title: 'Free hosted-service design', status: 'Done', text: 'Supabase chosen over Firebase and Appwrite: the only free plan that met invite-only sign-in, private files and access to existing files without a card.' },
       { id: '17.2', title: 'Sign-in and activation', status: 'Done', text: 'Invite-only database rules, then sign-in, activation, password recovery and sign-out pages. Sign-in is optional until 17.6.' },
-      { id: '17.3', title: 'Admin invitations and access', status: 'Next', text: 'Invite by email (30-day expiry, resend, extend, revoke), change roles, deactivate and reactivate. An Admin cannot read members\x27 files.' },
-      { id: '17.4', title: 'Private cross-device files', status: 'Planned', text: 'Files, results and metadata in Supabase, checked against the signed-in owner on every action; uploads refused at capacity.' },
+      { id: '17.3', title: 'Admin invitations and access', status: 'Done', text: 'An Admin page to invite by email (30-day expiry, resend, extend, revoke), change roles, deactivate and reactivate, enforced by the admin function and database rules. An Admin cannot read members\x27 files.' },
+      { id: '17.4', title: 'Private cross-device files', status: 'Next', text: 'Files, results and metadata in Supabase, checked against the signed-in owner on every action; uploads refused at capacity.' },
       { id: '17.5', title: 'Guest demo and export', status: 'Planned', text: 'Try the demo signs in with demo credentials; each demo gets isolated, temporary browser data with sample files, cleared when it ends. Files already in the browser can be exported.' },
       { id: '17.6', title: 'Require sign-in', status: 'Planned', text: 'The file workspace needs an invited account or a demo session; Admin, Architecture and Generator pages are Admin-only.' },
       { id: '17.7', title: 'Hosted verification', status: 'Planned', text: 'Real evidence on a non-production project: invitations, both sign-in methods, cross-device files, isolation and deactivation.' },
@@ -335,7 +335,7 @@ export const HOSTED_DESIGN = {
   services: [
     { role: 'Sign-in and sessions', service: 'Supabase Auth: email and password, Google, and an invite-only sign-up hook' },
     { role: 'Files and metadata', service: 'Supabase Postgres and one private Storage bucket, both behind row-level security' },
-    { role: 'Admin actions', service: 'Supabase Edge Functions for invitations, roles and deactivation; they never read files' },
+    { role: 'Admin actions', service: 'One Supabase Edge Function (admin) for invitations, roles and deactivation; it checks the caller is an active Admin, sends invitation email through the Gmail sender, and never reads files' },
     { role: 'Email', service: 'Supabase custom SMTP through a Gmail sender' },
   ],
   limits: [

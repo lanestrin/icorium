@@ -37,9 +37,12 @@ export function fakeSupabase({ session = null as Session | null, profile = null 
       return { error: null };
     }),
   };
+  // Edge Function calls (the Admin page). A test sets the reply: { data } or { error }.
+  const invoke = vi.fn(async (): Promise<Result> => ({ data: { data: null }, error: null }));
   const client = {
     auth,
+    functions: { invoke },
     from: vi.fn(() => ({ select: () => ({ eq: () => ({ maybeSingle }) }), update })),
   };
-  return { client: client as unknown as SupabaseClient, auth, maybeSingle, update, updateEq, emit };
+  return { client: client as unknown as SupabaseClient, auth, maybeSingle, update, updateEq, invoke, emit };
 }
