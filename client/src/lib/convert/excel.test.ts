@@ -157,6 +157,7 @@ describe('findExcelTables', () => {
     const [table] = await tablesOf({ Data: [['Lot', 'Mass (lb)', null, 'Column D'], ['L1', 10, 'x', 'y']] });
     expect(table.headers).toEqual(['Lot', 'Mass (lb)', 'Column C', 'Column D']);
     expect(table.flags).toEqual([{ row: 1, reason: 'C1 has no header; named "Column C"' }]);
+    expect(table.columns).toEqual(['A', 'B', 'C', 'D']);
     const [clash] = await tablesOf({ Data: [['Lot', null, 'Column B', 'Mass'], ['L1', 'x', 'y', 10]] });
     expect(clash.headers).toEqual(['Lot', 'Column B (2)', 'Column B', 'Mass']);
   });

@@ -111,3 +111,110 @@ export interface SupplierProfile {
 
 /** Where a file is in import, apart from its stored status. */
 export type IngestionState = 'Needs Mapping' | 'Needs Review' | 'Ready for Processing';
+
+/** The largest original file kept (and converted), in MB. */
+export const ORIGINAL_MAX_MB = 20;
+
+/** What OCR read: the whole image, or these PDF pages (1-based). */
+export type SourceOcr = 'image' | number[];
+
+/** The small summary kept on a file's metadata; the per-row data stays in its SourceRecord. */
+export interface SourceSummary {
+  kind: SourceKind;
+  name: string;
+  size: number;
+  /** Excel only: the sheet and the A1 range of the table. */
+  sheet?: string;
+  range?: string;
+  ocr?: SourceOcr;
+}
+
+/** A value read from a PDF or image that the person decided on before import. column is its 0-based position among the uploaded headers. */
+export interface SourceCheck {
+  /** 1-based data row. */
+  row: number;
+  column: number;
+  asRead: string;
+  reasons: string[];
+  decision: 'keep' | 'blank';
+}
+
+/**
+ * What storage keeps beside a file's CSV (build-plan 19.8): the original file and where each stored data row came
+ * from. A CSV has no per-row references (its source row is the data row plus one).
+ */
+export interface SourceRecord {
+  kind: SourceKind;
+  original: { name: string; mediaType: string; bytes: ArrayBuffer };
+  sheet?: string;
+  range?: string;
+  /** Excel only: the column letter of each header, in order. */
+  columns?: string[];
+  /** One per data row, in stored order; empty for a CSV. row is the sheet or document row. */
+  rows: { row: number; page?: number; pageRow?: number }[];
+  checks: SourceCheck[];
+  ocr?: SourceOcr;
+}
+
+/** What a result records about how it was calculated. */
+export interface ResultTrace {
+  inputFileId: string;
+  /** Absent for an input uploaded before sources were kept. */
+  source?: SourceSummary;
+  mappings: FieldMapping[];
+  units: UnitDecision[];
+  validation: {
+    approval: 'partner' | 'confirmed';
+    confirmedAt?: string;
+    rows: number;
+    excludedRows: number;
+    warnings: string[];
+  };
+  processor: string;
+  processorVersion: number;
+}
+
+/** One mapped field of a result row, traced to its raw source cell (build-plan 19.8). */
+export interface FieldExplanation {
+  field: CanonicalField;
+  label: string;
+  /** The input column the mapping read, and how it was matched. */
+  column: string;
+  origin: MappingOrigin;
+  /** Where the raw value is in the original file: "Sheet1!C7", "page 2, row 5" or `row 7, column "Net Mass"`; absent when not recorded. */
+  location?: string;
+  /** The raw value, exactly as stored in the input (empty when missing, or when the person chose Leave blank). */
+  raw: string;
+  /** PDF and image only: the value as read, when the person had to confirm it. */
+  confirmed?: { asRead: string; reasons: string[]; decision: 'keep' | 'blank' };
+  /** Measurements only: the unit read in, the factor to kg or percent, and the value used (never zero for a missing one). */
+  unit?: string;
+  factor?: number;
+  normalized?: number | null;
+  problem?: 'missing' | 'not a number' | 'ambiguous separator';
+}
+
+/** What explain() answers for a result that has a trace. */
+export interface Explanation {
+  traced: true;
+  fileId: string;
+  row: number;
+  column: string;
+  /** The value as stored in the result. */
+  value: string;
+  processor: { id: string; label: string; version: number };
+  /** excluded: the row had a blocking problem, so no value was calculated from it. */
+  rowStatus: 'calculated' | 'excluded';
+  reasons: string;
+  input: { fileId: string; name?: string; source?: SourceSummary };
+  fields: FieldExplanation[];
+}
+
+export type ExplainOutcome = Explanation | { traced: false; reason: string };
+
+/** What a converted upload (Excel, PDF or image) sends beside its CSV: the SourceRecord of a file that is not a CSV. */
+export type UploadSource = Omit<SourceRecord, 'kind'> & { kind: Exclude<SourceKind, 'csv'> };
+
+/** Why a result cannot be explained: it was uploaded, or it was processed before traces were recorded. */
+export const NO_TRACE_UPLOADED = 'This result was uploaded, so how it was calculated is not recorded.';
+export const NO_TRACE_OLD = 'This result was made before traces were recorded. Run the function again to record one.';

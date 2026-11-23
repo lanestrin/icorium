@@ -233,6 +233,10 @@ describe('converting PDF uploads', () => {
 X-1,2026-09-01,100,40,30,30
 X-2,2026-09-01,200,40,30,30
 `);
+    // The original file and where each row came from go with the CSV; the left-out repeated header (row 3) has no row of its own.
+    expect(vi.mocked(api.upload).mock.calls[0][1]).toMatchObject({
+      kind: 'pdf', original: { name: 'report.pdf' }, rows: [{ row: 2, page: 1, pageRow: 2 }, { row: 4, page: 1, pageRow: 4 }], checks: [],
+    });
   });
 
   it('converts a PDF table with other headers, and Map columns opens for the uploaded CSV', async () => {

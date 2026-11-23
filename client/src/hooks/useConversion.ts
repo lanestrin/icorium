@@ -3,7 +3,8 @@ import { findExcelTables, readExcel } from '../lib/convert/excel';
 import { readImage, type ReadProgress } from '../lib/convert/ocr';
 import { allDecided, applyDecisions, findPageTable, type Decision, type PageRows } from '../lib/convert/pages';
 import { readPdf } from '../lib/convert/pdf';
-import { fileKind, toCsvFile, type FileKind, type FoundTable } from '../lib/convert/table';
+import { fileKind, toCsvFile, toUploadSource, type FileKind, type FoundTable } from '../lib/convert/table';
+import type { UploadSource } from '../../../shared/ingestion';
 
 /** What was read by OCR: the whole image, or these PDF pages (1-based). Absent when nothing was. */
 export type ReadByOcr = 'image' | number[];
@@ -14,6 +15,12 @@ export type ReadByOcr = 'image' | number[];
  * chosen table to confirm (PDF and image), by the value's id.
  */
 export interface Review { name: string; tables: FoundTable[]; chosen: number | null; ocr?: ReadByOcr; decisions: Record<string, Decision> }
+
+/**
+ * What the upload loop sends for one file: the CSV, and for a converted file a way to build the original and its row references.
+ * source is called inside the upload's own error handling, since it reads the original file.
+ */
+export interface Prepared { file: File; source?: () => Promise<UploadSource> }
 
 /** A file kind that needs reading before upload. */
 type ReadableKind = Exclude<FileKind, 'csv'>;
@@ -49,7 +56,7 @@ export function readingStatus(name: string, progress?: ReadProgress) {
  * The one conversion in progress: its number, how to stop its reader, and how to hand its outcome back to
  * the upload loop.
  */
-interface Job { id: number; reader: AbortController; finish: (file: File | null) => void }
+interface Job { id: number; reader: AbortController; original: File; finish: (prepared: Prepared | null) => void }
 
 /**
  * Turns non-CSV uploads into CSVs in the browser, one file at a time, with a review before anything is
@@ -82,14 +89,14 @@ export function useConversion(read: ReadSource = readSource) {
 
   useEffect(() => cancel, [cancel]); // unmounting cancels the job in progress
 
-  const prepare = useCallback((file: File): Promise<File | null> => {
+  const prepare = useCallback((file: File): Promise<Prepared | null> => {
     const kind = fileKind(file);
-    if (kind === 'csv') return Promise.resolve(file);
+    if (kind === 'csv') return Promise.resolve({ file });
     cancel(); // only one conversion at a time
     const id = ++lastId.current;
-    return new Promise<File | null>((resolve, reject) => {
+    return new Promise<Prepared | null>((resolve, reject) => {
       const reader = new AbortController();
-      job.current = { id, reader, finish: resolve };
+      job.current = { id, reader, original: file, finish: resolve };
       setReading(readingStatus(file.name));
       const onProgress = (progress: ReadProgress) => {
         if (job.current?.id === id) setReading(readingStatus(file.name, progress));
@@ -132,7 +139,8 @@ export function useConversion(read: ReadSource = readSource) {
     if (!allDecided(table, review.decisions)) return;
     job.current = null;
     setReview(null);
-    active.finish(toCsvFile(applyDecisions(table, review.decisions), review.name));
+    const { name, decisions, ocr } = review;
+    active.finish({ file: toCsvFile(applyDecisions(table, decisions), name), source: () => toUploadSource(table, active.original, decisions, ocr) });
   }, [review]);
 
   return { prepare, review, reading, cancel, choose, decide, importReviewed };

@@ -1,10 +1,11 @@
-import type { CanonicalField, IngestionRecord, ValidationIssue } from './ingestion';
+import type { CanonicalField, IngestionRecord, ResultTrace, SourceSummary, ValidationIssue } from './ingestion';
 
 // code: the fixed letter a result's File ID ends with (101010-V). Never change or reuse a code.
+// version: recorded on each result. Raise it only when that function's rules or generated columns change; never reuse a number.
 export const PROCESSORS = [
-  { id: 'validation', code: 'V', label: 'Composition Validation', short: 'Validation', tableLabel: 'Validation', description: 'Check mixture percentages (≈100%)' },
-  { id: 'mass', code: 'M', label: 'Component Mass Calculation', short: 'Mass', tableLabel: 'Mass Calculation', description: 'Calculate mass of each refrigerant (kg)' },
-  { id: 'classification', code: 'C', label: 'Batch Classification', short: 'Classification', tableLabel: 'Classification', description: 'Categorize batches by composition' },
+  { id: 'validation', version: 1, code: 'V', label: 'Composition Validation', short: 'Validation', tableLabel: 'Validation', description: 'Check mixture percentages (≈100%)' },
+  { id: 'mass', version: 1, code: 'M', label: 'Component Mass Calculation', short: 'Mass', tableLabel: 'Mass Calculation', description: 'Calculate mass of each refrigerant (kg)' },
+  { id: 'classification', version: 1, code: 'C', label: 'Batch Classification', short: 'Classification', tableLabel: 'Classification', description: 'Categorize batches by composition' },
 ] as const;
 
 export type ProcessorId = (typeof PROCESSORS)[number]['id'];
@@ -62,6 +63,8 @@ export interface FileMeta {
   archivedAt?: string; // ISO; when it was last archived, cleared on restore
   imported?: boolean; // an uploaded result; linked to an original only when sourceId is set
   importedFrom?: string; // provenance only: the source File ID an uploaded result named in its file_id column
+  source?: SourceSummary; // uploads since 19.8: what the original file was; absent on older files
+  trace?: ResultTrace; // results processed since 19.8: how they were calculated
   ingestion?: IngestionRecord; // inputs that are not exactly a partner's (and their results); absent otherwise
 }
 

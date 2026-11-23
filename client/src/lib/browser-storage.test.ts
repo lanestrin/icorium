@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { SupplierProfile } from '../../../shared/ingestion';
+import type { SourceRecord, SupplierProfile } from '../../../shared/ingestion';
 import type { NewFile } from '../../../shared/storage';
 import { createMemoryStorage, openBrowserStorage, STORAGE_FULL_MESSAGE, UPGRADE_BLOCKED_MESSAGE, type BrowserStorage } from './browser-storage';
 
@@ -21,6 +21,13 @@ const holdVersionOne = (name: string) => new Promise<IDBDatabase>((resolve, reje
 });
 
 const input = (name: string, text = 'batch_id\nA-1\n'): NewFile => ({ name, text, rows: 1, columns: 1, status: 'Ready', problemRows: 0 });
+
+const sourceOf = (name: string): SourceRecord => ({
+  kind: 'pdf',
+  original: { name, mediaType: 'application/pdf', bytes: new Uint8Array([37, 80, 68, 70]).buffer },
+  rows: [{ row: 3, page: 1, pageRow: 3 }],
+  checks: [{ row: 1, column: 2, asRead: '1O.5', reasons: ['letter O in a number'], decision: 'blank' }],
+});
 
 describe.each<[string, () => Promise<BrowserStorage>]>([
   ['IndexedDB', () => openBrowserStorage(freshName())],
@@ -100,6 +107,21 @@ describe.each<[string, () => Promise<BrowserStorage>]>([
     expect((await store.create(input('c.csv'))).id).toBe('100001');
   });
 
+  it('saves a source with its file, reads it back, and clears it', async () => {
+    const store = await open();
+    const { id } = await store.create({ ...input('a.csv'), record: sourceOf('a.pdf') });
+    const plain = await store.create(input('b.csv'));
+    expect(new Uint8Array((await store.readSource(id))!.original.bytes)).toEqual(new Uint8Array([37, 80, 68, 70]));
+    expect(await store.readSource(id)).toMatchObject({ kind: 'pdf', rows: [{ row: 3, page: 1, pageRow: 3 }], checks: [{ asRead: '1O.5', decision: 'blank' }] });
+    expect('record' in (await store.get(id))).toBe(false); // the metadata stays small
+    expect(await store.readSource(plain.id)).toBeUndefined();
+    await expect(store.readSource('100099')).rejects.toMatchObject({ statusCode: 404 });
+    await store.clear();
+    expect(await store.list()).toEqual([]);
+    const again = await store.create(input('c.csv'));
+    expect(await store.readSource(again.id)).toBeUndefined(); // numbering restarted, and no old source came back
+  });
+
   it('saves a supplier profile, replaces the one with the same key, lists them, and clears them', async () => {
     const store = await open();
     expect(await store.listProfiles()).toEqual([]);
@@ -154,6 +176,46 @@ describe('IndexedDB storage only', () => {
     await expect(openBrowserStorage(name)).rejects.toMatchObject({ statusCode: 409, message: UPGRADE_BLOCKED_MESSAGE });
     oldTab.close();
     expect(await (await openBrowserStorage(name)).list()).toEqual([]); // once that tab is gone, the upgrade goes through
+  });
+
+  it('upgrades a version 2 database, keeping its files and profiles and adding sources', async () => {
+    const name = freshName();
+    const v2 = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name, 2);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore('meta', { keyPath: 'id' });
+        request.result.createObjectStore('files');
+        request.result.createObjectStore('profiles', { keyPath: 'key' });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const profile: SupplierProfile = { key: 'k', name: 'Acme', columns: { batchId: 'a', sampleDate: 'b', massKg: 'c', r32: 'd', r125: 'e', r134a: 'f' }, units: { massKg: 'kg', r32: '%', r125: '%', r134a: '%' }, savedAt: '2026-11-01T00:00:00.000Z' };
+    const tx = v2.transaction(['meta', 'files', 'profiles'], 'readwrite');
+    tx.objectStore('meta').put({ id: '100001', name: 'old.csv', rows: 1, columns: 1, uploadedAt: '2026-11-01T00:00:00.000Z', status: 'Ready' });
+    tx.objectStore('files').put('batch_id\nA-1\n', '100001');
+    tx.objectStore('profiles').put(profile);
+    await new Promise<void>((resolve) => { tx.oncomplete = () => resolve(); });
+    v2.close();
+
+    const store = await openBrowserStorage(name);
+    expect((await store.list()).map((f) => f.id)).toEqual(['100001']);
+    expect(await store.read('100001')).toBe('batch_id\nA-1\n');
+    expect(await store.listProfiles()).toEqual([profile]);
+    expect(await store.readSource('100001')).toBeUndefined(); // an older file has no source
+    const created = await store.create({ ...input('new.csv'), record: sourceOf('new.pdf') });
+    expect((await store.readSource(created.id))?.kind).toBe('pdf');
+  });
+
+  it('saves no file when its source cannot be saved', async () => {
+    const store = await openBrowserStorage(freshName());
+    const put = IDBObjectStore.prototype.put;
+    vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      if (this.name === 'sources') throw new DOMException('Quota exceeded', 'QuotaExceededError');
+      return put.call(this, value, key);
+    });
+    await expect(store.create({ ...input('a.csv'), record: sourceOf('a.pdf') })).rejects.toMatchObject({ statusCode: 507, message: STORAGE_FULL_MESSAGE });
+    expect(await store.list()).toEqual([]);
   });
 
   it('gives uploads made at the same time different IDs', async () => {

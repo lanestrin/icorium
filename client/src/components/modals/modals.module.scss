@@ -453,3 +453,58 @@
   line-height: var(--app-leading-sm);
   color: var(--app-color-text-muted);
 }
+.explainCell {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: var(--app-space-1);
+  cursor: pointer;
+
+  &:hover {
+    text-decoration-style: solid;
+  }
+}
+.explain {
+  margin-top: var(--app-space-5);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  padding: var(--app-space-3) var(--app-space-4);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  overflow-wrap: anywhere; // supplied names and values can be long
+}
+.explainHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-3);
+}
+.explainTitle {
+  font-weight: var(--app-weight-semibold);
+
+  &:focus {
+    outline: none;
+  }
+}
+.explainFields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-2);
+  margin-top: var(--app-space-2);
+}
+.explainField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-0-5);
+  border-top: var(--app-border-width) solid var(--app-color-border);
+  padding-top: var(--app-space-2);
+}
+.explainLabel {
+  font-weight: var(--app-weight-semibold);
+}
+.explainMuted {
+  color: var(--app-color-text-muted);
+}

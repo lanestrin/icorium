@@ -1,11 +1,11 @@
-import type { SupplierProfile } from './ingestion';
+import type { SourceRecord, SupplierProfile } from './ingestion';
 import type { FileMeta, ProcessorCode } from './types';
 
 // Storage contract: what the app needs from wherever files are kept. The browser implements it with IndexedDB
 // or memory in client/src/lib/browser-storage.ts; a cloud backend would be another Storage. Types only.
 
 /** What saving a file needs; the ID and upload time are set by storage. */
-export type NewFile = Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string };
+export type NewFile = Omit<FileMeta, 'id' | 'uploadedAt'> & { text: string; /** The original file and its row references, saved in the same transaction. */ record?: SourceRecord };
 /** For create(): the text may depend on the new File ID, which is written into the CSV's ID columns. */
 export type NewUpload = Omit<NewFile, 'text'> & { text: string | ((id: string) => string) };
 
@@ -15,6 +15,8 @@ export interface Storage {
   list(): Promise<FileMeta[]>;
   /** One file's metadata; 404 when there is none, or when the ID is not a File ID. */
   get(id: string): Promise<FileMeta>;
+  /** One file's source record (original file and row references); undefined when none was kept; 404 for an unknown file. */
+  readSource(id: string): Promise<SourceRecord | undefined>;
   /** One file's CSV text. */
   read(id: string): Promise<string>;
   /** Updates stored metadata fields of one file. */

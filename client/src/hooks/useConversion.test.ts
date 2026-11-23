@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReadProgress } from '../lib/convert/ocr';
 import type { FoundTable } from '../lib/convert/table';
-import { useConversion, type ReadByOcr, type ReadOutcome } from './useConversion';
+import { useConversion, type Prepared, type ReadByOcr, type ReadOutcome } from './useConversion';
 
 const A = ['batch_id', 'sample_date', 'feed_mass_kg', 'r32_pct', 'r125_pct', 'r134a_pct'];
 const sheet = [A, ['X-1', '2026-09-01', '100', '40', '30', '30']];
@@ -29,14 +29,14 @@ describe('useConversion', () => {
     const { read } = slowReader();
     const { result } = renderHook(() => useConversion(read));
     const csv = new File(['a'], 'data.csv');
-    await expect(result.current.prepare(csv)).resolves.toBe(csv);
+    await expect(result.current.prepare(csv)).resolves.toEqual({ file: csv });
     expect(read).not.toHaveBeenCalled();
   });
 
   it('resolves null on cancel and ignores the reader when it finishes later', async () => {
     const reader = slowReader();
     const { result } = renderHook(() => useConversion(reader.read));
-    let outcome!: Promise<File | null>;
+    let outcome!: Promise<Prepared | null>;
     act(() => { outcome = result.current.prepare(new File(['x'], 'report.xlsx')); });
     expect(result.current.reading).toBe('Reading report.xlsx…');
     expect(reader.signal().aborted).toBe(false);
@@ -51,7 +51,7 @@ describe('useConversion', () => {
   it('cancels the job in progress when it unmounts', async () => {
     const reader = slowReader();
     const { result, unmount } = renderHook(() => useConversion(reader.read));
-    let outcome!: Promise<File | null>;
+    let outcome!: Promise<Prepared | null>;
     act(() => { outcome = result.current.prepare(new File(['x'], 'report.xlsx')); });
     unmount();
     await expect(outcome).resolves.toBeNull();
@@ -62,7 +62,7 @@ describe('useConversion', () => {
   it('starting a new file cancels the one before it, whose late result is ignored', async () => {
     const reader = slowReader();
     const { result } = renderHook(() => useConversion(reader.read));
-    let earlier!: Promise<File | null>;
+    let earlier!: Promise<Prepared | null>;
     act(() => { earlier = result.current.prepare(new File(['x'], 'one.xlsx')); });
     act(() => { void result.current.prepare(new File(['y'], 'two.xlsx')); });
     await expect(earlier).resolves.toBeNull();
@@ -76,7 +76,7 @@ describe('useConversion', () => {
   it('rejects with the reader or table error, ready to show', async () => {
     const reader = slowReader();
     const { result } = renderHook(() => useConversion(reader.read));
-    let outcome!: Promise<File | null>;
+    let outcome!: Promise<Prepared | null>;
     act(() => { outcome = result.current.prepare(new File(['x'], 'report.xlsx')); });
     // Attach the expectation first, as the upload loop awaits prepare, so the rejection is always handled.
     const rejected = expect(outcome).rejects.toThrow("No header row was found in the workbook.");
@@ -88,7 +88,7 @@ describe('useConversion', () => {
   it('reads a PDF with the PDF reader and names the PDF when no header is found', async () => {
     const reader = slowReader();
     const { result } = renderHook(() => useConversion(reader.read));
-    let outcome!: Promise<File | null>;
+    let outcome!: Promise<Prepared | null>;
     const pdf = new File(['x'], 'scan.PDF');
     act(() => { outcome = result.current.prepare(pdf); });
     expect(reader.read).toHaveBeenCalledWith(pdf, 'pdf', expect.any(AbortSignal), expect.any(Function));
@@ -103,16 +103,16 @@ describe('useConversion', () => {
       .mockReturnValueOnce(new Promise((_, reject) => { fail = reject; }))
       .mockResolvedValueOnce({ pages: pages(sheet) });
     const { result } = renderHook(() => useConversion(read));
-    let first!: Promise<File | null>;
+    let first!: Promise<Prepared | null>;
     act(() => { first = result.current.prepare(new File(['x'], 'one.pdf')); });
     act(() => result.current.cancel());
     await expect(first).resolves.toBeNull();
     await act(async () => fail(new DOMException('Aborted', 'AbortError')));
-    let second!: Promise<File | null>;
+    let second!: Promise<Prepared | null>;
     await act(async () => { second = result.current.prepare(new File(['y'], 'two.pdf')); });
     expect(result.current.review?.name).toBe('two.pdf');
     act(() => result.current.importReviewed());
-    expect((await second)?.name).toBe('two.csv');
+    expect((await second)?.file.name).toBe('two.csv');
   });
 
   it('shows which page is being read, and when OCR is getting ready, until the review opens', async () => {
@@ -155,7 +155,7 @@ describe('useConversion', () => {
     expect(result.current.review).toMatchObject({ name: 'table.JPG', ocr: 'image' });
     act(() => result.current.cancel());
 
-    let outcome!: Promise<File | null>;
+    let outcome!: Promise<Prepared | null>;
     act(() => { outcome = result.current.prepare(new File(['x'], 'blank.png')); });
     const rejected = expect(outcome).rejects.toThrow("No header row was found in the image.");
     await reader.finish([['name'], ['a']], 'image');
@@ -173,13 +173,26 @@ describe('useConversion', () => {
   it('hands back the reviewed table as a CSV on import', async () => {
     const reader = slowReader();
     const { result } = renderHook(() => useConversion(reader.read));
-    let outcome!: Promise<File | null>;
+    let outcome!: Promise<Prepared | null>;
     act(() => { outcome = result.current.prepare(new File(['x'], 'report.xlsx')); });
     await reader.finish(sheet);
     expect(result.current.review).toMatchObject({ chosen: 0, tables: [{ partner: 'Partner A' }] });
     act(() => result.current.importReviewed());
-    expect((await outcome)?.name).toBe('report.csv');
+    expect((await outcome)?.file.name).toBe('report.csv');
     expect(result.current.review).toBeNull();
+  });
+
+  it('hands over an Excel table with its sheet, range and column letters, and nothing for a CSV', async () => {
+    const reader = slowReader();
+    const { result } = renderHook(() => useConversion(reader.read));
+    let outcome!: Promise<Prepared | null>;
+    act(() => { outcome = result.current.prepare(new File(['xlsx'], 'report.xlsx')); });
+    await reader.finishTables([{ partner: '', headerRow: 3, headers: ['Lot', 'Mass'], rows: [{ sourceRow: 4, cells: ['L-1', '1'] }], flags: [], sheet: 'Q3', range: 'B3:G4', columns: ['B', 'C', 'E', 'F', 'G', 'H'] }]);
+    act(() => result.current.importReviewed());
+    const source = await (await outcome)!.source!();
+    expect(source).toMatchObject({ kind: 'excel', sheet: 'Q3', range: 'B3:G4', columns: ['B', 'C', 'E', 'F', 'G', 'H'], checks: [] });
+    const csv = new File(['a'], 'plain.csv');
+    expect((await result.current.prepare(csv))!.source).toBeUndefined();
   });
 
   describe('Excel files with several tables', () => {
@@ -188,7 +201,7 @@ describe('useConversion', () => {
     async function openWithTables(tables: FoundTable[]) {
       const reader = slowReader();
       const hook = renderHook(() => useConversion(reader.read));
-      let outcome!: Promise<File | null>;
+      let outcome!: Promise<Prepared | null>;
       act(() => { outcome = hook.result.current.prepare(new File(['x'], 'report.xlsx')); });
       await reader.finishTables(tables);
       return { result: hook.result, outcome };
@@ -207,7 +220,7 @@ describe('useConversion', () => {
       expect(result.current.review?.chosen).toBeNull();
       act(() => result.current.choose(1));
       act(() => result.current.importReviewed());
-      const file = await outcome;
+      const file = (await outcome)?.file;
       expect(file?.name).toBe('report.csv');
       expect(await file?.text()).toBe('Lot,Mass\nTwo,1\n');
     });
@@ -220,7 +233,7 @@ describe('useConversion', () => {
     async function openPdf() {
       const reader = slowReader();
       const hook = renderHook(() => useConversion(reader.read));
-      let outcome!: Promise<File | null>;
+      let outcome!: Promise<Prepared | null>;
       act(() => { outcome = hook.result.current.prepare(new File(['x'], 'report.pdf')); });
       await reader.finish(doubtful);
       return { result: hook.result, outcome };
@@ -240,13 +253,13 @@ describe('useConversion', () => {
       const { result, outcome } = await openPdf();
       act(() => result.current.decide('3:2', 'keep'));
       act(() => result.current.importReviewed());
-      expect(await (await outcome)?.text()).toContain('X-2,2026-09-02,12.5-,40,30,30');
+      expect(await (await outcome)?.file.text()).toContain('X-2,2026-09-02,12.5-,40,30,30');
     });
 
     it('imports a table with other headers as CSV only after its doubtful value is decided', async () => {
       const reader = slowReader();
       const hook = renderHook(() => useConversion(reader.read));
-      let outcome!: Promise<File | null>;
+      let outcome!: Promise<Prepared | null>;
       act(() => { outcome = hook.result.current.prepare(new File(['x'], 'report.pdf')); });
       await reader.finish([['Lot', 'Mass (lb)'], ['L-1', '10.5'], ['L-2', '12.5-']]);
       expect(hook.result.current.review?.tables[0]).toMatchObject({ partner: '', headers: ['Lot', 'Mass (lb)'] });
@@ -254,16 +267,32 @@ describe('useConversion', () => {
       expect(hook.result.current.review).not.toBeNull(); // undecided
       act(() => hook.result.current.decide('3:1', 'keep'));
       act(() => hook.result.current.importReviewed());
-      expect(await (await outcome)?.text()).toBe('Lot,Mass (lb)\nL-1,10.5\nL-2,12.5-\n');
+      expect(await (await outcome)?.file.text()).toBe('Lot,Mass (lb)\nL-1,10.5\nL-2,12.5-\n');
     });
 
     it('uploads a value left blank as an empty cell, never zero', async () => {
       const { result, outcome } = await openPdf();
       act(() => result.current.decide('3:2', 'blank'));
       act(() => result.current.importReviewed());
-      const csv = await (await outcome)?.text();
+      const csv = await (await outcome)?.file.text();
       expect(csv).toContain('X-2,2026-09-02,,40,30,30');
       expect(csv).toContain('X-1,2026-09-01,100,40,30,30'); // other values stay as read
+    });
+
+    it('hands over the original PDF, the page and row of each row, and the decision for each doubtful value', async () => {
+      const { result, outcome } = await openPdf();
+      act(() => result.current.decide('3:2', 'blank'));
+      act(() => result.current.importReviewed());
+      const prepared = (await outcome)!;
+      const source = await prepared.source!();
+      expect(source).toMatchObject({
+        kind: 'pdf',
+        original: { name: 'report.pdf' },
+        rows: [{ row: 2, page: 1, pageRow: 2 }, { row: 3, page: 1, pageRow: 3 }],
+        checks: [{ row: 2, column: 2, asRead: '12.5-', decision: 'blank' }], // the second data row, third column
+      });
+      expect(new TextDecoder().decode(source.original.bytes)).toBe('x');
+      expect(source).not.toHaveProperty('columns');
     });
   });
 });

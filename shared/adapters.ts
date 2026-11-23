@@ -23,6 +23,7 @@ export interface Normalized {
 export interface Reader {
   name: string;
   units: UnitDecision[];
+  mappings: FieldMapping[];
   normalize(row: Row): Normalized;
 }
 
@@ -32,7 +33,7 @@ export const MAPPED_SOURCE = 'Mapped columns';
 const readerForAdapter = (a: (typeof ADAPTERS)[number]): Reader => {
   const mappings: FieldMapping[] = ADAPTER_FIELDS.map((field, i) => ({ field, sourceColumn: a.columns[i], origin: 'exact', approved: true }));
   const units = partnerUnits(a);
-  return { name: a.name, units, normalize: (row) => normalizeRow(row, mappings, units, a.name) };
+  return { name: a.name, units, mappings, normalize: (row) => normalizeRow(row, mappings, units, a.name) };
 };
 
 /**
@@ -73,7 +74,7 @@ export function resolveReader(meta: Pick<FileMeta, 'ingestion'>, headers: readon
     const problems = recordProblems(meta.ingestion, headers);
     if (problems.length) return { problems };
     const { mappings, units } = meta.ingestion;
-    return { reader: { name: MAPPED_SOURCE, units, normalize: (row) => normalizeRow(row, mappings, units, MAPPED_SOURCE) } };
+    return { reader: { name: MAPPED_SOURCE, units, mappings, normalize: (row) => normalizeRow(row, mappings, units, MAPPED_SOURCE) } };
   }
   const adapter = ADAPTERS.find((a) => a.columns.every((c) => headers.includes(c)));
   if (!adapter) return { problems: ['its columns are not a known partner format and have not been mapped'] };

@@ -1200,3 +1200,157 @@ describe('Needs Mapping, confirmMapping and the processing gate (19.4)', () => {
     expect(await metaOf(meta.id)).toMatchObject({ status: 'Needs Review', ingestion: { approved: true } });
   });
 });
+
+describe('original files and source references (19.8)', () => {
+  const SUPPLIER = 'Batch ID,Sample Date,Net Mass,R32 %,R125,R134a\nX-1,2026-09-01,100,50,30,20\nX-2,2026-09-02,200,40,40,20\n';
+  const bytesOf = (...n: number[]) => new Uint8Array(n).buffer;
+  const excelSource = (over: Record<string, unknown> = {}) => ({
+    kind: 'excel', original: { name: 'supplier.xlsx', mediaType: 'application/vnd.ms-excel', bytes: bytesOf(80, 75, 3, 4) },
+    sheet: 'Q3', range: 'B3:G5', columns: ['B', 'C', 'D', 'E', 'F', 'G'],
+    rows: [{ row: 4 }, { row: 5 }], checks: [], ...over,
+  });
+  const sourceOf = (id: string) => storage.readSource(id);
+
+  it('keeps a CSV as its own original, and every stored byte as before', async () => {
+    const meta = (await upload('kept.csv', SUPPLIER)).json<FileMeta>();
+    expect(meta.source).toEqual({ kind: 'csv', name: 'kept.csv', size: SUPPLIER.length });
+    const record = (await sourceOf(meta.id))!;
+    expect(new TextDecoder().decode(record.original.bytes)).toBe(SUPPLIER);
+    expect(record).toMatchObject({ kind: 'csv', rows: [], checks: [] });
+    expect(parseCsv(await textOf(meta.id))).toEqual(storedInput(SUPPLIER, meta.id)); // the stored CSV is the upload plus file_id, as before
+    expect(Object.keys(meta)).not.toContain('record');
+  });
+  it('keeps an original with every kind of upload: a partner file, an imported result and a sample', async () => {
+    const partner = (await upload('partner.csv', sample('partner_a_baseline.csv'))).json<FileMeta>();
+    expect((await sourceOf(partner.id))?.kind).toBe('csv');
+    const result = await processFile('100001', 'mass', true);
+    const exported = await textOf(result.json<FileMeta>().id);
+    const imported = (await upload('imported-result.csv', exported)).json<FileMeta>();
+    expect(imported).toMatchObject({ imported: true, source: { kind: 'csv' } });
+    expect((await sourceOf(imported.id))?.kind).toBe('csv');
+    expect((await sourceOf('100001'))?.kind).toBe('csv'); // seeded
+    expect((await listFiles()).find((f) => f.id === '100001')!.source).toMatchObject({ kind: 'csv', name: 'partner_a_baseline.csv' });
+  });
+  it('keeps a converted file as Needs Mapping with its original, sheet, range and column letters', async () => {
+    const res = await reply(() => service.upload({ name: 'supplier.csv', text: SUPPLIER, source: excelSource() }));
+    const meta = res.json<FileMeta>();
+    expect(meta).toMatchObject({ status: 'Needs Mapping', source: { kind: 'excel', name: 'supplier.xlsx', size: 4, sheet: 'Q3', range: 'B3:G5' } });
+    const record = (await sourceOf(meta.id))!;
+    expect(new Uint8Array(record.original.bytes)).toEqual(new Uint8Array([80, 75, 3, 4]));
+    expect(record).toMatchObject({ columns: ['B', 'C', 'D', 'E', 'F', 'G'], rows: [{ row: 4 }, { row: 5 }] });
+    expect(parseCsv(await textOf(meta.id))).toEqual(storedInput(SUPPLIER, meta.id));
+  });
+  it('refuses a source that does not match its table, storing nothing', async () => {
+    const before = (await listFiles()).length;
+    const refused = async (source: unknown) => {
+      const res = await reply(() => service.upload({ name: 'bad.csv', text: SUPPLIER, source }));
+      return [res.statusCode, res.json().message];
+    };
+    const mismatch = [400, 'The source record does not match the converted table'];
+    expect(await refused(excelSource({ rows: [{ row: 4 }] }))).toEqual(mismatch); // one reference per data row
+    expect(await refused(excelSource({ columns: ['B', 'C'] }))).toEqual(mismatch);
+    expect(await refused(excelSource({ kind: 'pdf', columns: undefined, rows: [{ row: 1, page: 1 }, { row: 2, page: 1 }], checks: [{ row: 3, column: 0, asRead: '1O', reasons: ['x'], decision: 'keep' }] }))).toEqual(mismatch);
+    expect(await refused(excelSource({ checks: [{ row: 1, column: 6, asRead: '1O', reasons: ['x'], decision: 'keep' }] }))).toEqual(mismatch);
+    expect((await refused(excelSource({ kind: 'csv' })))[0]).toBe(400);
+    expect((await refused(excelSource({ original: { name: 'x.xlsx', mediaType: 'x', bytes: 'not bytes' } })))[0]).toBe(400);
+    expect((await refused(excelSource({ original: { name: 'x.xlsx', mediaType: 'x', bytes: new ArrayBuffer(20 * 1024 * 1024 + 1) } })))[1]).toContain('larger than the 20 MB limit');
+    expect((await listFiles()).length).toBe(before);
+  });
+});
+
+describe('result traces and explain (19.8)', () => {
+  // Row 2 has no mass, so it is excluded from calculations.
+  const SUPPLIER = 'Batch ID,Sample Date,Net Mass,R32 %,R125,R134a\nX-1,2026-09-01,100,50,30,20\nX-2,2026-09-02,,40,40,20\n';
+  const columns = { batchId: 'Batch ID', sampleDate: 'Sample Date', massKg: 'Net Mass', r32: 'R32 %', r125: 'R125', r134a: 'R134a' };
+  const units = { massKg: 'lb', r32: '%', r125: '%', r134a: '%' };
+  const bytes = new Uint8Array([1, 2, 3]).buffer;
+  const source = (over: Record<string, unknown>) => ({ original: { name: 'src', mediaType: 'x', bytes }, rows: [{ row: 4 }, { row: 5 }], checks: [], ...over });
+  const explain = (fileId: string, row: number, column: string) => reply(() => service.explain({ fileId, row, column }));
+  const locations = (res: { fields: { location?: string }[] }) => res.fields.map((f) => f.location);
+  const mappedMass = async (text = SUPPLIER, src?: unknown) => {
+    const meta = (await reply(() => service.upload({ name: 'trace.csv', text, source: src }))).json<FileMeta>();
+    expect((await reply(() => service.confirmMapping({ fileId: meta.id, columns, units }))).statusCode).toBe(200);
+    return { id: meta.id, result: (await processFile(meta.id, 'mass')).json<FileMeta>() };
+  };
+
+  it('records the trace of a partner result: its exact mapping, partner units and function version', async () => {
+    const result = await processSample('partner_a_followup.csv', 'mass');
+    expect(result.trace).toMatchObject({
+      inputFileId: '100002', source: { kind: 'csv', name: 'partner_a_followup.csv' }, processor: 'mass', processorVersion: 1,
+      validation: { approval: 'partner', rows: 25, excludedRows: 1, warnings: [] },
+    });
+    expect(result.trace!.mappings.every((m) => m.origin === 'exact' && m.approved)).toBe(true);
+    expect(result.trace!.units.map((u) => [u.field, u.unit, u.factor])).toEqual([['massKg', 'kg', 1], ['r32', '%', 1], ['r125', '%', 1], ['r134a', '%', 1]]);
+  });
+  it('explains a calculated value from its raw cells, with the unit, the factor and the value used', async () => {
+    const { result } = await mappedMass();
+    expect(result.trace).toMatchObject({ validation: { approval: 'confirmed', rows: 2, excludedRows: 1 }, units: expect.arrayContaining([{ field: 'massKg', unit: 'lb', factor: 0.45359237, origin: 'confirmed' }]) });
+    const res = (await explain(result.id, 1, 'r32_mass_kg')).json();
+    expect(res).toMatchObject({ traced: true, value: '22.68', rowStatus: 'calculated', reasons: '', processor: { id: 'mass', version: 1, label: 'Component Mass Calculation' }, input: { name: 'trace.csv', source: { kind: 'csv' } } });
+    const mass = res.fields.find((f: { field: string }) => f.field === 'massKg');
+    expect(mass).toMatchObject({ column: 'Net Mass', raw: '100', unit: 'lb', factor: 0.45359237, normalized: 45.359237, location: 'row 2, column "Net Mass"' });
+    expect(res.fields.map((f: { field: string }) => f.field)).toEqual(['batchId', 'sampleDate', 'massKg', 'r32', 'r125', 'r134a']);
+  });
+  it('explains an excluded row without a value, and a missing measurement as missing, never zero', async () => {
+    const { result } = await mappedMass();
+    const res = (await explain(result.id, 2, 'r32_mass_kg')).json();
+    expect(res).toMatchObject({ rowStatus: 'excluded', value: '', reasons: 'mass missing' });
+    expect(res.fields.find((f: { field: string }) => f.field === 'massKg')).toMatchObject({ raw: '', normalized: null, problem: 'missing' });
+  });
+  it('finds an Excel value by sheet and cell, and a PDF value by page and row, with the value as read', async () => {
+    const excel = await mappedMass(SUPPLIER, source({ kind: 'excel', sheet: 'Q3 data', range: 'B3:G5', columns: ['B', 'C', 'E', 'F', 'G', 'H'] }));
+    const cells = (await explain(excel.result.id, 1, 'r32_mass_kg')).json();
+    expect(locations(cells)).toEqual(["'Q3 data'!B4", "'Q3 data'!C4", "'Q3 data'!E4", "'Q3 data'!F4", "'Q3 data'!G4", "'Q3 data'!H4"]);
+    expect(cells.input.source).toMatchObject({ kind: 'excel', name: 'src', sheet: 'Q3 data' });
+
+    const pdf = await mappedMass(SUPPLIER.replace(',100,', ',,'), source({
+      kind: 'pdf', ocr: [2], rows: [{ row: 3, page: 1, pageRow: 3 }, { row: 2, page: 2, pageRow: 2 }],
+      checks: [{ row: 1, column: 2, asRead: '1O0', reasons: ['letter O in a number'], decision: 'blank' }],
+    }));
+    const first = (await explain(pdf.result.id, 1, 'r32_mass_kg')).json();
+    expect(first.fields.find((f: { field: string }) => f.field === 'massKg')).toMatchObject({ location: 'page 1, row 3', raw: '', confirmed: { asRead: '1O0', decision: 'blank' }, problem: 'missing' });
+    expect(locations((await explain(pdf.result.id, 2, 'r32_mass_kg')).json())[0]).toBe('page 2, row 2');
+  });
+  it('still explains when the source record is missing, without locations', async () => {
+    const meta = (await upload('no-record.csv', SUPPLIER)).json<FileMeta>();
+    const { id: _id, uploadedAt: _at, ...rest } = meta;
+    const bare = await storage.create({ ...rest, text: await textOf(meta.id) });
+    expect(await storage.readSource(bare.id)).toBeUndefined();
+    expect((await reply(() => service.confirmMapping({ fileId: bare.id, columns, units }))).statusCode).toBe(200);
+    const result = (await processFile(bare.id, 'mass')).json<FileMeta>();
+    const res = (await explain(result.id, 1, 'r32_mass_kg')).json();
+    expect(res.traced).toBe(true);
+    expect(locations(res).every((l) => l === undefined)).toBe(true);
+    expect(res.fields.find((f: { field: string }) => f.field === 'massKg').raw).toBe('100');
+  });
+  it('replaces the trace when a result is re-run, and keeps the same File ID and CSV', async () => {
+    const { id, result } = await mappedMass();
+    const first = await textOf(result.id);
+    const again = (await processFile(id, 'mass', true)).json<FileMeta>();
+    expect(again.id).toBe(result.id);
+    expect(again.trace).toEqual(result.trace);
+    expect(await textOf(result.id)).toBe(first);
+  });
+  it('says an uploaded result or an older result has no trace, and refuses anything that cannot be explained', async () => {
+    const partnerResult = await processSample('partner_a_baseline.csv', 'mass');
+    const imported = (await upload('imported.csv', await textOf(partnerResult.id))).json<FileMeta>();
+    expect((await explain(imported.id, 1, 'r32_mass_kg')).json()).toEqual({ traced: false, reason: 'This result was uploaded, so how it was calculated is not recorded.' });
+    const traced = (await mappedMass()).result.id;
+    const status = async (id: string, row: number, column: string) => (await explain(id, row, column)).statusCode;
+    expect(await status('999999', 1, 'r32_mass_kg')).toBe(404);
+    expect(await status('100001', 1, 'r32_mass_kg')).toBe(400); // an input
+    expect(await status(traced, 3, 'r32_mass_kg')).toBe(400); // no such row
+    expect(await status(traced, 0, 'r32_mass_kg')).toBe(400);
+    expect(await status(traced, 1, 'result_id')).toBe(400);
+    expect(await status(traced, 1, 'Net Mass')).toBe(400); // an original column
+    await storage.patch(traced, { trace: undefined });
+    expect((await explain(traced, 1, 'r32_mass_kg')).json()).toEqual({ traced: false, reason: expect.stringContaining('Run the function again') });
+  });
+  it('writes nothing when it explains', async () => {
+    const { result } = await mappedMass();
+    const before = JSON.stringify(await listFiles());
+    await explain(result.id, 1, 'r32_mass_kg');
+    await explain(result.id, 9, 'r32_mass_kg');
+    expect(JSON.stringify(await listFiles())).toBe(before);
+  });
+});
