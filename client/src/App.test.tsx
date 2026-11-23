@@ -33,10 +33,10 @@ describe('App', () => {
   });
 
   it.each([
-    ['/sign-in', 'Sign in'],
+    ['/sign-in', 'Sign in to your workspace'],
     ['/activate', 'Activate your account'],
     ['/reset-password', 'Reset your password'],
-    ['/sign-in/', 'Sign in'],
+    ['/sign-in/', 'Sign in to your workspace'],
     ['/admin', 'Admin'],
   ])('opens the page at %s', async (path, heading) => {
     window.history.replaceState(null, '', path);

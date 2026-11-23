@@ -17,7 +17,7 @@ function setUp(options: Parameters<typeof fakeSupabase>[0] = {}) {
 async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText('Email'), ' ada@example.com ');
   await user.type(screen.getByLabelText('Password'), 'correct horse');
-  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+  await user.click(screen.getByRole('button', { name: 'Sign In' }));
 }
 
 afterEach(() => {
@@ -108,7 +108,7 @@ describe('SignInPage', () => {
     render(<SignInPage onSignedIn={vi.fn()} />);
     await fillAndSubmit(user);
     expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in is temporarily unavailable. Try again later.');
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeEnabled();
   });
 
   it('disables the button while signing in', async () => {
@@ -141,7 +141,7 @@ describe('SignInPage', () => {
     setUp();
     render(<SignInPage onSignedIn={vi.fn()} />);
     expect(await screen.findByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/reset-password');
-    expect(screen.getByRole('link', { name: 'Have an invitation? Activate your account' })).toHaveAttribute('href', '/activate');
+    expect(screen.getByRole('link', { name: 'Use invitation link' })).toHaveAttribute('href', '/activate');
   });
 
   it('tells a signed-in person who they are signed in as', async () => {
@@ -156,5 +156,46 @@ describe('SignInPage', () => {
     render(<SignInPage onSignedIn={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent("Sign-in isn't set up on this site yet.");
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+  });
+
+  it('shows what the workspace offers and the privacy note', async () => {
+    setUp();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sign in to your workspace' })).toBeInTheDocument();
+    for (const title of ['Admin invitations', 'Private workspace', 'Demo access', 'Role-based access']) {
+      expect(screen.getByText(title)).toBeInTheDocument();
+    }
+    expect(screen.getByText(/Admins cannot read members' file contents/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
+    expect(screen.getByRole('link', { name: /Architecture/ })).toHaveAttribute('href', '/architecture');
+  });
+
+  it('links Try Demo to the workspace and the invitation link to activation', async () => {
+    setUp();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByRole('link', { name: 'Try Demo' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Use invitation link' })).toHaveAttribute('href', '/activate');
+    expect(screen.getByText(/Invitations expire after 30 days/)).toBeInTheDocument();
+    expect(screen.getByText(/Need access\?/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/remember me/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps Try Demo on a site without sign-in settings', () => {
+    vi.mocked(isAuthConfigured).mockReturnValue(false);
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(screen.getByRole('link', { name: 'Try Demo' })).toHaveAttribute('href', '/');
+  });
+
+  it('shows and hides the password without submitting', async () => {
+    const fake = setUp();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    const password = await screen.findByLabelText('Password');
+    await user.type(password, 'secret');
+    await user.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(password).toHaveAttribute('type', 'text');
+    await user.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(password).toHaveAttribute('type', 'password');
+    expect(fake.auth.signInWithPassword).not.toHaveBeenCalled();
   });
 });

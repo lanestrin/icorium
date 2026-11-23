@@ -307,7 +307,7 @@ Rules for every M19 item:
   Admin cannot read members’ file contents.
   **Depends on:** 17.2.
 
-- [ ] **17.8** Sign-in page redesign — Rebuild `/sign-in` to match
+- [x] **17.8** Sign-in page redesign — Rebuild `/sign-in` to match
   [the login reference](reference/CSV%20Files%20Secure%20Workspace%20Login.png):
   a left panel with the title, intro, four feature cards (Admin
   invitations, private workspace, demo access, role-based access) and
