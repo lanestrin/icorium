@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 17.4 - Private cross-device file workspace.**
+**Next: 17.8 - Sign-in page redesign.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 to 17.3
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -92,8 +92,13 @@ the cloud in 17.4.
 Build in this order:
 
 17.1 -> 17.2 -> 19.1 -> 19.2 -> 19.3 -> 19.4 -> 19.5 -> 19.6 -> 19.7
--> 19.7b -> 19.8 -> 19.9 -> 17.3 -> 17.4 -> 17.5 -> 17.6 -> 17.7
--> 18.1 -> 18.2 -> 18.3
+-> 19.7b -> 19.8 -> 19.9 -> 17.3 -> 17.8 -> 17.9 -> 17.4 -> 17.5 -> 17.6
+-> 17.7 -> 18.1 -> 18.2 -> 18.3
+
+17.8 and 17.9 were added and moved ahead of 17.4 (decided 2026-11-23),
+so the sign-in page and workspace navigation match the reference images
+before cloud files arrive. They change the interface only; sign-in stays
+optional until 17.6.
 
 Select only an unchecked item whose dependencies are satisfied.
 
@@ -301,6 +306,35 @@ Rules for every M19 item:
   on deactivation and enforce access changes for existing sessions.
   Admin cannot read members’ file contents.
   **Depends on:** 17.2.
+
+- [ ] **17.8** Sign-in page redesign — Rebuild `/sign-in` to match
+  [the login reference](reference/CSV%20Files%20Secure%20Workspace%20Login.png):
+  a left panel with the title, intro, four feature cards (Admin
+  invitations, private workspace, demo access, role-based access) and
+  the file-privacy note; a right "Welcome back" card with email and
+  password (show/hide), Forgot password, Sign In, Continue with Google,
+  Try Demo, Use invitation link (to `/activate`), and the 30-day and
+  "Need access?" notes. Keep the 17.2b sign-in behavior, redirects and
+  error messages; stack to one column on phones. Sign-in stays
+  optional. Until 17.5, Try Demo opens the existing browser demo
+  workspace. No "Remember me": Supabase already keeps the session.
+  **Depends on:** 17.2.
+
+- [ ] **17.9** Workspace header and sidebar navigation — Add the app
+  header from [the header reference](reference/icorium-header.png) and
+  the left navigation from [the sidebar reference](reference/icorium-sidebar.png).
+  The header shows "Dashboard" and its intro on the file workspace, the
+  CSV Generator and Architecture links, a help link and an account menu
+  (name, role and Sign out, or Sign in when signed out); no
+  notification bell. Sidebar entries open existing screens only:
+  Dashboard and My Files the workspace, Processing its processing
+  panel, Results the file list showing results; Invitations, Users and
+  Access & Roles the matching `/admin` sections, shown only to an
+  active Admin; the help card links to existing documentation. Keep
+  the upload and processing panel. On phones the navigation collapses
+  into a menu without sideways scroll. Hidden links are display only;
+  17.6 enforces page access.
+  **Depends on:** 17.3, 17.8.
 
 - [ ] **17.4** Private cross-device file workspace — Persist registered
   users’ files, results and metadata through the selected cloud

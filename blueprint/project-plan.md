@@ -385,14 +385,19 @@ unused alternatives now.
 
 Use the existing restrained, Apple-inspired visual language:
 - Existing tokens, typography, spacing and shared components.
-- No unnecessary dashboard or navigation.
+- One app header and left navigation, as in the reference images in
+  `blueprint/reference/` (sign-in page, header and sidebar; added
+  2026-11-23). No notifications and no extra dashboard pages: the
+  navigation opens existing screens.
 - Responsive phone layouts without sideways page scroll.
 - Accessible forms, validation messages, keyboard interaction and focus.
 
 Primary screens:
-- Sign-in, with email/password, Google sign-in and Try the demo.
+- Sign-in, with email/password, Google sign-in and Try the demo
+  (build-plan 17.8).
 - Invitation acceptance and password recovery.
-- Existing file workspace, the signed-in landing screen.
+- Existing file workspace, shown as "Dashboard", the signed-in landing
+  screen, with the app header and navigation (build-plan 17.9).
 - Admin user and invitation management.
 - Existing Architecture and Generator pages, restricted to Admin.
 - Existing preview/review patterns extended for corrections and deletion.
