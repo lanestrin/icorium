@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from 'react';
-import { ArrowLeft, FilePlus2, Network, Wand2 } from 'lucide-react';
+import { FilePlus2, Wand2 } from 'lucide-react';
 import { ADAPTERS, GENERATOR_MAX_FILES, GENERATOR_MAX_ROWS, type GeneratedFile, type GeneratorPartner } from '../../../shared/types';
 import { Banner } from '../components/Banner';
 import { ChoiceOption } from '../components/generator/ChoiceOption';
@@ -10,11 +10,11 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import styles from '../components/generator/generator.module.scss';
 import page from '../styles/page.module.scss';
-import { classNames } from '../lib/class-names';
 import { api } from '../lib/api';
 import { errorMessage, plural } from '../lib/format';
 import { flaggedRows, withCsv } from '../lib/generated-files';
-import { AppVersion } from '../components/AppVersion';
+import { AppShell } from '../components/layout/AppShell';
+import { useAccount } from '../hooks/useAccount';
 
 const ERROR_ROWS_HELP = 'In each file. Each of these rows fails Composition Validation: missing or non-numeric mass, a negative percentage, '
   + 'a composition total off by 15 points, a missing batch ID, or a duplicate batch ID (which marks two rows).';
@@ -31,6 +31,7 @@ function batchSummary(files: GeneratedFile[]) {
 
 /** The CSV Generator (/generator): make synthetic partner CSVs, preview and download them, or add them to CSV Files. */
 export function GeneratorPage() {
+  const account = useAccount();
   const [partner, setPartner] = useState<GeneratorPartner>('A');
   const [rows, setRows] = useState('25');
   const [count, setCount] = useState('1');
@@ -90,13 +91,9 @@ export function GeneratorPage() {
   const generateLabel = busy === 'generate' ? 'Generating…' : Number(count) > 1 ? `Generate ${count} CSV files` : 'Generate CSV';
 
   return (
-    <div className={classNames(page.shell, styles.page)}>
-      <nav aria-label="Pages" className={page.nav}>
-        <a href="/" className={page.navLink}><ArrowLeft aria-hidden /> Back to CSV Files</a>
-        <a href="/architecture" className={page.navLink}><Network aria-hidden /> Architecture</a>
-        <AppVersion />
-      </nav>
-      <div className={classNames(page.titleRow, styles.header)}>
+    <AppShell account={account}>
+    <div className={styles.page}>
+      <div className={page.titleRow}>
         <h1 className={page.title}>CSV Generator</h1>
         <p className={page.intro}>Create synthetic partner CSVs for testing. All values are invented.</p>
       </div>
@@ -167,5 +164,6 @@ export function GeneratorPage() {
         </Card>
       </div>
     </div>
+    </AppShell>
   );
 }

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Network, Wand2 } from 'lucide-react';
+import { Archive } from 'lucide-react';
 import { isInputFile, type CompareResult, type FileMeta } from '../../../shared/types';
 import { Banner } from '../components/Banner';
 import { ClearDataModal } from '../components/modals/ClearDataModal';
@@ -15,8 +15,6 @@ import { SelectionBar } from '../components/files/SelectionBar';
 import { Sidebar } from '../components/files/Sidebar';
 import { SortMenu } from '../components/files/SortMenu';
 import styles from '../components/files/files.module.scss';
-import page from '../styles/page.module.scss';
-import { classNames } from '../lib/class-names';
 import { useArchive } from '../hooks/useArchive';
 import { useConversion } from '../hooks/useConversion';
 import { useFileList } from '../hooks/useFileList';
@@ -27,8 +25,10 @@ import { api, type StorageMode } from '../lib/api';
 import { compareBlocker } from '../lib/compare-view';
 import { filterFiles } from '../lib/file-status';
 import { errorMessage } from '../lib/format';
-import { AccountStatus } from '../components/AccountStatus';
-import { AppVersion } from '../components/AppVersion';
+import { AppShell } from '../components/layout/AppShell';
+import { useAccount } from '../hooks/useAccount';
+import { useHashSection } from '../hooks/useHashSection';
+import { showAndFocus, WORKSPACE_HASHES, type AdminSection, type WorkspaceSection } from '../lib/navigation';
 
 // The comparison dialog and its charts download the first time Compare is used, alongside the request.
 const loadCompareWorkspace = () => import('../components/compare/CompareWorkspace');
@@ -49,6 +49,7 @@ export function FilesPage() {
   const [clearing, setClearing] = useState(false);
 
   const { files, refresh, upload, uploading, loading } = useFileList(setError);
+  const account = useAccount();
   const conversion = useConversion();
   const { selectedIds, setSelectedIds, toggle, toggleAll } = useSelection();
   const {
@@ -71,6 +72,19 @@ export function FilesPage() {
   // Compare is offered once the selection in view includes a result; it explains when it can't run.
   const showCompare = !viewArchived && selectedInView.some((f) => f.status === 'Processed');
   const compareReason = compareBlocker(selectedInView);
+
+  // The navigation's workspace entries (and a #files, #processing or #results address): My Files and Results
+  // show the Active Files tab with the filters cleared (Results then filters to Processed); Processing focuses
+  // its panel. Dashboard changes nothing. An Admin section can't reach here, so it is ignored.
+  function goToSection(section: WorkspaceSection | AdminSection) {
+    if (section === 'files' || section === 'results') {
+      clearFilters();
+      setTab('active');
+      if (section === 'results') setStatus('Processed');
+      showAndFocus('file-tabpanel');
+    } else if (section === 'processing') showAndFocus('processing-heading');
+  }
+  useHashSection(WORKSPACE_HASHES, goToSection);
 
   // Where files are kept, for the note under the upload area. If storage can't open, the file list reports it.
   useEffect(() => {
@@ -139,23 +153,9 @@ export function FilesPage() {
   }
 
   return (
-    <div className={classNames(page.shell, styles.filesPage)}>
+    <AppShell account={account} title="Dashboard" intro="Your file workspace for refrigerant analysis." onNavigate={goToSection}>
+    <div className={styles.filesPage}>
       <main className={styles.workspace}>
-        <div className={classNames(page.titleRow, styles.titleArea)}>
-          <h1 className={page.title}>CSV Files</h1>
-          <p className={page.intro}>Upload, preview, process, and compare refrigerant datasets.</p>
-          <nav aria-label="Pages" className={styles.headerNav}>
-            <a href="/generator" className={page.navLink}>
-              <Wand2 aria-hidden /> CSV Generator
-            </a>
-            <a href="/architecture" className={page.navLink}>
-              <Network aria-hidden /> Architecture
-            </a>
-            <AppVersion />
-            <AccountStatus />
-          </nav>
-        </div>
-
         <Sidebar
           processor={processor}
           setProcessor={setProcessor}
@@ -190,7 +190,7 @@ export function FilesPage() {
             extra={<SortMenu sort={sort} setSort={setSort} viewArchived={viewArchived} />}
           />
 
-          <div role="tabpanel" id="file-tabpanel" aria-labelledby={`tab-${tab}`} className={styles.tabPanel}>
+          <div role="tabpanel" id="file-tabpanel" tabIndex={-1} aria-labelledby={`tab-${tab}`} className={styles.tabPanel}>
             {viewArchived && (
               <p className={styles.archivedNote}>
                 <Archive className={styles.archivedIcon} aria-hidden />
@@ -260,5 +260,6 @@ export function FilesPage() {
         </Suspense>
       )}
     </div>
+    </AppShell>
   );
 }

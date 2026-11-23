@@ -37,7 +37,7 @@ describe('CSV generator page', () => {
     const user = userEvent.setup();
     vi.mocked(api.generate).mockResolvedValue({ files: [clean] });
     render(<GeneratorPage />);
-    expect(screen.getByRole('link', { name: /Back to CSV Files/ })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'CSV Files' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('radio', { name: /Partner A/ })).toBeChecked();
     expect(number('Rows')).toHaveValue(25);
     expect(number('Number of files')).toHaveValue(1);
@@ -185,7 +185,7 @@ describe('page routing', () => {
 
     window.history.pushState({}, '', '/');
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'CSV Files' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
     await waitFor(() => expect(api.list).toHaveBeenCalled());
   });

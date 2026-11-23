@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft } from 'lucide-react';
 import { AccountList } from '../components/admin/AccountList';
 import { formatDate, InvitationList } from '../components/admin/InvitationList';
 import { InviteForm } from '../components/admin/InviteForm';
 import styles from '../components/admin/admin.module.scss';
-import { AppVersion } from '../components/AppVersion';
+import { AppShell } from '../components/layout/AppShell';
 import { Banner } from '../components/Banner';
 import { Modal } from '../components/modals/Modal';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { useAccount } from '../hooks/useAccount';
+import { isActiveAdmin, useAccount } from '../hooks/useAccount';
+import { useHashSection } from '../hooks/useHashSection';
 import { callAdmin, NOT_ADMIN_CODE, type Account, type AdminAction, type AdminList, type Invitation, type Role } from '../lib/admin';
 import { NOT_SET_UP_MESSAGE } from '../lib/auth';
+import { ADMIN_HASHES, showAndFocus, type AdminSection, type WorkspaceSection } from '../lib/navigation';
 import { PAGES } from '../lib/pages';
 import page from '../styles/page.module.scss';
 
@@ -23,11 +24,12 @@ type Confirmation = { title: string; text: string; label: string; run: () => voi
  * /admin (build-plan 17.3): invite people, manage invitations, change roles and deactivate or reactivate
  * accounts. Every request goes to the Admin function, which checks the caller is an active Admin, so this
  * page only decides what to show; hiding it protects nothing. Admins see account and invitation details,
- * never files. There is no link to this page until 17.6.
+ * never files. The navigation links to it for Admins only (17.9); that is display, not access control.
  */
 export function AdminPage() {
-  const { account } = useAccount();
-  const isAdmin = account.status === 'signed-in' && account.profile?.active === true && account.profile.role === 'Admin';
+  const accountApi = useAccount();
+  const { account } = accountApi;
+  const isAdmin = isActiveAdmin(account);
   const currentUserId = account.status === 'signed-in' ? account.userId : '';
 
   const [list, setList] = useState<ListState>({ status: 'loading' });
@@ -89,6 +91,15 @@ export function AdminPage() {
     else void run({ action: 'reactivate', userId: acct.user_id }, () => `${acct.email} reactivated`);
   };
 
+  // The navigation's Admin entries: Invitations opens the invite card, Users and Access & Roles the account list
+  // (where roles and deactivation are). They apply once the list has loaded; before that, or for anyone who
+  // isn't an Admin, there is nothing to show and the address is ignored.
+  function goToSection(section: WorkspaceSection | AdminSection) {
+    if (section === 'invitations') showAndFocus('invite-heading');
+    else if (section === 'users' || section === 'access') showAndFocus('accounts-heading');
+  }
+  useHashSection(ADMIN_HASHES, goToSection, isAdmin && list.status === 'ready');
+
   function body(): ReactNode {
     if (account.status === 'unconfigured') return <p role="status" className={styles.notice}>{NOT_SET_UP_MESSAGE}</p>;
     if (account.status === 'loading') return <p role="status" className={styles.notice}>Loading…</p>;
@@ -101,7 +112,7 @@ export function AdminPage() {
       <>
         {notice && <Banner tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</Banner>}
         <Card as="section" className={styles.section} aria-labelledby="invite-heading">
-          <h2 id="invite-heading" className={styles.heading}>Invite someone</h2>
+          <h2 id="invite-heading" tabIndex={-1} className={styles.heading}>Invite someone</h2>
           <InviteForm busy={busy} onInvite={invite} />
         </Card>
         {list.status === 'loading' && <p role="status" className={styles.notice}>Loading accounts and invitations…</p>}
@@ -118,7 +129,7 @@ export function AdminPage() {
               <InvitationList invitations={list.data.invitations} busy={busy} onResend={resend} onExtend={extend} onRevoke={revoke} />
             </Card>
             <Card as="section" className={styles.section} aria-labelledby="accounts-heading">
-              <h2 id="accounts-heading" className={styles.heading}>Accounts</h2>
+              <h2 id="accounts-heading" tabIndex={-1} className={styles.heading}>Users</h2>
               <AccountList accounts={list.data.accounts} currentUserId={currentUserId} busy={busy} onToggleRole={toggleRole} onToggleActive={toggleActive} />
             </Card>
           </>
@@ -128,13 +139,9 @@ export function AdminPage() {
   }
 
   return (
-    <div className={page.shell}>
+    <AppShell account={accountApi} onNavigate={goToSection}>
       <main className={styles.page}>
         <div className={styles.content}>
-          <nav aria-label="Pages" className={page.nav}>
-            <a href="/" className={page.navLink}><ArrowLeft aria-hidden /> Back to CSV Files</a>
-            <AppVersion />
-          </nav>
           <header className={styles.header}>
             <h1 className={page.title}>Admin</h1>
             <p className={page.intro}>Invite people and manage account access. Administrators cannot see anyone's files.</p>
@@ -157,6 +164,6 @@ export function AdminPage() {
           <p>{confirm.text}</p>
         </Modal>
       )}
-    </div>
+    </AppShell>
   );
 }

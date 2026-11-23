@@ -115,7 +115,7 @@ export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, runn
       </div>
 
       <section>
-        <h2 className={styles.sectionTitle}>Processing Function</h2>
+        <h2 id="processing-heading" tabIndex={-1} className={styles.sectionTitle}>Processing Function</h2>
         <div className={styles.processorList}>
           {PROCESSORS.map((option) => {
             const isChosen = option.id === processor;

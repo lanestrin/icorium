@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppVersion } from './AppVersion';
 import { ArchitecturePage } from '../pages/ArchitecturePage';
@@ -14,14 +15,15 @@ describe('app version label', () => {
     ['CSV Files', FilesPage],
     ['CSV Generator', GeneratorPage],
     ['Architecture', ArchitecturePage],
-  ])('shows the version and environment in the %s navigation', async (_name, Page) => {
+  ])('shows the version and environment in the navigation of the %s page', async (_name, Page) => {
     vi.stubEnv('VITE_APP_VERSION', '1.0.0');
     vi.stubEnv('VITE_APP_ENV', 'Test');
     render(<Page />);
-    const nav = screen.getByRole('navigation', { name: 'Pages' });
-    expect(nav).toContainElement(screen.getByLabelText('App version'));
-    expect(screen.getByLabelText('App version')).toHaveTextContent('v1.0.0 · Test');
     await screen.findAllByRole('heading', { level: 1 }); // let a page finish its first load
+    // The navigation column shows from 80rem wide; below that the same navigation opens from the Menu button.
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Open navigation' }));
+    const nav = screen.getByRole('navigation', { name: 'App' });
+    expect(within(nav).getByLabelText('App version')).toHaveTextContent('v1.0.0 · Test');
   });
 
   it('shows the version alone outside Test and Preview', () => {

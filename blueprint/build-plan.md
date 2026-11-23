@@ -320,7 +320,7 @@ Rules for every M19 item:
   workspace. No "Remember me": Supabase already keeps the session.
   **Depends on:** 17.2.
 
-- [ ] **17.9** Workspace header and sidebar navigation — Add the app
+- [x] **17.9** Workspace header and sidebar navigation — Add the app
   header from [the header reference](reference/icorium-header.png) and
   the left navigation from [the sidebar reference](reference/icorium-sidebar.png).
   The header shows "Dashboard" and its intro on the file workspace, the

@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
-import { useAccount } from './useAccount';
+import { isActiveAdmin, useAccount, type AccountState, type Profile } from './useAccount';
 
 vi.mock('../lib/supabase', () => ({ getSupabase: vi.fn(), isAuthConfigured: vi.fn(() => true) }));
 
@@ -120,5 +120,17 @@ describe('useAccount', () => {
     expect(fake.update).not.toHaveBeenCalled();
     fake.updateEq.mockResolvedValueOnce({ error: { name: 'AuthRetryableFetchError', status: 0 } });
     expect(await result.current.saveName('Ada')).toBe('Sign-in is temporarily unavailable. Try again later.');
+  });
+});
+
+describe('isActiveAdmin', () => {
+  const signedIn = (profile: Profile | null): AccountState => ({ status: 'signed-in', userId: 'u', email: 'a@example.com', profile });
+  it('is true only for a signed-in, active Admin', () => {
+    expect(isActiveAdmin(signedIn({ name: 'Ada', role: 'Admin', active: true }))).toBe(true);
+    expect(isActiveAdmin(signedIn({ name: 'Ada', role: 'Member', active: true }))).toBe(false);
+    expect(isActiveAdmin(signedIn({ name: 'Ada', role: 'Admin', active: false }))).toBe(false);
+    expect(isActiveAdmin(signedIn(null))).toBe(false);
+    for (const status of ['unconfigured', 'loading', 'signed-out'] as const) expect(isActiveAdmin({ status })).toBe(false);
+    expect(isActiveAdmin({ status: 'error', message: 'x' })).toBe(false);
   });
 });

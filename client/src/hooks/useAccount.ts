@@ -13,6 +13,10 @@ export type AccountState =
   | { status: 'signed-in'; userId: string; email: string; profile: Profile | null }
   | { status: 'error'; message: string };
 
+/** True only for an active Admin. A display hint for links: access itself is enforced by trusted code. */
+export const isActiveAdmin = (account: AccountState) =>
+  account.status === 'signed-in' && account.profile?.active === true && account.profile.role === 'Admin';
+
 /**
  * The signed-in account, kept current from Supabase's auth events. The role is for display only:
  * access is enforced by row-level security and trusted code (17.6), never by this hook.

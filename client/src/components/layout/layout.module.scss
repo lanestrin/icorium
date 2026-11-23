@@ -1,0 +1,358 @@
+// The app header, the left navigation and the phone menu (AppShell). Below xl the navigation is a drawer
+// opened from the Menu button; from xl it is a column beside the page.
+@use '../../styles/mixins' as *;
+
+@mixin icon($size) {
+  flex-shrink: 0;
+  width: $size;
+  height: $size;
+}
+
+.hidden {
+  @include visually-hidden;
+}
+
+// Header
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  min-height: calc(var(--app-space-unit) * 16);
+  border-bottom: var(--app-border-width) solid var(--app-color-border-subtle);
+  background: var(--app-color-surface-frosted);
+  padding: var(--app-space-2) var(--app-space-4);
+  @include up(sm) {
+    gap: var(--app-space-5);
+    padding: var(--app-space-2) var(--app-space-6);
+  }
+}
+.menuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--app-radius-lg);
+  background: transparent;
+  padding: var(--app-space-2);
+  color: var(--app-color-text);
+  cursor: pointer;
+  @include focus-ring;
+
+  &:hover {
+    background: var(--app-color-surface-subtle);
+  }
+
+  svg {
+    @include icon(var(--app-space-5));
+  }
+  @include up(xl) {
+    &:not([aria-label='Close navigation']) {
+      display: none;
+    }
+  }
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  border-radius: var(--app-radius-sm);
+  color: var(--app-color-text);
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-bold);
+  text-decoration: none;
+  white-space: nowrap;
+  @include focus-ring;
+
+  svg {
+    @include icon(var(--app-space-6));
+    color: var(--app-color-primary);
+  }
+}
+.headerTitle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--app-space-4);
+  min-width: 0;
+  margin-right: auto;
+}
+.pageTitle {
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  font-weight: var(--app-weight-semibold);
+}
+.pageIntro {
+  display: none;
+  color: var(--app-color-text-muted);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  @include up(lg) {
+    display: block;
+  }
+}
+// Pushes the links and account to the right edge when there is no title beside the brand.
+.headerLinks {
+  display: none;
+  align-items: center;
+  gap: var(--app-space-5);
+  margin-left: auto;
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  font-weight: var(--app-weight-medium);
+  @include up(md) {
+    display: flex;
+  }
+
+  a[aria-current='page'] {
+    text-decoration: underline;
+  }
+}
+.headerTitle + .headerLinks {
+  margin-left: 0;
+}
+.helpButton {
+  display: inline-flex;
+  margin-left: auto;
+  border-radius: var(--app-radius-full);
+  padding: var(--app-space-1-5);
+  color: var(--app-color-text-secondary);
+  @include focus-ring;
+  @include up(md) {
+    margin-left: 0;
+  }
+
+  &:hover {
+    background: var(--app-color-surface-subtle);
+  }
+
+  svg {
+    @include icon(var(--app-space-5));
+  }
+}
+
+// Account
+.account {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-space-2);
+  min-width: 0;
+}
+.accountSpace {
+  display: inline-block;
+  width: var(--app-space-10);
+}
+.signIn {
+  border-radius: var(--app-radius-sm);
+  color: var(--app-color-link);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  font-weight: var(--app-weight-medium);
+  white-space: nowrap;
+  @include focus-ring;
+}
+.accountTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-space-1);
+  border: 0;
+  border-radius: var(--app-radius-full);
+  background: transparent;
+  padding: var(--app-space-1);
+  color: var(--app-color-text-secondary);
+  cursor: pointer;
+  @include focus-ring;
+
+  &:hover {
+    background: var(--app-color-surface-subtle);
+  }
+}
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--app-space-8);
+  height: var(--app-space-8);
+  border-radius: var(--app-radius-full);
+  background: var(--app-color-primary-surface);
+  color: var(--app-color-primary-text);
+  font-size: var(--app-text-sm);
+  font-weight: var(--app-weight-semibold);
+
+  svg {
+    @include icon(var(--app-space-4));
+  }
+}
+.chevron {
+  @include icon(var(--app-space-4));
+}
+.accountError {
+  max-width: 12rem;
+  color: var(--app-color-danger-text);
+  font-size: var(--app-text-xs);
+  line-height: var(--app-leading-xs);
+}
+.menu {
+  z-index: var(--app-z-menu);
+  width: 14rem;
+  max-width: calc(100vw - var(--app-space-6));
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  background: var(--app-color-surface);
+  padding: var(--app-space-1);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  box-shadow: var(--app-shadow-lg);
+}
+.menuHeading {
+  display: flex;
+  flex-direction: column;
+  border-bottom: var(--app-border-width) solid var(--app-color-border-subtle);
+  padding: var(--app-space-2) var(--app-space-3);
+}
+.menuName {
+  overflow-wrap: anywhere;
+  font-weight: var(--app-weight-semibold);
+}
+.menuRole {
+  color: var(--app-color-text-muted);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  width: 100%;
+  margin-top: var(--app-space-1);
+  border-radius: var(--app-radius-lg);
+  padding: var(--app-space-2) var(--app-space-3);
+  color: var(--app-color-text);
+  outline: none;
+  cursor: pointer;
+
+  &[data-highlighted] {
+    background: var(--app-color-primary-surface);
+  }
+
+  svg {
+    @include icon(var(--app-space-4));
+    color: var(--app-color-icon);
+  }
+}
+
+// Body: the navigation column (from xl) beside the page
+.body {
+  @include up(xl) {
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 1fr);
+    align-items: start;
+  }
+}
+.sidebar {
+  display: none;
+  // A white column with a full border, so it stands apart from the page background. It fills the window's
+  // height below the header, so the version sits at the bottom; the first entry lines up
+  // with the top of the page's content (both start space-6 below the header).
+  @include up(xl) {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    min-height: calc(100vh - var(--app-space-unit) * 16);
+    border-right: var(--app-border-width) solid var(--app-color-border);
+    background: var(--app-color-surface);
+    padding: var(--app-space-6) var(--app-space-4);
+  }
+}
+.content {
+  min-width: 0;
+}
+
+// Navigation
+.appNav {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--app-space-1);
+}
+.navList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-3);
+  border-radius: var(--app-radius-lg);
+  padding: var(--app-space-2-5) var(--app-space-3);
+  color: var(--app-color-text);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+  font-weight: var(--app-weight-medium);
+  text-decoration: none;
+  @include focus-ring;
+
+  &:hover {
+    background: var(--app-color-surface-subtle);
+  }
+
+  &[aria-current='page'] {
+    background: var(--app-color-primary-surface);
+    color: var(--app-color-primary-text);
+  }
+
+  svg {
+    @include icon(var(--app-space-4));
+  }
+}
+.navDivider {
+  width: 100%;
+  margin: var(--app-space-3) 0;
+  border: 0;
+  border-top: var(--app-border-width) solid var(--app-color-border-subtle);
+}
+.navGroup {
+  padding: 0 var(--app-space-3);
+  color: var(--app-color-text-muted);
+  font-size: var(--app-text-xs);
+  line-height: var(--app-leading-xs);
+  font-weight: var(--app-weight-medium);
+}
+.navFoot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-3);
+  margin-top: auto;
+  padding-top: var(--app-space-8);
+}
+// Phone menu
+.drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--app-z-modal);
+  background: var(--app-color-backdrop);
+}
+.drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-3);
+  width: min(20rem, 100%);
+  height: 100%;
+  overflow-y: auto;
+  background: var(--app-color-surface);
+  padding: var(--app-space-4);
+  box-shadow: var(--app-shadow-2xl);
+  outline: none;
+}
+.drawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.drawerTitle {
+  font-size: var(--app-text-lg);
+  line-height: var(--app-leading-lg);
+  font-weight: var(--app-weight-semibold);
+}
