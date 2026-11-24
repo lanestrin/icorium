@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.20.0](https://github.com/lanestrin/icorium/compare/v2.19.0...v2.20.0) (2026-11-24)
+
+
+### Features
+
+* require sign-in and apply page access (17.6) ([#180](https://github.com/lanestrin/icorium/issues/180)) ([800777c](https://github.com/lanestrin/icorium/commit/800777cd72d42028f19444f4c2b346eebca1fdac))
+
 ## [2.19.0](https://github.com/lanestrin/icorium/compare/v2.18.0...v2.19.0) (2026-11-24)
 
 
