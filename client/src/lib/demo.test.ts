@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openBrowserStorage } from './browser-storage';
 import {
   BROWSER_DB, claimDemoLock, currentDemoId, DEMO_EMAIL, DEMO_PASSWORD, DEMO_SESSION_KEY, DEMO_STORAGE_MESSAGE, demoDbName, deleteDemoDatabase, endDemo,
-  isDemoCredentials, isDemoDbName, startDemo, sweepStaleDemos, type LockManagerLike,
+  isDemoCredentials, isDemoDbName, leaveDemo, startDemo, sweepStaleDemos, type LockManagerLike,
 } from './demo';
 
 const ID_A = '11111111-1111-4111-8111-111111111111';
@@ -122,6 +122,31 @@ describe('demo session', () => {
     await (await openBrowserStorage(BROWSER_DB)).clear();
     expect(await deleteDemoDatabase(BROWSER_DB)).toBe(false);
     expect(await names()).toContain(BROWSER_DB);
+  });
+});
+
+describe('leaveDemo', () => {
+  afterEach(() => sessionStorage.clear());
+
+  it('deletes only the demo this tab holds, and does nothing without one', async () => {
+    const id = '44444444-4444-4444-8444-444444444444';
+    await leaveDemo(fakeLocks());
+    startDemo(undefined, () => id);
+    for (const name of [demoDbName(id), demoDbName(ID_B), BROWSER_DB]) await openBrowserStorage(name);
+    await leaveDemo(fakeLocks());
+    expect(currentDemoId()).toBeNull();
+    const left = (await indexedDB.databases()).map((db) => db.name);
+    expect(left).not.toContain(demoDbName(id));
+    expect(left).toEqual(expect.arrayContaining([demoDbName(ID_B), BROWSER_DB]));
+  });
+
+  it('only forgets a demo another tab holds', async () => {
+    const id = '55555555-5555-4555-8555-555555555555';
+    startDemo(undefined, () => id);
+    await openBrowserStorage(demoDbName(id));
+    await leaveDemo(fakeLocks([demoDbName(id)]));
+    expect(currentDemoId()).toBeNull();
+    expect((await indexedDB.databases()).map((db) => db.name)).toContain(demoDbName(id));
   });
 });
 

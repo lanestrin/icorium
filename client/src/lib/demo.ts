@@ -11,6 +11,9 @@ export const BROWSER_DB = 'reclaim-studio';
 export const DEMO_DB_PREFIX = 'reclaim-studio-demo-';
 export const DEMO_SESSION_KEY = 'reclaim-studio-demo-session';
 
+/** Added to /sign-in's address when a demo is signed out, so the page offers the demo again with its details filled in. */
+export const DEMO_ENDED_PARAM = 'demo-ended';
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** The parts of the Web Locks API this file uses, so tests can pass their own. */
@@ -130,6 +133,17 @@ export async function endDemo(id: string, store: Pick<Storage, 'removeItem'> | n
   releases.get(name)?.();
   releases.delete(name);
   return deleted;
+}
+
+/**
+ * Leaves the demo because the person has signed in to an account. A duplicated tab, whose demo another tab holds,
+ * only forgets the ID, so the other tab's files stay.
+ */
+export async function leaveDemo(locks: LockManagerLike | null = defaultLocks()): Promise<void> {
+  const id = currentDemoId();
+  if (!id) return;
+  if (await claimDemoLock(id, locks)) await endDemo(id);
+  else dropDemoId();
 }
 
 /**
