@@ -96,6 +96,7 @@ interface SidebarProps {
 
 const STORAGE_NOTES: Record<StorageMode, string> = {
   saved: 'Files are kept only in this browser. Clearing your browser data removes them.',
+  cloud: 'Files are saved privately to your account and open on any device where you sign in.',
   memory: "This browser isn't saving files. They'll be gone when you refresh or close this page.",
 };
 
@@ -109,9 +110,11 @@ export function Sidebar({ processor, setProcessor, onUpload, onRun, canRun, runn
       <div className={styles.storage}>
         <DropZone uploading={uploading} reading={reading} disabled={uploadDisabled} onUpload={onUpload} onCancelReading={onCancelReading} />
         {storageMode && <p className={styles.storageNote}>{STORAGE_NOTES[storageMode]}</p>}
-        <Button variant="secondary" className={styles.clearData} disabled={clearDisabled} onClick={onClearData} icon={<Trash2 />}>
-          Clear my data
-        </Button>
+        {storageMode !== 'cloud' && (
+          <Button variant="secondary" className={styles.clearData} disabled={clearDisabled} onClick={onClearData} icon={<Trash2 />}>
+            Clear my data
+          </Button>
+        )}
       </div>
 
       <section>

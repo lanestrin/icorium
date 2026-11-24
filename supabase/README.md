@@ -110,6 +110,8 @@ How it works: every file row and Storage object belongs to the signed-in user (`
 
 For 17.4b: allocate the ID, upload the objects (`<owner uuid>/<file uuid>.csv`, `.original`, `.source.json`), insert the `files` row last (delete the objects if it fails), replace a result with Storage `update` rather than upsert (upsert needs the insert policy as well), and map `storage_full`, an RLS refusal on a Storage write at capacity, `not_active`, `file_ids_exhausted` and `processing_not_allowed` errors to messages.
 
+17.4b (`client/src/lib/cloud-storage.ts`) follows that order. It also: pages every list (the API returns at most 1000 rows at a time); saves a supplier profile with update-then-insert, because upsert would also write `key`, which has no update grant; and, when the database refuses a write with a row-level security error, calls `file_storage_has_room()` to tell a full workspace (capacity message) from an inactive account (inactive message). The app opens a cloud workspace only after `is_active_account()` returns true, and a network error or a 5xx response is shown as "temporarily unavailable", never as an empty workspace. Cloud workspaces start empty (no samples), and Clear my data is not offered there until 18.1 adds deletion. Replacing a result and archiving or mapping from two devices at once are last-write-wins, and a replace that fails after the CSV was replaced leaves new text with the old metadata until the replace is confirmed again.
+
 ## Not verified yet (17.7)
 
 These are recorded as assumptions until hosted evidence exists:
@@ -126,6 +128,7 @@ These are recorded as assumptions until hosted evidence exists:
 - that Gmail SMTP on port 465 is reachable from an Edge Function and that nodemailer runs there;
 - that a ban stops an already signed-in user's token refresh, and that sign-in then reports "user_banned";
 - cloud files (17.4a): Storage sets `metadata.size` on each object; the capacity function can sum every user's objects despite their row-level security; Storage `update` is checked only against the update policy; the policies, the counter, the metadata value checks, the processing gate (advisory against a modified client) and the 900 MB refusal behave as the SQL describes;
+- the cloud workspace in the app (17.4b): the calls in `cloud-storage.ts` against real Postgres and Storage (the order of writes, cleanup after a failed save, Storage `update`, the capacity-versus-inactive check, 1000-row pages) and how a paused project looks from the browser. The tests use a fake client;
 - the sign-in pages against a real project: password and Google sign-in, the
   confirmation and reset emails, and the PKCE redirects back to the site.
 

@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 17.8 - Sign-in page redesign.**
+**Next: 17.5 - Isolated guest demo and existing-file export.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 to 17.3
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -336,7 +336,7 @@ Rules for every M19 item:
   17.6 enforces page access.
   **Depends on:** 17.3, 17.8.
 
-- [ ] **17.4** Private cross-device file workspace — Persist registered
+- [x] **17.4** Private cross-device file workspace — Persist registered
   users’ files, results and metadata through the selected cloud
   services. Preserve the existing workspace and processing workflow,
   applying the approved identity contract and trusted owner checks
@@ -359,7 +359,7 @@ Rules for every M19 item:
     Hosted evidence is deferred to 17.7.
     **Depends on:** 17.1, 17.2a.
 
-  - [ ] **17.4b** Cloud workspace in the app — Add the cloud Storage
+  - [x] **17.4b** Cloud workspace in the app — Add the cloud Storage
     implementation and use it for signed-in active accounts, keeping
     the browser workspace for everyone else until 17.6. Show capacity
     refusals and a temporarily unavailable workspace clearly. Keep

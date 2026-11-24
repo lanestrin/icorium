@@ -12,7 +12,7 @@ import { ConvertError } from '../lib/convert/table';
 
 vi.mock('../lib/api', () => ({ api: {
   list: vi.fn(), process: vi.fn(), rows: vi.fn(), upload: vi.fn(), compare: vi.fn(), archive: vi.fn(), generate: vi.fn(),
-  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(),
+  download: vi.fn(), storageMode: vi.fn(), clearData: vi.fn(), setWorkspace: vi.fn(), workspaceId: vi.fn(),
 } }));
 // The Excel reader is tested with real workbooks in lib/convert; here it is mocked to control timing.
 vi.mock('../lib/convert/excel', async (importOriginal) => ({ ...(await importOriginal<typeof import('../lib/convert/excel')>()), readExcel: vi.fn() }));

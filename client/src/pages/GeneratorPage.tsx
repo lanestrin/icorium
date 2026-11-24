@@ -11,10 +11,12 @@ import { Card } from '../components/ui/Card';
 import styles from '../components/generator/generator.module.scss';
 import page from '../styles/page.module.scss';
 import { api } from '../lib/api';
+import { WORKSPACE_CHANGED_MESSAGE } from '../lib/workspace';
 import { errorMessage, plural } from '../lib/format';
 import { flaggedRows, withCsv } from '../lib/generated-files';
 import { AppShell } from '../components/layout/AppShell';
 import { useAccount } from '../hooks/useAccount';
+import { useWorkspace } from '../hooks/useWorkspace';
 
 const ERROR_ROWS_HELP = 'In each file. Each of these rows fails Composition Validation: missing or non-numeric mass, a negative percentage, '
   + 'a composition total off by 15 points, a missing batch ID, or a duplicate batch ID (which marks two rows).';
@@ -32,6 +34,7 @@ function batchSummary(files: GeneratedFile[]) {
 /** The CSV Generator (/generator): make synthetic partner CSVs, preview and download them, or add them to CSV Files. */
 export function GeneratorPage() {
   const account = useAccount();
+  useWorkspace(account.account); // adds generated files to the account's workspace
   const [partner, setPartner] = useState<GeneratorPartner>('A');
   const [rows, setRows] = useState('25');
   const [count, setCount] = useState('1');
@@ -70,8 +73,11 @@ export function GeneratorPage() {
     setAdded(undefined);
     const done: string[] = [];
     const failed: string[] = [];
+    const workspace = api.workspaceId();
     for (const [i, f] of files.entries()) {
       const fileName = nameOf(i);
+      // File IDs repeat across workspaces: after a switch the rest must not be added to the other one.
+      if (api.workspaceId() !== workspace) { failed.push(WORKSPACE_CHANGED_MESSAGE); break; }
       try {
         await api.upload(new File([f.text], fileName, { type: 'text/csv' }));
         done.push(fileName);
@@ -79,7 +85,8 @@ export function GeneratorPage() {
         failed.push(`${fileName}: ${errorMessage(err)}`);
       }
     }
-    if (done.length) setAdded(done.length === 1 ? `Added ${done[0]} to CSV Files.` : `Added ${done.length} files to CSV Files.`);
+    if (api.workspaceId() !== workspace && !failed.includes(WORKSPACE_CHANGED_MESSAGE)) failed.push(WORKSPACE_CHANGED_MESSAGE);
+    if (done.length && api.workspaceId() === workspace) setAdded(done.length === 1 ? `Added ${done[0]} to CSV Files.` : `Added ${done.length} files to CSV Files.`);
     if (failed.length) setError(`Could not add to CSV Files\n${failed.join('\n')}`);
     setBusy(undefined);
   }
