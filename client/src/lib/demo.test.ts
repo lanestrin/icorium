@@ -164,6 +164,7 @@ describe('the Admin demo (17.10)', () => {
     store.data.set(DEMO_ADMIN_DATA_KEY, '{}');
     startDemo(store, () => ID_B);
     expect(currentDemoKind(store)).toBe('standard');
+    expect(store.data.has(DEMO_KIND_KEY)).toBe(false);
     expect(store.data.has(DEMO_ADMIN_DATA_KEY)).toBe(false);
   });
 

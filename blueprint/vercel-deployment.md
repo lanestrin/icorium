@@ -42,7 +42,7 @@ Three build variables are read. All are public values built into the page:
 | Variable | Where | Effect |
 | --- | --- | --- |
 | `APP_ENV_LABEL` | Production environment, `Test` | The navigation label reads `vX.Y.Z · Test`. Previews show `· Preview` without it. |
-| `VITE_SUPABASE_URL` | Set on the test site (reported 2026-11-23) | With the key below, turns on sign-in. Without both, the sign-in pages say sign-in isn't set up and only Try Demo opens the workspace. |
+| `VITE_SUPABASE_URL` | Set on the test site (reported 2026-11-23) | With the key below, turns on sign-in. Without both, the sign-in pages say sign-in isn't set up and only Try Demo and Try Admin Demo open the workspace. |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Set on the test site (reported 2026-11-23) | The Supabase publishable key, which is safe in the browser. Never put the secret key here. |
 
 Changing the two Supabase variables needs the person's authorization, and the

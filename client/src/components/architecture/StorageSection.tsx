@@ -50,7 +50,7 @@ export function StorageSection() {
           <h3 className={styles.cardHeading}><Laptop className={styles.headingIcon} aria-hidden /> Local development</h3>
           <Checks label="Local development" items={[
             'One Vite dev server; no API or database to start',
-            <>Without Supabase settings, Try Demo opens the workspace; its files are kept by <Path>client/src/lib/browser-storage.ts</Path></>,
+            <>Without Supabase settings, Try Demo and Try Admin Demo open the workspace; its files are kept by <Path>client/src/lib/browser-storage.ts</Path></>,
           ]} />
         </Card>
         <Card as="article">

@@ -1,6 +1,6 @@
 import { isActiveAdmin, type AccountState } from '../hooks/useAccount';
 
-/** What a page needs: workspace is an active account or a demo guest; admin is an active Admin. */
+/** What a page needs: workspace is an active account or a demo guest; admin is an active Admin or an Admin demo (17.10). */
 export type Requirement = 'workspace' | 'admin';
 
 /** What a protected page does for an account. Only allow opens it. */

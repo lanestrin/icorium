@@ -3,10 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminMessage, callAdmin, type AdminAction, type AdminList, type AdminResult } from '../lib/admin';
 import type { AccountState } from '../hooks/useAccount';
-import { DEMO_ADMIN_DATA_KEY } from '../lib/demo';
-import { accountApi, admin, DEMO_SESSION } from '../test-fixtures/accounts';
+import { DEMO_ADMIN_DATA_KEY, DEMO_SESSION_KEY } from '../lib/demo';
+import { getSupabase } from '../lib/supabase';
+import { accountApi, admin, DEMO_SESSION, demo as standardDemo } from '../test-fixtures/accounts';
 import { AdminPage } from './AdminPage';
 
+vi.mock('../lib/supabase', () => ({ getSupabase: vi.fn(), isAuthConfigured: vi.fn(() => true) }));
 vi.mock('../lib/admin', async (original) => ({ ...(await original<typeof import('../lib/admin')>()), callAdmin: vi.fn() }));
 
 const ME = 'user-1';
@@ -291,9 +293,16 @@ describe('AdminPage: navigation (17.9)', () => {
 
 describe('AdminPage: Admin demo (17.10)', () => {
   const adminDemo: AccountState = { status: 'demo', sessionId: DEMO_SESSION, kind: 'admin' };
+  beforeEach(() => sessionStorage.setItem(DEMO_SESSION_KEY, DEMO_SESSION));
   afterEach(() => sessionStorage.clear());
+  const confirmWith = async (user: ReturnType<typeof userEvent.setup>, button: string) => {
+    const dialog = screen.getByRole('dialog');
+    const text = dialog.textContent ?? '';
+    await user.click(within(dialog).getByRole('button', { name: button }));
+    return text;
+  };
 
-  it('shows fictional people with a permanent notice, and never calls the Admin function', async () => {
+  it('shows fictional people with a permanent notice, and simulates every action without the Admin function or Supabase', async () => {
     const user = userEvent.setup();
     render(<AdminPage account={accountApi(adminDemo)} />);
     await screen.findByRole('heading', { name: 'Users' });
@@ -305,22 +314,81 @@ describe('AdminPage: Admin demo (17.10)', () => {
     expect(within(screen.getByRole('list', { name: 'Invitations' })).getByText('guest.one@demo.example')).toBeInTheDocument();
     await user.click(within(row('Invitations', 'lee.park@demo.example')).getByRole('button', { name: /Resend/ }));
     expect(await screen.findByText(/simulated again\. No email was sent/)).toBeInTheDocument();
+    await user.click(within(row('Invitations', 'old.invite@demo.example')).getByRole('button', { name: /Extend/ }));
+    expect(await screen.findByText(/old\.invite@demo\.example now expires on .* \(simulated\)/)).toBeInTheDocument();
+    await user.click(within(row('Invitations', 'lee.park@demo.example')).getByRole('button', { name: /Revoke/ }));
+    await confirmWith(user, 'Revoke');
+    expect(await screen.findByText('Invitation to lee.park@demo.example revoked (simulated)')).toBeInTheDocument();
+    await user.click(within(row('Accounts', 'Noah Quinn')).getByRole('button', { name: /Make Admin/ }));
+    await confirmWith(user, 'Make Admin');
+    expect(await screen.findByText('noah.quinn@demo.example is now Admin (simulated)')).toBeInTheDocument();
+    await user.click(within(row('Accounts', 'Noah Quinn')).getByRole('button', { name: /Deactivate/ }));
+    await confirmWith(user, 'Deactivate');
+    expect(await screen.findByText('noah.quinn@demo.example deactivated (simulated)')).toBeInTheDocument();
+    await user.click(within(row('Accounts', 'Priya Shah')).getByRole('button', { name: /Reactivate/ }));
+    expect(await screen.findByText('priya.shah@demo.example reactivated (simulated)')).toBeInTheDocument();
     expect(callAdmin).not.toHaveBeenCalled();
+    expect(getSupabase).not.toHaveBeenCalled();
   });
 
-  it('confirms and simulates a deactivation, keeps it over a reload, and explains your own row', async () => {
+  it('keeps a standard demo off the simulation: it uses the Admin function, with no demo notice', async () => {
+    setUp();
+    render(<AdminPage account={accountApi(standardDemo)} />);
+    await screen.findByRole('heading', { name: 'Users' });
+    expect(callAdmin).toHaveBeenCalledWith({ action: 'list' });
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    expect(screen.queryByText('Demo Admin (you)')).not.toBeInTheDocument();
+  });
+
+  it('words every demo confirmation as the simulation, and a real Admin keeps the real wording', async () => {
+    const user = userEvent.setup();
+    const view = render(<AdminPage account={accountApi(adminDemo)} />);
+    await user.click(within(await waitFor(() => row('Invitations', 'lee.park@demo.example'))).getByRole('button', { name: /Revoke/ }));
+    expect(await confirmWith(user, 'Revoke')).toContain('In this demo, the fictional invitation to lee.park@demo.example will be marked revoked. Nothing is sent.');
+    await screen.findByText(/revoked \(simulated\)/);
+    await user.click(within(row('Accounts', 'Noah Quinn')).getByRole('button', { name: /Make Admin/ }));
+    expect(await confirmWith(user, 'Make Admin')).toContain('In this demo, noah.quinn@demo.example will be shown as Admin. No real account changes.');
+    await screen.findByText(/is now Admin/);
+    await user.click(within(row('Accounts', 'Noah Quinn')).getByRole('button', { name: /Deactivate/ }));
+    const text = await confirmWith(user, 'Deactivate');
+    expect(text).toContain('In this demo, noah.quinn@demo.example will be shown as deactivated. No real account changes.');
+    expect(text).not.toMatch(/signed out|blocked|no longer/);
+    view.unmount();
+    setUp();
+    render(<AdminPage account={accountApi(admin)} />);
+    await user.click(within(await waitFor(() => row('Accounts', 'bo@example.com'))).getByRole('button', { name: /Make Admin/ }));
+    let real = await confirmWith(user, 'Cancel');
+    expect(real).toContain('bo@example.com will be able to administer the app.');
+    expect(real).not.toContain('demo');
+    await user.click(within(row('Accounts', 'bo@example.com')).getByRole('button', { name: /Deactivate/ }));
+    real = await confirmWith(user, 'Cancel');
+    expect(real).toContain('bo@example.com will be signed out and blocked from the app. Their files are kept.');
+    expect(real).not.toContain('demo');
+    await user.click(within(row('Invitations', 'new@example.com')).getByRole('button', { name: /Revoke/ }));
+    real = await confirmWith(user, 'Cancel');
+    expect(real).toContain('new@example.com will no longer be able to activate an account with this invitation.');
+    expect(real).not.toContain('demo');
+  });
+
+  it('confirms and simulates a deactivation, keeps it over a reload, and explains your own row only when access would go', async () => {
     const user = userEvent.setup();
     const view = render(<AdminPage account={accountApi(adminDemo)} />);
     await user.click(within(await waitFor(() => row('Accounts', 'Noah Quinn'))).getByRole('button', { name: /Deactivate/ }));
-    expect(within(screen.getByRole('dialog')).getByText(/only the fictional list changes/)).toBeInTheDocument();
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deactivate' }));
+    await confirmWith(user, 'Deactivate');
     expect(await screen.findByText(/noah\.quinn@demo\.example deactivated \(simulated\)/)).toBeInTheDocument();
     view.unmount();
     render(<AdminPage account={accountApi(adminDemo)} />);
     expect(within(await waitFor(() => row('Accounts', 'Noah Quinn'))).getByText('Deactivated')).toBeInTheDocument();
     await user.click(within(row('Accounts', 'Demo Admin (you)')).getByRole('button', { name: /Make Member/ }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Make Member' }));
-    expect(await screen.findByText(/the demo stays open/)).toBeInTheDocument();
+    await confirmWith(user, 'Make Member');
+    expect(await screen.findByText(/A real Admin would lose access; the demo stays open\./)).toBeInTheDocument();
+    await user.click(within(row('Accounts', 'Demo Admin (you)')).getByRole('button', { name: /Make Admin/ }));
+    await confirmWith(user, 'Make Admin');
+    expect(await screen.findByText(/you@demo\.example is now Admin \(simulated\)$/)).toBeInTheDocument();
+    expect(screen.queryByText(/real Admin/)).not.toBeInTheDocument();
+    await user.click(within(row('Accounts', 'Demo Admin (you)')).getByRole('button', { name: /Deactivate/ }));
+    await confirmWith(user, 'Deactivate');
+    expect(await screen.findByText('you@demo.example deactivated (simulated). A real Admin would lose access; the demo stays open.')).toBeInTheDocument();
     expect(callAdmin).not.toHaveBeenCalled();
   });
 

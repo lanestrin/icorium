@@ -145,6 +145,7 @@ describe('useAccount demo', () => {
     const id = startDemo(undefined, undefined, 'admin');
     const { result } = renderHook(() => useAccount());
     await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id, kind: 'admin' }));
+    expect(isActiveAdmin(result.current.account)).toBe(false); // an Admin demo opens the Admin pages by canSeeAdminPages, never as an active Admin
   });
 
   it('a duplicated Admin demo tab that loses the lock is neither a demo nor an Admin demo', async () => {

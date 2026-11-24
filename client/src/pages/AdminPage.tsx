@@ -23,7 +23,8 @@ type Confirmation = { title: string; text: string; label: string; run: () => voi
 /**
  * /admin (build-plan 17.3): invite people, manage invitations, change roles and deactivate or reactivate
  * accounts. Every request goes to the Admin function, which checks the caller is an active Admin. The gate
- * (17.6) opens this page only for an active Admin; that decides what is shown, and the function protects the data.
+ * (17.6) opens this page for an active Admin or an Admin demo (17.10); that decides what is shown, and the function
+ * protects the data. An Admin demo never reaches the function: its actions are simulated on fictional data.
  * Admins see account and invitation details, never files.
  */
 export function AdminPage({ account }: { account: AccountApi }) {
@@ -74,25 +75,26 @@ export function AdminPage({ account }: { account: AccountApi }) {
     return result.ok;
   }
 
-  const ask = (title: string, text: string, label: string, action: () => void) =>
-    setConfirm({ title, text: demo ? `${text} In this demo only the fictional list changes.` : text, label, run: action });
-  // Changing your own fictional row never changes the demo's access; say what a real account would do.
-  const ownRow = (acct: Account) => (demo && acct.user_id === DEMO_YOU_ID ? '. On a real account this would change your own Admin access; the demo stays open.' : '');
+  // A demo describes only the simulation, never a real effect.
+  const ask = (title: string, text: string, demoText: string, label: string, action: () => void) =>
+    setConfirm({ title, text: demo ? demoText : text, label, run: action });
+  // Your own fictional row never changes the demo's access; for demotion and deactivation say what a real Admin would face.
+  const ownRow = (acct: Account) => (demo && acct.user_id === DEMO_YOU_ID ? '. A real Admin would lose access; the demo stays open.' : '');
 
   const invite = (email: string, role: Role) => run<Invitation>({ action: 'invite', email, role }, () => (demo ? `Invitation to ${email} simulated. No email was sent.` : `Invitation sent to ${email}`));
   const resend = (inv: Invitation) => void run({ action: 'resend', id: inv.id }, () => (demo ? `Invitation to ${inv.email} simulated again. No email was sent.` : `Invitation sent again to ${inv.email}`));
   const extend = (inv: Invitation) => void run<Invitation>({ action: 'extend', id: inv.id }, (data) => simulated(`Invitation to ${inv.email} now expires on ${formatDate(data.expires_at)}`));
   const revoke = (inv: Invitation) =>
-    ask('Revoke invitation?', `${inv.email} will no longer be able to activate an account with this invitation.`, 'Revoke', () =>
+    ask('Revoke invitation?', `${inv.email} will no longer be able to activate an account with this invitation.`, `In this demo, the fictional invitation to ${inv.email} will be marked revoked. Nothing is sent.`, 'Revoke', () =>
       void run({ action: 'revoke', id: inv.id }, () => simulated(`Invitation to ${inv.email} revoked`)));
   const toggleRole = (acct: Account) => {
     const role: Role = acct.role === 'Admin' ? 'Member' : 'Admin';
-    ask(`Make ${role}?`, `${acct.email} will be ${role === 'Admin' ? 'able to administer the app' : 'no longer able to administer the app'}.`, `Make ${role}`, () =>
-      void run({ action: 'setRole', userId: acct.user_id, role }, () => simulated(`${acct.email} is now ${role}`) + ownRow(acct)));
+    ask(`Make ${role}?`, `${acct.email} will be ${role === 'Admin' ? 'able to administer the app' : 'no longer able to administer the app'}.`, `In this demo, ${acct.email} will be shown as ${role}. No real account changes.`, `Make ${role}`, () =>
+      void run({ action: 'setRole', userId: acct.user_id, role }, () => simulated(`${acct.email} is now ${role}`) + (role === 'Member' ? ownRow(acct) : '')));
   };
   const toggleActive = (acct: Account) => {
     if (acct.active)
-      ask('Deactivate account?', `${acct.email} will be signed out and blocked from the app. Their files are kept.`, 'Deactivate', () =>
+      ask('Deactivate account?', `${acct.email} will be signed out and blocked from the app. Their files are kept.`, `In this demo, ${acct.email} will be shown as deactivated. No real account changes.`, 'Deactivate', () =>
         void run({ action: 'deactivate', userId: acct.user_id }, () => simulated(`${acct.email} deactivated`) + ownRow(acct)));
     else void run({ action: 'reactivate', userId: acct.user_id }, () => simulated(`${acct.email} reactivated`));
   };
