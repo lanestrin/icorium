@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.17.2](https://github.com/lanestrin/icorium/compare/v2.17.1...v2.17.2) (2026-11-23)
+
+
+### Bug Fixes
+
+* keep the sidebar full height while scrolling ([#173](https://github.com/lanestrin/icorium/issues/173)) ([367e01e](https://github.com/lanestrin/icorium/commit/367e01e17c4a56dab2ab936db1498e64cb189c1f))
+
 ## [2.17.1](https://github.com/lanestrin/icorium/compare/v2.17.0...v2.17.1) (2026-11-23)
 
 
