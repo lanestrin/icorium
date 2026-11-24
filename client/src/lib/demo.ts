@@ -11,6 +11,9 @@ export const BROWSER_DB = 'reclaim-studio';
 export const DEMO_DB_PREFIX = 'reclaim-studio-demo-';
 export const DEMO_SESSION_KEY = 'reclaim-studio-demo-session';
 
+/** Added to /sign-in's address when a demo is signed out, so the page offers the demo again with its details filled in. */
+export const DEMO_ENDED_PARAM = 'demo-ended';
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** The parts of the Web Locks API this file uses, so tests can pass their own. */

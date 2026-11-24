@@ -16,14 +16,15 @@ import { useAccount } from '../hooks/useAccount';
 import { useRedirectResult } from '../hooks/useRedirectResult';
 import { authErrorMessage, NOT_SET_UP_MESSAGE } from '../lib/auth';
 import { createBrowserExport } from '../lib/browser-export';
-import { DEMO_EMAIL, DEMO_PASSWORD, DEMO_STORAGE_MESSAGE, isDemoCredentials, leaveDemo, startDemo } from '../lib/demo';
+import { DEMO_EMAIL, DEMO_ENDED_PARAM, DEMO_PASSWORD, DEMO_STORAGE_MESSAGE, isDemoCredentials, leaveDemo, startDemo } from '../lib/demo';
 import { getSupabase } from '../lib/supabase';
 import { PAGES } from '../lib/pages';
 
 /**
  * /sign-in: email and password, or Google (build-plan 17.2b), in one centered card. Protected
  * pages send signed-out visitors here (17.6). Try Demo fills the public demo credentials; the guest then presses Sign In, which starts an
- * isolated temporary demo (17.5) without calling Supabase. On a site without Supabase settings Try Demo also shows the form.
+ * isolated temporary demo (17.5) without calling Supabase. After a demo is signed out, the details are
+ * already filled in. On a site without Supabase settings the form only starts the demo.
  * Google and email-confirmation redirects come back here: a failed one shows its message, and a
  * successful one opens the file workspace. Signing in to an account leaves a demo open in this tab; just opening
  * this page does not. onSignedIn opens it; tests pass their own.
@@ -31,12 +32,13 @@ import { PAGES } from '../lib/pages';
 export function SignInPage({ onSignedIn = () => window.location.assign('/') }: { onSignedIn?: () => void }) {
   const { account, hasSession, signOut } = useAccount();
   const redirect = useRedirectResult();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [demoEnded] = useState(() => new URLSearchParams(window.location.search).has(DEMO_ENDED_PARAM));
+  const [email, setEmail] = useState(demoEnded ? DEMO_EMAIL : '');
+  const [password, setPassword] = useState(demoEnded ? DEMO_PASSWORD : '');
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(redirect.error);
-  const [demoFills, setDemoFills] = useState(0); // counts Try Demo presses, so each one refocuses Sign In
-  const [demoFilled, setDemoFilled] = useState(false); // the demo details are still in the fields
+  const [demoFills, setDemoFills] = useState(demoEnded ? 1 : 0); // counts Try Demo presses, so each one refocuses Sign In
+  const [demoFilled, setDemoFilled] = useState(demoEnded); // the demo details are still in the fields
   const [offerExport, setOfferExport] = useState(false); // this browser has older files, or couldn't be read
   const [exporting, setExporting] = useState(false);
   const form = useRef<HTMLFormElement>(null);
@@ -50,10 +52,21 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
     if (signedInByRedirect) void leaveDemo().then(onSignedIn);
   }, [signedInByRedirect]);
 
-  // After Try Demo has filled the fields, focus Sign In so the guest only has to press it.
+  // The sign-in form and Try Demo show together.
+  const showForm = account.status === 'signed-out' || account.status === 'error' || account.status === 'unconfigured';
+
+  // Drops the marker, so a reload or a kept address starts with empty fields.
   useEffect(() => {
-    if (demoFills > 0) form.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus();
-  }, [demoFills]);
+    if (!demoEnded) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(DEMO_ENDED_PARAM);
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [demoEnded]);
+
+  // Once the demo details are in the fields, focus Sign In so the guest only has to press it.
+  useEffect(() => {
+    if (showForm && demoFills > 0) form.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus();
+  }, [showForm, demoFills]);
 
   function fillDemo() {
     setError(null);
@@ -96,21 +109,19 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
     setSigningIn(false);
   }
 
-  const showForm = account.status === 'signed-out' || account.status === 'error' || (account.status === 'unconfigured' && demoFills > 0);
-  // Invitations only matter where accounts exist; a site without Supabase settings offers just the demo.
-  const showInvitation = account.status === 'signed-out' || account.status === 'error';
-  const showTryDemo = account.status === 'signed-out' || account.status === 'error' || account.status === 'unconfigured';
+  // Invitations and password recovery need accounts; a site without Supabase settings offers just the demo.
+  const showAccountHelp = account.status === 'signed-out' || account.status === 'error';
 
   // Offer the older files kept in this browser (read-only). A failed look still offers them: the dialog explains and retries.
   useEffect(() => {
-    if (!showTryDemo) return;
+    if (!showForm) return;
     let cancelled = false;
     createBrowserExport().list().then(
       (files) => { if (!cancelled) setOfferExport(files.length > 0); },
       () => { if (!cancelled) setOfferExport(true); },
     );
     return () => { cancelled = true; };
-  }, [showTryDemo]);
+  }, [showForm]);
 
   return (
     <div className={page.shell}>
@@ -149,27 +160,27 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
                 <form ref={form} className={styles.form} onSubmit={(event) => void signIn(event)}>
                   <AuthField label="Email" hideLabel placeholder="Email address" icon={<Mail />} type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); setDemoFilled(false); }} />
                   <AuthField label="Password" hideLabel placeholder="Password" icon={<Lock />} revealable type="password" autoComplete="current-password" required value={password} onChange={(e) => { setPassword(e.target.value); setDemoFilled(false); }} />
-                  <a href={PAGES.resetPassword} className={layout.forgot}>Forgot password?</a>
+                  {showAccountHelp && <a href={PAGES.resetPassword} className={layout.forgot}>Forgot password?</a>}
                   <Button type="submit" loading={signingIn}>{signingIn ? 'Signing in…' : 'Sign In'}</Button>
                 </form>
                 {account.status !== 'unconfigured' && <GoogleButton onError={setError} />}
               </>
             )}
-            {showTryDemo && (
+            {showForm && (
               <button type="button" className={layout.demo} onClick={fillDemo}><Play aria-hidden /> Try Demo</button>
             )}
             {/* Always mounted, so a screen reader announces the text when it appears. */}
-            <p role="status" className={demoFilled ? styles.notice : styles.hiddenLabel}>{demoFilled ? 'Demo details filled in. Press Sign In to start the demo.' : ''}</p>
-            {showInvitation && (
+            <p role="status" className={showForm && demoFilled ? styles.notice : styles.hiddenLabel}>{showForm && demoFilled ? 'Demo details filled in. Press Sign In to start the demo.' : ''}</p>
+            {showAccountHelp && (
               <>
                 <a href={PAGES.activate} className={layout.invitation}>Use invitation link</a>
                 <p className={layout.expiry}>Invitations expire after 30 days unless an admin extends them.</p>
               </>
             )}
-            {showTryDemo && offerExport && (
+            {showForm && offerExport && (
               <Button variant="link" className={layout.export} icon={<FolderDown />} onClick={() => setExporting(true)}>Export files kept in this browser</Button>
             )}
-            {showInvitation && (
+            {showAccountHelp && (
               <>
                 <hr className={layout.divider} />
                 <p className={layout.access}><User aria-hidden /> <span><strong>Need access?</strong> Contact your administrator for an invitation.</span></p>
@@ -178,7 +189,7 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
           </Card>
         </div>
       </main>
-      {showTryDemo && exporting && <ExportBrowserFilesModal onClose={() => setExporting(false)} />}
+      {showForm && exporting && <ExportBrowserFilesModal onClose={() => setExporting(false)} />}
     </div>
   );
 }

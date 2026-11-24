@@ -167,7 +167,41 @@ describe('SignInPage', () => {
     vi.mocked(isAuthConfigured).mockReturnValue(false);
     render(<SignInPage onSignedIn={vi.fn()} />);
     expect(screen.getByText("Sign-in isn't set up on this site yet.")).toBeInTheDocument();
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Email')).toHaveValue('');
+    expect(screen.queryByText('Forgot password?')).not.toBeInTheDocument(); // it needs accounts
+  });
+
+  it.each([true, false])('offers the demo again after it is signed out (accounts set up: %s)', async (configured) => {
+    setUp();
+    vi.mocked(isAuthConfigured).mockReturnValue(configured);
+    window.history.replaceState(null, '', '/sign-in?demo-ended');
+    const onSignedIn = vi.fn();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={onSignedIn} />);
+    expect(await screen.findByLabelText('Email')).toHaveValue(DEMO_EMAIL);
+    expect(screen.getByLabelText('Password')).toHaveValue(DEMO_PASSWORD);
+    expect(screen.getByText('Demo details filled in. Press Sign In to start the demo.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign In' })).toHaveFocus();
+    expect(window.location.search).toBe('');
+    expect(currentDemoId()).toBeNull(); // nothing starts until Sign In
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    expect(onSignedIn).toHaveBeenCalledTimes(1);
+    expect(currentDemoId()).not.toBeNull();
+  });
+
+  it('does not mention demo details to a person whose account is signed in', async () => {
+    setUp({ session: fakeSession(), profile: { name: 'Ada', role: 'Member', active: true } });
+    window.history.replaceState(null, '', '/sign-in?demo-ended');
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByText(/You're signed in as Ada/)).toBeInTheDocument();
+    expect(screen.queryByText(/Demo details filled in/)).not.toBeInTheDocument();
+  });
+
+  it('starts with empty fields when no demo was signed out', async () => {
+    setUp();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByLabelText('Email')).toHaveValue('');
+    expect(screen.getByLabelText('Password')).toHaveValue('');
   });
 
   it('shows one sign-in card, without the workspace panel or Admin links', async () => {
@@ -352,13 +386,12 @@ describe('SignInPage', () => {
     expect(currentDemoId()).toBeNull();
   });
 
-  it('on a site without sign-in settings, Try Demo reveals the form and other credentials are refused', async () => {
+  it('on a site without sign-in settings, the form starts only the demo and other credentials are refused', async () => {
     vi.mocked(isAuthConfigured).mockReturnValue(false);
     const onSignedIn = vi.fn();
     const user = userEvent.setup();
     render(<SignInPage onSignedIn={onSignedIn} />);
     expect(screen.getByText("Sign-in isn't set up on this site yet.")).toBeInTheDocument();
-    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
     expect(screen.queryByText('Use invitation link')).not.toBeInTheDocument(); // no accounts exist here
     expect(screen.queryByText(/Need access?/)).not.toBeInTheDocument();
     expect(screen.getByText('Try the demo with sample files.')).toBeInTheDocument();

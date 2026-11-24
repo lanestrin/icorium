@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { authErrorMessage, cleanName, NAME_MAX } from '../lib/auth';
-import { claimDemoLock, currentDemoId, dropDemoId, endDemo, sweepStaleDemos } from '../lib/demo';
+import { claimDemoLock, currentDemoId, DEMO_ENDED_PARAM, dropDemoId, endDemo, sweepStaleDemos } from '../lib/demo';
 import { PAGES } from '../lib/pages';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 
@@ -114,7 +114,7 @@ export function useAccount() {
       // Ends this tab's demo and deletes its files; a Supabase session held by another tab is left alone.
       // The demo state stays until the page unloads, so the open page never switches to another workspace first.
       await endDemo(demo.id);
-      window.location.assign(PAGES.signIn);
+      window.location.assign(`${PAGES.signIn}?${DEMO_ENDED_PARAM}`);
       return;
     }
     try {

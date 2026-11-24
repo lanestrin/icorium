@@ -195,7 +195,7 @@ describe('useAccount demo', () => {
     await act(async () => { await result.current.signOut(); });
     clearInterval(stop);
     expect(sessionStorage.getItem(DEMO_SESSION_KEY)).toBeNull();
-    expect(assign).toHaveBeenCalledWith('/sign-in');
+    expect(assign).toHaveBeenCalledWith('/sign-in?demo-ended');
     expect(fake.client.auth.signOut).not.toHaveBeenCalled();
     expect(result.current.account.status).toBe('demo'); // the open page never switches to another workspace before it leaves
     expect(seen.every((status) => status === 'demo')).toBe(true);
