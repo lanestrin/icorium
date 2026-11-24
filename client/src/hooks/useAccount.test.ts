@@ -1,8 +1,11 @@
+import 'fake-indexeddb/auto';
+import { StrictMode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
-import { DEMO_SESSION_KEY, startDemo } from '../lib/demo';
+import { openBrowserStorage } from '../lib/browser-storage';
+import { BROWSER_DB, DEMO_SESSION_KEY, demoDbName, startDemo } from '../lib/demo';
 import { isActiveAdmin, useAccount, type AccountState, type Profile } from './useAccount';
 
 vi.mock('../lib/supabase', () => ({ getSupabase: vi.fn(), isAuthConfigured: vi.fn(() => true) }));
@@ -145,10 +148,37 @@ describe('useAccount demo', () => {
   it('gives up a demo whose lock another tab holds (a duplicated tab) without deleting anything', async () => {
     setUp({});
     startDemo();
-    vi.stubGlobal('navigator', { ...navigator, locks: { request: async (_n: string, _o: unknown, cb: (l: null) => void) => cb(null), query: async () => ({ held: [] }) } });
+    vi.stubGlobal('navigator', { ...navigator, locks: { request: async (_n: string, _o: unknown, cb: (l: null) => void) => cb(null) } });
     const { result } = renderHook(() => useAccount());
-    await waitFor(() => expect(result.current.account).toEqual({ status: 'signed-out' }));
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'signed-out' }), { timeout: 4000 });
     expect(sessionStorage.getItem(DEMO_SESSION_KEY)).toBeNull();
+  });
+
+  it('keeps its demo under React StrictMode, which runs the claim twice before a browser lock answers', async () => {
+    setUp({});
+    const held = new Set<string>();
+    const request = (name: string, _o: unknown, cb: (lock: object | null) => Promise<void> | undefined) =>
+      new Promise((resolve) => setTimeout(() => { // the browser calls back later, never inside request()
+        if (held.has(name)) return resolve(cb(null));
+        held.add(name);
+        resolve(cb({}));
+      }, 0));
+    vi.stubGlobal('navigator', { ...navigator, locks: { request } });
+    vi.stubGlobal('location', { ...window.location, assign: vi.fn() });
+    const id = startDemo();
+    const { result } = renderHook(() => useAccount(), { wrapper: StrictMode });
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id }), { timeout: 4000 });
+    expect(sessionStorage.getItem(DEMO_SESSION_KEY)).toBe(id);
+    await act(async () => { await result.current.signOut(); }); // lets go of the lock for the next test
+  });
+
+  it('does not crash where the browser blocks site storage', async () => {
+    setUp({});
+    const blocked = vi.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError'); });
+    try {
+      const { result } = renderHook(() => useAccount());
+      await waitFor(() => expect(result.current.account).toEqual({ status: 'signed-out' }));
+    } finally { blocked.mockRestore(); }
   });
 
   it('signs out of the demo by deleting its session and opening sign-in, leaving Supabase alone', async () => {
@@ -158,10 +188,29 @@ describe('useAccount demo', () => {
     startDemo();
     const { result } = renderHook(() => useAccount());
     await waitFor(() => expect(result.current.account.status).toBe('demo'));
+    const seen: string[] = [];
+    const stop = setInterval(() => seen.push(result.current.account.status), 0);
     await act(async () => { await result.current.signOut(); });
+    clearInterval(stop);
     expect(sessionStorage.getItem(DEMO_SESSION_KEY)).toBeNull();
     expect(assign).toHaveBeenCalledWith('/sign-in');
     expect(fake.client.auth.signOut).not.toHaveBeenCalled();
+    expect(result.current.account.status).toBe('demo'); // the open page never switches to another workspace before it leaves
+    expect(seen.every((status) => status === 'demo')).toBe(true);
+  });
+
+  it('deletes only the demo database when signing out of the demo, and leaves the browser workspace', async () => {
+    setUp({});
+    vi.stubGlobal('location', { ...window.location, assign: vi.fn() });
+    const id = startDemo();
+    await openBrowserStorage(demoDbName(id));
+    await openBrowserStorage(BROWSER_DB);
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.account.status).toBe('demo'));
+    await act(async () => { await result.current.signOut(); });
+    const left = (await indexedDB.databases()).map((db) => db.name);
+    expect(left).not.toContain(demoDbName(id));
+    expect(left).toContain(BROWSER_DB);
   });
 });
 

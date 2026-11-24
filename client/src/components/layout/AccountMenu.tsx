@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ChevronDown, FolderDown, LogOut, User } from 'lucide-react';
 import type { useAccount } from '../../hooks/useAccount';
@@ -29,6 +29,11 @@ export function initials(name: string | null | undefined, email: string): string
 export function AccountMenu({ account, actionError, signOut, saveName }: AccountApi) {
   const [namePromptDismissed, setNamePromptDismissed] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // The dialog belongs to a signed-in account: it closes when that account goes, and doesn't reopen at the next sign-in.
+  useEffect(() => {
+    if (account.status !== 'signed-in') setExporting(false);
+  }, [account.status]);
 
   if (account.status === 'unconfigured' || account.status === 'loading') return <span className={styles.accountSpace} />;
   if (account.status === 'signed-out') return <a href={PAGES.signIn} className={styles.signIn}>Sign in</a>;
@@ -79,7 +84,7 @@ export function AccountMenu({ account, actionError, signOut, saveName }: Account
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
       {actionError && <span role="alert" className={styles.accountError}>{actionError}</span>}
-      {exporting && <ExportBrowserFilesModal onClose={() => setExporting(false)} />}
+      {exporting && account.status === 'signed-in' && <ExportBrowserFilesModal onClose={() => setExporting(false)} />}
       {askForName && <NamePrompt onSave={saveName} onClose={() => setNamePromptDismissed(true)} />}
     </span>
   );

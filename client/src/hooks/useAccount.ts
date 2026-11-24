@@ -107,8 +107,8 @@ export function useAccount() {
     setActionError(null);
     if (demo) {
       // Ends this tab's demo and deletes its files; a Supabase session held by another tab is left alone.
+      // The demo state stays until the page unloads, so the open page never switches to another workspace first.
       await endDemo(demo.id);
-      setDemo(null);
       window.location.assign(PAGES.signIn);
       return;
     }

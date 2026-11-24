@@ -97,6 +97,8 @@ describe('workspace choice', () => {
 describe('demo workspace', () => {
   const ID_1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const ID_2 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const ID_4 = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const ID_3 = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   const databaseNames = async () => (await indexedDB.databases()).map((db) => db.name);
 
   it("seeds a demo's own database and leaves the browser workspace and other demos alone", async () => {
@@ -116,6 +118,32 @@ describe('demo workspace', () => {
 
     api.setWorkspace({ kind: 'demo', sessionId: ID_1 });
     expect(await api.list()).toHaveLength(6); // the first demo continues, as after a refresh
+  });
+
+  it('clears only the demo database, back to the five samples', async () => {
+    const api = createApi((name) => openWorkspace(name), vi.fn(), { kind: 'browser' });
+    const before = await api.list();
+    await api.upload(csvFile('kept.csv', sample('partner_a_baseline.csv')));
+    api.setWorkspace({ kind: 'demo', sessionId: ID_4 });
+    await api.upload(csvFile('mine.csv', sample('partner_a_baseline.csv')));
+    expect(await api.list()).toHaveLength(6);
+    await api.clearData();
+    expect(await api.list()).toHaveLength(5);
+    api.setWorkspace({ kind: 'browser' });
+    expect(await api.list()).toHaveLength(before.length + 1); // the browser workspace kept its upload
+  });
+
+  it("never shows a demo's files in the cloud workspace, or the cloud's files in the demo", async () => {
+    const openCloud = vi.fn(async (_userId: string) => cloudWorkspace());
+    const api = createApi((name) => openWorkspace(name), openCloud, { kind: 'demo', sessionId: ID_3 });
+    expect(await api.list()).toHaveLength(5);
+    api.setWorkspace({ kind: 'cloud', userId: 'user-1' });
+    expect(await api.list()).toEqual([]);
+    expect(await api.storageMode()).toBe('cloud');
+    api.setWorkspace({ kind: 'demo', sessionId: ID_3 });
+    expect(await api.list()).toHaveLength(5);
+    expect(await api.storageMode()).toBe('demo');
+    expect(openCloud).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a demo's memory fallback as memory when the browser blocks IndexedDB", async () => {

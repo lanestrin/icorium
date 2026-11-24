@@ -68,6 +68,23 @@ describe('AccountMenu', () => {
     expect(screen.queryByRole('menuitem', { name: /Export/ })).not.toBeInTheDocument();
   });
 
+  it('offers no export of earlier browser files when the account could not be read', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    setUp({ session: fakeSession(), profileError: { code: 'PGRST301', message: 'boom' } });
+    const user = userEvent.setup();
+    render(<Harness />);
+    await openMenu(user);
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Export/ })).not.toBeInTheDocument();
+  });
+
+  it('offers no export to a signed-out visitor', async () => {
+    setUp();
+    render(<Harness />);
+    expect(await screen.findByRole('link', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.queryByText(/Export this browser/)).not.toBeInTheDocument();
+  });
+
   it('shows nothing on a site without sign-in', () => {
     vi.mocked(isAuthConfigured).mockReturnValue(false);
     render(<Harness />);

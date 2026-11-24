@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { INVITE_ONLY_MESSAGE } from '../lib/auth';
-import { currentDemoId, DEMO_EMAIL, DEMO_PASSWORD } from '../lib/demo';
+import { currentDemoId, DEMO_EMAIL, DEMO_PASSWORD, DEMO_STORAGE_MESSAGE, startDemo } from '../lib/demo';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
 import { SignInPage } from './SignInPage';
@@ -156,7 +156,7 @@ describe('SignInPage', () => {
   it('says sign-in is not set up on a site without Supabase settings', () => {
     vi.mocked(isAuthConfigured).mockReturnValue(false);
     render(<SignInPage onSignedIn={vi.fn()} />);
-    expect(screen.getByRole('status')).toHaveTextContent("Sign-in isn't set up on this site yet.");
+    expect(screen.getByText("Sign-in isn't set up on this site yet.")).toBeInTheDocument();
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
   });
 
@@ -206,6 +206,39 @@ describe('SignInPage', () => {
     expect(fake.auth.signInWithPassword).not.toHaveBeenCalled();
   });
 
+  it('says so, and starts nothing, when the browser blocks the storage the demo needs', async () => {
+    setUp();
+    const blocked = vi.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError'); });
+    try {
+      const onSignedIn = vi.fn();
+      const user = userEvent.setup();
+      render(<SignInPage onSignedIn={onSignedIn} />);
+      await user.click(await screen.findByRole('button', { name: 'Try Demo' }));
+      await user.click(screen.getByRole('button', { name: 'Sign In' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(DEMO_STORAGE_MESSAGE);
+      expect(onSignedIn).not.toHaveBeenCalled();
+    } finally { blocked.mockRestore(); }
+  });
+
+  it('clears the demo announcement once either field is edited', async () => {
+    setUp();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: 'Try Demo' }));
+    expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Demo details filled in.');
+    await user.type(screen.getByLabelText('Email'), 'x');
+    expect(screen.getByRole('status', { name: '' })).toBeEmptyDOMElement();
+  });
+
+  it('tells a tab that already has a demo open where to go, instead of an empty card', async () => {
+    setUp();
+    startDemo();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByText(/A demo is open in this tab/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Go to CSV Files' })).toHaveAttribute('href', '/');
+    expect(screen.queryByRole('button', { name: 'Try Demo' })).not.toBeInTheDocument();
+  });
+
   it('does not start a demo for other credentials', async () => {
     const fake = setUp();
     const user = userEvent.setup();
@@ -223,6 +256,7 @@ describe('SignInPage', () => {
     expect(screen.getByText("Sign-in isn't set up on this site yet.")).toBeInTheDocument();
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Try Demo' }));
+    expect(screen.queryByRole('button', { name: 'Continue with Google' })).not.toBeInTheDocument(); // it could only spin
     await user.clear(screen.getByLabelText('Email'));
     await user.type(screen.getByLabelText('Email'), 'ada@example.com');
     await user.click(screen.getByRole('button', { name: 'Sign In' }));

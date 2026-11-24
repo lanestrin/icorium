@@ -16,15 +16,27 @@ async function openExisting(idb: Pick<IDBFactory, 'databases'> | undefined = glo
   return createFileService(await openBrowserStorage(BROWSER_DB));
 }
 
-/** Every file kept in this browser, active and archived, inputs and results; empty when there is none. */
-export async function listBrowserFiles(): Promise<FileMeta[]> {
-  const files = await openExisting();
-  return files ? files.list() : [];
-}
-
-/** One browser file's name and CSV text, exactly as the workspace's own download gives it. */
-export async function readBrowserFile(id: string): Promise<{ name: string; text: string }> {
-  const files = await openExisting();
-  if (!files) throw new Error('This file is no longer in this browser.');
-  return files.download(id);
+/**
+ * A reader for one export dialog. It opens the browser database once and reuses it for every list and download,
+ * and tries again after a failed open.
+ */
+export function createBrowserExport() {
+  let opened: ReturnType<typeof openExisting> | undefined;
+  const open = () => {
+    opened ??= openExisting().catch((error) => { opened = undefined; throw error; });
+    return opened;
+  };
+  return {
+    /** Every file kept in this browser, active and archived, inputs and results; empty when there is none. */
+    async list(): Promise<FileMeta[]> {
+      const files = await open();
+      return files ? files.list() : [];
+    },
+    /** One browser file's name and CSV text, exactly as the workspace's own download gives it. */
+    async read(id: string): Promise<{ name: string; text: string }> {
+      const files = await open();
+      if (!files) throw new Error('This file is no longer in this browser.');
+      return files.download(id);
+    },
+  };
 }

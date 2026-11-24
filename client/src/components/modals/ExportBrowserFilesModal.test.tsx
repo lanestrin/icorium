@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { FileMeta } from '../../../../shared/types';
@@ -24,12 +24,41 @@ describe('ExportBrowserFilesModal', () => {
     const save = vi.fn();
     const user = userEvent.setup();
     render(<ExportBrowserFilesModal onClose={vi.fn()} load={async () => FILES} read={csv} save={save} />);
-    await user.click(await screen.findByRole('button', { name: 'Download b.csv' }));
+    await user.click(await screen.findByRole('button', { name: 'Download b.csv, File ID 100002' }));
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     expect(save).toHaveBeenLastCalledWith({ name: 'b.csv', text: 'id\n100002\n' });
     await user.click(screen.getByRole('button', { name: 'Download all' }));
     await waitFor(() => expect(save).toHaveBeenCalledTimes(3));
     expect(save.mock.calls.slice(1).map(([saved]) => saved.name)).toEqual(['a.csv', 'b.csv']);
+  });
+
+  it('tells apart files that share a name by their File ID', async () => {
+    render(<ExportBrowserFilesModal onClose={vi.fn()} load={async () => [file('100001', 'same.csv'), file('100002', 'same.csv')]} />);
+    expect(await screen.findByRole('button', { name: 'Download same.csv, File ID 100001' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download same.csv, File ID 100002' })).toBeInTheDocument();
+  });
+
+  it('offers Try again after a failed read and lists the files when it works', async () => {
+    const load = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValue(FILES);
+    const user = userEvent.setup();
+    render(<ExportBrowserFilesModal onClose={vi.fn()} load={load} />);
+    await user.click(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('list', { name: 'Files kept in this browser' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends no more files once the dialog has closed', async () => {
+    const save = vi.fn();
+    let release: () => void = () => {};
+    const read = vi.fn((id: string) => new Promise<{ name: string; text: string }>((resolve) => { release = () => resolve({ name: id, text: 'x' }); }));
+    const user = userEvent.setup();
+    const view = render(<ExportBrowserFilesModal onClose={vi.fn()} load={async () => FILES} read={read} save={save} />);
+    await user.click(await screen.findByRole('button', { name: 'Download all' }));
+    view.unmount();
+    await act(async () => { release(); });
+    expect(save).not.toHaveBeenCalled();
+    expect(read).toHaveBeenCalledTimes(1);
   });
 
   it('stops at a failed read and says so', async () => {

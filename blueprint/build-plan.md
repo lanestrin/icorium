@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 17.5 - Isolated guest demo and existing-file export.**
+**Next: 17.6 - Require sign-in and apply page access.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 to 17.3
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -366,7 +366,7 @@ Rules for every M19 item:
     the Architecture page accurate.
     **Depends on:** 17.4a.
 
-- [ ] **17.5** Isolated guest demo and existing-file export — Add
+- [x] **17.5** Isolated guest demo and existing-file export — Add
   Try the demo credential autofill followed by login submission.
   Each demo receives isolated temporary browser data and sample
   files, with cleanup on session end. Provide export access to

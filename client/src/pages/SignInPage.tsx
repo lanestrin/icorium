@@ -14,7 +14,7 @@ import { Button } from '../components/ui/Button';
 import { useAccount } from '../hooks/useAccount';
 import { useRedirectResult } from '../hooks/useRedirectResult';
 import { authErrorMessage, NOT_SET_UP_MESSAGE } from '../lib/auth';
-import { DEMO_EMAIL, DEMO_PASSWORD, isDemoCredentials, startDemo } from '../lib/demo';
+import { DEMO_EMAIL, DEMO_PASSWORD, DEMO_STORAGE_MESSAGE, isDemoCredentials, startDemo } from '../lib/demo';
 import { getSupabase } from '../lib/supabase';
 import { PAGES } from '../lib/pages';
 
@@ -40,6 +40,7 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(redirect.error);
   const [demoFills, setDemoFills] = useState(0); // counts Try Demo presses, so each one refocuses Sign In
+  const [demoFilled, setDemoFilled] = useState(false); // the demo details are still in the fields
   const form = useRef<HTMLFormElement>(null);
 
   // Back from Google or a confirmation link with a session: go straight to the files.
@@ -59,6 +60,7 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
     setError(null);
     setEmail(DEMO_EMAIL);
     setPassword(DEMO_PASSWORD);
+    setDemoFilled(true);
     setDemoFills((count) => count + 1);
   }
 
@@ -66,7 +68,12 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
     event.preventDefault();
     setError(null);
     if (isDemoCredentials(email, password)) {
-      startDemo(); // this tab's own temporary workspace; no account is involved
+      try {
+        startDemo(); // this tab's own temporary workspace; no account is involved
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : DEMO_STORAGE_MESSAGE);
+        return;
+      }
       onSignedIn();
       return;
     }
@@ -136,6 +143,9 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
               </div>
               {account.status === 'unconfigured' && <NotSetUp message={NOT_SET_UP_MESSAGE} />}
               {account.status === 'loading' && <p role="status" className={styles.notice}>Checking whether you're signed in…</p>}
+              {account.status === 'demo' && (
+                <p className={styles.notice}>A demo is open in this tab. <a href="/">Go to CSV Files</a></p>
+              )}
               {account.status === 'signed-in' && (
                 <p className={styles.notice}>
                   You're signed in as {account.profile?.name || account.email}. <a href="/">Go to CSV Files</a>
@@ -145,18 +155,19 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
                 <>
                   {error && <Banner tone="error">{error}</Banner>}
                   <form ref={form} className={styles.form} onSubmit={(event) => void signIn(event)}>
-                    <AuthField label="Email" hideLabel placeholder="Email address" icon={<Mail />} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-                    <AuthField label="Password" hideLabel placeholder="Password" icon={<Lock />} revealable type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                    <AuthField label="Email" hideLabel placeholder="Email address" icon={<Mail />} type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); setDemoFilled(false); }} />
+                    <AuthField label="Password" hideLabel placeholder="Password" icon={<Lock />} revealable type="password" autoComplete="current-password" required value={password} onChange={(e) => { setPassword(e.target.value); setDemoFilled(false); }} />
                     <a href={PAGES.resetPassword} className={layout.forgot}>Forgot password?</a>
                     <Button type="submit" loading={signingIn}>{signingIn ? 'Signing in…' : 'Sign In'}</Button>
                   </form>
-                  <GoogleButton onError={setError} />
+                  {account.status !== 'unconfigured' && <GoogleButton onError={setError} />}
                 </>
               )}
               {showTryDemo && (
                 <button type="button" className={layout.demo} onClick={fillDemo}><Play aria-hidden /> Try Demo</button>
               )}
-              {demoFills > 0 && <p role="status" className={styles.notice}>Demo details filled in. Press Sign In to start the demo.</p>}
+              {/* Always mounted, so a screen reader announces the text when it appears. */}
+              <p role="status" className={demoFilled ? styles.notice : styles.hiddenLabel}>{demoFilled ? 'Demo details filled in. Press Sign In to start the demo.' : ''}</p>
               <a href={PAGES.activate} className={layout.invitation}>Use invitation link</a>
               <p className={layout.expiry}>Invitations expire after 30 days unless an admin extends them.</p>
               <hr className={layout.divider} />
