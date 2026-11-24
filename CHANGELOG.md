@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.18.0](https://github.com/lanestrin/icorium/compare/v2.17.2...v2.18.0) (2026-11-24)
+
+
+### Features
+
+* add the private cloud workspace for signed-in accounts (17.4b) ([#175](https://github.com/lanestrin/icorium/issues/175)) ([90b8664](https://github.com/lanestrin/icorium/commit/90b8664398591a40d8746647e2d0839380069402))
+
 ## [2.17.2](https://github.com/lanestrin/icorium/compare/v2.17.1...v2.17.2) (2026-11-23)
 
 
