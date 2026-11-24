@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { ChevronDown, LogOut, User } from 'lucide-react';
+import { ChevronDown, FolderDown, LogOut, User } from 'lucide-react';
 import type { useAccount } from '../../hooks/useAccount';
 import { NAME_MAX } from '../../lib/auth';
 import { PAGES } from '../../lib/pages';
 import { AuthField } from '../auth/AuthField';
+import { ExportBrowserFilesModal } from '../modals/ExportBrowserFilesModal';
 import { Modal } from '../modals/Modal';
 import { Button } from '../ui/Button';
 import styles from './layout.module.scss';
@@ -22,10 +23,12 @@ export function initials(name: string | null | undefined, email: string): string
 /**
  * The account at the right end of the header (build-plan 17.2b, 17.9): a Sign in link when signed out, and a
  * menu with the name, role and Sign out when signed in. Nothing shows on a site without sign-in or while the
- * session loads. The role is shown, not enforced: access checks live in trusted code.
+ * session loads. The role is shown, not enforced: access checks live in trusted code. A demo guest (17.5) sees
+ * "Demo guest" and Sign out, which discards the demo. Any signed-in account can export the files kept in this browser.
  */
 export function AccountMenu({ account, actionError, signOut, saveName }: AccountApi) {
   const [namePromptDismissed, setNamePromptDismissed] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   if (account.status === 'unconfigured' || account.status === 'loading') return <span className={styles.accountSpace} />;
   if (account.status === 'signed-out') return <a href={PAGES.signIn} className={styles.signIn}>Sign in</a>;
@@ -34,6 +37,11 @@ export function AccountMenu({ account, actionError, signOut, saveName }: Account
   let secondary: string | undefined;
   let letters = '';
   if (account.status === 'error') primary = account.message;
+  else if (account.status === 'demo') {
+    primary = 'Demo guest';
+    secondary = 'Temporary demo';
+    letters = 'D';
+  }
   else if (!account.profile) primary = 'Account not active yet';
   else if (!account.profile.active) primary = 'Account deactivated';
   else {
@@ -59,6 +67,11 @@ export function AccountMenu({ account, actionError, signOut, saveName }: Account
               <span className={styles.menuName}>{primary}</span>
               {secondary && <span className={styles.menuRole}>{secondary}</span>}
             </DropdownMenu.Label>
+            {account.status === 'signed-in' && (
+              <DropdownMenu.Item className={styles.menuItem} onSelect={() => setExporting(true)}>
+                <FolderDown aria-hidden /> Export this browser's files
+              </DropdownMenu.Item>
+            )}
             <DropdownMenu.Item className={styles.menuItem} onSelect={() => void signOut()}>
               <LogOut aria-hidden /> Sign out
             </DropdownMenu.Item>
@@ -66,6 +79,7 @@ export function AccountMenu({ account, actionError, signOut, saveName }: Account
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
       {actionError && <span role="alert" className={styles.accountError}>{actionError}</span>}
+      {exporting && <ExportBrowserFilesModal onClose={() => setExporting(false)} />}
       {askForName && <NamePrompt onSave={saveName} onClose={() => setNamePromptDismissed(true)} />}
     </span>
   );

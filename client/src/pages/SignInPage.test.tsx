@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { INVITE_ONLY_MESSAGE } from '../lib/auth';
+import { currentDemoId, DEMO_EMAIL, DEMO_PASSWORD } from '../lib/demo';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
 import { SignInPage } from './SignInPage';
@@ -21,6 +22,7 @@ async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
 }
 
 afterEach(() => {
+  sessionStorage.clear();
   vi.clearAllMocks();
   vi.mocked(isAuthConfigured).mockReturnValue(true);
   window.history.replaceState(null, '', '/');
@@ -170,20 +172,74 @@ describe('SignInPage', () => {
     expect(screen.getByRole('link', { name: /Architecture/ })).toHaveAttribute('href', '/architecture');
   });
 
-  it('links Try Demo to the workspace and the invitation link to activation', async () => {
+  it('offers the invitation link, the expiry note and no remember-me', async () => {
     setUp();
     render(<SignInPage onSignedIn={vi.fn()} />);
-    expect(await screen.findByRole('link', { name: 'Try Demo' })).toHaveAttribute('href', '/');
+    expect(await screen.findByRole('button', { name: 'Try Demo' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Use invitation link' })).toHaveAttribute('href', '/activate');
     expect(screen.getByText(/Invitations expire after 30 days/)).toBeInTheDocument();
     expect(screen.getByText(/Need access\?/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/remember me/i)).not.toBeInTheDocument();
   });
 
-  it('keeps Try Demo on a site without sign-in settings', () => {
-    vi.mocked(isAuthConfigured).mockReturnValue(false);
+  it('fills the public demo credentials, announces it and focuses Sign In', async () => {
+    setUp();
+    const user = userEvent.setup();
     render(<SignInPage onSignedIn={vi.fn()} />);
-    expect(screen.getByRole('link', { name: 'Try Demo' })).toHaveAttribute('href', '/');
+    await user.click(await screen.findByRole('button', { name: 'Try Demo' }));
+    expect(screen.getByLabelText('Email')).toHaveValue(DEMO_EMAIL);
+    expect(screen.getByLabelText('Password')).toHaveValue(DEMO_PASSWORD);
+    expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Demo details filled in. Press Sign In to start the demo.');
+    expect(screen.getByRole('button', { name: 'Sign In' })).toHaveFocus();
+  });
+
+  it('starts an isolated demo only when the guest submits the demo credentials, without calling Supabase', async () => {
+    const fake = setUp();
+    const onSignedIn = vi.fn();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={onSignedIn} />);
+    await user.click(await screen.findByRole('button', { name: 'Try Demo' }));
+    expect(currentDemoId()).toBeNull(); // filling the form starts nothing
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    expect(onSignedIn).toHaveBeenCalledTimes(1);
+    expect(currentDemoId()).not.toBeNull();
+    expect(fake.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('does not start a demo for other credentials', async () => {
+    const fake = setUp();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await fillAndSubmit(user);
+    expect(fake.auth.signInWithPassword).toHaveBeenCalled();
+    expect(currentDemoId()).toBeNull();
+  });
+
+  it('on a site without sign-in settings, Try Demo reveals the form and other credentials are refused', async () => {
+    vi.mocked(isAuthConfigured).mockReturnValue(false);
+    const onSignedIn = vi.fn();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={onSignedIn} />);
+    expect(screen.getByText("Sign-in isn't set up on this site yet.")).toBeInTheDocument();
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Try Demo' }));
+    await user.clear(screen.getByLabelText('Email'));
+    await user.type(screen.getByLabelText('Email'), 'ada@example.com');
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("Sign-in isn't set up on this site yet.");
+    expect(onSignedIn).not.toHaveBeenCalled();
+    expect(getSupabase).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Try Demo' }));
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    expect(onSignedIn).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides Try Demo while the account loads and when someone is already signed in', async () => {
+    setUp({ session: fakeSession(), profile: { name: 'Ada', role: 'Member', active: true } });
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: 'Try Demo' })).not.toBeInTheDocument();
+    expect(await screen.findByText(/You're signed in as Ada/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try Demo' })).not.toBeInTheDocument();
   });
 
   it('shows and hides the password without submitting', async () => {

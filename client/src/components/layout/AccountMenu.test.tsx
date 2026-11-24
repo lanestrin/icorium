@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAccount, type Profile } from '../../hooks/useAccount';
+import { startDemo } from '../../lib/demo';
 import { getSupabase, isAuthConfigured } from '../../lib/supabase';
 import { fakeSession, fakeSupabase } from '../../test-fixtures/fake-supabase';
 import { AccountMenu, initials } from './AccountMenu';
@@ -23,6 +24,7 @@ const member: Profile = { name: 'Ada', role: 'Member', active: true };
 const openMenu = async (user: ReturnType<typeof userEvent.setup>) => user.click(await screen.findByRole('button', { name: /^Account menu/ }));
 
 afterEach(() => {
+  sessionStorage.clear();
   vi.clearAllMocks();
   vi.mocked(isAuthConfigured).mockReturnValue(true);
 });
@@ -37,6 +39,35 @@ describe('initials', () => {
 });
 
 describe('AccountMenu', () => {
+  it('offers the browser-files export to a signed-in account, and opens it', async () => {
+    signedIn(member);
+    const user = userEvent.setup();
+    render(<Harness />);
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: "Export this browser's files" }));
+    expect(await screen.findByRole('dialog', { name: "Export this browser's files" })).toBeInTheDocument();
+  });
+
+  it('offers the export even to an account that is not active', async () => {
+    signedIn({ ...member, active: false });
+    const user = userEvent.setup();
+    render(<Harness />);
+    await openMenu(user);
+    expect(screen.getByRole('menuitem', { name: "Export this browser's files" })).toBeInTheDocument();
+  });
+
+  it('shows a demo guest as temporary, with Sign out and no export of earlier browser files', async () => {
+    setUp({ session: fakeSession(), profile: member });
+    startDemo();
+    const user = userEvent.setup();
+    render(<Harness />);
+    const trigger = await screen.findByRole('button', { name: 'Account menu, Demo guest · Temporary demo' });
+    expect(trigger).toHaveTextContent('D');
+    await user.click(trigger);
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Export/ })).not.toBeInTheDocument();
+  });
+
   it('shows nothing on a site without sign-in', () => {
     vi.mocked(isAuthConfigured).mockReturnValue(false);
     render(<Harness />);

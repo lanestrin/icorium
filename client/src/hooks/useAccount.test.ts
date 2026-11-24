@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
+import { DEMO_SESSION_KEY, startDemo } from '../lib/demo';
 import { isActiveAdmin, useAccount, type AccountState, type Profile } from './useAccount';
 
 vi.mock('../lib/supabase', () => ({ getSupabase: vi.fn(), isAuthConfigured: vi.fn(() => true) }));
@@ -120,6 +121,47 @@ describe('useAccount', () => {
     expect(fake.update).not.toHaveBeenCalled();
     fake.updateEq.mockResolvedValueOnce({ error: { name: 'AuthRetryableFetchError', status: 0 } });
     expect(await result.current.saveName('Ada')).toBe('Sign-in is temporarily unavailable. Try again later.');
+  });
+});
+
+describe('useAccount demo', () => {
+  afterEach(() => { sessionStorage.clear(); vi.unstubAllGlobals(); });
+
+  it('reports the demo, even when Supabase has a signed-in session, and never reads the profile', async () => {
+    setUp({ session: fakeSession(), profile: active });
+    const id = startDemo();
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id }));
+    expect(isActiveAdmin(result.current.account)).toBe(false);
+  });
+
+  it('reports the demo on a site without Supabase settings', async () => {
+    vi.mocked(isAuthConfigured).mockReturnValue(false);
+    const id = startDemo();
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id }));
+  });
+
+  it('gives up a demo whose lock another tab holds (a duplicated tab) without deleting anything', async () => {
+    setUp({});
+    startDemo();
+    vi.stubGlobal('navigator', { ...navigator, locks: { request: async (_n: string, _o: unknown, cb: (l: null) => void) => cb(null), query: async () => ({ held: [] }) } });
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'signed-out' }));
+    expect(sessionStorage.getItem(DEMO_SESSION_KEY)).toBeNull();
+  });
+
+  it('signs out of the demo by deleting its session and opening sign-in, leaving Supabase alone', async () => {
+    const fake = setUp({ session: fakeSession(), profile: active });
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    startDemo();
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.account.status).toBe('demo'));
+    await act(async () => { await result.current.signOut(); });
+    expect(sessionStorage.getItem(DEMO_SESSION_KEY)).toBeNull();
+    expect(assign).toHaveBeenCalledWith('/sign-in');
+    expect(fake.client.auth.signOut).not.toHaveBeenCalled();
   });
 });
 

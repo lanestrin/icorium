@@ -167,9 +167,11 @@ export const TECH: Tech[] = [
       'Built into every browser, and it survives a refresh; memory is the fallback when a browser blocks it.',
       'Each file keeps its original (the Excel, PDF or image it came from, or the CSV itself) and where each row came from, in a separate sources store (database version 3), so a calculated value can be explained from its raw source cell.',
       'Every storage implements one Storage interface, so the Supabase backend (17.4) sits behind it without changing processing or the UI.',
+      'The guest demo (17.5) gets its own database per browser tab, named for a random session ID kept in sessionStorage and seeded with the five samples. A refresh continues it, another tab never sees it, and signing out deletes it. A tab that closed without signing out is cleaned up the next time the app opens: only demo databases whose Web Lock no open tab holds are deleted, never the existing browser workspace. Rarely, a refresh can lose a demo to that cleanup; the guest then gets a fresh one.',
+      'A signed-in person can download the files already kept in this browser from the account menu. The export only reads them: nothing is uploaded to the account or erased.',
     ],
     tradeoff: 'Files live on one device only: there is no sharing, and clearing browser data (or Clear my data) removes them and their originals. Tests use fake-indexeddb, not a real browser.',
-    files: ['shared/storage.ts', 'client/src/lib/browser-storage.ts'],
+    files: ['shared/storage.ts', 'client/src/lib/browser-storage.ts', 'client/src/lib/demo.ts', 'client/src/lib/browser-export.ts'],
   },
 ];
 
