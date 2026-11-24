@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.20.1](https://github.com/lanestrin/icorium/compare/v2.20.0...v2.20.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* simplify the sign-in page and leave the demo at sign-in ([#182](https://github.com/lanestrin/icorium/issues/182)) ([2d1dd10](https://github.com/lanestrin/icorium/commit/2d1dd10d056b06727b525b07136c7782210307f9))
+
 ## [2.20.0](https://github.com/lanestrin/icorium/compare/v2.19.0...v2.20.0) (2026-11-24)
 
 
