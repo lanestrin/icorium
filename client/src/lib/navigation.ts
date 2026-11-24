@@ -31,6 +31,12 @@ export function sectionFromHash<T extends string>(hash: string, allowed: readonl
   return allowed.find((section) => section === name);
 }
 
+/** The browser's own page changes, in one place so tests can replace them. */
+export const browserLocation = {
+  replace: (path: string) => window.location.replace(path),
+  reload: () => window.location.reload(),
+};
+
 /** Scrolls an element into view and moves focus to it (it needs tabIndex={-1}). Does nothing if it isn't there. */
 export function showAndFocus(id: string) {
   const element = document.getElementById(id);

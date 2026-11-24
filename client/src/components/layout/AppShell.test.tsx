@@ -20,8 +20,8 @@ async function openMenu(user: ReturnType<typeof userEvent.setup>) {
 afterEach(() => window.history.pushState({}, '', '/'));
 
 describe('AppShell header', () => {
-  it('shows the brand, the page links, a help link and the title, and no notification bell', () => {
-    render(<AppShell account={signedIn()} title="Dashboard" intro="Your file workspace."><p>content</p></AppShell>);
+  it('shows an Admin the brand, the page links, a help link and the title, and no notification bell', () => {
+    render(<AppShell account={signedIn({ role: 'Admin' })} title="Dashboard" intro="Your file workspace."><p>content</p></AppShell>);
     const header = screen.getByRole('banner');
     expect(within(header).getByRole('link', { name: 'CSV Files' })).toHaveAttribute('href', '/');
     expect(within(header).getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
@@ -44,7 +44,7 @@ describe('AppShell header', () => {
 
   it('marks the current page link', () => {
     window.history.pushState({}, '', '/generator');
-    render(<AppShell account={signedIn()}><p /></AppShell>);
+    render(<AppShell account={signedIn({ role: 'Admin' })}><p /></AppShell>);
     const pages = screen.getByRole('navigation', { name: 'Pages' });
     expect(within(pages).getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('aria-current', 'page');
     expect(within(pages).getByRole('link', { name: /Architecture/ })).not.toHaveAttribute('aria-current');
@@ -70,18 +70,16 @@ describe('AppShell navigation', () => {
     expect(within(nav).queryByRole('heading', { name: 'Admin' })).not.toBeInTheDocument();
     // Help is only the header's ? link; the navigation has no help card.
     expect(within(nav).queryByRole('link', { name: /View Documentation/ })).not.toBeInTheDocument();
-    // The drawer also carries the page links the header hides on phones.
-    expect(within(nav).getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
-    expect(within(nav).getByRole('link', { name: /Architecture/ })).toHaveAttribute('href', '/architecture');
   });
 
-  it('shows the Admin group to an active Admin only', async () => {
+  it('shows the Admin group and the Generator and Architecture links to an active Admin only', async () => {
     const admin = signedIn({ role: 'Admin' });
     const cases: [string, AccountApi, boolean][] = [
       ['an active Admin', admin, true],
       ['a Member', signedIn({ role: 'Member' }), false],
       ['a deactivated Admin', signedIn({ role: 'Admin', active: false }), false],
       ['an account with no profile', signedIn(null), false],
+      ['a demo guest', accountWith({ status: 'demo', sessionId: 's1' }), false],
       ['a signed-out visitor', accountWith({ status: 'signed-out' }), false],
       ['a loading session', accountWith({ status: 'loading' }), false],
       ['a failed account read', accountWith({ status: 'error', message: 'boom' }), false],
@@ -90,10 +88,12 @@ describe('AppShell navigation', () => {
     for (const [who, account, visible] of cases) {
       const user = userEvent.setup();
       const { unmount } = render(<AppShell account={account}><p /></AppShell>);
+      // The header's page links, then the drawer's, which the header hides on phones.
+      expect(!!screen.queryByRole('navigation', { name: 'Pages' }), who).toBe(visible);
       const nav = await openMenu(user);
       const group = within(nav).queryByRole('heading', { name: 'Admin' });
       expect(!!group, who).toBe(visible);
-      for (const [name, href] of [['Invitations', '/admin#invitations'], ['Users', '/admin#users'], ['Access & Roles', '/admin#access']]) {
+      for (const [name, href] of [['Invitations', '/admin#invitations'], ['Users', '/admin#users'], ['Access & Roles', '/admin#access'], ['CSV Generator', '/generator'], ['Architecture', '/architecture']]) {
         const link = within(nav).queryByRole('link', { name });
         expect(!!link, `${who}: ${name}`).toBe(visible);
         if (link) expect(link).toHaveAttribute('href', href);

@@ -7,9 +7,8 @@ import { errorMessage, type Report } from '../lib/format';
 
 /**
  * The file list, reloaded on demand, and uploads into it. loading is true until the latest list request settles.
- * hold postpones the first load (the account is still being read, so there is no workspace to list yet).
  */
-export function useFileList(onError: Report, hold = false) {
+export function useFileList(onError: Report) {
   const [files, setFiles] = useState<FileMeta[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -27,7 +26,7 @@ export function useFileList(onError: Report, hold = false) {
   };
   // Only the first load, and the first load of a different workspace, shows "Loading files…"; other refreshes keep the
   // current rows on screen. refresh never rejects (failures go to onError), so loading ends even after an error.
-  useEffect(() => { if (!hold) void refresh(); }, [hold]);
+  useEffect(() => { void refresh(); }, []);
 
   /**
    * Uploads each file in turn, reports the ones that failed, and returns how many were saved and which of them

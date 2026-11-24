@@ -135,10 +135,11 @@ export const TECH: Tech[] = [
       'The SQL in supabase/ decides who may sign up: a "Before User Created" hook rejects any email without a pending invitation, and row-level security limits each profile to its owner.',
       'The browser holds only the public publishable key, never a secret, and loads the client only on a site with Supabase settings, so the demo downloads none of it.',
       'A signed-in, active account keeps its files in a private Supabase workspace (17.4): metadata and supplier profiles in Postgres, the CSV and original in one private Storage bucket, each limited by row-level security to its owner. The database refuses uploads once stored files reach 900 MB of the 1 GB free limit.',
-      'A demo guest has no account and no Supabase session, so the guest never reaches the cloud workspace or Admin data. Until 17.6 the Admin, Architecture and Generator pages are still open to everyone, so the demo is not an access boundary yet.',
+      'A demo guest has no account and no Supabase session, so the guest never reaches the cloud workspace, Admin data or the Admin-only pages.',
+      'One access rule (17.6) decides every protected page: the workspace needs an active invited account or a demo session, and Admin, Architecture and Generator need an active Admin. A denied page is not rendered and its code is not downloaded by the app. The page code holds no secrets and can still be fetched directly; row-level security and the Admin function protect the data.',
     ],
-    tradeoff: 'Sign-in works but is not required yet, and no Supabase project has been set up, so the cloud workspace is built but has not run against a real project (17.7). Everyone else keeps the browser workspace until 17.6. Supabase\x27s free plan pauses a project after a week without use; the app then says the workspace is temporarily unavailable.',
-    files: ['client/src/lib/supabase.ts', 'client/src/lib/auth.ts', 'client/src/hooks/useAccount.ts', 'client/src/lib/cloud-storage.ts', 'supabase/migrations/20261118000000_identity.sql', 'supabase/migrations/20261123000000_cloud_files.sql'],
+    tradeoff: 'Supabase is deployed and validation is in progress: formal hosted evidence is recorded in 17.7. Without Supabase settings only Try Demo opens the workspace. The processing check is advisory against a modified copy of the app. Supabase\x27s free plan pauses a project after a week without use; the app then says the workspace is temporarily unavailable.',
+    files: ['client/src/lib/supabase.ts', 'client/src/lib/auth.ts', 'client/src/hooks/useAccount.ts', 'client/src/lib/access.ts', 'client/src/components/layout/AccessGate.tsx', 'client/src/lib/cloud-storage.ts', 'supabase/migrations/20261118000000_identity.sql', 'supabase/migrations/20261123000000_cloud_files.sql'],
   },
   {
     name: 'Vitest + React Testing Library', label: 'Vitest', role: 'Testing', icon: FlaskConical,
@@ -164,14 +165,14 @@ export const TECH: Tech[] = [
   {
     name: 'IndexedDB', label: 'IndexedDB', role: 'File storage', icon: Database, packages: [],
     why: [
-      'Files and results stay in the person\x27s browser, so the demo costs nothing to run and no file leaves the device.',
+      'A demo guest\x27s files and results stay in their browser, so the demo costs nothing to run and no demo file leaves the device.',
       'Built into every browser, and it survives a refresh; memory is the fallback when a browser blocks it.',
       'Each file keeps its original (the Excel, PDF or image it came from, or the CSV itself) and where each row came from, in a separate sources store (database version 3), so a calculated value can be explained from its raw source cell.',
       'Every storage implements one Storage interface, so the Supabase backend (17.4) sits behind it without changing processing or the UI.',
       'The guest demo (17.5) gets its own database per browser tab, named for a random session ID kept in sessionStorage and seeded with the five samples. A refresh continues it, another tab never sees it, and signing out deletes it. A tab that closed without signing out is cleaned up the next time the app opens: only demo databases whose Web Lock no open tab holds are deleted, never the existing browser workspace. Rarely, a refresh can lose a demo to that cleanup; the guest then gets a fresh one.',
-      'A signed-in person can download the files already kept in this browser from the account menu. The export only reads them: nothing is uploaded to the account or erased.',
+      'Files kept in this browser before sign-in was required can be downloaded from the account menu or the sign-in page. The export only reads them: nothing is uploaded or erased, and the app no longer opens that older workspace.',
     ],
-    tradeoff: 'Files live on one device only: there is no sharing, and clearing browser data (or Clear my data) removes them and their originals. Tests use fake-indexeddb, not a real browser.',
+    tradeoff: 'Demo files live in one browser tab only, and signing out, clearing browser data or Clear my data removes them. Tests use fake-indexeddb, not a real browser.',
     files: ['shared/storage.ts', 'client/src/lib/browser-storage.ts', 'client/src/lib/demo.ts', 'client/src/lib/browser-export.ts'],
   },
 ];
@@ -196,17 +197,17 @@ export const HOW_IT_WORKS = [
   'The file service checks every action with Zod.',
   'Each file is parsed, normalized to one record per row and validated.',
   'A processing function adds its columns; results can be previewed, downloaded and compared.',
-  'Files are stored by File ID in the browser\x27s IndexedDB, or in the signed-in account\x27s private Supabase workspace.',
+  'Files are stored by File ID in the signed-in account\x27s private Supabase workspace, or in a guest demo\x27s own IndexedDB database.',
 ];
 
 /** The decision shown first and in full: where the CSV work runs. */
 export const PROCESSING_LOCATION = {
   title: 'Processing location (browser only)',
   icon: Laptop,
-  tradeoffTitle: 'one device only',
-  text: 'The browser does everything: it parses, normalizes, validates and processes every CSV, keeps the files (and the original of each) in IndexedDB, or in the signed-in account\x27s private Supabase workspace, and converts Excel, PDF and image files to CSV before upload. No server of ours is involved.',
-  benefits: ['Free to host: any static site works', 'No file ever leaves the person\x27s device', 'Nothing to run or maintain besides the page'],
-  tradeoff: 'Without an account, files live in one browser on one device, and they are lost when the person clears their browser data. The processing check (approved mapping, confirmed units) runs in the file service in the browser, so it can\x27t stop someone who edits the app\x27s own code; the database checks ownership, capacity and that a result comes from the same owner\x27s processable input, but not the mapping itself. Invited accounts keep their files in private Supabase storage (17.4), so they reach every device, while processing stays in the browser.',
+  tradeoffTitle: 'advisory checks',
+  text: 'The browser does everything: it parses, normalizes, validates and processes every CSV, keeps the files (and the original of each) in the signed-in account\x27s private Supabase workspace, or in a demo\x27s own IndexedDB database, and converts Excel, PDF and image files to CSV before upload. No server of ours is involved.',
+  benefits: ['Free to host: any static site works', 'A demo\x27s files never leave the guest\x27s device', 'Nothing to run or maintain besides the page'],
+  tradeoff: 'A demo\x27s files live in one browser tab, and they are lost on sign-out or when the guest clears their browser data. The processing check (approved mapping, confirmed units) runs in the file service in the browser, so it can\x27t stop someone who edits the app\x27s own code; the database checks ownership, capacity and that a result comes from the same owner\x27s processable input, but not the mapping itself. Invited accounts keep their files in private Supabase storage (17.4), so they reach every device, while processing stays in the browser.',
 };
 
 export const CONVERSION = {
@@ -259,8 +260,8 @@ export const SCALE = {
   rows: [
     { layer: 'UI', today: 'React application', future: 'Same React UI' },
     { layer: 'API', today: 'Browser-local file service', future: 'Fastify in containers' },
-    { layer: 'Identity', today: 'Optional, invitation-only sign-in (Supabase Auth)', future: 'Managed OIDC provider with customer organizations' },
-    { layer: 'Data', today: 'IndexedDB, with memory fallback; Supabase Postgres and Storage for signed-in accounts (17.4)', future: 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs' },
+    { layer: 'Identity', today: 'Required, invitation-only sign-in (Supabase Auth), or a guest demo', future: 'Managed OIDC provider with customer organizations' },
+    { layer: 'Data', today: 'Supabase Postgres and Storage for signed-in accounts (17.4); IndexedDB, with memory fallback, for the demo', future: 'PostgreSQL with row-level security; private S3 or R2 storage via presigned URLs' },
     { layer: 'Work', today: 'Local processing; PDF and OCR conversion workers', future: 'A queue and workers' },
     { layer: 'OCR', today: 'Tesseract in the browser', future: 'Managed document AI when volume or accuracy requires it' },
     { layer: 'Operations', today: 'Static hosting, automated tests and CI', future: 'Logs, Sentry, metrics, a secrets manager and backups' },
@@ -269,7 +270,7 @@ export const SCALE = {
 
 export const CUSTOMER_SECURITY = {
   status: 'Recommended, not built',
-  today: 'Today this is a static demo with optional sign-in that nothing requires yet: no secret keys reach the browser, and files leave it only for a signed-in, active account, into its private Supabase workspace. M17 adds private workspaces for invited individuals only; teams, sharing and customer organizations are not planned yet. The following describes a future hosted product, not safeguards implemented in this demo.',
+  today: 'Today this is a static site that needs an invited account or a guest demo: no secret keys reach the browser, and files leave it only for a signed-in, active account, into its private Supabase workspace. M17 covers private workspaces for invited individuals only; teams, sharing and customer organizations are not planned yet. The following describes a future hosted product, not safeguards implemented here.',
   topics: [
     { title: 'One hosted product', text: 'Use one hosted multi-tenant app rather than copies customers download. Offer a dedicated deployment only when a contract needs it.' },
     { title: 'People and roles', text: 'Use a managed OIDC provider with customer organizations, SSO and MFA. Give people admin, uploader or viewer roles within their customer.' },
@@ -282,8 +283,8 @@ export const CUSTOMER_SECURITY = {
 
 /** Storage backends in the order they apply: built ones first, then the possible next one. */
 export const STORAGE_OPTIONS: { name: string; icon: LucideIcon; note: string; built: boolean }[] = [
-  { name: 'Browser (IndexedDB)', icon: Laptop, note: 'In use', built: true },
-  { name: 'Supabase Storage', icon: Cloud, note: 'Built (17.4)', built: true },
+  { name: 'Browser (IndexedDB)', icon: Laptop, note: 'Guest demo', built: true },
+  { name: 'Supabase Storage', icon: Cloud, note: 'Signed-in accounts', built: true },
   { name: 'S3 / Cloudflare R2', icon: Boxes, note: 'At scale', built: false },
 ];
 
@@ -314,14 +315,14 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
     goal: 'Invited people sign in and keep private files on every device; a guest demo stays open to anyone.',
     items: [
       { id: '17.1', title: 'Free hosted-service design', status: 'Done', text: 'Supabase chosen over Firebase and Appwrite: the only free plan that met invite-only sign-in, private files and access to existing files without a card.' },
-      { id: '17.2', title: 'Sign-in and activation', status: 'Done', text: 'Invite-only database rules, then sign-in, activation, password recovery and sign-out pages. Sign-in is optional until 17.6.' },
+      { id: '17.2', title: 'Sign-in and activation', status: 'Done', text: 'Invite-only database rules, then sign-in, activation, password recovery and sign-out pages.' },
       { id: '17.3', title: 'Admin invitations and access', status: 'Done', text: 'An Admin page to invite by email (30-day expiry, resend, extend, revoke), change roles, deactivate and reactivate, enforced by the admin function and database rules. An Admin cannot read members\x27 files.' },
-      { id: '17.8', title: 'Sign-in page redesign', status: 'Done', text: 'A two-column sign-in page from the reference design: what the workspace offers on one side, sign-in, Google, Try Demo and the invitation link on the other. Sign-in stays optional until 17.6.' },
+      { id: '17.8', title: 'Sign-in page redesign', status: 'Done', text: 'A two-column sign-in page from the reference design: what the workspace offers on one side, sign-in, Google, Try Demo and the invitation link on the other.' },
       { id: '17.9', title: 'Workspace header and navigation', status: 'Done', text: 'An app header with help and an account menu, and a left navigation that opens existing screens, with an Admin group shown only to Admins.' },
-      { id: '17.4', title: 'Private cross-device files', status: 'Done', text: 'Signed-in, active accounts keep files, results and metadata in Supabase, checked against the owner on every action; uploads refused at capacity and an unreachable workspace reported. The browser workspace stays for everyone else until 17.6.' },
+      { id: '17.4', title: 'Private cross-device files', status: 'Done', text: 'Signed-in, active accounts keep files, results and metadata in Supabase, checked against the owner on every action; uploads refused at capacity and an unreachable workspace reported.' },
       { id: '17.5', title: 'Guest demo and export', status: 'Done', text: 'Try the demo signs in with demo credentials; each demo gets isolated, temporary browser data with sample files, cleared when it ends. A signed-in account can download the files already kept in the browser; nothing is uploaded or erased.' },
-      { id: '17.6', title: 'Require sign-in', status: 'Next', text: 'The file workspace needs an invited account or a demo session; Admin, Architecture and Generator pages are Admin-only.' },
-      { id: '17.7', title: 'Hosted verification', status: 'Planned', text: 'Real evidence on a non-production project: invitations, both sign-in methods, cross-device files, isolation and deactivation.' },
+      { id: '17.6', title: 'Require sign-in', status: 'Done', text: 'The file workspace needs an active invited account or a demo session; Admin, Architecture and Generator pages open only for an active Admin. Older browser files can be exported, read-only, from the sign-in page.' },
+      { id: '17.7', title: 'Hosted verification', status: 'Next', text: 'Real evidence on a non-production project: invitations, both sign-in methods, cross-device files, isolation and deactivation.' },
     ],
   },
   {
@@ -337,7 +338,7 @@ export const ROADMAP: { milestone: string; title: string; goal: string; items: {
 
 /** The design chosen in 17.1 (blueprint/hosted-services.md): one provider, its free-plan limits accepted. */
 export const HOSTED_DESIGN = {
-  status: 'Planned, not provisioned',
+  status: 'Supabase deployed; validation in progress',
   services: [
     { role: 'Sign-in and sessions', service: 'Supabase Auth: email and password, Google, and an invite-only sign-up hook' },
     { role: 'Files and metadata', service: 'Supabase Postgres and one private Storage bucket, both behind row-level security' },
@@ -345,7 +346,7 @@ export const HOSTED_DESIGN = {
     { role: 'Email', service: 'Supabase custom SMTP through a Gmail sender' },
   ],
   limits: [
-    'Free projects pause after a week without use; the app will say the workspace is temporarily unavailable until it is restored.',
+    'Free projects pause after a week without use; the app says the workspace is temporarily unavailable until it is restored.',
     'No backups on the free plan, so regular exports are part of the operating guide (17.7).',
     'One quota shared by every user: 1 GB of files and 500 MB of database. Uploads are refused before it is reached; existing files stay readable.',
     'Gmail sends up to 500 emails a day; a failed invitation email is reported as a failure.',
@@ -359,7 +360,7 @@ export const OVERVIEW: [LucideIcon, string, string][] = [
   [ShieldCheck, 'Validate', 'Shared rules; bad rows kept'],
   [FileCog, 'Process', 'Three functions; originals kept'],
   [ChartColumn, 'Compare', '2–5 results side by side'],
-  [Globe, 'Run anywhere', 'Any static host; files stay in the browser'],
+  [Globe, 'Run anywhere', 'Any static host; no server of ours'],
 ];
 
 /** The "On this page" links: each section's id and label, in page order. */

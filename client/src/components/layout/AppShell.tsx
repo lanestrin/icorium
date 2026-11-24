@@ -13,7 +13,7 @@ const currentPath = () => window.location.pathname.replace(/\/+$/, '');
 
 /**
  * The frame of every app page (build-plan 17.9): the header, the left navigation and the page's content.
- * The page passes its single useAccount() result. title and intro are the workspace's "Dashboard" heading in
+ * The page passes the account its gate read. Generator and Architecture links show only to an active Admin. title and intro are the workspace's "Dashboard" heading in
  * the header; other pages keep their own heading in their content. onNavigate lets the current page apply a
  * navigation entry that points at itself (scroll, focus, filter) instead of reloading; it gets the entry's section.
  */
@@ -86,14 +86,16 @@ export function AppShell({ account, title, intro, onNavigate, children }: {
             {intro && <p className={styles.pageIntro}>{intro}</p>}
           </div>
         )}
-        <nav aria-label="Pages" className={styles.headerLinks}>
-          <a href={PAGES.generator} aria-current={path === PAGES.generator ? 'page' : undefined} className={page.navLink}>
-            <Wand2 aria-hidden /> CSV Generator
-          </a>
-          <a href={PAGES.architecture} aria-current={path === PAGES.architecture ? 'page' : undefined} className={page.navLink}>
-            <Network aria-hidden /> Architecture
-          </a>
-        </nav>
+        {isAdmin && (
+          <nav aria-label="Pages" className={styles.headerLinks}>
+            <a href={PAGES.generator} aria-current={path === PAGES.generator ? 'page' : undefined} className={page.navLink}>
+              <Wand2 aria-hidden /> CSV Generator
+            </a>
+            <a href={PAGES.architecture} aria-current={path === PAGES.architecture ? 'page' : undefined} className={page.navLink}>
+              <Network aria-hidden /> Architecture
+            </a>
+          </nav>
+        )}
         <a href={HELP_URL} target="_blank" rel="noopener noreferrer" className={styles.helpButton} aria-label="Help (opens in a new tab)">
           <HelpCircle aria-hidden />
         </a>

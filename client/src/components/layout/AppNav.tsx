@@ -20,8 +20,8 @@ const isCurrent = (entry: NavEntry, path: string, hash: string) => entry.path ==
 
 /**
  * The left navigation: the file workspace's entries, an Admin group shown only to an active Admin (display
- * only; 17.6 and the Admin function enforce access), and the app version. Help is the header's ? link.
- * withPages adds the Generator and Architecture links for the phone menu, where the header hides them.
+ * only; AccessGate decides which pages open and trusted code protects the data), and the app version. Help is the header's ? link.
+ * withPages adds the Generator and Architecture links for the phone menu, where the header hides them; they too are for an active Admin.
  */
 export function AppNav({ isAdmin, path, hash, withPages, onChoose }: {
   isAdmin: boolean; path: string; hash: string; withPages?: boolean; onChoose: (event: MouseEvent, entry?: NavEntry) => void;
@@ -50,7 +50,7 @@ export function AppNav({ isAdmin, path, hash, withPages, onChoose }: {
             <ul className={styles.navList}>{ADMIN_ENTRIES.map(link)}</ul>
           </>
         )}
-        {withPages && (
+        {withPages && isAdmin && (
           <>
             <hr className={styles.navDivider} />
             <ul className={styles.navList}>

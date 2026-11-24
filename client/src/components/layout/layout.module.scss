@@ -129,6 +129,10 @@
     @include icon(var(--app-space-5));
   }
 }
+// With no title or page links before it, Help still starts the right end.
+.brand + .helpButton {
+  margin-left: auto;
+}
 
 // Account
 .account {

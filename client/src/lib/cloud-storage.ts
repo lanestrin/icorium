@@ -34,6 +34,17 @@ function withoutUndefined<T extends object>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
 
+/** Asks the database whether the signed-in account is active: the inactive 403 if not, the unavailable 503 if it can't be asked. */
+export async function assertActiveAccount(supabase: SupabaseClient): Promise<void> {
+  let active: boolean | null = null;
+  try {
+    const { data, error } = await supabase.rpc('is_active_account');
+    if (!error) active = data === true;
+  } catch { /* unreachable: reported below */ }
+  if (active === null) throw httpError(503, UNAVAILABLE_FILES_MESSAGE);
+  if (!active) throw httpError(403, INACTIVE_MESSAGE);
+}
+
 /** The files of one account, over a Supabase client that is signed in as that account. */
 export function createCloudStorage(supabase: SupabaseClient, userId: string): Storage {
   const bucket = () => supabase.storage.from(BUCKET);
@@ -191,6 +202,8 @@ export function createCloudStorage(supabase: SupabaseClient, userId: string): St
       // Paged by the internal ID, which never changes: a replace on another device moves uploaded_at and could
       // otherwise list a file twice or skip one between two pages.
       const rows = await allRows<Row>((from, to) => supabase.from('files').select(COLUMNS).order('id').range(from, to));
+      // The database shows a deactivated account no rows, so an empty list is checked before it means no files.
+      if (!rows.length) await assertActiveAccount(supabase);
       const names = new Map(rows.map((row) => [row.id, row.file_id]));
       return rows.map((row) => toMeta(row, row.source_id ? names.get(row.source_id) : undefined)).sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt) || a.id.localeCompare(b.id));
     },

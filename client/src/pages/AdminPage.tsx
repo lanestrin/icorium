@@ -8,12 +8,10 @@ import { Banner } from '../components/Banner';
 import { Modal } from '../components/modals/Modal';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { isActiveAdmin, useAccount } from '../hooks/useAccount';
+import type { AccountApi } from '../components/layout/AccountMenu';
 import { useHashSection } from '../hooks/useHashSection';
 import { callAdmin, NOT_ADMIN_CODE, type Account, type AdminAction, type AdminList, type Invitation, type Role } from '../lib/admin';
-import { NOT_SET_UP_MESSAGE } from '../lib/auth';
 import { ADMIN_HASHES, showAndFocus, type AdminSection, type WorkspaceSection } from '../lib/navigation';
-import { PAGES } from '../lib/pages';
 import page from '../styles/page.module.scss';
 
 type ListState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: AdminList };
@@ -22,15 +20,12 @@ type Confirmation = { title: string; text: string; label: string; run: () => voi
 
 /**
  * /admin (build-plan 17.3): invite people, manage invitations, change roles and deactivate or reactivate
- * accounts. Every request goes to the Admin function, which checks the caller is an active Admin, so this
- * page only decides what to show; hiding it protects nothing. Admins see account and invitation details,
- * never files. The navigation links to it for Admins only (17.9); that is display, not access control.
+ * accounts. Every request goes to the Admin function, which checks the caller is an active Admin. The gate
+ * (17.6) opens this page only for an active Admin; that decides what is shown, and the function protects the data.
+ * Admins see account and invitation details, never files.
  */
-export function AdminPage() {
-  const accountApi = useAccount();
-  const { account } = accountApi;
-  const isAdmin = isActiveAdmin(account);
-  const currentUserId = account.status === 'signed-in' ? account.userId : '';
+export function AdminPage({ account }: { account: AccountApi }) {
+  const currentUserId = account.account.status === 'signed-in' ? account.account.userId : '';
 
   const [list, setList] = useState<ListState>({ status: 'loading' });
   const [busy, setBusy] = useState(false);
@@ -49,13 +44,11 @@ export function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    setList({ status: 'loading' });
     void load();
     return () => {
       latest.current++; // ignore a reply that arrives after the page is gone
     };
-  }, [isAdmin, load]);
+  }, [load]);
 
   /** Sends one action, shows its outcome and refreshes the lists. Resolves to whether it worked. */
   async function run<T>(request: AdminAction, success: (data: T) => string): Promise<boolean> {
@@ -92,20 +85,15 @@ export function AdminPage() {
   };
 
   // The navigation's Admin entries: Invitations opens the invite card, Users and Access & Roles the account list
-  // (where roles and deactivation are). They apply once the list has loaded; before that, or for anyone who
-  // isn't an Admin, there is nothing to show and the address is ignored.
+  // (where roles and deactivation are). They apply once the list has loaded; before that
+  // there is nothing to show and the address is ignored.
   function goToSection(section: WorkspaceSection | AdminSection) {
     if (section === 'invitations') showAndFocus('invite-heading');
     else if (section === 'users' || section === 'access') showAndFocus('accounts-heading');
   }
-  useHashSection(ADMIN_HASHES, goToSection, isAdmin && list.status === 'ready');
+  useHashSection(ADMIN_HASHES, goToSection, list.status === 'ready');
 
   function body(): ReactNode {
-    if (account.status === 'unconfigured') return <p role="status" className={styles.notice}>{NOT_SET_UP_MESSAGE}</p>;
-    if (account.status === 'loading') return <p role="status" className={styles.notice}>Loading…</p>;
-    if (account.status === 'error') return <Banner tone="error">{account.message}</Banner>;
-    if (account.status === 'signed-out') return <p className={styles.notice}>Sign in to continue. <a href={PAGES.signIn}>Go to sign in</a></p>;
-    if (!isAdmin) return <p role="alert" className={styles.notice}>Admins only. This page is for administrators.</p>;
     if (lostAccess) return <p role="alert" className={styles.notice}>You no longer have Admin access.</p>;
 
     return (
@@ -139,7 +127,7 @@ export function AdminPage() {
   }
 
   return (
-    <AppShell account={accountApi} onNavigate={goToSection}>
+    <AppShell account={account} onNavigate={goToSection}>
       <main className={styles.page}>
         <div className={styles.content}>
           <header className={styles.header}>

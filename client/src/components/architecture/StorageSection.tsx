@@ -25,7 +25,7 @@ function StorageOptions() {
     <div className={styles.storageOptions}>
       <h3 className={styles.storageHeading}>Storage options</h3>
       <div role="img" className={styles.storageRow}
-        aria-label="Storage options: the browser's IndexedDB is in use; Supabase Storage holds signed-in users' files (built in 17.4); S3 or Cloudflare R2 could follow at scale, behind the same interface.">
+        aria-label="Storage options: the browser's IndexedDB holds a guest demo's files; Supabase Storage holds signed-in users' files (built in 17.4); S3 or Cloudflare R2 could follow at scale, behind the same interface.">
         {STORAGE_OPTIONS.map((option, i) => (
           <div key={option.name} className={styles.storageStep}>
             {i > 0 && <ArrowRight className={styles.storageArrow} aria-hidden />}
@@ -44,20 +44,20 @@ function StorageOptions() {
 export function StorageSection() {
   return (
     <Section id="storage" eyebrow="5 · Storage and deployment" title="Hosting and storage" side
-      intro="Separate concerns, one storage interface. Processing never touches persistence directly; the browser opens IndexedDB, or memory when it is blocked.">
+      intro="Separate concerns, one storage interface. Processing never touches persistence directly; a signed-in account opens its Supabase workspace, and the demo opens IndexedDB, or memory when it is blocked.">
       <div className={styles.storageGrid}>
         <Card as="article">
           <h3 className={styles.cardHeading}><Laptop className={styles.headingIcon} aria-hidden /> Local development</h3>
           <Checks label="Local development" items={[
             'One Vite dev server; no API or database to start',
-            <>Files kept in the browser by <Path>client/src/lib/browser-storage.ts</Path></>,
+            <>Without Supabase settings, Try Demo opens the workspace; its files are kept by <Path>client/src/lib/browser-storage.ts</Path></>,
           ]} />
         </Card>
         <Card as="article">
           <h3 className={styles.cardHeading}><Cloud className={styles.headingIcon} aria-hidden /> Optional Vercel deployment</h3>
           <Checks label="Optional Vercel deployment" items={[
             'One static site, free on the Hobby plan',
-            'No server of ours: files stay in each visitor\'s browser unless they sign in to a Supabase workspace',
+            'No server of ours: a demo\'s files stay in the guest\'s browser, a signed-in account\'s in its Supabase workspace',
             'Stays static with no functions when Supabase holds signed-in users\' files (17.4)',
             'Test site: deploys main',
             <>Each release also ships as a deployable zip (<Path>scripts/build-release.mjs</Path>); Production host not chosen yet</>,

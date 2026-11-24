@@ -4,9 +4,13 @@ This folder is the release {{TAG}} (version {{VERSION}}), built from commit
 `{{COMMIT}}`. `RELEASE-MANIFEST.json` lists every application file with its
 SHA-256. Nothing in this folder is a secret.
 
-Reclaim Studio is a static web app: it runs entirely in each visitor's
-browser and keeps their files in that browser's storage (IndexedDB). There is
-no server or database to run.
+Reclaim Studio is a static web app: it processes files in each visitor's
+browser, and there is no server of ours to run. Access needs sign-in: the file
+workspace opens for an active invited account (its files are kept in a private
+Supabase workspace) or for a guest demo (its files stay in that browser tab and
+are discarded when the demo ends). The Admin, Architecture and Generator pages
+open only for an active Admin. Without Supabase settings, only Try Demo opens
+the workspace and those three pages are denied.
 
 ## Requirements
 
@@ -29,9 +33,14 @@ Serve `client/dist` as the site root. Its `generator/index.html` and
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `APP_ENV_LABEL` | Label after the version in the page navigation | none |
+| `VITE_SUPABASE_URL` | The Supabase project URL, a public value; with the key below it turns on sign-in | none |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The Supabase publishable key, a public value; never the secret key | none |
 
-Each visitor's uploads and results stay in their own browser and are lost when
-they clear its data. The five sample files are built into the site.
+Accounts, invitations and the database rules need a Supabase project set up as
+described in `supabase/README.md`; that setup is not part of this folder. A
+demo guest's uploads and results stay in their own browser tab and are lost
+when the demo ends or they clear its data. The five sample files are built
+into the site.
 
 ## Check the download
 

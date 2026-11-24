@@ -28,11 +28,12 @@ The five sample CSVs are bundled into the JavaScript at build time.
 
 ## Where files are kept
 
-Each visitor's uploads, results and archive flags stay in their own browser
-(IndexedDB, or memory when the browser blocks it; see
-`client/src/lib/browser-storage.ts`). Nothing is sent to Vercel, and visitors
-never see each other's files. The page says files can be lost when browser
-data is cleared, and **Clear my data** resets them to the five samples.
+A signed-in, active account's files are kept in its private Supabase workspace
+(Supabase deployed; validation in progress, see `supabase/README.md`). A demo
+guest's files stay in that tab's own browser database (IndexedDB, or memory when
+the browser blocks it; see `client/src/lib/browser-storage.ts`), are discarded on
+sign-out, and **Clear my data** resets them to the five samples. Nothing is sent
+to Vercel. Signed-out visitors are sent to `/sign-in` (17.6).
 
 ## Settings
 
@@ -41,10 +42,10 @@ Three build variables are read. All are public values built into the page:
 | Variable | Where | Effect |
 | --- | --- | --- |
 | `APP_ENV_LABEL` | Production environment, `Test` | The navigation label reads `vX.Y.Z · Test`. Previews show `· Preview` without it. |
-| `VITE_SUPABASE_URL` | Not set yet (build-plan 17.2b) | With the key below, turns on the sign-in pages (`/sign-in`, `/activate`, `/reset-password`). Without both, those pages say sign-in isn't set up, and the demo is unchanged. |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Not set yet (build-plan 17.2b) | The Supabase publishable key, which is safe in the browser. Never put the secret key here. |
+| `VITE_SUPABASE_URL` | Set on the test site (reported 2026-11-23) | With the key below, turns on sign-in. Without both, the sign-in pages say sign-in isn't set up and only Try Demo opens the workspace. |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Set on the test site (reported 2026-11-23) | The Supabase publishable key, which is safe in the browser. Never put the secret key here. |
 
-Setting the two Supabase variables needs the person's authorization, and the
+Changing the two Supabase variables needs the person's authorization, and the
 Supabase setup in `supabase/README.md` first. Nothing in this repository sets
 them.
 
@@ -56,8 +57,8 @@ part of a code change:
 
 - the private Blob store attached to the project, and its data (fictional demo
   files only; they are not moved into browsers);
-- the environment variables `BLOB_READ_WRITE_TOKEN`, `RECLAIM_BLOB_PREFIX` and
-  `MAX_UPLOAD_MB`.
+- the environment variables `RECLAIM_BLOB_PREFIX` and `MAX_UPLOAD_MB`
+  (`BLOB_READ_WRITE_TOKEN` has been removed).
 
 ## Limits
 
@@ -71,10 +72,11 @@ part of a code change:
 
 ## Checking a deployment
 
-Open `/`, `/generator` and `/architecture` (and, once sign-in is set up,
-`/sign-in`, `/activate` and `/reset-password`), upload a CSV, process, preview,
-compare and download it, then refresh and see the files are still there. The
-browser's Network tab shows no `/api` requests. A PR's Vercel Preview is the
+Signed out, open `/` and check it goes to `/sign-in`; open `/activate` and
+`/reset-password`. Start Try Demo, or sign in, then upload a CSV, process, preview,
+compare and download it, then refresh and see the files are still there. As an Admin, open
+`/admin`, `/generator` and `/architecture`; as a Member or demo guest, check they
+say Admins only. The browser's Network tab shows no `/api` requests. A PR's Vercel Preview is the
 first real check of a `vercel.json` change; the repository's tests do not
 exercise Vercel.
 

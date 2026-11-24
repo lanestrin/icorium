@@ -16,13 +16,13 @@ export type AccountState =
   | { status: 'demo'; sessionId: string }
   | { status: 'error'; message: string };
 
-/** True only for an active Admin. A display hint for links: access itself is enforced by trusted code. */
+/** True only for an active Admin. It decides which links and pages are shown; trusted code protects the data. */
 export const isActiveAdmin = (account: AccountState) =>
   account.status === 'signed-in' && account.profile?.active === true && account.profile.role === 'Admin';
 
 /**
- * The signed-in account, kept current from Supabase's auth events. The role is for display only:
- * access is enforced by row-level security and trusted code (17.6), never by this hook.
+ * The signed-in account, kept current from Supabase's auth events. AccessGate (17.6) shows pages
+ * by it; row-level security and trusted code protect the data, never this hook.
  *
  * recovering turns true when the page was opened from a password-reset link (the PASSWORD_RECOVERY
  * event), so the reset page can ask for the new password.
@@ -86,6 +86,8 @@ export function useAccount() {
             setAccount({ status: 'signed-out' });
             return;
           }
+          // Another person's session: their profile isn't known yet, so the previous account's page must not stay open.
+          setAccount((state) => (state.status === 'signed-in' && state.userId !== session.user.id ? { status: 'loading' } : state));
           // Read the profile after the callback returns: Supabase holds its auth lock while it runs, so
           // another Supabase call awaited inside it could wait forever.
           setTimeout(() => void loadProfile(supabase, session, request), 0);

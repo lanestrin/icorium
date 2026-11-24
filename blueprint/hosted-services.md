@@ -1,9 +1,10 @@
 # Hosted services design (17.1)
 
-Status: **design only, nothing provisioned.** No account, project, domain,
-OAuth client or sender has been created, and no email has been sent. Every
-setup step below needs the person's separate authorization. Build-plan items
-17.2-17.7 implement this design.
+Status: **Supabase deployed; validation in progress.** The person reported a
+development project on 2026-11-23; what is in place, what failed and what is
+still to be checked is under "Hosted status" in `supabase/README.md`. Formal
+hosted evidence stays in 17.7. Every further setup step needs the person's
+separate authorization. Build-plan items 17.2-17.7 implement this design.
 
 Scope: choose one managed implementation each for identity and sessions,
 private file metadata and storage, and invitation and account email, under
@@ -236,7 +237,7 @@ either owner's files.
   Each result is recorded with its date. Nothing is claimed without its
   evidence.
 
-### Setup checklist (not done; each step needs the person's authorization)
+### Setup checklist (reported done for the development project; repeating a step needs authorization)
 
 1. Create a Supabase account and one Free project for non-production
    verification (and, later, the prototype project).

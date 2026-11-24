@@ -4,7 +4,7 @@ import { workspaceChoice, workspaceKey, type WorkspaceChoice } from '../lib/work
 import type { AccountState } from './useAccount';
 
 /**
- * Points the file actions at the account's workspace (browser or cloud) and returns the choice. It runs as a layout
+ * Points the file actions at the account's workspace (the demo, the cloud or none) and returns the choice. It runs as a layout
  * effect, so it takes effect before any page effect that loads files. key changes when the workspace does.
  */
 export function useWorkspace(account: AccountState): { choice: WorkspaceChoice; key: string } {

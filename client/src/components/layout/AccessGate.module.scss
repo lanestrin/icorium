@@ -1,0 +1,14 @@
+// The message shown in place of a page the account may not open (17.6).
+@use '../../styles/mixins' as *;
+
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--app-space-4);
+  padding: var(--app-space-6) var(--app-space-4);
+
+  @include up(md) {
+    padding: var(--app-space-8) var(--app-space-6);
+  }
+}

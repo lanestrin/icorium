@@ -18,8 +18,8 @@ function failure(error: unknown): string {
 }
 
 /**
- * Lists the files kept in this browser before sign-in (17.5) so a signed-in person can save them. They stay in
- * this browser: nothing is uploaded to the account and nothing is deleted. The loaders can be replaced for tests.
+ * Lists the files kept in this browser before sign-in (17.5) so a person can save them, from the account menu or the sign-in page. They stay in
+ * this browser: nothing is uploaded and nothing is deleted. The loaders can be replaced for tests.
  */
 export function ExportBrowserFilesModal({ onClose, load, read, save = saveCsv }: {
   onClose: () => void;
@@ -69,8 +69,8 @@ export function ExportBrowserFilesModal({ onClose, load, read, save = saveCsv }:
   }
 
   return (
-    <Modal title="Export this browser's files" subtitle="Files kept in this browser before you signed in" onClose={onClose}>
-      <p>These files stay in this browser. They are not added to your account and nothing here is deleted. Download any you want to keep, then upload them to your workspace.</p>
+    <Modal title="Export this browser's files" subtitle="Files kept in this browser before sign-in was required" onClose={onClose}>
+      <p>These files stay in this browser. They are not added to any account and nothing here is deleted. Download any you want to keep; once signed in, you can upload them to your workspace.</p>
       {error && <Banner tone="error">{error}</Banner>}
       {error && files === null && <Button variant="secondary" onClick={() => setAttempt((count) => count + 1)}>Try again</Button>}
       {files === null && !error && <p role="status">Looking for files in this browser…</p>}
