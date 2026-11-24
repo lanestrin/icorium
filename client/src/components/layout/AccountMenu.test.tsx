@@ -68,6 +68,17 @@ describe('AccountMenu', () => {
     expect(screen.queryByRole('menuitem', { name: /Export/ })).not.toBeInTheDocument();
   });
 
+  it('shows an Admin demo guest as Demo Admin, still temporary and without export', async () => {
+    setUp({ session: null });
+    startDemo(undefined, undefined, 'admin');
+    const user = userEvent.setup();
+    render(<Harness />);
+    const trigger = await screen.findByRole('button', { name: 'Account menu, Demo Admin · Temporary demo' });
+    await user.click(trigger);
+    expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Export/ })).not.toBeInTheDocument();
+  });
+
   it('offers no export of earlier browser files when the account could not be read', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     setUp({ session: fakeSession(), profileError: { code: 'PGRST301', message: 'boom' } });

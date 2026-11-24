@@ -55,7 +55,11 @@ Demo sessions:
 - Exercise the login form using credentials filled by a Try the demo link.
 - Require the guest to submit the login form.
 - Receive separate temporary browser workspaces seeded with sample data.
-- Cannot access cloud workspaces, administration or developer pages.
+- A standard demo cannot access cloud workspaces, administration or
+  developer pages.
+- An Admin demo can open the administration and developer pages with
+  fictional account data only. It cannot access cloud workspaces, real
+  accounts or invitations, or send email.
 - Cannot affect another guest’s files.
 
 An Admin’s account-management permissions never imply permission to read

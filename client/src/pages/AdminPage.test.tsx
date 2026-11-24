@@ -2,7 +2,9 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { adminMessage, callAdmin, type AdminAction, type AdminList, type AdminResult } from '../lib/admin';
-import { accountApi, admin } from '../test-fixtures/accounts';
+import type { AccountState } from '../hooks/useAccount';
+import { DEMO_ADMIN_DATA_KEY } from '../lib/demo';
+import { accountApi, admin, DEMO_SESSION } from '../test-fixtures/accounts';
 import { AdminPage } from './AdminPage';
 
 vi.mock('../lib/admin', async (original) => ({ ...(await original<typeof import('../lib/admin')>()), callAdmin: vi.fn() }));
@@ -284,5 +286,66 @@ describe('AdminPage: navigation (17.9)', () => {
     render(<AdminPage account={accountApi(admin)} />);
     await screen.findByRole('heading', { name: 'Users' });
     expect(screen.getByRole('heading', { name: 'Users' })).not.toHaveFocus();
+  });
+});
+
+describe('AdminPage: Admin demo (17.10)', () => {
+  const adminDemo: AccountState = { status: 'demo', sessionId: DEMO_SESSION, kind: 'admin' };
+  afterEach(() => sessionStorage.clear());
+
+  it('shows fictional people with a permanent notice, and never calls the Admin function', async () => {
+    const user = userEvent.setup();
+    render(<AdminPage account={accountApi(adminDemo)} />);
+    await screen.findByRole('heading', { name: 'Users' });
+    expect(screen.getByRole('note')).toHaveTextContent('fictional. Nothing is emailed and no real account changes.');
+    expect(within(screen.getByRole('list', { name: 'Accounts' })).getByText(/Demo Admin \(you\)/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Email'), 'guest.one@demo.example');
+    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+    expect(await screen.findByText('Invitation to guest.one@demo.example simulated. No email was sent.')).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'Invitations' })).getByText('guest.one@demo.example')).toBeInTheDocument();
+    await user.click(within(row('Invitations', 'lee.park@demo.example')).getByRole('button', { name: /Resend/ }));
+    expect(await screen.findByText(/simulated again\. No email was sent/)).toBeInTheDocument();
+    expect(callAdmin).not.toHaveBeenCalled();
+  });
+
+  it('confirms and simulates a deactivation, keeps it over a reload, and explains your own row', async () => {
+    const user = userEvent.setup();
+    const view = render(<AdminPage account={accountApi(adminDemo)} />);
+    await user.click(within(await waitFor(() => row('Accounts', 'Noah Quinn'))).getByRole('button', { name: /Deactivate/ }));
+    expect(within(screen.getByRole('dialog')).getByText(/only the fictional list changes/)).toBeInTheDocument();
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deactivate' }));
+    expect(await screen.findByText(/noah\.quinn@demo\.example deactivated \(simulated\)/)).toBeInTheDocument();
+    view.unmount();
+    render(<AdminPage account={accountApi(adminDemo)} />);
+    expect(within(await waitFor(() => row('Accounts', 'Noah Quinn'))).getByText('Deactivated')).toBeInTheDocument();
+    await user.click(within(row('Accounts', 'Demo Admin (you)')).getByRole('button', { name: /Make Member/ }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Make Member' }));
+    expect(await screen.findByText(/the demo stays open/)).toBeInTheDocument();
+    expect(callAdmin).not.toHaveBeenCalled();
+  });
+
+  it('shows the last-Admin refusal', async () => {
+    const user = userEvent.setup();
+    render(<AdminPage account={accountApi(adminDemo)} />);
+    await user.click(within(await waitFor(() => row('Accounts', 'Mara Ellis'))).getByRole('button', { name: /Deactivate/ }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deactivate' }));
+    await screen.findByText(/mara\.ellis@demo\.example deactivated/);
+    await user.click(within(row('Accounts', 'Demo Admin (you)')).getByRole('button', { name: /Deactivate/ }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deactivate' }));
+    expect(await screen.findByText('At least one active Admin must remain.')).toBeInTheDocument();
+  });
+
+  it('starts again from fresh data when the saved demo data is damaged', async () => {
+    sessionStorage.setItem(DEMO_ADMIN_DATA_KEY, '{"oops":true}');
+    render(<AdminPage account={accountApi(adminDemo)} />);
+    expect(await screen.findByText('Mara Ellis')).toBeInTheDocument();
+  });
+
+  it('keeps a real Admin on the Admin function, with no demo notice', async () => {
+    setUp();
+    render(<AdminPage account={accountApi(admin)} />);
+    await screen.findByRole('heading', { name: 'Users' });
+    expect(callAdmin).toHaveBeenCalledWith({ action: 'list' });
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 });

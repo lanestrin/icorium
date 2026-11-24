@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { INVITE_ONLY_MESSAGE } from '../lib/auth';
-import { currentDemoId, DEMO_EMAIL, DEMO_PASSWORD, DEMO_STORAGE_MESSAGE, startDemo } from '../lib/demo';
+import { ADMIN_DEMO_EMAIL, ADMIN_DEMO_PASSWORD, currentDemoId, currentDemoKind, DEMO_EMAIL, DEMO_PASSWORD, DEMO_STORAGE_MESSAGE, startDemo } from '../lib/demo';
 import { createBrowserExport } from '../lib/browser-export';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
@@ -489,5 +489,74 @@ describe('SignInPage: files kept in this browser', () => {
     await screen.findByText(/You're signed in as Ada/);
     expect(list).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', exportButton)).not.toBeInTheDocument();
+  });
+});
+
+describe('SignInPage: Admin demo (17.10)', () => {
+  afterEach(() => { window.history.replaceState(null, '', '/sign-in'); sessionStorage.clear(); });
+
+  it.each([true, false])('fills the Admin demo details, focuses Sign In and starts an Admin demo without calling Supabase (accounts set up: %s)', async (configured) => {
+    const fake = setUp();
+    vi.mocked(isAuthConfigured).mockReturnValue(configured);
+    const signIn = vi.spyOn(fake.client.auth, 'signInWithPassword');
+    const onSignedIn = vi.fn();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={onSignedIn} />);
+    await user.click(await screen.findByRole('button', { name: 'Try Admin Demo' }));
+    expect(screen.getByLabelText('Email')).toHaveValue(ADMIN_DEMO_EMAIL);
+    expect(screen.getByLabelText('Password')).toHaveValue(ADMIN_DEMO_PASSWORD);
+    expect(screen.getByText('Admin demo details filled in. Press Sign In to start the Admin demo.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign In' })).toHaveFocus();
+    expect(currentDemoId()).toBeNull(); // nothing starts until Sign In
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    expect(onSignedIn).toHaveBeenCalledTimes(1);
+    expect(currentDemoKind()).toBe('admin');
+    expect(signIn).not.toHaveBeenCalled();
+  });
+
+  it('switches between the two demos, and the standard one stays standard', async () => {
+    setUp();
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await user.click(await screen.findByRole('button', { name: 'Try Admin Demo' }));
+    await user.click(screen.getByRole('button', { name: 'Try Demo' }));
+    expect(screen.getByLabelText('Email')).toHaveValue(DEMO_EMAIL);
+    expect(screen.getByText('Demo details filled in. Press Sign In to start the demo.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    expect(currentDemoId()).not.toBeNull();
+    expect(currentDemoKind()).toBe('standard');
+  });
+
+  it('treats one demo email with the other demo password as an ordinary failed sign-in', async () => {
+    const fake = setUp();
+    const signIn = vi.spyOn(fake.client.auth, 'signInWithPassword');
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await user.type(await screen.findByLabelText('Email'), ADMIN_DEMO_EMAIL);
+    await user.type(screen.getByLabelText('Password'), DEMO_PASSWORD);
+    await user.click(screen.getByRole('button', { name: 'Sign In' }));
+    await waitFor(() => expect(signIn).toHaveBeenCalled());
+    expect(currentDemoId()).toBeNull();
+  });
+
+  it.each([
+    ['?demo-ended=admin', ADMIN_DEMO_EMAIL, ADMIN_DEMO_PASSWORD, 'Admin demo details filled in'],
+    ['?demo-ended', DEMO_EMAIL, DEMO_PASSWORD, 'Demo details filled in'],
+    ['?demo-ended=anything-else', DEMO_EMAIL, DEMO_PASSWORD, 'Demo details filled in'],
+  ])('after a demo is signed out (%s) it fills that demo\'s details', async (search, email, password, status) => {
+    setUp();
+    window.history.replaceState(null, '', `/sign-in${search}`);
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByLabelText('Email')).toHaveValue(email);
+    expect(screen.getByLabelText('Password')).toHaveValue(password);
+    expect(screen.getByText(new RegExp(status))).toBeInTheDocument();
+    expect(window.location.search).toBe('');
+  });
+
+  it('hides both demo buttons for someone already signed in', async () => {
+    setUp({ session: fakeSession(), profile: { name: 'Ada', role: 'Member', active: true } });
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await screen.findByText(/You're signed in as Ada/);
+    expect(screen.queryByRole('button', { name: 'Try Admin Demo' })).not.toBeInTheDocument();
   });
 });

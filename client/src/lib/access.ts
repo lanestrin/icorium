@@ -16,7 +16,7 @@ export function pageAccess(account: AccountState, requirement: Requirement): Acc
     case 'signed-out':
     case 'unconfigured': return 'sign-in';
     case 'error': return 'unavailable';
-    case 'demo': return requirement === 'workspace' ? 'allow' : 'admins-only';
+    case 'demo': return requirement === 'workspace' || account.kind === 'admin' ? 'allow' : 'admins-only'; // 17.10
     case 'signed-in':
       if (!account.profile) return 'no-profile';
       if (!account.profile.active) return 'inactive';

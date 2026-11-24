@@ -384,6 +384,20 @@ Rules for every M19 item:
   against a modified client (decided 2026-11-23).
   **Depends on:** 17.3, 17.4, 17.5.
 
+- [x] **17.10** Admin demo — Add a Try Admin Demo button to the
+  sign-in page, beside Try Demo. It fills separate public demo
+  credentials, and the guest submits the form. The Admin demo opens
+  the isolated, temporary browser workspace with samples, plus the
+  Admin, Architecture and Generator pages. Admin pages list fictional
+  accounts and invitations, and every action (invite, resend, extend,
+  revoke, role change, deactivate, reactivate) is simulated in that
+  tab with a notice that no email is sent and no real account changes.
+  It never calls Supabase, the Admin function or cloud storage, and
+  never shows real accounts. It keeps the last-active-Admin rule and is
+  cleared when the demo ends. The existing demo and real Admin access
+  are unchanged.
+  **Depends on:** 17.3, 17.5, 17.6.
+
 - [ ] **17.7** Hosted workflow verification and operating guidance —
   Demonstrate invitation acceptance, both sign-in methods,
   cross-device files, cross-user isolation, deactivation, demo
@@ -391,7 +405,7 @@ Rules for every M19 item:
   hosted evidence, capacity limitations and provider upgrade/export
   steps. Keep the Architecture page and setup documentation accurate.
   No deployment or invitation sending without explicit authorization.
-  **Depends on:** 17.6.
+  **Depends on:** 17.6, 17.10.
 
 ### M18 — File deletion and correction
 

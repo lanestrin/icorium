@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { authErrorMessage, cleanName, NAME_MAX } from '../lib/auth';
-import { claimDemoLock, currentDemoId, DEMO_ENDED_PARAM, dropDemoId, endDemo, sweepStaleDemos } from '../lib/demo';
+import { ADMIN_DEMO_ENDED, claimDemoLock, currentDemoId, currentDemoKind, DEMO_ENDED_PARAM, dropDemoId, endDemo, sweepStaleDemos, type DemoKind } from '../lib/demo';
 import { PAGES } from '../lib/pages';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 
@@ -13,12 +13,18 @@ export type AccountState =
   | { status: 'loading' }
   | { status: 'signed-out' }
   | { status: 'signed-in'; userId: string; email: string; profile: Profile | null }
-  | { status: 'demo'; sessionId: string }
+  | { status: 'demo'; sessionId: string; kind: DemoKind }
   | { status: 'error'; message: string };
 
 /** True only for an active Admin. It decides which links and pages are shown; trusted code protects the data. */
 export const isActiveAdmin = (account: AccountState) =>
   account.status === 'signed-in' && account.profile?.active === true && account.profile.role === 'Admin';
+
+/** True for an Admin demo (17.10): a browser-only guest shown the Admin-only pages with fictional data. */
+export const isAdminDemo = (account: AccountState) => account.status === 'demo' && account.kind === 'admin';
+
+/** Whether the Admin-only pages and their links are shown: an active Admin, or an Admin demo. Display only. */
+export const canSeeAdminPages = (account: AccountState) => isActiveAdmin(account) || isAdminDemo(account);
 
 /**
  * The signed-in account, kept current from Supabase's auth events. AccessGate (17.6) shows pages
@@ -33,9 +39,9 @@ export const isActiveAdmin = (account: AccountState) =>
  */
 export function useAccount() {
   const [account, setAccount] = useState<AccountState>(() => (isAuthConfigured() ? { status: 'loading' } : { status: 'unconfigured' }));
-  const [demo, setDemo] = useState<{ id: string; claimed: boolean } | null>(() => {
+  const [demo, setDemo] = useState<{ id: string; claimed: boolean; kind: DemoKind } | null>(() => {
     const id = currentDemoId();
-    return id ? { id, claimed: false } : null;
+    return id ? { id, claimed: false, kind: currentDemoKind() } : null;
   });
   const [hasSession, setHasSession] = useState(false);
   const [recovering, setRecovering] = useState(false);
@@ -48,7 +54,7 @@ export function useAccount() {
     let cancelled = false;
     void claimDemoLock(demo.id).then((ok) => {
       if (cancelled) return;
-      if (ok) setDemo({ id: demo.id, claimed: true });
+      if (ok) setDemo({ ...demo, claimed: true });
       else {
         dropDemoId();
         setDemo(null);
@@ -114,7 +120,7 @@ export function useAccount() {
       // Ends this tab's demo and deletes its files; a Supabase session held by another tab is left alone.
       // The demo state stays until the page unloads, so the open page never switches to another workspace first.
       await endDemo(demo.id);
-      window.location.assign(`${PAGES.signIn}?${DEMO_ENDED_PARAM}`);
+      window.location.assign(`${PAGES.signIn}?${DEMO_ENDED_PARAM}${demo.kind === 'admin' ? `=${ADMIN_DEMO_ENDED}` : ''}`);
       return;
     }
     try {
@@ -141,6 +147,6 @@ export function useAccount() {
     return null;
   }, [account]);
 
-  const visible: AccountState = demo ? (demo.claimed ? { status: 'demo', sessionId: demo.id } : { status: 'loading' }) : account;
+  const visible: AccountState = demo ? (demo.claimed ? { status: 'demo', sessionId: demo.id, kind: demo.kind } : { status: 'loading' }) : account;
   return { account: visible, hasSession, recovering, actionError, signOut, saveName };
 }

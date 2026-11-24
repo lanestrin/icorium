@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { adminMessage, callAdmin } from './admin';
 import { UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE } from './auth';
 import { getSupabase } from './supabase';
+import { startDemo } from './demo';
 import { fakeSupabase } from '../test-fixtures/fake-supabase';
 
 vi.mock('./supabase', () => ({ getSupabase: vi.fn(), isAuthConfigured: vi.fn(() => true) }));
@@ -10,6 +11,15 @@ vi.mock('./supabase', () => ({ getSupabase: vi.fn(), isAuthConfigured: vi.fn(() 
 const httpError = (body: unknown) => ({ name: 'FunctionsHttpError', context: new Response(JSON.stringify(body), { status: 409 }) });
 
 afterEach(() => vi.clearAllMocks());
+
+describe('callAdmin in a demo tab', () => {
+  afterEach(() => sessionStorage.clear());
+  it.each(['standard', 'admin'] as const)('refuses a %s demo before Supabase is loaded, even over a real session', async (kind) => {
+    startDemo(undefined, undefined, kind);
+    expect(await callAdmin({ action: 'list' })).toEqual({ ok: false, code: 'not_admin', message: 'You no longer have Admin access.' });
+    expect(getSupabase).not.toHaveBeenCalled();
+  });
+});
 
 describe('callAdmin', () => {
   it('sends the request to the admin function and returns its data', async () => {

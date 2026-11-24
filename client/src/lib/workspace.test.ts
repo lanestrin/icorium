@@ -21,7 +21,7 @@ describe('workspaceChoice', () => {
   });
 
   it('gives a demo guest their own temporary workspace, keyed by the session', () => {
-    expect(workspaceChoice({ status: 'demo', sessionId: 's1' })).toEqual({ kind: 'demo', sessionId: 's1' });
+    expect(workspaceChoice({ status: 'demo', sessionId: 's1', kind: 'standard' })).toEqual({ kind: 'demo', sessionId: 's1' });
     expect(workspaceKey({ kind: 'demo', sessionId: 's1' })).toBe('demo:s1');
     expect(workspaceKey({ kind: 'demo', sessionId: 's2' })).not.toBe(workspaceKey({ kind: 'demo', sessionId: 's1' }));
   });

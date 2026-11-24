@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openBrowserStorage } from './browser-storage';
 import {
   BROWSER_DB, claimDemoLock, currentDemoId, DEMO_EMAIL, DEMO_PASSWORD, DEMO_SESSION_KEY, DEMO_STORAGE_MESSAGE, demoDbName, deleteDemoDatabase, endDemo,
+  ADMIN_DEMO_EMAIL, ADMIN_DEMO_PASSWORD, currentDemoKind, DEMO_ADMIN_DATA_KEY, DEMO_KIND_KEY, demoKindFor, dropDemoId,
   isDemoCredentials, isDemoDbName, leaveDemo, startDemo, sweepStaleDemos, type LockManagerLike,
 } from './demo';
 
@@ -113,7 +114,7 @@ describe('demo session', () => {
     try {
       expect(currentDemoId()).toBeNull();
       expect(() => startDemo()).toThrow(DEMO_STORAGE_MESSAGE);
-      expect(() => startDemo({ setItem: () => { throw new Error('full'); } })).toThrow(DEMO_STORAGE_MESSAGE);
+      expect(() => startDemo({ setItem: () => { throw new Error('full'); }, removeItem: () => undefined })).toThrow(DEMO_STORAGE_MESSAGE);
       await expect(endDemo(ID_A)).resolves.toBe(true);
     } finally { blocked.mockRestore(); }
   });
@@ -122,6 +123,77 @@ describe('demo session', () => {
     await (await openBrowserStorage(BROWSER_DB)).clear();
     expect(await deleteDemoDatabase(BROWSER_DB)).toBe(false);
     expect(await names()).toContain(BROWSER_DB);
+  });
+});
+
+describe('the Admin demo (17.10)', () => {
+  afterEach(() => sessionStorage.clear());
+
+  it('starts only for its own exact credentials; a mix of the two is neither', () => {
+    expect(demoKindFor(DEMO_EMAIL, DEMO_PASSWORD)).toBe('standard');
+    expect(demoKindFor(` ${ADMIN_DEMO_EMAIL.toUpperCase()} `, ADMIN_DEMO_PASSWORD)).toBe('admin');
+    expect(demoKindFor(ADMIN_DEMO_EMAIL, DEMO_PASSWORD)).toBeNull();
+    expect(demoKindFor(DEMO_EMAIL, ADMIN_DEMO_PASSWORD)).toBeNull();
+    expect(demoKindFor(ADMIN_DEMO_EMAIL, ADMIN_DEMO_PASSWORD + ' ')).toBeNull();
+    expect(isDemoCredentials(ADMIN_DEMO_EMAIL, ADMIN_DEMO_PASSWORD)).toBe(true);
+    expect(isDemoCredentials('ada@example.com', ADMIN_DEMO_PASSWORD)).toBe(false);
+  });
+
+  it('records the kind against this session only, and treats anything else as a standard demo', () => {
+    const store = fakeStore();
+    const id = startDemo(store, () => ID_A, 'admin');
+    expect(store.data.get(DEMO_KIND_KEY)).toBe(`${id}:admin`);
+    expect(currentDemoKind(store)).toBe('admin');
+    store.data.set(DEMO_KIND_KEY, `${ID_B}:admin`); // another session's value
+    expect(currentDemoKind(store)).toBe('standard');
+    for (const value of ['admin', `${ID_A}:Admin`, `${ID_A}:admin:x`, '']) {
+      store.data.set(DEMO_KIND_KEY, value);
+      expect(currentDemoKind(store), value).toBe('standard');
+    }
+    store.data.delete(DEMO_KIND_KEY);
+    expect(currentDemoKind(store)).toBe('standard');
+    expect(currentDemoKind(null)).toBe('standard');
+    store.data.set(DEMO_KIND_KEY, `${ID_A}:admin`);
+    store.data.delete(DEMO_SESSION_KEY); // no session: the kind alone counts for nothing
+    expect(currentDemoKind(store)).toBe('standard');
+  });
+
+  it('a new demo replaces the earlier kind and fictional data', () => {
+    const store = fakeStore();
+    startDemo(store, () => ID_A, 'admin');
+    store.data.set(DEMO_ADMIN_DATA_KEY, '{}');
+    startDemo(store, () => ID_B);
+    expect(currentDemoKind(store)).toBe('standard');
+    expect(store.data.has(DEMO_ADMIN_DATA_KEY)).toBe(false);
+  });
+
+  it('does not start when the kind cannot be saved, and leaves no session behind', () => {
+    const data = new Map<string, string>();
+    const store = {
+      setItem: (k: string, v: string) => { if (k === DEMO_KIND_KEY) throw new Error('full'); data.set(k, v); },
+      removeItem: (k: string) => void data.delete(k),
+    };
+    expect(() => startDemo(store, () => ID_A, 'admin')).toThrow(DEMO_STORAGE_MESSAGE);
+    expect(data.size).toBe(0);
+  });
+
+  it('ends with the demo: dropping the session removes the kind and the fictional data', async () => {
+    const store = fakeStore();
+    startDemo(store, () => ID_A, 'admin');
+    store.data.set(DEMO_ADMIN_DATA_KEY, '{}');
+    dropDemoId(store);
+    expect([...store.data.keys()]).toEqual([]);
+    startDemo(store, () => ID_B, 'admin');
+    store.data.set(DEMO_ADMIN_DATA_KEY, '{}');
+    await endDemo(ID_B, store, indexedDB);
+    expect([...store.data.keys()]).toEqual([]);
+  });
+
+  it('leaving it, or a duplicated tab giving it up, removes the kind too', async () => {
+    startDemo(undefined, () => ID_C, 'admin');
+    await leaveDemo(fakeLocks([demoDbName(ID_C)]));
+    expect(sessionStorage.getItem(DEMO_KIND_KEY)).toBeNull();
+    expect(currentDemoKind()).toBe('standard');
   });
 });
 

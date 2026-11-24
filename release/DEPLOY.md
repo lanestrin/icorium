@@ -9,8 +9,9 @@ browser, and there is no server of ours to run. Access needs sign-in: the file
 workspace opens for an active invited account (its files are kept in a private
 Supabase workspace) or for a guest demo (its files stay in that browser tab and
 are discarded when the demo ends). The Admin, Architecture and Generator pages
-open only for an active Admin. Without Supabase settings, only Try Demo opens
-the workspace and those three pages are denied.
+open only for an active Admin or an Admin demo (fictional data, simulated actions,
+nothing sent to Supabase). Without Supabase settings, only the two demos open the
+workspace, and a standard demo is denied those three pages.
 
 ## Requirements
 

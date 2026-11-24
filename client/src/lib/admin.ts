@@ -1,4 +1,5 @@
 import { UNAVAILABLE_MESSAGE, UNEXPECTED_MESSAGE } from './auth';
+import { currentDemoId } from './demo';
 import { getSupabase } from './supabase';
 
 export type Role = 'Admin' | 'Member';
@@ -70,9 +71,14 @@ async function errorCode(error: { context?: unknown }): Promise<string | null> {
   }
 }
 
-/** Sends one request to the Admin function with the signed-in person's token. Never throws. */
+/**
+ * Sends one request to the Admin function with the signed-in person's token. Never throws. A tab with a demo (17.10)
+ * is refused before Supabase is loaded: the Admin demo has its own fictional backend (lib/demo-admin.ts) and
+ * never uses the real one, even over a real Admin session.
+ */
 export async function callAdmin<T>(request: AdminAction): Promise<AdminResult<T>> {
   const fail = (code: string, message: string): AdminResult<T> => ({ ok: false, code, message });
+  if (currentDemoId()) return fail(NOT_ADMIN_CODE, adminMessage(NOT_ADMIN_CODE));
   try {
     const supabase = await getSupabase();
     if (!supabase) return fail('unavailable', UNAVAILABLE_MESSAGE);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { FolderDown, Lock, Mail, Play, User } from 'lucide-react';
+import { FolderDown, Lock, Mail, Play, ShieldCheck, User } from 'lucide-react';
 import { AuthField } from '../components/auth/AuthField';
 import { NotSetUp } from '../components/auth/AuthLayout';
 import { GoogleButton } from '../components/auth/GoogleButton';
@@ -16,7 +16,10 @@ import { useAccount } from '../hooks/useAccount';
 import { useRedirectResult } from '../hooks/useRedirectResult';
 import { authErrorMessage, NOT_SET_UP_MESSAGE } from '../lib/auth';
 import { createBrowserExport } from '../lib/browser-export';
-import { DEMO_EMAIL, DEMO_ENDED_PARAM, DEMO_PASSWORD, DEMO_STORAGE_MESSAGE, isDemoCredentials, leaveDemo, startDemo } from '../lib/demo';
+import {
+  ADMIN_DEMO_EMAIL, ADMIN_DEMO_ENDED, ADMIN_DEMO_PASSWORD, DEMO_EMAIL, DEMO_ENDED_PARAM, DEMO_PASSWORD, DEMO_STORAGE_MESSAGE, demoKindFor, leaveDemo, startDemo,
+  type DemoKind,
+} from '../lib/demo';
 import { getSupabase } from '../lib/supabase';
 import { PAGES } from '../lib/pages';
 
@@ -26,19 +29,23 @@ import { PAGES } from '../lib/pages';
  * isolated temporary demo (17.5) without calling Supabase. After a demo is signed out, the details are
  * already filled in. On a site without Supabase settings the form only starts the demo.
  * Google and email-confirmation redirects come back here: a failed one shows its message, and a
- * successful one opens the file workspace. Signing in to an account leaves a demo open in this tab; just opening
+ * Try Admin Demo (17.10) does the same with the Admin demo's credentials. A successful one opens the file workspace. Signing in to an account leaves a demo open in this tab; just opening
  * this page does not. onSignedIn opens it; tests pass their own.
  */
 export function SignInPage({ onSignedIn = () => window.location.assign('/') }: { onSignedIn?: () => void }) {
   const { account, hasSession, signOut } = useAccount();
   const redirect = useRedirectResult();
-  const [demoEnded] = useState(() => new URLSearchParams(window.location.search).has(DEMO_ENDED_PARAM));
-  const [email, setEmail] = useState(demoEnded ? DEMO_EMAIL : '');
-  const [password, setPassword] = useState(demoEnded ? DEMO_PASSWORD : '');
+  // After a demo ends the page offers it again with its details filled in; only the Admin marker fills the Admin demo's.
+  const [demoEnded] = useState<DemoKind | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has(DEMO_ENDED_PARAM) ? (params.get(DEMO_ENDED_PARAM) === ADMIN_DEMO_ENDED ? 'admin' : 'standard') : null;
+  });
+  const [email, setEmail] = useState(demoEnded === 'admin' ? ADMIN_DEMO_EMAIL : demoEnded ? DEMO_EMAIL : '');
+  const [password, setPassword] = useState(demoEnded === 'admin' ? ADMIN_DEMO_PASSWORD : demoEnded ? DEMO_PASSWORD : '');
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(redirect.error);
   const [demoFills, setDemoFills] = useState(demoEnded ? 1 : 0); // counts Try Demo presses, so each one refocuses Sign In
-  const [demoFilled, setDemoFilled] = useState(demoEnded); // the demo details are still in the fields
+  const [demoFilled, setDemoFilled] = useState<DemoKind | null>(demoEnded); // which demo's details are still in the fields
   const [offerExport, setOfferExport] = useState(false); // this browser has older files, or couldn't be read
   const [exporting, setExporting] = useState(false);
   const form = useRef<HTMLFormElement>(null);
@@ -68,20 +75,21 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
     if (showForm && demoFills > 0) form.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus();
   }, [showForm, demoFills]);
 
-  function fillDemo() {
+  function fillDemo(kind: DemoKind) {
     setError(null);
-    setEmail(DEMO_EMAIL);
-    setPassword(DEMO_PASSWORD);
-    setDemoFilled(true);
+    setEmail(kind === 'admin' ? ADMIN_DEMO_EMAIL : DEMO_EMAIL);
+    setPassword(kind === 'admin' ? ADMIN_DEMO_PASSWORD : DEMO_PASSWORD);
+    setDemoFilled(kind);
     setDemoFills((count) => count + 1);
   }
 
   async function signIn(event: FormEvent) {
     event.preventDefault();
     setError(null);
-    if (isDemoCredentials(email, password)) {
+    const demoKind = demoKindFor(email, password);
+    if (demoKind) {
       try {
-        startDemo(); // this tab's own temporary workspace; no account is involved
+        startDemo(undefined, undefined, demoKind); // this tab's own temporary workspace; no account is involved
       } catch (failure) {
         setError(failure instanceof Error ? failure.message : DEMO_STORAGE_MESSAGE);
         return;
@@ -158,8 +166,8 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
               <>
                 {error && <Banner tone="error">{error}</Banner>}
                 <form ref={form} className={styles.form} onSubmit={(event) => void signIn(event)}>
-                  <AuthField label="Email" hideLabel placeholder="Email address" icon={<Mail />} type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); setDemoFilled(false); }} />
-                  <AuthField label="Password" hideLabel placeholder="Password" icon={<Lock />} revealable type="password" autoComplete="current-password" required value={password} onChange={(e) => { setPassword(e.target.value); setDemoFilled(false); }} />
+                  <AuthField label="Email" hideLabel placeholder="Email address" icon={<Mail />} type="email" autoComplete="email" required value={email} onChange={(e) => { setEmail(e.target.value); setDemoFilled(null); }} />
+                  <AuthField label="Password" hideLabel placeholder="Password" icon={<Lock />} revealable type="password" autoComplete="current-password" required value={password} onChange={(e) => { setPassword(e.target.value); setDemoFilled(null); }} />
                   {showAccountHelp && <a href={PAGES.resetPassword} className={layout.forgot}>Forgot password?</a>}
                   <Button type="submit" loading={signingIn}>{signingIn ? 'Signing in…' : 'Sign In'}</Button>
                 </form>
@@ -167,10 +175,15 @@ export function SignInPage({ onSignedIn = () => window.location.assign('/') }: {
               </>
             )}
             {showForm && (
-              <button type="button" className={layout.demo} onClick={fillDemo}><Play aria-hidden /> Try Demo</button>
+              <div className={layout.demos}>
+                <button type="button" className={layout.demo} onClick={() => fillDemo('standard')}><Play aria-hidden /> Try Demo</button>
+                <button type="button" className={layout.demo} onClick={() => fillDemo('admin')}><ShieldCheck aria-hidden /> Try Admin Demo</button>
+              </div>
             )}
             {/* Always mounted, so a screen reader announces the text when it appears. */}
-            <p role="status" className={showForm && demoFilled ? styles.notice : styles.hiddenLabel}>{showForm && demoFilled ? 'Demo details filled in. Press Sign In to start the demo.' : ''}</p>
+            <p role="status" className={showForm && demoFilled ? styles.notice : styles.hiddenLabel}>
+              {showForm && demoFilled === 'admin' ? 'Admin demo details filled in. Press Sign In to start the Admin demo.' : showForm && demoFilled ? 'Demo details filled in. Press Sign In to start the demo.' : ''}
+            </p>
             {showAccountHelp && (
               <>
                 <a href={PAGES.activate} className={layout.invitation}>Use invitation link</a>

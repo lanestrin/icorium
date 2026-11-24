@@ -6,7 +6,7 @@ import App from './App';
 import type { Profile } from './hooks/useAccount';
 import { api } from './lib/api';
 import { callAdmin } from './lib/admin';
-import { DEMO_SESSION_KEY } from './lib/demo';
+import { DEMO_KIND_KEY, DEMO_SESSION_KEY } from './lib/demo';
 import { browserLocation } from './lib/navigation';
 import { getSupabase, isAuthConfigured } from './lib/supabase';
 import { DEMO_SESSION } from './test-fixtures/accounts';
@@ -200,6 +200,24 @@ describe('App access', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Admins only' })).toBeInTheDocument();
     expect(rendered.pages).toEqual([]);
     expect(callAdmin).not.toHaveBeenCalled();
+  });
+
+  it.each(ADMIN_PAGES)('opens %s for an Admin demo guest without calling the Admin function', async (path) => {
+    signedInAs(admin); // a real session behind the demo changes nothing
+    startDemoTab();
+    sessionStorage.setItem(DEMO_KIND_KEY, `${DEMO_SESSION}:admin`);
+    open(path);
+    expect(await screen.findByRole('heading', { level: 1, name: /^(Admin|CSV Generator|Architecture & Tech Stack)$/ })).toBeInTheDocument();
+    expect(callAdmin).not.toHaveBeenCalled();
+  });
+
+  it.each(['someone-elses-session:admin', 'admin', ''])('treats a demo whose kind reads %j as a standard demo', async (value) => {
+    site({ session: null });
+    startDemoTab();
+    sessionStorage.setItem(DEMO_KIND_KEY, value);
+    open('/admin');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Admins only' })).toBeInTheDocument();
+    expect(rendered.pages).toEqual([]);
   });
 
   it.each([

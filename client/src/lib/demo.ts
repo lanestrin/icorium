@@ -5,14 +5,26 @@
 
 export const DEMO_EMAIL = 'demo@reclaim-studio.example';
 export const DEMO_PASSWORD = 'try-the-demo';
+/** The Admin demo's public credentials (17.10). */
+export const ADMIN_DEMO_EMAIL = 'admin-demo@reclaim-studio.example';
+export const ADMIN_DEMO_PASSWORD = 'try-the-admin-demo';
+
+/** A standard demo opens the file workspace; an Admin demo also opens the Admin-only pages, with fictional data. */
+export type DemoKind = 'standard' | 'admin';
 
 /** The database of the browser workspace that existed before the demo. The demo never touches it. */
 export const BROWSER_DB = 'reclaim-studio';
 export const DEMO_DB_PREFIX = 'reclaim-studio-demo-';
 export const DEMO_SESSION_KEY = 'reclaim-studio-demo-session';
+/** Holds `<session id>:admin` for an Admin demo. Only a value naming the current session counts. */
+export const DEMO_KIND_KEY = 'reclaim-studio-demo-kind';
+/** The Admin demo's fictional accounts and invitations (lib/demo-admin.ts). */
+export const DEMO_ADMIN_DATA_KEY = 'reclaim-studio-demo-admin-data';
 
 /** Added to /sign-in's address when a demo is signed out, so the page offers the demo again with its details filled in. */
 export const DEMO_ENDED_PARAM = 'demo-ended';
+/** The value that param has after an Admin demo, so the page fills the Admin demo's details. Any other value fills the standard demo's. */
+export const ADMIN_DEMO_ENDED = 'admin';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -28,10 +40,16 @@ function tabStorage(): Storage | null {
   try { return sessionStorage; } catch { return null; }
 }
 
-/** True for exactly the public demo email and password (the email ignores case and surrounding spaces). */
-export function isDemoCredentials(email: string, password: string): boolean {
-  return email.trim().toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD;
+/** The demo these exact public credentials start (the email ignores case and surrounding spaces), or null. */
+export function demoKindFor(email: string, password: string): DemoKind | null {
+  const clean = email.trim().toLowerCase();
+  if (clean === DEMO_EMAIL && password === DEMO_PASSWORD) return 'standard';
+  if (clean === ADMIN_DEMO_EMAIL && password === ADMIN_DEMO_PASSWORD) return 'admin';
+  return null;
 }
+
+/** True for either demo's credentials. */
+export const isDemoCredentials = (email: string, password: string) => demoKindFor(email, password) !== null;
 
 export const demoDbName = (sessionId: string) => `${DEMO_DB_PREFIX}${sessionId}`;
 
@@ -51,13 +69,34 @@ export function currentDemoId(store: Pick<Storage, 'getItem' | 'removeItem'> | n
   return null;
 }
 
-/** Starts a new demo in this tab and returns its ID. Throws DEMO_STORAGE_MESSAGE where site storage is blocked. */
-export function startDemo(store: Pick<Storage, 'setItem'> | null = tabStorage(), newId: () => string = () => crypto.randomUUID()): string {
+/**
+ * This tab's demo kind. Anything but an exact `<current session id>:admin` is standard, so a missing, malformed or
+ * leftover value never grants more. The kind only chooses what is shown; trusted code never reads it.
+ */
+export function currentDemoKind(store: Pick<Storage, 'getItem' | 'removeItem'> | null = tabStorage()): DemoKind {
+  const id = currentDemoId(store);
+  if (!id || !store) return 'standard';
+  try { return store.getItem(DEMO_KIND_KEY) === `${id}:admin` ? 'admin' : 'standard'; } catch { return 'standard'; }
+}
+
+/**
+ * Starts a new demo in this tab and returns its ID. Throws DEMO_STORAGE_MESSAGE where site storage is blocked, and
+ * then no demo has started. Starting a demo of either kind replaces any earlier kind and Admin data.
+ */
+export function startDemo(
+  store: Pick<Storage, 'setItem' | 'removeItem'> | null = tabStorage(),
+  newId: () => string = () => crypto.randomUUID(),
+  kind: DemoKind = 'standard',
+): string {
   const id = newId();
   try {
     if (!store) throw new Error('no storage');
+    store.removeItem(DEMO_KIND_KEY);
+    store.removeItem(DEMO_ADMIN_DATA_KEY);
     store.setItem(DEMO_SESSION_KEY, id);
+    if (kind === 'admin') store.setItem(DEMO_KIND_KEY, `${id}:admin`);
   } catch {
+    try { store?.removeItem(DEMO_SESSION_KEY); store?.removeItem(DEMO_KIND_KEY); } catch { /* nothing to clean */ }
     throw new Error(DEMO_STORAGE_MESSAGE);
   }
   return id;
@@ -107,7 +146,9 @@ export function claimDemoLock(id: string, locks: LockManagerLike | null = defaul
 
 /** Forgets this tab's demo ID without deleting any data (a duplicated tab giving the demo up). */
 export function dropDemoId(store: Pick<Storage, 'removeItem'> | null = tabStorage()) {
-  try { store?.removeItem(DEMO_SESSION_KEY); } catch { /* nothing to clean */ }
+  for (const key of [DEMO_SESSION_KEY, DEMO_KIND_KEY, DEMO_ADMIN_DATA_KEY]) {
+    try { store?.removeItem(key); } catch { /* nothing to clean */ }
+  }
 }
 
 /** Deletes one demo database. False when the browser blocked or failed it; the next sweep tries again. */
