@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.19.0](https://github.com/lanestrin/icorium/compare/v2.18.0...v2.19.0) (2026-11-24)
+
+
+### Features
+
+* add the isolated guest demo and browser-file export (17.5) ([#177](https://github.com/lanestrin/icorium/issues/177)) ([509863c](https://github.com/lanestrin/icorium/commit/509863cd80cef9b892497809f40b3c72bece35e4))
+
 ## [2.18.0](https://github.com/lanestrin/icorium/compare/v2.17.2...v2.18.0) (2026-11-24)
 
 
