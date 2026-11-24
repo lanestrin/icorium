@@ -19,9 +19,9 @@ const ICONS: Record<string, ReactNode> = {
 const isCurrent = (entry: NavEntry, path: string, hash: string) => entry.path === path && entry.hash === hash;
 
 /**
- * The left navigation: the file workspace's entries, an Admin group shown only to an active Admin (display
+ * The left navigation: the file workspace's entries, an Admin group shown only to an active Admin or an Admin demo (display
  * only; AccessGate decides which pages open and trusted code protects the data), and the app version. Help is the header's ? link.
- * withPages adds the Generator and Architecture links for the phone menu, where the header hides them; they too are for an active Admin.
+ * withPages adds the Generator and Architecture links for the phone menu, where the header hides them; they too are for an active Admin or an Admin demo.
  */
 export function AppNav({ isAdmin, path, hash, withPages, onChoose }: {
   isAdmin: boolean; path: string; hash: string; withPages?: boolean; onChoose: (event: MouseEvent, entry?: NavEntry) => void;

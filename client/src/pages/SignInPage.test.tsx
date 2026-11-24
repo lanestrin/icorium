@@ -181,7 +181,7 @@ describe('SignInPage', () => {
     expect(await screen.findByLabelText('Email')).toHaveValue(DEMO_EMAIL);
     expect(screen.getByLabelText('Password')).toHaveValue(DEMO_PASSWORD);
     expect(screen.getByText('Demo details filled in. Press Sign In to start the demo.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign In' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign In' })).toHaveFocus());
     expect(window.location.search).toBe('');
     expect(currentDemoId()).toBeNull(); // nothing starts until Sign In
     await user.click(screen.getByRole('button', { name: 'Sign In' }));
@@ -232,7 +232,7 @@ describe('SignInPage', () => {
     expect(screen.getByLabelText('Email')).toHaveValue(DEMO_EMAIL);
     expect(screen.getByLabelText('Password')).toHaveValue(DEMO_PASSWORD);
     expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Demo details filled in. Press Sign In to start the demo.');
-    expect(screen.getByRole('button', { name: 'Sign In' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign In' })).toHaveFocus());
   });
 
   it('starts an isolated demo only when the guest submits the demo credentials, without calling Supabase', async () => {
@@ -506,7 +506,7 @@ describe('SignInPage: Admin demo (17.10)', () => {
     expect(screen.getByLabelText('Email')).toHaveValue(ADMIN_DEMO_EMAIL);
     expect(screen.getByLabelText('Password')).toHaveValue(ADMIN_DEMO_PASSWORD);
     expect(screen.getByText('Admin demo details filled in. Press Sign In to start the Admin demo.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign In' })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign In' })).toHaveFocus());
     expect(currentDemoId()).toBeNull(); // nothing starts until Sign In
     await user.click(screen.getByRole('button', { name: 'Sign In' }));
     expect(onSignedIn).toHaveBeenCalledTimes(1);

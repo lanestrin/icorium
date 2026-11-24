@@ -2,19 +2,18 @@
 // tied to the demo's session ID, and goes nowhere: no Supabase call, no Admin function, no email. The rules mirror
 // supabase/migrations/20261122000000_admin_access.sql so the page behaves as the real one does.
 import { z } from 'zod';
-import { adminMessage, type AdminAction, type AdminList, type AdminResult, type Invitation, type Role } from './admin';
-import { DEMO_ADMIN_DATA_KEY } from './demo';
+import { adminMessage, NOT_ADMIN_CODE, type AdminAction, type AdminList, type AdminResult, type Invitation, type Role } from './admin';
+import { currentDemoId, DEMO_ADMIN_DATA_KEY, DEMO_STORAGE_MESSAGE } from './demo';
 
 /** The fictional account the guest "is". Changing its role or status here never changes the demo's own access. */
 export const DEMO_YOU_ID = 'demo-you';
 export const MAX_DEMO_INVITATIONS = 50;
-export const DEMO_LIMIT_MESSAGE = `This demo holds up to ${MAX_DEMO_INVITATIONS} invitations. Revoke or reload the demo to continue.`;
-export const DEMO_STORAGE_FAILED_MESSAGE = "This browser wouldn't save the demo change. Allow site storage and try again.";
+export const DEMO_LIMIT_MESSAGE = `This demo holds up to ${MAX_DEMO_INVITATIONS} invitations. To start over, sign out and start the Admin demo again.`;
 
 const DAY = 86_400_000;
 
 const role = z.enum(['Admin', 'Member']);
-const date = z.string().min(1).max(40);
+const date = z.iso.datetime();
 const schema = z.object({
   sessionId: z.string(),
   accounts: z.array(z.object({
@@ -52,6 +51,7 @@ function fresh(sessionId: string, now: number): Data {
   };
 }
 
+/** The saved data for this session, or fresh fictional data, saved at once so its dates stay fixed from here on. */
 function read(sessionId: string, now: number): Data {
   try {
     const raw = sessionStorage.getItem(DEMO_ADMIN_DATA_KEY);
@@ -60,7 +60,9 @@ function read(sessionId: string, now: number): Data {
       if (parsed.success && parsed.data.sessionId === sessionId) return parsed.data;
     }
   } catch { /* unreadable: start again with fresh data */ }
-  return fresh(sessionId, now);
+  const created = fresh(sessionId, now);
+  write(created); // if the browser refuses, the list still shows; the next change reports it
+  return created;
 }
 
 /** Saves, or reports that the browser refused. */
@@ -80,7 +82,7 @@ const toInvitation = (i: StoredInvitation, now: number): Invitation => ({ ...i, 
 const EMAIL = /^[^@\s\u0000-\u001f\u007f,;<>"()\\]+@[^@\s\u0000-\u001f\u007f,;<>"()\\]+\.[^@\s\u0000-\u001f\u007f,;<>"()\\]+$/;
 
 /** The fictional lists in the real list action's order: accounts oldest first, invitations newest first. */
-export function demoAdminList(sessionId: string, now = Date.now()): AdminList {
+function demoAdminList(sessionId: string, now = Date.now()): AdminList {
   const data = read(sessionId, now);
   return {
     accounts: [...data.accounts].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
@@ -92,8 +94,10 @@ export function demoAdminList(sessionId: string, now = Date.now()): AdminList {
 export function demoAdmin<T>(request: AdminAction, sessionId: string, now = Date.now()): AdminResult<T> {
   const fail = (code: string, message = adminMessage(code, request.action)): AdminResult<T> => ({ ok: false, code, message });
   const done = (data: unknown): AdminResult<T> => ({ ok: true, data: data as T });
+  // Once the demo has ended (sign-out is deleting its files) nothing may write the fictional data back.
+  if (currentDemoId() !== sessionId) return fail(NOT_ADMIN_CODE);
   const data = read(sessionId, now);
-  const save = (result: unknown): AdminResult<T> => (write(data) ? done(result) : fail('storage', DEMO_STORAGE_FAILED_MESSAGE));
+  const save = (result: unknown): AdminResult<T> => (write(data) ? done(result) : fail('storage', DEMO_STORAGE_MESSAGE));
   const lastActiveAdmin = (target: Data['accounts'][number]) =>
     target.role === 'Admin' && target.active && !data.accounts.some((other) => other.role === 'Admin' && other.active && other.user_id !== target.user_id);
 

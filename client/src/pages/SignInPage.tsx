@@ -28,9 +28,10 @@ import { PAGES } from '../lib/pages';
  * pages send signed-out visitors here (17.6). Try Demo fills the public demo credentials; the guest then presses Sign In, which starts an
  * isolated temporary demo (17.5) without calling Supabase. After a demo is signed out, the details are
  * already filled in. On a site without Supabase settings the form only starts the demo.
- * Google and email-confirmation redirects come back here: a failed one shows its message, and a
- * Try Admin Demo (17.10) does the same with the Admin demo's credentials. A successful one opens the file workspace. Signing in to an account leaves a demo open in this tab; just opening
- * this page does not. onSignedIn opens it; tests pass their own.
+ * Try Admin Demo (17.10) does the same with the Admin demo's credentials. Google and email-confirmation
+ * redirects come back here: a failed one shows its message and a successful one opens the file workspace.
+ * Signing in to an account leaves a demo open in this tab; just opening this page does not. onSignedIn opens
+ * it; tests pass their own.
  */
 export function SignInPage({ onSignedIn = () => window.location.assign('/') }: { onSignedIn?: () => void }) {
   const { account, hasSession, signOut } = useAccount();

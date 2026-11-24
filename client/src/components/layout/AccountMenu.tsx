@@ -24,7 +24,7 @@ export function initials(name: string | null | undefined, email: string): string
  * The account at the right end of the header (build-plan 17.2b, 17.9): a Sign in link when signed out, and a
  * menu with the name, role and Sign out when signed in. Nothing shows on a site without sign-in or while the
  * session loads. The role is shown here; AccessGate and trusted code apply it. A demo guest (17.5) sees
- * "Demo guest" and Sign out, which discards the demo. Any signed-in account can export the files kept in this browser.
+ * "Demo guest" ("Demo Admin" for an Admin demo, 17.10) and Sign out, which discards the demo. Any signed-in account can export the files kept in this browser.
  */
 export function AccountMenu({ account, actionError, signOut, saveName }: AccountApi) {
   const [namePromptDismissed, setNamePromptDismissed] = useState(false);

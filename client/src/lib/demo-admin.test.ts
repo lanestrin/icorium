@@ -1,15 +1,17 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AdminAction, Invitation } from './admin';
-import { DEMO_ADMIN_DATA_KEY } from './demo';
-import { DEMO_LIMIT_MESSAGE, DEMO_STORAGE_FAILED_MESSAGE, DEMO_YOU_ID, demoAdmin, demoAdminList, MAX_DEMO_INVITATIONS } from './demo-admin';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Account, AdminAction, Invitation } from './admin';
+import { DEMO_ADMIN_DATA_KEY, DEMO_SESSION_KEY, DEMO_STORAGE_MESSAGE } from './demo';
+import { DEMO_LIMIT_MESSAGE, DEMO_YOU_ID, demoAdmin, MAX_DEMO_INVITATIONS } from './demo-admin';
 
-const S = 'session-a';
+const S = '11111111-1111-4111-8111-111111111111';
+const OTHER = '22222222-2222-4222-8222-222222222222';
 const NOW = Date.parse('2026-11-24T12:00:00Z');
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const run = (request: AdminAction, session = S) => demoAdmin<any>(request, session, NOW);
-const list = () => demoAdminList(S, NOW);
+const list = () => (run({ action: 'list' }) as { data: { accounts: Account[]; invitations: Invitation[] } }).data;
 const invitation = (email: string) => list().invitations.find((i) => i.email === email) as Invitation;
 
+beforeEach(() => sessionStorage.setItem(DEMO_SESSION_KEY, S)); // the tab's demo, as the Admin page runs in one
 afterEach(() => { sessionStorage.clear(); vi.restoreAllMocks(); });
 
 describe('the Admin demo backend', () => {
@@ -75,30 +77,84 @@ describe('the Admin demo backend', () => {
     expect(run({ action: 'setRole', userId: DEMO_YOU_ID, role: 'Member' })).toMatchObject({ ok: true, data: { role: 'Member' } });
   });
 
-  it('keeps changes for this session, and replaces them for another', () => {
+  it('keeps changes for this session, and starts again for a new demo', () => {
     run({ action: 'revoke', id: 'demo-inv-1' });
     expect(invitation('lee.park@demo.example').state).toBe('revoked');
-    expect(demoAdminList('another-session', NOW).invitations.find((i) => i.email === 'lee.park@demo.example')?.state).toBe('pending');
+    sessionStorage.setItem(DEMO_SESSION_KEY, OTHER); // a new demo in this tab
+    const fresh = (run({ action: 'list' }, OTHER) as { data: { invitations: Invitation[] } }).data;
+    expect(fresh.invitations.find((i) => i.email === 'lee.park@demo.example')?.state).toBe('pending');
+  });
+
+  it('keeps the fictional dates fixed from the first read, so later reads do not move them', () => {
+    const first = demoAdmin<{ accounts: Account[] }>({ action: 'list' }, S, NOW).ok && sessionStorage.getItem(DEMO_ADMIN_DATA_KEY);
+    expect(first).toBeTruthy(); // saved at once
+    const later = demoAdmin<{ accounts: Account[] }>({ action: 'list' }, S, NOW + 5 * 86_400_000);
+    expect(JSON.stringify(later.ok && later.data.accounts.map((a) => a.created_at))).toBe(JSON.stringify(JSON.parse(first as string).accounts.map((a: Account) => a.created_at)));
+  });
+
+  it('still lists when the browser refuses the first save, and reports it on the next change', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('full'); });
+    expect(run({ action: 'list' })).toMatchObject({ ok: true });
+    expect(run({ action: 'revoke', id: 'demo-inv-1' })).toMatchObject({ ok: false, code: 'storage' });
+  });
+
+  it('lists accounts oldest first and invitations newest first', () => {
+    list();
+    const stored = JSON.parse(sessionStorage.getItem(DEMO_ADMIN_DATA_KEY) as string);
+    stored.accounts.reverse(); // saved out of order, so only sorting can put them right
+    sessionStorage.setItem(DEMO_ADMIN_DATA_KEY, JSON.stringify(stored));
+    const { accounts, invitations } = list();
+    const times = (rows: { created_at: string }[]) => rows.map((r) => Date.parse(r.created_at));
+    expect(times(accounts)).toEqual([...times(accounts)].sort((a, b) => a - b));
+    expect(times(invitations)).toEqual([...times(invitations)].sort((a, b) => b - a));
+  });
+
+  it('gives a new invitation 30 days', () => {
+    expect(run({ action: 'invite', email: 'fresh@demo.example', role: 'Member' })).toMatchObject({ ok: true, data: { expires_at: new Date(NOW + 30 * 86_400_000).toISOString() } });
+  });
+
+  it('does nothing once the demo has ended: every action is refused and nothing is written back', () => {
+    list();
+    sessionStorage.removeItem(DEMO_ADMIN_DATA_KEY);
+    sessionStorage.removeItem(DEMO_SESSION_KEY); // sign-out has dropped the session while it deletes the files
+    const requests: AdminAction[] = [
+      { action: 'list' }, { action: 'invite', email: 'late@demo.example', role: 'Member' }, { action: 'resend', id: 'demo-inv-1' },
+      { action: 'extend', id: 'demo-inv-2' }, { action: 'revoke', id: 'demo-inv-1' },
+      { action: 'setRole', userId: 'demo-noah', role: 'Admin' }, { action: 'deactivate', userId: 'demo-noah' }, { action: 'reactivate', userId: 'demo-priya' },
+    ];
+    for (const request of requests) expect(run(request), request.action).toMatchObject({ ok: false, code: 'not_admin' });
+    expect(sessionStorage.getItem(DEMO_ADMIN_DATA_KEY)).toBeNull();
   });
 
   it.each([
     'not json',
     '{}',
-    '{"sessionId":"session-a","accounts":"x","invitations":[]}',
+    JSON.stringify({ sessionId: S, accounts: 'x', invitations: [] }),
     JSON.stringify({ sessionId: S, accounts: [{ user_id: 'x', role: 'Root' }], invitations: [] }),
-  ])('starts again from fresh data when the stored data is %s', (stored) => {
+    'DAMAGED_DATES',
+  ])('starts again from fresh data when the stored data is %s', (stored: string) => {
+    if (stored === 'DAMAGED_DATES') {
+      list(); // saves fresh data
+      const data = JSON.parse(sessionStorage.getItem(DEMO_ADMIN_DATA_KEY) as string);
+      data.invitations[0].expires_at = 'tomorrow';
+      stored = JSON.stringify(data);
+    }
     sessionStorage.setItem(DEMO_ADMIN_DATA_KEY, stored);
-    expect(list().accounts.map((a) => a.user_id)).toContain(DEMO_YOU_ID);
+    const restored = list();
+    expect(restored.accounts.map((a) => a.user_id)).toContain(DEMO_YOU_ID);
+    expect(restored.invitations.find((i) => i.id === 'demo-inv-1')?.expires_at).toBe(new Date(NOW + 25 * 86_400_000).toISOString());
     expect(run({ action: 'list' })).toMatchObject({ ok: true });
   });
 
-  it('reports a failed save instead of success', () => {
+  it('reports a failed save with the demo storage message instead of success', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('full'); });
-    expect(run({ action: 'revoke', id: 'demo-inv-1' })).toEqual({ ok: false, code: 'storage', message: DEMO_STORAGE_FAILED_MESSAGE });
+    expect(run({ action: 'revoke', id: 'demo-inv-1' })).toEqual({ ok: false, code: 'storage', message: DEMO_STORAGE_MESSAGE });
+    expect(run({ action: 'invite', email: 'x@demo.example', role: 'Member' })).toEqual({ ok: false, code: 'storage', message: DEMO_STORAGE_MESSAGE });
   });
 
   it('holds at most 50 invitations', () => {
     for (let i = list().invitations.length; i < MAX_DEMO_INVITATIONS; i++) expect(run({ action: 'invite', email: `p${i}@demo.example`, role: 'Member' })).toMatchObject({ ok: true });
     expect(run({ action: 'invite', email: 'one.more@demo.example', role: 'Member' })).toEqual({ ok: false, code: 'demo_limit', message: DEMO_LIMIT_MESSAGE });
+    expect(DEMO_LIMIT_MESSAGE).toBe('This demo holds up to 50 invitations. To start over, sign out and start the Admin demo again.');
   });
 });

@@ -13,7 +13,7 @@ const currentPath = () => window.location.pathname.replace(/\/+$/, '');
 
 /**
  * The frame of every app page (build-plan 17.9): the header, the left navigation and the page's content.
- * The page passes the account its gate read. Generator and Architecture links show only to an active Admin. title and intro are the workspace's "Dashboard" heading in
+ * The page passes the account its gate read. Generator and Architecture links show only to an active Admin or an Admin demo (17.10). title and intro are the workspace's "Dashboard" heading in
  * the header; other pages keep their own heading in their content. onNavigate lets the current page apply a
  * navigation entry that points at itself (scroll, focus, filter) instead of reloading; it gets the entry's section.
  */
