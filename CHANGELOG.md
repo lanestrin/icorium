@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.21.1](https://github.com/lanestrin/icorium/compare/v2.21.0...v2.21.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* correct the Admin demo's messages, dates and sign-out ([#186](https://github.com/lanestrin/icorium/issues/186)) ([b950c1f](https://github.com/lanestrin/icorium/commit/b950c1f11434080254620fb06e25d5e439199b7d))
+
 ## [2.21.0](https://github.com/lanestrin/icorium/compare/v2.20.1...v2.21.0) (2026-11-24)
 
 
