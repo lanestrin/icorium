@@ -94,6 +94,17 @@
   }
 }
 
+// Try Demo and Try Admin Demo side by side, stacked when the card is too narrow for both.
+.demos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+
+  .demo {
+    flex: 1 1 10rem;
+  }
+}
+
 .filesLink {
   font-weight: var(--app-weight-medium);
   color: var(--app-color-link);

@@ -75,8 +75,8 @@ part of a code change:
 Signed out, open `/` and check it goes to `/sign-in`; open `/activate` and
 `/reset-password`. Start Try Demo, or sign in, then upload a CSV, process, preview,
 compare and download it, then refresh and see the files are still there. As an Admin, open
-`/admin`, `/generator` and `/architecture`; as a Member or demo guest, check they
-say Admins only. The browser's Network tab shows no `/api` requests. A PR's Vercel Preview is the
+`/admin`, `/generator` and `/architecture`; as a Member or a standard Try Demo guest, check they
+say Admins only (an Admin demo opens them with fictional data). The browser's Network tab shows no `/api` requests. A PR's Vercel Preview is the
 first real check of a `vercel.json` change; the repository's tests do not
 exercise Vercel.
 

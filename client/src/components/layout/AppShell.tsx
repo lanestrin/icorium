@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { HelpCircle, Menu, Network, UploadCloud, Wand2, X } from 'lucide-react';
-import { isActiveAdmin } from '../../hooks/useAccount';
+import { canSeeAdminPages } from '../../hooks/useAccount';
 import { entryHref, HELP_URL, type AdminSection, type NavEntry, type WorkspaceSection } from '../../lib/navigation';
 import { PAGES } from '../../lib/pages';
 import page from '../../styles/page.module.scss';
@@ -30,7 +30,7 @@ export function AppShell({ account, title, intro, onNavigate, children }: {
   // and when it closes it would pull focus back to Menu, so the page could not move focus to its section.
   const afterClose = useRef<(() => void) | null>(null);
   const path = currentPath();
-  const isAdmin = isActiveAdmin(account.account);
+  const isAdmin = canSeeAdminPages(account.account);
 
   useEffect(() => {
     const update = () => setHash(window.location.hash);

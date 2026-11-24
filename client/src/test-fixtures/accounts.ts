@@ -6,7 +6,7 @@ import type { AccountState, Profile } from '../hooks/useAccount';
 
 export const DEMO_SESSION = '11111111-1111-4111-8111-111111111111';
 
-export const demo: AccountState = { status: 'demo', sessionId: DEMO_SESSION };
+export const demo: AccountState = { status: 'demo', sessionId: DEMO_SESSION, kind: 'standard' };
 export const signedIn = (profile: Partial<Profile> | null = {}, userId = 'user-1'): AccountState => ({
   status: 'signed-in', userId, email: 'ada@example.com', profile: profile && { name: 'Ada', role: 'Member', active: true, ...profile },
 });

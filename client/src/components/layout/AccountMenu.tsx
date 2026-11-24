@@ -43,7 +43,7 @@ export function AccountMenu({ account, actionError, signOut, saveName }: Account
   let letters = '';
   if (account.status === 'error') primary = account.message;
   else if (account.status === 'demo') {
-    primary = 'Demo guest';
+    primary = account.kind === 'admin' ? 'Demo Admin' : 'Demo guest';
     secondary = 'Temporary demo';
     letters = 'D';
   }

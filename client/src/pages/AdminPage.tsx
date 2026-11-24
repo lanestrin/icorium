@@ -9,7 +9,9 @@ import { Modal } from '../components/modals/Modal';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import type { AccountApi } from '../components/layout/AccountMenu';
+import { isAdminDemo } from '../hooks/useAccount';
 import { useHashSection } from '../hooks/useHashSection';
+import { demoAdmin, DEMO_YOU_ID } from '../lib/demo-admin';
 import { callAdmin, NOT_ADMIN_CODE, type Account, type AdminAction, type AdminList, type Invitation, type Role } from '../lib/admin';
 import { ADMIN_HASHES, showAndFocus, type AdminSection, type WorkspaceSection } from '../lib/navigation';
 import page from '../styles/page.module.scss';
@@ -25,7 +27,15 @@ type Confirmation = { title: string; text: string; label: string; run: () => voi
  * Admins see account and invitation details, never files.
  */
 export function AdminPage({ account }: { account: AccountApi }) {
-  const currentUserId = account.account.status === 'signed-in' ? account.account.userId : '';
+  const demoSession = account.account.status === 'demo' && isAdminDemo(account.account) ? account.account.sessionId : null;
+  const demo = demoSession !== null;
+  const currentUserId = account.account.status === 'signed-in' ? account.account.userId : demo ? DEMO_YOU_ID : '';
+  // An Admin demo (17.10) uses the fictional backend and never the Admin function; a real Admin never uses it.
+  const send = useCallback(
+    <T,>(request: AdminAction) => (demoSession ? Promise.resolve(demoAdmin<T>(request, demoSession)) : callAdmin<T>(request)),
+    [demoSession],
+  );
+  const simulated = (text: string) => (demo ? `${text} (simulated)` : text);
 
   const [list, setList] = useState<ListState>({ status: 'loading' });
   const [busy, setBusy] = useState(false);
@@ -36,12 +46,12 @@ export function AdminPage({ account }: { account: AccountApi }) {
 
   const load = useCallback(async () => {
     const request = ++latest.current;
-    const result = await callAdmin<AdminList>({ action: 'list' });
+    const result = await send<AdminList>({ action: 'list' });
     if (request !== latest.current) return;
     if (result.ok) setList({ status: 'ready', data: result.data });
     else if (result.code === NOT_ADMIN_CODE) setLostAccess(true);
     else setList({ status: 'error', message: result.message });
-  }, []);
+  }, [send]);
 
   useEffect(() => {
     void load();
@@ -54,7 +64,7 @@ export function AdminPage({ account }: { account: AccountApi }) {
   async function run<T>(request: AdminAction, success: (data: T) => string): Promise<boolean> {
     setBusy(true);
     setNotice(null);
-    const result = await callAdmin<T>(request);
+    const result = await send<T>(request);
     if (result.ok) setNotice({ tone: 'success', text: success(result.data) });
     else if (result.code === NOT_ADMIN_CODE) setLostAccess(true);
     else setNotice({ tone: 'error', text: result.message });
@@ -64,24 +74,27 @@ export function AdminPage({ account }: { account: AccountApi }) {
     return result.ok;
   }
 
-  const ask = (title: string, text: string, label: string, action: () => void) => setConfirm({ title, text, label, run: action });
+  const ask = (title: string, text: string, label: string, action: () => void) =>
+    setConfirm({ title, text: demo ? `${text} In this demo only the fictional list changes.` : text, label, run: action });
+  // Changing your own fictional row never changes the demo's access; say what a real account would do.
+  const ownRow = (acct: Account) => (demo && acct.user_id === DEMO_YOU_ID ? '. On a real account this would change your own Admin access; the demo stays open.' : '');
 
-  const invite = (email: string, role: Role) => run<Invitation>({ action: 'invite', email, role }, () => `Invitation sent to ${email}`);
-  const resend = (inv: Invitation) => void run({ action: 'resend', id: inv.id }, () => `Invitation sent again to ${inv.email}`);
-  const extend = (inv: Invitation) => void run<Invitation>({ action: 'extend', id: inv.id }, (data) => `Invitation to ${inv.email} now expires on ${formatDate(data.expires_at)}`);
+  const invite = (email: string, role: Role) => run<Invitation>({ action: 'invite', email, role }, () => (demo ? `Invitation to ${email} simulated. No email was sent.` : `Invitation sent to ${email}`));
+  const resend = (inv: Invitation) => void run({ action: 'resend', id: inv.id }, () => (demo ? `Invitation to ${inv.email} simulated again. No email was sent.` : `Invitation sent again to ${inv.email}`));
+  const extend = (inv: Invitation) => void run<Invitation>({ action: 'extend', id: inv.id }, (data) => simulated(`Invitation to ${inv.email} now expires on ${formatDate(data.expires_at)}`));
   const revoke = (inv: Invitation) =>
     ask('Revoke invitation?', `${inv.email} will no longer be able to activate an account with this invitation.`, 'Revoke', () =>
-      void run({ action: 'revoke', id: inv.id }, () => `Invitation to ${inv.email} revoked`));
+      void run({ action: 'revoke', id: inv.id }, () => simulated(`Invitation to ${inv.email} revoked`)));
   const toggleRole = (acct: Account) => {
     const role: Role = acct.role === 'Admin' ? 'Member' : 'Admin';
     ask(`Make ${role}?`, `${acct.email} will be ${role === 'Admin' ? 'able to administer the app' : 'no longer able to administer the app'}.`, `Make ${role}`, () =>
-      void run({ action: 'setRole', userId: acct.user_id, role }, () => `${acct.email} is now ${role}`));
+      void run({ action: 'setRole', userId: acct.user_id, role }, () => simulated(`${acct.email} is now ${role}`) + ownRow(acct)));
   };
   const toggleActive = (acct: Account) => {
     if (acct.active)
       ask('Deactivate account?', `${acct.email} will be signed out and blocked from the app. Their files are kept.`, 'Deactivate', () =>
-        void run({ action: 'deactivate', userId: acct.user_id }, () => `${acct.email} deactivated`));
-    else void run({ action: 'reactivate', userId: acct.user_id }, () => `${acct.email} reactivated`);
+        void run({ action: 'deactivate', userId: acct.user_id }, () => simulated(`${acct.email} deactivated`) + ownRow(acct)));
+    else void run({ action: 'reactivate', userId: acct.user_id }, () => simulated(`${acct.email} reactivated`));
   };
 
   // The navigation's Admin entries: Invitations opens the invite card, Users and Access & Roles the account list
@@ -98,6 +111,11 @@ export function AdminPage({ account }: { account: AccountApi }) {
 
     return (
       <>
+        {demo && (
+          <p role="note" className={styles.notice}>
+            Admin demo: the people and invitations here are fictional. Nothing is emailed and no real account changes.
+          </p>
+        )}
         {notice && <Banner tone={notice.tone} onDismiss={() => setNotice(null)}>{notice.text}</Banner>}
         <Card as="section" className={styles.section} aria-labelledby="invite-heading">
           <h2 id="invite-heading" tabIndex={-1} className={styles.heading}>Invite someone</h2>

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
 import { openBrowserStorage } from '../lib/browser-storage';
-import { BROWSER_DB, DEMO_SESSION_KEY, demoDbName, startDemo } from '../lib/demo';
+import { BROWSER_DB, DEMO_KIND_KEY, DEMO_SESSION_KEY, demoDbName, startDemo } from '../lib/demo';
 import { isActiveAdmin, useAccount, type AccountState, type Profile } from './useAccount';
 
 vi.mock('../lib/supabase', () => ({ getSupabase: vi.fn(), isAuthConfigured: vi.fn(() => true) }));
@@ -134,17 +134,45 @@ describe('useAccount demo', () => {
     setUp({ session: fakeSession(), profile: active });
     const id = startDemo();
     const { result } = renderHook(() => useAccount());
-    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id }));
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id, kind: 'standard' }));
     expect(isActiveAdmin(result.current.account)).toBe(false);
     await waitFor(() => expect(result.current.hasSession).toBe(true)); // the sign-in page leaves the demo by this
     expect(result.current.account.status).toBe('demo');
+  });
+
+  it('reports an Admin demo as such', async () => {
+    setUp({ session: null });
+    const id = startDemo(undefined, undefined, 'admin');
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id, kind: 'admin' }));
+  });
+
+  it('a duplicated Admin demo tab that loses the lock is neither a demo nor an Admin demo', async () => {
+    setUp({});
+    startDemo(undefined, undefined, 'admin');
+    vi.stubGlobal('navigator', { ...navigator, locks: { request: async (_n: string, _o: unknown, cb: (l: null) => void) => cb(null) } });
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'signed-out' }), { timeout: 4000 });
+    expect(sessionStorage.getItem(DEMO_KIND_KEY)).toBeNull();
+  });
+
+  it('opens sign-in after an Admin demo with the Admin demo marker', async () => {
+    setUp({ session: null });
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    startDemo(undefined, undefined, 'admin');
+    const { result } = renderHook(() => useAccount());
+    await waitFor(() => expect(result.current.account.status).toBe('demo'));
+    await act(async () => { await result.current.signOut(); });
+    expect(assign).toHaveBeenCalledWith('/sign-in?demo-ended=admin');
+    expect(sessionStorage.getItem(DEMO_KIND_KEY)).toBeNull();
   });
 
   it('reports the demo on a site without Supabase settings', async () => {
     vi.mocked(isAuthConfigured).mockReturnValue(false);
     const id = startDemo();
     const { result } = renderHook(() => useAccount());
-    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id }));
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id, kind: 'standard' }));
   });
 
   it('gives up a demo whose lock another tab holds (a duplicated tab) without deleting anything', async () => {
@@ -169,7 +197,7 @@ describe('useAccount demo', () => {
     vi.stubGlobal('location', { ...window.location, assign: vi.fn() });
     const id = startDemo();
     const { result } = renderHook(() => useAccount(), { wrapper: StrictMode });
-    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id }), { timeout: 4000 });
+    await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id, kind: 'standard' }), { timeout: 4000 });
     expect(sessionStorage.getItem(DEMO_SESSION_KEY)).toBe(id);
     await act(async () => { await result.current.signOut(); }); // lets go of the lock for the next test
   });

@@ -11,7 +11,8 @@ The steps below describe the setup; repeating any of them on a project still
 needs the person's authorization.
 
 The app requires sign-in (17.6): the workspace needs an active profile or a
-guest demo, and the Admin, Architecture and Generator pages an active Admin.
+guest demo, and the Admin, Architecture and Generator pages an active Admin or an
+Admin demo (17.10), which is browser-only with fictional data and never reaches Supabase.
 
 ## Hosted status
 
