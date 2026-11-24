@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.21.0](https://github.com/lanestrin/icorium/compare/v2.20.1...v2.21.0) (2026-11-24)
+
+
+### Features
+
+* add an Admin demo with fictional data (17.10) ([#184](https://github.com/lanestrin/icorium/issues/184)) ([b6301b9](https://github.com/lanestrin/icorium/commit/b6301b97c0a90fd0012bd2cc043bfe1f244e9ad3))
+
 ## [2.20.1](https://github.com/lanestrin/icorium/compare/v2.20.0...v2.20.1) (2026-11-24)
 
 
