@@ -170,14 +170,11 @@ describe('SignInPage', () => {
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
   });
 
-  it('shows what the workspace offers and the privacy note', async () => {
+  it('shows one sign-in card, without the workspace panel or Admin links', async () => {
     setUp();
     render(<SignInPage onSignedIn={vi.fn()} />);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Sign in to your workspace' })).toBeInTheDocument();
-    for (const title of ['Admin invitations', 'Private workspace', 'Demo access', 'Role-based access']) {
-      expect(screen.getByText(title)).toBeInTheDocument();
-    }
-    expect(screen.getByText(/Admins cannot read members' file contents/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome back' })).toBeInTheDocument();
+    expect(screen.queryByText('Admin invitations')).not.toBeInTheDocument();
     expect(screen.queryByText(/stay in this browser for now/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /CSV Generator/ })).not.toBeInTheDocument(); // Admin pages (17.6)
     expect(screen.queryByRole('link', { name: /Architecture/ })).not.toBeInTheDocument();
@@ -250,6 +247,102 @@ describe('SignInPage', () => {
     expect(screen.queryByRole('button', { name: 'Try Demo' })).not.toBeInTheDocument();
   });
 
+  describe('with a demo open in this tab', () => {
+    const ada = { session: fakeSession(), profile: { name: 'Ada', role: 'Admin' as const, active: true } };
+
+    it('leaves the demo and opens the files once when Google signs an account in', async () => {
+      setUp(ada);
+      startDemo();
+      window.history.replaceState(null, '', '/sign-in?code=abc');
+      let demoAtOpen: string | null = 'not opened';
+      const onSignedIn = vi.fn(() => { demoAtOpen = currentDemoId(); });
+      render(<SignInPage onSignedIn={onSignedIn} />);
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+      expect(demoAtOpen).toBeNull(); // already left, so the workspace that opens is the account's
+    });
+
+    it('keeps the demo when the code was never exchanged, even though an account session exists', async () => {
+      const fake = setUp({ ...ada, keepCode: true });
+      const id = startDemo();
+      window.history.replaceState(null, '', '/sign-in?code=stale');
+      const onSignedIn = vi.fn();
+      render(<SignInPage onSignedIn={onSignedIn} />);
+      expect(await screen.findByText(/A demo is open in this tab/)).toBeInTheDocument();
+      await waitFor(() => expect(fake.maybeSingle).toHaveBeenCalled());
+      expect(currentDemoId()).toBe(id);
+      expect(onSignedIn).not.toHaveBeenCalled();
+    });
+
+    it('leaves the demo when Google signs in but the profile cannot be read', async () => {
+      setUp({ session: fakeSession(), profileError: { name: 'AuthRetryableFetchError', status: 0 } });
+      startDemo();
+      window.history.replaceState(null, '', '/sign-in?code=abc');
+      const onSignedIn = vi.fn();
+      render(<SignInPage onSignedIn={onSignedIn} />);
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+      expect(currentDemoId()).toBeNull();
+    });
+
+    it('keeps the demo and shows the error when the redirect failed', async () => {
+      const fake = setUp(ada);
+      const id = startDemo();
+      window.history.replaceState(null, '', '/sign-in?code=abc&error=access_denied&error_code=otp_expired');
+      const onSignedIn = vi.fn();
+      render(<SignInPage onSignedIn={onSignedIn} />);
+      expect(await screen.findByText(/A demo is open in this tab/)).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('This link has expired');
+      await waitFor(() => expect(fake.maybeSingle).toHaveBeenCalled());
+      expect(currentDemoId()).toBe(id);
+      expect(onSignedIn).not.toHaveBeenCalled();
+    });
+
+    it('keeps the demo on a plain visit, even with a session, and hides the invitation items', async () => {
+      const fake = setUp(ada);
+      const id = startDemo();
+      const onSignedIn = vi.fn();
+      render(<SignInPage onSignedIn={onSignedIn} />);
+      expect(await screen.findByRole('button', { name: 'Sign out of demo' })).toBeInTheDocument();
+      await waitFor(() => expect(fake.maybeSingle).toHaveBeenCalled());
+      expect(currentDemoId()).toBe(id);
+      expect(onSignedIn).not.toHaveBeenCalled();
+      expect(screen.queryByText('Use invitation link')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Need access\?/)).not.toBeInTheDocument();
+    });
+
+    it('signs out of the demo', async () => {
+      const quiet = vi.spyOn(console, 'error').mockImplementation(() => {}); // jsdom reports the navigation it can't do
+      setUp();
+      startDemo();
+      const user = userEvent.setup();
+      render(<SignInPage onSignedIn={vi.fn()} />);
+      await user.click(await screen.findByRole('button', { name: 'Sign out of demo' }));
+      await waitFor(() => expect(currentDemoId()).toBeNull());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      quiet.mockRestore();
+    });
+
+    it('leaves a demo started after the page loaded when a password signs in', async () => {
+      setUp();
+      const onSignedIn = vi.fn();
+      const user = userEvent.setup();
+      render(<SignInPage onSignedIn={onSignedIn} />);
+      await screen.findByLabelText('Email');
+      startDemo(); // as when the browser goes Back to a kept sign-in page
+      await fillAndSubmit(user);
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+      expect(currentDemoId()).toBeNull();
+    });
+  });
+
+  it('hides the invitation items from a signed-in person', async () => {
+    setUp({ session: fakeSession(), profile: { name: 'Ada', role: 'Member', active: true } });
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByText(/You're signed in as Ada/)).toBeInTheDocument();
+    expect(screen.queryByText('Use invitation link')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Invitations expire/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Need access\?/)).not.toBeInTheDocument();
+  });
+
   it('does not start a demo for other credentials', async () => {
     const fake = setUp();
     const user = userEvent.setup();
@@ -266,6 +359,9 @@ describe('SignInPage', () => {
     render(<SignInPage onSignedIn={onSignedIn} />);
     expect(screen.getByText("Sign-in isn't set up on this site yet.")).toBeInTheDocument();
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument();
+    expect(screen.queryByText('Use invitation link')).not.toBeInTheDocument(); // no accounts exist here
+    expect(screen.queryByText(/Need access?/)).not.toBeInTheDocument();
+    expect(screen.getByText('Try the demo with sample files.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Try Demo' }));
     expect(screen.queryByRole('button', { name: 'Continue with Google' })).not.toBeInTheDocument(); // it could only spin
     await user.clear(screen.getByLabelText('Email'));

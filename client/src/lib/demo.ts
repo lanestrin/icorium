@@ -133,6 +133,17 @@ export async function endDemo(id: string, store: Pick<Storage, 'removeItem'> | n
 }
 
 /**
+ * Leaves the demo because the person has signed in to an account. A duplicated tab, whose demo another tab holds,
+ * only forgets the ID, so the other tab's files stay.
+ */
+export async function leaveDemo(locks: LockManagerLike | null = defaultLocks()): Promise<void> {
+  const id = currentDemoId();
+  if (!id) return;
+  if (await claimDemoLock(id, locks)) await endDemo(id);
+  else dropDemoId();
+}
+
+/**
  * Deletes demo databases whose tab is gone: each candidate is deleted while holding its own lock, so a tab that
  * has just taken it is never deleted. Never deletes the browser workspace or the current tab's demo. Skipped when
  * the browser can't list databases or take locks.

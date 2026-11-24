@@ -130,12 +130,14 @@ describe('useAccount', () => {
 describe('useAccount demo', () => {
   afterEach(() => { sessionStorage.clear(); vi.unstubAllGlobals(); });
 
-  it('reports the demo, even when Supabase has a signed-in session, and never reads the profile', async () => {
+  it('reports the demo, even when Supabase has a signed-in session, which it only notes', async () => {
     setUp({ session: fakeSession(), profile: active });
     const id = startDemo();
     const { result } = renderHook(() => useAccount());
     await waitFor(() => expect(result.current.account).toEqual({ status: 'demo', sessionId: id }));
     expect(isActiveAdmin(result.current.account)).toBe(false);
+    await waitFor(() => expect(result.current.hasSession).toBe(true)); // the sign-in page leaves the demo by this
+    expect(result.current.account.status).toBe('demo');
   });
 
   it('reports the demo on a site without Supabase settings', async () => {

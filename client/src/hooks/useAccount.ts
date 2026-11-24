@@ -29,6 +29,7 @@ export const isActiveAdmin = (account: AccountState) =>
  *
  * A tab that started the guest demo (17.5) reports status 'demo' instead, whatever Supabase says: the demo has no
  * account and never opens the cloud. A duplicated tab that finds its demo held by another tab gives the demo up.
+ * hasSession says whether Supabase has a session, even behind a demo or before the profile is read, so the sign-in page can leave the demo.
  */
 export function useAccount() {
   const [account, setAccount] = useState<AccountState>(() => (isAuthConfigured() ? { status: 'loading' } : { status: 'unconfigured' }));
@@ -36,6 +37,7 @@ export function useAccount() {
     const id = currentDemoId();
     return id ? { id, claimed: false } : null;
   });
+  const [hasSession, setHasSession] = useState(false);
   const [recovering, setRecovering] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const client = useRef<SupabaseClient | null>(null);
@@ -82,6 +84,7 @@ export function useAccount() {
         const { data } = supabase.auth.onAuthStateChange((event, session) => {
           if (event === 'PASSWORD_RECOVERY') setRecovering(true);
           const request = ++latest;
+          setHasSession(session !== null);
           if (!session) {
             setAccount({ status: 'signed-out' });
             return;
@@ -139,5 +142,5 @@ export function useAccount() {
   }, [account]);
 
   const visible: AccountState = demo ? (demo.claimed ? { status: 'demo', sessionId: demo.id } : { status: 'loading' }) : account;
-  return { account: visible, recovering, actionError, signOut, saveName };
+  return { account: visible, hasSession, recovering, actionError, signOut, saveName };
 }

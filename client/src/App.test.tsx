@@ -90,10 +90,10 @@ describe('App pages', () => {
   });
 
   it.each([
-    ['/sign-in', 'Sign in to your workspace'],
+    ['/sign-in', 'Welcome back'],
     ['/activate', 'Activate your account'],
     ['/reset-password', 'Reset your password'],
-    ['/sign-in/', 'Sign in to your workspace'],
+    ['/sign-in/', 'Welcome back'],
   ])('keeps %s public', async (path, heading) => {
     open(path);
     expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
