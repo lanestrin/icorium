@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { authErrorMessage, cleanName, NAME_MAX } from '../lib/auth';
+import { claimDemoLock, currentDemoId, dropDemoId, endDemo, sweepStaleDemos } from '../lib/demo';
+import { PAGES } from '../lib/pages';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 
 /** A signed-in person's own row in public.profiles (17.2a). null means the account isn't activated yet. */
@@ -11,6 +13,7 @@ export type AccountState =
   | { status: 'loading' }
   | { status: 'signed-out' }
   | { status: 'signed-in'; userId: string; email: string; profile: Profile | null }
+  | { status: 'demo'; sessionId: string }
   | { status: 'error'; message: string };
 
 /** True only for an active Admin. A display hint for links: access itself is enforced by trusted code. */
@@ -23,12 +26,37 @@ export const isActiveAdmin = (account: AccountState) =>
  *
  * recovering turns true when the page was opened from a password-reset link (the PASSWORD_RECOVERY
  * event), so the reset page can ask for the new password.
+ *
+ * A tab that started the guest demo (17.5) reports status 'demo' instead, whatever Supabase says: the demo has no
+ * account and never opens the cloud. A duplicated tab that finds its demo held by another tab gives the demo up.
  */
 export function useAccount() {
   const [account, setAccount] = useState<AccountState>(() => (isAuthConfigured() ? { status: 'loading' } : { status: 'unconfigured' }));
+  const [demo, setDemo] = useState<{ id: string; claimed: boolean } | null>(() => {
+    const id = currentDemoId();
+    return id ? { id, claimed: false } : null;
+  });
   const [recovering, setRecovering] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const client = useRef<SupabaseClient | null>(null);
+
+  // Takes this tab's demo lock; a tab that doesn't get it (a duplicate) drops the copied demo ID, deleting nothing.
+  useEffect(() => {
+    if (!demo || demo.claimed) return;
+    let cancelled = false;
+    void claimDemoLock(demo.id).then((ok) => {
+      if (cancelled) return;
+      if (ok) setDemo({ id: demo.id, claimed: true });
+      else {
+        dropDemoId();
+        setDemo(null);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [demo]);
+
+  // Removes demo databases whose tab is gone.
+  useEffect(() => { void sweepStaleDemos(currentDemoId()); }, []);
 
   useEffect(() => {
     if (!isAuthConfigured()) return;
@@ -77,13 +105,20 @@ export function useAccount() {
   /** Signs out on this device only (other devices stay signed in). The auth event updates the state. */
   const signOut = useCallback(async () => {
     setActionError(null);
+    if (demo) {
+      // Ends this tab's demo and deletes its files; a Supabase session held by another tab is left alone.
+      // The demo state stays until the page unloads, so the open page never switches to another workspace first.
+      await endDemo(demo.id);
+      window.location.assign(PAGES.signIn);
+      return;
+    }
     try {
       const { error } = (await client.current?.auth.signOut({ scope: 'local' })) ?? { error: null };
       if (error) setActionError(authErrorMessage(error));
     } catch (error) {
       setActionError(authErrorMessage(error));
     }
-  }, []);
+  }, [demo]);
 
   /** Saves the person's own name. Resolves to an error message, or null when it was saved. */
   const saveName = useCallback(async (raw: string): Promise<string | null> => {
@@ -101,5 +136,6 @@ export function useAccount() {
     return null;
   }, [account]);
 
-  return { account, recovering, actionError, signOut, saveName };
+  const visible: AccountState = demo ? (demo.claimed ? { status: 'demo', sessionId: demo.id } : { status: 'loading' }) : account;
+  return { account: visible, recovering, actionError, signOut, saveName };
 }

@@ -12,12 +12,14 @@ export type WorkspaceChoice =
   | { kind: 'pending' }
   | { kind: 'browser' }
   | { kind: 'cloud'; userId: string }
+  | { kind: 'demo'; sessionId: string }
   | { kind: 'unavailable'; message: string };
 
 /** The workspace for an account: the cloud only for a signed-in, active account; the browser for everyone else (until 17.6). */
 export function workspaceChoice(account: AccountState): WorkspaceChoice {
   switch (account.status) {
     case 'loading': return { kind: 'pending' };
+    case 'demo': return { kind: 'demo', sessionId: account.sessionId };
     case 'error': return { kind: 'unavailable', message: UNAVAILABLE_FILES_MESSAGE };
     case 'signed-in': return account.profile?.active ? { kind: 'cloud', userId: account.userId } : { kind: 'browser' };
     default: return { kind: 'browser' };
@@ -25,4 +27,5 @@ export function workspaceChoice(account: AccountState): WorkspaceChoice {
 }
 
 /** Equal keys mean the same workspace. */
-export const workspaceKey = (choice: WorkspaceChoice) => (choice.kind === 'cloud' ? `cloud:${choice.userId}` : choice.kind);
+export const workspaceKey = (choice: WorkspaceChoice) =>
+  choice.kind === 'cloud' ? `cloud:${choice.userId}` : choice.kind === 'demo' ? `demo:${choice.sessionId}` : choice.kind;

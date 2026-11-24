@@ -173,8 +173,10 @@
   font-weight: var(--app-weight-medium);
 }
 
-// Try Demo is a link that looks like the outline button.
+// Try Demo is a button that looks like the outline button.
 .demo {
+  cursor: pointer;
+  font: inherit;
   display: inline-flex;
   align-items: center;
   justify-content: center;

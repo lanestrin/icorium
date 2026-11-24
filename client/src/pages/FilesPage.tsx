@@ -202,7 +202,7 @@ export function FilesPage() {
           selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
           storageMode={storageMode}
           onClearData={() => setConfirmClear(true)}
-          clearDisabled={workspace.choice.kind !== 'browser' || uploading || !!conversion.reading || !!processingId || archiving || clearing}
+          clearDisabled={(workspace.choice.kind !== 'browser' && workspace.choice.kind !== 'demo') || uploading || !!conversion.reading || !!processingId || archiving || clearing}
         />
 
         <div className={styles.main}>

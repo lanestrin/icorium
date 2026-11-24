@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileMeta } from '../../../shared/types';
@@ -45,6 +45,18 @@ describe('cloud workspace', () => {
     expect(await screen.findByText('Files are saved privately to your account and open on any device where you sign in.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Clear my data' })).not.toBeInTheDocument();
     expect(api.setWorkspace).toHaveBeenCalledWith({ kind: 'cloud', userId: 'user-1' });
+  });
+
+  it('says demo files are temporary, opens the demo workspace, and lets a guest clear it', async () => {
+    vi.mocked(api.storageMode).mockResolvedValue('demo');
+    account = { status: 'demo', sessionId: '11111111-1111-4111-8111-111111111111' };
+    render(<FilesPage />);
+    expect(await screen.findByText("Demo files are temporary. They're discarded when you sign out.")).toBeInTheDocument();
+    expect(api.setWorkspace).toHaveBeenCalledWith({ kind: 'demo', sessionId: '11111111-1111-4111-8111-111111111111' });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Clear my data' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clear my data' }));
+    await waitFor(() => expect(api.clearData).toHaveBeenCalledTimes(1));
   });
 
   it('keeps Clear my data and the browser workspace for a signed-out visitor', async () => {

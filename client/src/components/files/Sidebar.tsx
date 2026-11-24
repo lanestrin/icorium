@@ -97,6 +97,7 @@ interface SidebarProps {
 const STORAGE_NOTES: Record<StorageMode, string> = {
   saved: 'Files are kept only in this browser. Clearing your browser data removes them.',
   cloud: 'Files are saved privately to your account and open on any device where you sign in.',
+  demo: "Demo files are temporary. They're discarded when you sign out.",
   memory: "This browser isn't saving files. They'll be gone when you refresh or close this page.",
 };
 

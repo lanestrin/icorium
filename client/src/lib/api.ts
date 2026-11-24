@@ -5,6 +5,7 @@ import { httpError } from '../../../shared/csv';
 import type { Storage } from '../../../shared/storage';
 import { createMemoryStorage, openBrowserStorage, UPGRADE_BLOCKED_STATUS, type BrowserStorage } from './browser-storage';
 import { createCloudStorage, INACTIVE_MESSAGE, UNAVAILABLE_FILES_MESSAGE } from './cloud-storage';
+import { demoDbName } from './demo';
 import { workspaceKey, type WorkspaceChoice } from './workspace';
 import { SAMPLE_FILES } from './samples';
 import { getSupabase, isAuthConfigured } from './supabase';
@@ -17,11 +18,25 @@ export const UPLOAD_MAX_MB = 10;
 /** How long a download's object URL is kept before it is released, so the browser has time to start the download. */
 export const DOWNLOAD_URL_LIFETIME_MS = 60_000;
 
+/** Saves CSV text to the person's downloads under the given name. */
+export function saveCsv({ name, text }: { name: string; text: string }) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_LIFETIME_MS);
+}
+
 /**
  * saved: files are kept in IndexedDB on this device. memory: the browser blocked IndexedDB, so files last until a refresh.
  * cloud: a signed-in, active account's files, kept in its private Supabase workspace.
+ * demo: a guest's temporary files, kept in this tab's own browser database and discarded on sign-out.
  */
-export type StorageMode = 'saved' | 'memory' | 'cloud';
+export type StorageMode = 'saved' | 'memory' | 'cloud' | 'demo';
 export interface Workspace { storage: Storage; mode: StorageMode }
 
 /** Opens the signed-in account's cloud workspace, after the database confirms the account is active. */
@@ -56,7 +71,7 @@ export async function openWorkspace(name?: string): Promise<Workspace> {
  * a cloud workspace starts empty. setWorkspace follows the account: a change drops the old file service and its cache.
  */
 export function createApi(
-  open: () => Promise<Workspace>,
+  open: (name?: string) => Promise<Workspace>,
   openCloud: (userId: string) => Promise<Workspace> = openCloudWorkspace,
   initial: WorkspaceChoice = isAuthConfigured() ? { kind: 'pending' } : { kind: 'browser' },
 ) {
@@ -71,8 +86,9 @@ export function createApi(
     if (choice.kind === 'pending') return settled.then(opened); // actions wait for the account
     if (choice.kind === 'unavailable') return Promise.reject(httpError(503, choice.message));
     const chosen = choice;
-    const attempt: Promise<{ workspace: Workspace; files: FileService }> = (opening ??= (chosen.kind === 'cloud' ? openCloud(chosen.userId) : open())
-      .then(async (workspace) => {
+    const attempt: Promise<{ workspace: Workspace; files: FileService }> = (opening ??= (chosen.kind === 'cloud' ? openCloud(chosen.userId) : chosen.kind === 'demo' ? open(demoDbName(chosen.sessionId)) : open())
+      .then(async (raw) => {
+        const workspace: Workspace = chosen.kind === 'demo' && raw.mode === 'saved' ? { ...raw, mode: 'demo' } : raw;
         if (workspace.mode !== 'cloud') await seedSampleFiles(workspace.storage, SAMPLE_FILES);
         return { workspace, files: createFileService(workspace.storage) };
       })
@@ -102,18 +118,7 @@ export function createApi(
     list: async () => (await files()).list(),
     rows: async (id: string, offset = 0, limit = 100) => (await files()).rows(id, { offset, limit }),
     /** Saves the file's CSV to the person's downloads under its name. */
-    download: async (id: string) => {
-      const { name, text } = await (await files()).download(id);
-      const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = name;
-      link.hidden = true;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_LIFETIME_MS);
-    },
+    download: async (id: string) => saveCsv(await (await files()).download(id)),
     /** source is what a converted file brings: its original and where each row came from. */
     upload: async (file: File, source?: UploadSource) => {
       if (file.size > UPLOAD_MAX_MB * 1024 * 1024) throw new Error(`This file is larger than the ${UPLOAD_MAX_MB} MB upload limit.`);
@@ -148,4 +153,4 @@ export function createApi(
   };
 }
 
-export const api = createApi(() => openWorkspace());
+export const api = createApi((name) => openWorkspace(name));

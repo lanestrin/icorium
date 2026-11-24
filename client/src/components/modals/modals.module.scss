@@ -508,3 +508,15 @@
 .explainMuted {
   color: var(--app-color-text-muted);
 }
+// One file in the export list: its name and File ID, and its Download button.
+.exportItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-3);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-xl);
+  padding: var(--app-space-2-5) var(--app-space-4);
+  font-size: var(--app-text-sm);
+  line-height: var(--app-leading-sm);
+}
