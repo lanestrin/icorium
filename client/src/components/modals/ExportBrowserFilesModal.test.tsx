@@ -17,7 +17,7 @@ describe('ExportBrowserFilesModal', () => {
     expect(list).toHaveTextContent('a.csv');
     expect(list).toHaveTextContent('File ID 100001 · Active');
     expect(list).toHaveTextContent('File ID 100002 · Archived');
-    expect(screen.getByText(/not added to your account and nothing here is deleted/)).toBeInTheDocument();
+    expect(screen.getByText(/not added to any account and nothing here is deleted/)).toBeInTheDocument();
   });
 
   it('downloads one file, then all of them in order', async () => {

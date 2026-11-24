@@ -70,6 +70,9 @@ function sqlProblems(migration: string, bootstrap: string): string[] {
   if (/grant[^;]*\bto\b[^;]*\banon\b/.test(normalized(sql))) problems.push('something is granted to anon');
 
   // Broad grants would quietly reach every table or function, including the hook and invitations.
+  // Supabase gives new public tables broad default privileges, so each table is closed before its grants.
+  for (const table of ['invitations', 'profiles'])
+    if (!normalized(sql).includes(`revoke all on table public.${table} from public, anon, authenticated;`)) problems.push(`${table} not closed before its grants`);
   if (grants(sql).some((grant) => /^all (tables|functions|routines|sequences) in schema /.test(grant.object))) problems.push('a schema-wide grant');
   // The hook may run only as the Auth service role, whatever privilege or role list a grant uses.
   if (grants(sql).some((grant) => grant.object.startsWith(`function ${HOOK}`) && grant.roles.some((role) => role !== 'supabase_auth_admin')))
@@ -110,6 +113,8 @@ describe('Supabase identity SQL', () => {
   // Each rule must actually fail when it is broken, or the check above proves nothing.
   const broken: [string, (sql: string) => string, string][] = [
     ['row level security removed', (s) => s.replace('alter table public.profiles enable row level security;', ''), 'no row level security on public.profiles'],
+    ['the profiles table not revoked', (s) => s.replace('revoke all on table public.profiles from public, anon, authenticated;', ''), 'profiles not closed before its grants'],
+    ['the invitations table not revoked', (s) => s.replace('revoke all on table public.invitations from public, anon, authenticated;', ''), 'invitations not closed before its grants'],
     ['a grant to anon', (s) => `${s}\ngrant select on table public.profiles to anon;`, 'something is granted to anon'],
     ['empty search_path removed', (s) => s.replace("security definer\nset search_path = ''", 'security definer'), 'security definer function without empty search_path'],
     ['hook granted to clients', (s) => `${s}\ngrant execute on function ${HOOK}(jsonb) to authenticated;`, 'hook granted to another role'],
@@ -297,6 +302,11 @@ function cloudProblems(migration: string): string[] {
     .map((grant) => `${grant.privileges} on ${grant.object}`);
   if (clientGrants.join(' | ') !== CLIENT_GRANTS) problems.push(`client table grants changed: ${clientGrants.join(' | ')}`);
   if (!flat.includes('revoke all on table public.file_id_counters from public, anon, authenticated;')) problems.push('counter not closed to clients');
+  // Supabase gives new public tables broad default privileges, so each table is closed before the grants above.
+  for (const table of ['files', 'supplier_profiles'])
+    if (!flat.includes(`revoke all on table public.${table} from public, anon, authenticated;`)) problems.push(`${table} not closed before its grants`);
+  // Active means the caller's own profile is active now.
+  if (!flat.includes('from public.profiles profile where profile.user_id = (select auth.uid()) and profile.active )')) problems.push('is_active_account does not check the caller is active');
 
   // Every function is security definer with an empty search_path, except the gate trigger, which runs as the caller.
   for (const fn of functions(migration)) {
@@ -392,6 +402,9 @@ describe('Supabase cloud files SQL', () => {
     ['a delete grant', (s) => s.replace('grant select, insert on table public.files', 'grant select, insert, delete on table public.files'), 'client table grants changed: select, insert, delete on public.files | update (meta, source_id, uploaded_at) on public.files | select, insert on public.supplier_profiles | update (profile, saved_at) on public.supplier_profiles'],
     ['owner_id writable', (s) => s.replace('update (meta, source_id, uploaded_at)', 'update (owner_id, meta, source_id, uploaded_at)'), 'client table grants changed: select, insert on public.files | update (owner_id, meta, source_id, uploaded_at) on public.files | select, insert on public.supplier_profiles | update (profile, saved_at) on public.supplier_profiles'],
     ['the counter opened to clients', (s) => s.replace('revoke all on table public.file_id_counters from public, anon, authenticated;', ''), 'counter not closed to clients'],
+    ['the files table not revoked', (s) => s.replace('revoke all on table public.files from public, anon, authenticated;', ''), 'files not closed before its grants'],
+    ['the supplier profiles table not revoked', (s) => s.replace('revoke all on table public.supplier_profiles from public, anon, authenticated;', ''), 'supplier_profiles not closed before its grants'],
+    ['an inactive account counted as active', (s) => s.replace('(select auth.uid()) and profile.active\n', '(select auth.uid())\n'), 'is_active_account does not check the caller is active'],
     ['the active check dropped from reading files', (s) => s.replace('using (owner_id = (select auth.uid()) and (select public.is_active_account()));\n\n-- Adding a file', 'using (owner_id = (select auth.uid()));\n\n-- Adding a file'), 'public.files policies are not owner and active only'],
     ['every file readable', (s) => s.replace('using (owner_id = (select auth.uid()) and (select public.is_active_account()));\n\n-- Adding a file', 'using (true);\n\n-- Adding a file'), 'public.files policies are not owner and active only'],
     ['capacity dropped from adding files', (s) => s.replace(' and (select public.file_storage_has_room()));\n\n-- Replacing', ');\n\n-- Replacing'), 'file insert ignores capacity'],

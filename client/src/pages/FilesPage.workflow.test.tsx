@@ -1,5 +1,5 @@
 // The whole workflow with real files and no mocked results (build-plan 16.4): the real Files page, the real
-// file service over a simulated IndexedDB (fake-indexeddb), the real SheetJS reader, the real sample CSVs and
+// file service over a guest demo's simulated IndexedDB (fake-indexeddb), the real SheetJS reader, the real sample CSVs and
 // an Excel file made from one of them (scripts/make-excel-fixture.mjs). Only the browser's download plumbing,
 // which jsdom lacks, is replaced so the saved file can be read back.
 import 'fake-indexeddb/auto';
@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { parseCsv } from '../../../shared/csv';
 import { FilesPage } from './FilesPage';
+import { accountApi, demo, pageStatus } from '../test-fixtures/accounts';
 import { SAMPLE_FILES } from '../lib/samples';
 import excelFixture from '../test-fixtures/partner_b_baseline.xlsx?inline';
 
@@ -26,7 +27,7 @@ const rowOf = (id: string) => screen.getByRole('checkbox', { name: new RegExp(`^
 describe('the whole workflow with real files', () => {
   it('uploads a sample CSV and an Excel file, processes, previews, downloads and compares them', async () => {
     const user = userEvent.setup();
-    render(<FilesPage />);
+    render(<FilesPage account={accountApi(demo)} />);
 
     // Start: the five bundled samples.
     for (const id of ['100001', '100002', '100003', '100004', '100005']) expect(await screen.findByRole('checkbox', { name: new RegExp(`^Select ${id} `) })).toBeInTheDocument();
@@ -63,7 +64,7 @@ describe('the whole workflow with real files', () => {
         await waitFor(() => expect(result()).toBeChecked(), slow);
         expect(within(rowOf(id)).getByText('Processed')).toBeInTheDocument();
       }
-      expect(screen.getByRole('status')).toHaveTextContent('Processed 2 files. Their results are selected, so you can compare them.');
+      expect(pageStatus()).toHaveTextContent('Processed 2 files. Their results are selected, so you can compare them.');
       // Start the next run from every file and no selection.
       await user.click(within(screen.getByRole('toolbar', { name: 'Selected files' })).getByRole('button', { name: /Clear selection/ }));
       const clearFilters = screen.getByRole('button', { name: 'Clear filters' });

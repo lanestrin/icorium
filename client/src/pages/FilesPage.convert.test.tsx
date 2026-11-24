@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileMeta } from '../../../shared/types';
 import { FilesPage } from './FilesPage';
+import { accountApi, demo } from '../test-fixtures/accounts';
 import { api } from '../lib/api';
 import { readExcel, type SheetCell, type SheetData } from '../lib/convert/excel';
 import type { PlacedCell } from '../lib/convert/layout';
@@ -47,16 +48,18 @@ function deferredRead() {
   return (sheets: SheetData[]) => act(async () => resolve(sheets));
 }
 
+const account = accountApi(demo); // a guest's workspace
+
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(api.storageMode).mockResolvedValue('saved');
+  vi.mocked(api.storageMode).mockResolvedValue('demo');
   vi.mocked(api.list).mockResolvedValue([clean]);
   vi.mocked(api.upload).mockResolvedValue(clean);
 });
 
 async function setup() {
   const user = userEvent.setup();
-  render(<FilesPage />);
+  render(<FilesPage account={account} />);
   await screen.findByRole('checkbox', { name: 'Select clean clean.csv' });
   return user;
 }

@@ -42,7 +42,7 @@ describe('Architecture page content', () => {
     for (const [i, item] of roadmapItems.entries()) expect(item.status === 'Done', item.id).toBe(planItems[i].done);
     const firstUnchecked = planItems.find((item) => !item.done);
     expect(roadmapItems.filter((item) => item.status === 'Next').map((item) => item.id)).toEqual(firstUnchecked ? [firstUnchecked.id] : []);
-    expect(HOSTED_DESIGN.status).toBe('Planned, not provisioned');
+    expect(HOSTED_DESIGN.status).toBe('Supabase deployed; validation in progress');
   });
 
   it('only names repository paths that exist', () => {

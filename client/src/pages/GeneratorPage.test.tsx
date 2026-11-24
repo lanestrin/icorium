@@ -2,8 +2,8 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FileMeta, GeneratedFile } from '../../../shared/types';
-import App from '../App';
 import { GeneratorPage } from './GeneratorPage';
+import { accountApi, admin, findPageStatus } from '../test-fixtures/accounts';
 import { api } from '../lib/api';
 import generatorStyles from '../components/generator/generator.module.scss';
 
@@ -36,7 +36,7 @@ describe('CSV generator page', () => {
   it('generates one clean Partner A file with the defaults and previews it', async () => {
     const user = userEvent.setup();
     vi.mocked(api.generate).mockResolvedValue({ files: [clean] });
-    render(<GeneratorPage />);
+    render(<GeneratorPage account={accountApi(admin)} />);
     expect(screen.getByRole('link', { name: 'CSV Files' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('radio', { name: /Partner A/ })).toBeChecked();
     expect(number('Rows')).toHaveValue(25);
@@ -61,7 +61,7 @@ describe('CSV generator page', () => {
   it('asks for partner, rows, number of files and error rows, then lists each file', async () => {
     const user = userEvent.setup();
     vi.mocked(api.generate).mockResolvedValue({ files: batch });
-    render(<GeneratorPage />);
+    render(<GeneratorPage account={accountApi(admin)} />);
     await user.click(screen.getByRole('radio', { name: /Partner C/ }));
     await user.clear(number('Rows'));
     await user.type(number('Rows'), '40');
@@ -106,7 +106,7 @@ describe('CSV generator page', () => {
   it('downloads each file under its chosen name', async () => {
     const user = userEvent.setup();
     vi.mocked(api.generate).mockResolvedValue({ files: batch });
-    render(<GeneratorPage />);
+    render(<GeneratorPage account={accountApi(admin)} />);
     await user.click(generateButton());
     const link = await within(results()).findByRole('link', { name: `Download ${batch[1].name}` });
     expect(link).toHaveAttribute('download', batch[1].name);
@@ -122,13 +122,13 @@ describe('CSV generator page', () => {
     const user = userEvent.setup();
     vi.mocked(api.generate).mockResolvedValue({ files: batch });
     vi.mocked(api.upload).mockResolvedValue({} as FileMeta);
-    render(<GeneratorPage />);
+    render(<GeneratorPage account={accountApi(admin)} />);
     await user.click(generateButton());
     await user.click(await within(results()).findByRole('button', { name: 'Add all 2 to CSV Files' }));
     const uploaded = vi.mocked(api.upload).mock.calls.map(([f]) => f);
     expect(uploaded.map((f) => f.name)).toEqual(batch.map((f) => f.name));
     expect(await Promise.all(uploaded.map((f) => f.text()))).toEqual(batch.map((f) => f.text));
-    const status = await screen.findByRole('status');
+    const status = await findPageStatus();
     expect(status).toHaveTextContent('Added 2 files to CSV Files.');
     expect(within(status).getByRole('link', { name: 'Open CSV Files' })).toHaveAttribute('href', '/');
   });
@@ -137,10 +137,10 @@ describe('CSV generator page', () => {
     const user = userEvent.setup();
     vi.mocked(api.generate).mockResolvedValue({ files: batch });
     vi.mocked(api.upload).mockResolvedValueOnce({} as FileMeta).mockRejectedValueOnce(new Error('Unrecognized CSV schema'));
-    render(<GeneratorPage />);
+    render(<GeneratorPage account={accountApi(admin)} />);
     await user.click(generateButton());
     await user.click(await within(results()).findByRole('button', { name: 'Add all 2 to CSV Files' }));
-    expect(await screen.findByRole('status')).toHaveTextContent(`Added ${batch[0].name} to CSV Files.`);
+    expect(await findPageStatus()).toHaveTextContent(`Added ${batch[0].name} to CSV Files.`);
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('Could not add to CSV Files');
     expect(alert).toHaveTextContent(`${batch[1].name}: Unrecognized CSV schema`);
@@ -152,7 +152,7 @@ describe('CSV generator page', () => {
     const user = userEvent.setup();
     let reject!: (e: Error) => void;
     vi.mocked(api.generate).mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }));
-    render(<GeneratorPage />);
+    render(<GeneratorPage account={accountApi(admin)} />);
     await user.dblClick(generateButton());
     expect(screen.getByRole('button', { name: /Generating/ })).toBeDisabled();
     reject(new Error('Generate at most 10 files at a time'));
@@ -164,29 +164,9 @@ describe('CSV generator page', () => {
   it('generates from the keyboard', async () => {
     const user = userEvent.setup();
     vi.mocked(api.generate).mockResolvedValue({ files: [clean] });
-    render(<GeneratorPage />);
+    render(<GeneratorPage account={accountApi(admin)} />);
     number('Number of files').focus();
     await user.keyboard('{Enter}'); // submits the form
     await waitFor(() => expect(api.generate).toHaveBeenCalledWith({ partner: 'A', rows: 25, errorRows: 0, files: 1 }));
-  });
-});
-
-describe('page routing', () => {
-  afterEach(() => { window.history.pushState({}, '', '/'); });
-
-  it('shows the generator at /generator and the file workspace elsewhere', async () => {
-    vi.mocked(api.list).mockResolvedValue([]);
-    vi.mocked(api.storageMode).mockResolvedValue('saved');
-    window.history.pushState({}, '', '/generator');
-    const { unmount } = render(<App />);
-    // The page is loaded on demand, so it appears after a moment.
-    expect(await screen.findByRole('heading', { name: 'CSV Generator' })).toBeInTheDocument();
-    unmount();
-
-    window.history.pushState({}, '', '/');
-    render(<App />);
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
-    await waitFor(() => expect(api.list).toHaveBeenCalled());
   });
 });

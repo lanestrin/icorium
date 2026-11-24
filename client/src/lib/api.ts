@@ -4,14 +4,14 @@ import { createFileService, seedSampleFiles, type FileService } from '../../../s
 import { httpError } from '../../../shared/csv';
 import type { Storage } from '../../../shared/storage';
 import { createMemoryStorage, openBrowserStorage, UPGRADE_BLOCKED_STATUS, type BrowserStorage } from './browser-storage';
-import { createCloudStorage, INACTIVE_MESSAGE, UNAVAILABLE_FILES_MESSAGE } from './cloud-storage';
+import { assertActiveAccount, createCloudStorage, UNAVAILABLE_FILES_MESSAGE } from './cloud-storage';
 import { demoDbName } from './demo';
-import { workspaceKey, type WorkspaceChoice } from './workspace';
+import { CLOSED_MESSAGE, workspaceKey, type WorkspaceChoice } from './workspace';
 import { SAMPLE_FILES } from './samples';
-import { getSupabase, isAuthConfigured } from './supabase';
+import { getSupabase } from './supabase';
 
 // The app's file actions, run in the browser: the shared file service over the account's workspace, which is
-// browser storage (nothing is sent to a server) or, for a signed-in active account, its private Supabase workspace.
+// a demo guest's own browser database (nothing is sent to a server) or a signed-in active account's private Supabase workspace.
 
 /** Largest CSV upload, in megabytes. */
 export const UPLOAD_MAX_MB = 10;
@@ -32,34 +32,28 @@ export function saveCsv({ name, text }: { name: string; text: string }) {
 }
 
 /**
- * saved: files are kept in IndexedDB on this device. memory: the browser blocked IndexedDB, so files last until a refresh.
- * cloud: a signed-in, active account's files, kept in its private Supabase workspace.
  * demo: a guest's temporary files, kept in this tab's own browser database and discarded on sign-out.
+ * memory: the browser blocked IndexedDB, so the guest's files last until a refresh.
+ * cloud: a signed-in, active account's files, kept in its private Supabase workspace.
  */
-export type StorageMode = 'saved' | 'memory' | 'cloud' | 'demo';
+export type StorageMode = 'demo' | 'memory' | 'cloud';
 export interface Workspace { storage: Storage; mode: StorageMode }
 
 /** Opens the signed-in account's cloud workspace, after the database confirms the account is active. */
 export async function openCloudWorkspace(userId: string): Promise<Workspace> {
   const supabase = await getSupabase();
   if (!supabase) throw httpError(503, UNAVAILABLE_FILES_MESSAGE);
-  let active: boolean | null = null;
-  try {
-    const { data, error } = await supabase.rpc('is_active_account');
-    if (!error) active = data === true;
-  } catch { /* unreachable: reported below */ }
-  if (active === null) throw httpError(503, UNAVAILABLE_FILES_MESSAGE);
-  if (!active) throw httpError(403, INACTIVE_MESSAGE);
+  await assertActiveAccount(supabase);
   return { storage: createCloudStorage(supabase, userId), mode: 'cloud' };
 }
 
 /**
- * Opens IndexedDB, or keeps files in memory when the browser won't open it (storage turned off, some private windows).
+ * Opens a demo's own IndexedDB database, or keeps files in memory when the browser won't open it (storage turned off, some private windows).
  * An upgrade blocked by another open tab is not that: it is reported, because memory would hide the person's saved files.
  */
-export async function openWorkspace(name?: string): Promise<Workspace> {
+export async function openWorkspace(name: string): Promise<Workspace> {
   try {
-    return { storage: await openBrowserStorage(name), mode: 'saved' };
+    return { storage: await openBrowserStorage(name), mode: 'demo' };
   } catch (error) {
     if ((error as { statusCode?: number }).statusCode === UPGRADE_BLOCKED_STATUS) throw error;
     return { storage: createMemoryStorage(), mode: 'memory' };
@@ -67,13 +61,13 @@ export async function openWorkspace(name?: string): Promise<Workspace> {
 }
 
 /**
- * The file actions over the chosen workspace. The browser workspace opens on first use with the five samples seeded;
- * a cloud workspace starts empty. setWorkspace follows the account: a change drops the old file service and its cache.
+ * The file actions over the chosen workspace. Nothing opens until setWorkspace gives an allowed one. A demo
+ * opens on first use with the five samples seeded; a cloud workspace starts empty. setWorkspace follows the account: a change drops the old file service and its cache.
  */
 export function createApi(
-  open: (name?: string) => Promise<Workspace>,
+  open: (name: string) => Promise<Workspace>,
   openCloud: (userId: string) => Promise<Workspace> = openCloudWorkspace,
-  initial: WorkspaceChoice = isAuthConfigured() ? { kind: 'pending' } : { kind: 'browser' },
+  initial: WorkspaceChoice = { kind: 'closed' },
 ) {
   let choice = initial;
   let release = () => {};
@@ -84,11 +78,11 @@ export function createApi(
 
   function opened(): Promise<{ workspace: Workspace; files: FileService }> {
     if (choice.kind === 'pending') return settled.then(opened); // actions wait for the account
+    if (choice.kind === 'closed') return Promise.reject(httpError(403, CLOSED_MESSAGE));
     if (choice.kind === 'unavailable') return Promise.reject(httpError(503, choice.message));
     const chosen = choice;
-    const attempt: Promise<{ workspace: Workspace; files: FileService }> = (opening ??= (chosen.kind === 'cloud' ? openCloud(chosen.userId) : chosen.kind === 'demo' ? open(demoDbName(chosen.sessionId)) : open())
-      .then(async (raw) => {
-        const workspace: Workspace = chosen.kind === 'demo' && raw.mode === 'saved' ? { ...raw, mode: 'demo' } : raw;
+    const attempt: Promise<{ workspace: Workspace; files: FileService }> = (opening ??= (chosen.kind === 'cloud' ? openCloud(chosen.userId) : open(demoDbName(chosen.sessionId)))
+      .then(async (workspace) => {
         if (workspace.mode !== 'cloud') await seedSampleFiles(workspace.storage, SAMPLE_FILES);
         return { workspace, files: createFileService(workspace.storage) };
       })
@@ -140,12 +134,12 @@ export function createApi(
     /** Explains one calculated value of a result from its raw source cells. */
     explain: async (body: Parameters<FileService['explain']>[0]) => (await files()).explain(body),
     storageMode: async (): Promise<StorageMode> => (await opened()).workspace.mode,
-    /** Clear my data (browser workspace only): deletes every file and result, then brings the five samples back. */
+    /** Clear my data (demo only): deletes every file and result, then brings the five samples back. */
     clearData: async () => {
       const current = await opened();
       const { storage } = current.workspace;
       // Cloud files reach every device and can't be deleted until 18.1, so there is nothing to clear there.
-      if (current.workspace.mode === 'cloud' || !('clear' in storage)) throw httpError(400, 'Clear my data only clears this browser.');
+      if (current.workspace.mode === 'cloud' || !('clear' in storage)) throw httpError(400, 'Clear my data only clears the demo.');
       await (storage as BrowserStorage).clear();
       await seedSampleFiles(current.workspace.storage, SAMPLE_FILES);
       current.files = createFileService(current.workspace.storage); // starts with an empty parsed-file cache
@@ -153,4 +147,4 @@ export function createApi(
   };
 }
 
-export const api = createApi((name) => openWorkspace(name));
+export const api = createApi(openWorkspace);

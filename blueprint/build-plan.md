@@ -81,7 +81,7 @@ plan still apply. IDs retain their original phase prefix for traceability.
 
 ### What to build next
 
-**Next: 17.6 - Require sign-in and apply page access.**
+**Next: 17.7 - Hosted workflow verification and operating guidance.**
 
 The demonstration milestone through 9.15 is complete, and 17.1 to 17.3
 are done. M19 (universal file ingestion) comes before the rest of M17
@@ -97,8 +97,8 @@ Build in this order:
 
 17.8 and 17.9 were added and moved ahead of 17.4 (decided 2026-11-23),
 so the sign-in page and workspace navigation match the reference images
-before cloud files arrive. They change the interface only; sign-in stays
-optional until 17.6.
+before cloud files arrive. They change the interface only; 17.6 made
+sign-in required.
 
 Select only an unchecked item whose dependencies are satisfied.
 
@@ -333,7 +333,7 @@ Rules for every M19 item:
   active Admin; the help card links to existing documentation. Keep
   the upload and processing panel. On phones the navigation collapses
   into a menu without sideways scroll. Hidden links are display only;
-  17.6 enforces page access.
+  17.6 decides page access.
   **Depends on:** 17.3, 17.8.
 
 - [x] **17.4** Private cross-device file workspace — Persist registered
@@ -374,11 +374,14 @@ Rules for every M19 item:
   or erasing them during demo cleanup.
   **Depends on:** 17.2, 17.4.
 
-- [ ] **17.6** Require sign-in and apply page access — Make the file
+- [x] **17.6** Require sign-in and apply page access — Make the file
   workspace the signed-in landing page. Require either an active
   invited account or an isolated demo session for file tools.
   Restrict Admin, Architecture and Generator pages to Admin.
   Complete direct-route and trusted-service access enforcement.
+  Trusted enforcement means authentication, authorization, database
+  policies and Admin functions; the processing gate stays advisory
+  against a modified client (decided 2026-11-23).
   **Depends on:** 17.3, 17.4, 17.5.
 
 - [ ] **17.7** Hosted workflow verification and operating guidance —

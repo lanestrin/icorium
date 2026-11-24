@@ -6,6 +6,7 @@ import { ArchitecturePage } from '../pages/ArchitecturePage';
 import { FilesPage } from '../pages/FilesPage';
 import { GeneratorPage } from '../pages/GeneratorPage';
 import { api } from '../lib/api';
+import { accountApi, admin } from '../test-fixtures/accounts';
 
 describe('app version label', () => {
   beforeEach(() => { vi.spyOn(api, 'list').mockResolvedValue([]); });
@@ -18,7 +19,7 @@ describe('app version label', () => {
   ])('shows the version and environment in the navigation of the %s page', async (_name, Page) => {
     vi.stubEnv('VITE_APP_VERSION', '1.0.0');
     vi.stubEnv('VITE_APP_ENV', 'Test');
-    render(<Page />);
+    render(<Page account={accountApi(admin)} />);
     await screen.findAllByRole('heading', { level: 1 }); // let a page finish its first load
     // The navigation column shows from 80rem wide; below that the same navigation opens from the Menu button.
     await userEvent.setup().click(screen.getByRole('button', { name: 'Open navigation' }));

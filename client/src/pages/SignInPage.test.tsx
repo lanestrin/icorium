@@ -1,13 +1,23 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { INVITE_ONLY_MESSAGE } from '../lib/auth';
 import { currentDemoId, DEMO_EMAIL, DEMO_PASSWORD, DEMO_STORAGE_MESSAGE, startDemo } from '../lib/demo';
+import { createBrowserExport } from '../lib/browser-export';
 import { getSupabase, isAuthConfigured } from '../lib/supabase';
 import { fakeSession, fakeSupabase } from '../test-fixtures/fake-supabase';
 import { SignInPage } from './SignInPage';
 
 vi.mock('../lib/supabase', () => ({ getSupabase: vi.fn(), isAuthConfigured: vi.fn(() => true) }));
+
+vi.mock('../lib/browser-export', () => ({ createBrowserExport: vi.fn() }));
+
+const list = vi.fn();
+const read = vi.fn();
+beforeEach(() => {
+  list.mockReset().mockResolvedValue([]);
+  vi.mocked(createBrowserExport).mockReturnValue({ list, read });
+});
 
 function setUp(options: Parameters<typeof fakeSupabase>[0] = {}) {
   const fake = fakeSupabase(options);
@@ -168,8 +178,9 @@ describe('SignInPage', () => {
       expect(screen.getByText(title)).toBeInTheDocument();
     }
     expect(screen.getByText(/Admins cannot read members' file contents/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
-    expect(screen.getByRole('link', { name: /Architecture/ })).toHaveAttribute('href', '/architecture');
+    expect(screen.queryByText(/stay in this browser for now/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /CSV Generator/ })).not.toBeInTheDocument(); // Admin pages (17.6)
+    expect(screen.queryByRole('link', { name: /Architecture/ })).not.toBeInTheDocument();
   });
 
   it('offers the invitation link, the expiry note and no remember-me', async () => {
@@ -287,5 +298,67 @@ describe('SignInPage', () => {
     await user.click(screen.getByRole('button', { name: 'Hide password' }));
     expect(password).toHaveAttribute('type', 'password');
     expect(fake.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+});
+
+describe('SignInPage: files kept in this browser', () => {
+  const FILE = { id: '100001', name: 'older.csv', rows: 2, columns: 3, uploadedAt: '2026-01-01T00:00:00.000Z', status: 'Ready' };
+  const exportButton = { name: 'Export files kept in this browser' };
+
+  it('offers the export when there are files, opens the list, and returns focus when closed, calling no Supabase service', async () => {
+    const fake = setUp();
+    list.mockResolvedValue([FILE]);
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    const button = await screen.findByRole('button', exportButton);
+    await user.click(button);
+    expect(await screen.findByRole('dialog', { name: "Export this browser's files" })).toHaveTextContent('older.csv');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(button).toHaveFocus();
+    expect(fake.maybeSingle).not.toHaveBeenCalled();
+    expect(fake.invoke).not.toHaveBeenCalled();
+    expect(fake.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('offers nothing when the browser has no files', async () => {
+    setUp();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await screen.findByLabelText('Email');
+    await waitFor(() => expect(list).toHaveBeenCalled());
+    expect(screen.queryByRole('button', exportButton)).not.toBeInTheDocument();
+  });
+
+  it('offers the export when the look failed, so the dialog can explain and try again', async () => {
+    setUp();
+    list.mockRejectedValueOnce(new Error('boom')).mockRejectedValueOnce(new Error('boom')).mockResolvedValue([FILE]);
+    const user = userEvent.setup();
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await user.click(await screen.findByRole('button', exportButton));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(await screen.findByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(dialog).toHaveTextContent('older.csv'));
+  });
+
+  it('offers it on a site without sign-in and when the account read failed', async () => {
+    list.mockResolvedValue([FILE]);
+    vi.mocked(isAuthConfigured).mockReturnValue(false);
+    const first = render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByRole('button', exportButton)).toBeInTheDocument();
+    first.unmount();
+
+    vi.mocked(isAuthConfigured).mockReturnValue(true);
+    setUp({ session: fakeSession(), profileError: { message: 'boom' } });
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    expect(await screen.findByRole('button', exportButton)).toBeInTheDocument();
+  });
+
+  it('does not look for files for someone who is signed in', async () => {
+    setUp({ session: fakeSession(), profile: { name: 'Ada', role: 'Member', active: true } });
+    list.mockResolvedValue([FILE]);
+    render(<SignInPage onSignedIn={vi.fn()} />);
+    await screen.findByText(/You're signed in as Ada/);
+    expect(list).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', exportButton)).not.toBeInTheDocument();
   });
 });

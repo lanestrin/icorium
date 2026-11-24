@@ -28,7 +28,7 @@ import { compareBlocker } from '../lib/compare-view';
 import { filterFiles } from '../lib/file-status';
 import { errorMessage } from '../lib/format';
 import { AppShell } from '../components/layout/AppShell';
-import { useAccount } from '../hooks/useAccount';
+import type { AccountApi } from '../components/layout/AccountMenu';
 import { useHashSection } from '../hooks/useHashSection';
 import { showAndFocus, WORKSPACE_HASHES, type AdminSection, type WorkspaceSection } from '../lib/navigation';
 
@@ -37,8 +37,8 @@ const loadCompareWorkspace = () => import('../components/compare/CompareWorkspac
 const CompareWorkspace = lazy(() => loadCompareWorkspace().then((m) => ({ default: m.CompareWorkspace })));
 const COMPARE_CODE_FAILED = "The comparison couldn't be loaded. Reload the page to try again.";
 
-/** The file workspace: upload, filter, process, preview, archive and compare files. */
-export function FilesPage() {
+/** The file workspace: upload, filter, process, preview, archive and compare files. The gate (17.6) passes the account it allowed. */
+export function FilesPage({ account }: { account: AccountApi }) {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [preview, setPreview] = useState<FileMeta>();
@@ -50,9 +50,8 @@ export function FilesPage() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
 
-  const account = useAccount();
   const workspace = useWorkspace(account.account);
-  const { files, refresh, reset, upload, uploading, loading, loadFailed } = useFileList(setError, workspace.choice.kind === 'pending');
+  const { files, refresh, reset, upload, uploading, loading, loadFailed } = useFileList(setError);
   const conversion = useConversion();
   const { selectedIds, setSelectedIds, toggle, toggleAll } = useSelection();
   const {
@@ -100,8 +99,6 @@ export function FilesPage() {
     const previous = shownWorkspace.current;
     shownWorkspace.current = workspace.key;
     if (previous === workspace.key) return () => { current = false; };
-    // The account was still loading, so no files were shown and the list's first load was held until now.
-    if (previous === 'pending') return () => { current = false; };
     reset();
     setSelectedIds(new Set());
     setPreview(undefined);
@@ -116,13 +113,7 @@ export function FilesPage() {
     return () => { current = false; };
   }, [workspace.key]);
 
-  // Try again after the list could not be loaded. An account that couldn't be confirmed is read again by reloading.
-  function retryLoad() {
-    if (workspace.choice.kind === 'unavailable') window.location.reload();
-    else void refresh();
-  }
-
-  // Clear my data: every upload and result in this browser is deleted and the five samples come back.
+  // Clear my data: every upload and result in the demo is deleted and the five samples come back.
   // It holds busy like a run or archive, so nothing else starts meanwhile, and it closes the archive toast
   // first: its Undo names File IDs that a re-added sample or a new upload may reuse after the clear.
   async function clearData() {
@@ -202,7 +193,7 @@ export function FilesPage() {
           selected={selectedInputs.map(({ id, name }) => ({ id, name }))}
           storageMode={storageMode}
           onClearData={() => setConfirmClear(true)}
-          clearDisabled={(workspace.choice.kind !== 'browser' && workspace.choice.kind !== 'demo') || uploading || !!conversion.reading || !!processingId || archiving || clearing}
+          clearDisabled={workspace.choice.kind !== 'demo' || uploading || !!conversion.reading || !!processingId || archiving || clearing}
         />
 
         <div className={styles.main}>
@@ -214,7 +205,7 @@ export function FilesPage() {
 
           {notice && <Banner tone="success" className={styles.banner} onDismiss={() => setNotice(undefined)}>{notice}</Banner>}
           {error && <Banner tone="error" className={styles.banner} onDismiss={() => setError(undefined)}>{error}</Banner>}
-          {loadFailed && <Button variant="secondary" className={styles.banner} onClick={retryLoad}>Try again</Button>}
+          {loadFailed && <Button variant="secondary" className={styles.banner} onClick={() => void refresh()}>Try again</Button>}
 
           <FileTabs
             tab={tab}

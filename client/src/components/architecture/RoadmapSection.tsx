@@ -42,7 +42,7 @@ export function RoadmapSection() {
         {ROADMAP.map((milestone) => <Milestone key={milestone.milestone} milestone={milestone} />)}
       </div>
       <Card as="article" aria-labelledby="hosted-design" className={styles.hostedDesign}>
-        <h3 id="hosted-design" className={styles.cardHeading}><Cloud className={styles.headingIcon} aria-hidden /> Planned hosted design</h3>
+        <h3 id="hosted-design" className={styles.cardHeading}><Cloud className={styles.headingIcon} aria-hidden /> Hosted design</h3>
         <p className={styles.storageHeading}>{HOSTED_DESIGN.status}</p>
         <dl className={styles.serviceList}>
           {HOSTED_DESIGN.services.map((row) => (
@@ -57,7 +57,7 @@ export function RoadmapSection() {
           {HOSTED_DESIGN.limits.map((limit) => <li key={limit}>{limit}</li>)}
         </ul>
         <p className={styles.storageNote}>
-          The database rules are already in <Path>supabase/migrations/20261118000000_identity.sql</Path>; they have not been applied to any project yet.
+          The database rules start in <Path>supabase/migrations/20261118000000_identity.sql</Path>. They are applied to a development project; formal hosted evidence is recorded in 17.7.
         </p>
       </Card>
     </Section>

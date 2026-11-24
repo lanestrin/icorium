@@ -10,7 +10,7 @@ import { Modal } from '../modals/Modal';
 import { Button } from '../ui/Button';
 import styles from './layout.module.scss';
 
-/** What the account menu needs from the page's useAccount(): the shell takes it so a page subscribes once. */
+/** What the account menu needs from the gate's useAccount(): pages and the shell take it, so a page subscribes once. */
 export type AccountApi = Pick<ReturnType<typeof useAccount>, 'account' | 'actionError' | 'signOut' | 'saveName'>;
 
 /** Up to two capital letters from a name's first words, else the email's first letter; '' when there is neither. */
@@ -23,7 +23,7 @@ export function initials(name: string | null | undefined, email: string): string
 /**
  * The account at the right end of the header (build-plan 17.2b, 17.9): a Sign in link when signed out, and a
  * menu with the name, role and Sign out when signed in. Nothing shows on a site without sign-in or while the
- * session loads. The role is shown, not enforced: access checks live in trusted code. A demo guest (17.5) sees
+ * session loads. The role is shown here; AccessGate and trusted code apply it. A demo guest (17.5) sees
  * "Demo guest" and Sign out, which discards the demo. Any signed-in account can export the files kept in this browser.
  */
 export function AccountMenu({ account, actionError, signOut, saveName }: AccountApi) {

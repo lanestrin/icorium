@@ -10,14 +10,13 @@ import { TechStackSection } from '../components/architecture/TechStackSection';
 import sections from '../components/architecture/architecture.module.scss';
 import styles from './ArchitecturePage.module.scss';
 import { AppShell } from '../components/layout/AppShell';
-import { useAccount } from '../hooks/useAccount';
+import type { AccountApi } from '../components/layout/AccountMenu';
 
 /*
  * Architecture & Tech Stack page (/architecture), for walking through the design in an interview.
  * Each section lives in components/architecture/; the text they show is in content.ts there.
  */
-export function ArchitecturePage() {
-  const account = useAccount();
+export function ArchitecturePage({ account }: { account: AccountApi }) {
   return (
     <AppShell account={account}>
     <div className={styles.page}>

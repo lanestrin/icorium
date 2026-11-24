@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CompareResult, FileMeta, FileRows } from '../../../shared/types';
 import { FilesPage } from './FilesPage';
+import { accountApi, demo, findPageStatus, pageStatus, queryPageStatus } from '../test-fixtures/accounts';
 import { Modal } from '../components/modals/Modal';
 import { PreviewModal } from '../components/modals/PreviewModal';
 import modalStyles from '../components/modals/modals.module.scss';
@@ -40,9 +41,11 @@ async function previewRow(user: ReturnType<typeof userEvent.setup>, rowName: str
   await user.click(within(await rowMenu(user, rowName)).getByRole('menuitem', { name: 'Preview file' }));
 }
 
+const account = accountApi(demo); // a guest's workspace
+
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.mocked(api.storageMode).mockResolvedValue('saved');
+  vi.mocked(api.storageMode).mockResolvedValue('demo');
   vi.mocked(api.download).mockResolvedValue();
   vi.mocked(api.list).mockResolvedValue([clean, invalid, result]);
   vi.mocked(api.rows).mockResolvedValue({ headers: ['batch_id'], rows: [], offset: 0, totalRows: 0, generatedColumns: [], problems: { total: 0, items: [] } });
@@ -50,7 +53,7 @@ beforeEach(() => {
 
 async function setup() {
   const user = userEvent.setup();
-  render(<FilesPage />);
+  render(<FilesPage account={account} />);
   await screen.findByRole('checkbox', { name: 'Select clean clean.csv' });
   return user;
 }
@@ -155,7 +158,7 @@ describe('input selection and status filtering', () => {
     const archivedLate: FileMeta = { ...clean, id: 'al', name: 'y_late.csv', archived: true, archivedAt: '2026-11-08T09:00:00Z' };
     vi.mocked(api.list).mockResolvedValue([older, newer, middle, archivedEarly, archivedLate]);
     const user = userEvent.setup();
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     await screen.findByRole('checkbox', { name: 'Select older b_older.csv' });
     const order = () => screen.getAllByRole('checkbox', { name: /^Select (?!all)/ }).map((c) => c.getAttribute('aria-label')!.replace(/^Select \S+ /, ''));
     const sortBy = () => screen.getByRole('combobox', { name: 'Sort by' });
@@ -361,7 +364,7 @@ describe('mapping dialog', () => {
     vi.mocked(api.upload).mockResolvedValueOnce(needsMapping('first')).mockResolvedValueOnce(needsMapping('second'));
     await upload(user, 'first.csv', 'second.csv');
     expect(await screen.findByRole('dialog', { name: 'Map columns: first.csv' })).toBeInTheDocument();
-    expect(screen.getByRole('status', behindDialog)).toHaveTextContent('2 files need their columns mapped; use Map columns on each.');
+    expect(pageStatus(behindDialog)).toHaveTextContent('2 files need their columns mapped; use Map columns on each.');
   });
 
   it('offers Map columns only for an unarchived input that has a mapping, and opens the dialog from it', async () => {
@@ -392,7 +395,7 @@ describe('mapping dialog', () => {
     await user.click(await within(open).findByRole('button', { name: 'Confirm mapping' }).then(async (b) => { await waitFor(() => expect(b).toBeEnabled()); return b; }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(api.confirmMapping).toHaveBeenCalledWith(expect.objectContaining({ fileId: 'mapme', units: { massKg: 'kg', r32: '%', r125: '%', r134a: '%' } }));
-    expect(screen.getByRole('status')).toHaveTextContent('mapme.csv is ready for processing.');
+    expect(pageStatus()).toHaveTextContent('mapme.csv is ready for processing.');
     expect(api.list).toHaveBeenCalledTimes(2); // initial load + refresh after the confirm
   });
 });
@@ -447,7 +450,7 @@ describe('data quality warning', () => {
     vi.mocked(api.process).mockResolvedValue(result);
     const user = await warnMixedMass();
     await user.dblClick(within(warning()).getByRole('button', { name: 'Process Valid Rows' }));
-    await screen.findByRole('status');
+    await findPageStatus();
     expect(api.process).toHaveBeenCalledTimes(2);
     expect(api.process).toHaveBeenNthCalledWith(1, 'clean', 'mass');
     expect(api.process).toHaveBeenNthCalledWith(2, 'invalid', 'mass');
@@ -574,7 +577,7 @@ describe('replacing an existing result', () => {
     await screen.findByRole('dialog', { name: 'Replace existing result?' });
     expect(dialog()).toHaveTextContent('Composition Validation has already been run for file clean. Running it again will replace the existing result clean-V.');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('status', behindDialog)).toHaveTextContent('Processed 1 file.');
+    expect(pageStatus(behindDialog)).toHaveTextContent('Processed 1 file.');
     // clean stays selected for the replace. The list now shows only today's results (9.13), so read the
     // selection from the processing panel, which names the selected input.
     expect(screen.getByTitle('clean · clean.csv')).toHaveTextContent('Input: clean · clean.csv');
@@ -669,7 +672,7 @@ describe('archive and restore', () => {
   const tab = (name: RegExp) => screen.getByRole('tab', { name });
   const bar = () => screen.getByRole('toolbar', { name: 'Selected files' });
   const barButton = (name: RegExp) => within(bar()).getByRole('button', { name });
-  const toast = () => screen.getByRole('status');
+  const toast = () => pageStatus();
   const openMenu = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
     await user.click(screen.getByRole('button', { name: withId('Actions for', name) }));
     return screen.getByRole('menu', { name: withId('Actions for', name) });
@@ -701,7 +704,7 @@ describe('archive and restore', () => {
     await user.click(barButton(/^Archive 2 files$/));
 
     expect(api.archive).toHaveBeenCalledWith(['invalid', 'result'], true);
-    expect(await screen.findByRole('status')).toHaveTextContent('2 files archived');
+    expect(await findPageStatus()).toHaveTextContent('2 files archived');
     expect(toast()).toHaveTextContent('Moved out of Active Files.');
     expect(screen.queryByRole('checkbox', { name: 'Select invalid invalid.csv' })).not.toBeInTheDocument();
     expect(tab(/Archived/)).toHaveTextContent('Archived2');
@@ -723,28 +726,28 @@ describe('archive and restore', () => {
     await user.click(check('clean.csv'));
     vi.mocked(api.archive).mockResolvedValueOnce([archived(clean)]);
     await user.click(barButton(/^Archive 1 file$/));
-    await screen.findByRole('status');
+    await findPageStatus();
     vi.mocked(api.archive).mockResolvedValueOnce([clean]);
     await user.click(within(toast()).getByRole('button', { name: 'Undo' }));
     expect(api.archive).toHaveBeenLastCalledWith(['clean'], false);
     await waitFor(() => expect(toast()).toHaveTextContent('1 file restored'));
     expect(within(toast()).queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument(); // an undo cannot be undone
     await user.click(within(toast()).getByRole('button', { name: 'Dismiss notification' }));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(queryPageStatus()).not.toBeInTheDocument();
   });
 
   it('hides the toast on its own after a few seconds', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      render(<FilesPage />);
+      render(<FilesPage account={account} />);
       await screen.findByRole('checkbox', { name: 'Select clean clean.csv' });
       await user.click(check('clean.csv'));
       vi.mocked(api.archive).mockResolvedValueOnce([archived(clean)]);
       await user.click(barButton(/^Archive 1 file$/));
-      await screen.findByRole('status');
+      await findPageStatus();
       await act(async () => { vi.advanceTimersByTime(8000); });
-      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(queryPageStatus()).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -764,7 +767,7 @@ describe('archive and restore', () => {
     menu = await openMenu(user, 'invalid.csv');
     await user.click(within(menu).getByRole('menuitem', { name: 'Restore file' }));
     expect(api.archive).toHaveBeenCalledWith(['invalid'], false);
-    expect(await screen.findByRole('status')).toHaveTextContent('1 file restored');
+    expect(await findPageStatus()).toHaveTextContent('1 file restored');
     expect(toast()).toHaveTextContent('Back in Active Files.');
     expect(screen.queryByRole('checkbox', { name: 'Select invalid invalid.csv' })).not.toBeInTheDocument();
     await user.click(tab(/Active Files/));
@@ -840,7 +843,7 @@ describe('archive and restore', () => {
     vi.mocked(api.archive).mockRejectedValueOnce(new Error('File not found'));
     await user.click(barButton(/^Archive/));
     expect(await screen.findByRole('alert')).toHaveTextContent('Archive failed: File not found');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(queryPageStatus()).not.toBeInTheDocument();
     expect(check('clean.csv')).toBeChecked();
     expect(barButton(/^Archive 1 file$/)).toBeEnabled();
   });
@@ -984,7 +987,7 @@ describe('file IDs', () => {
   async function open() {
     vi.mocked(api.list).mockResolvedValue([input, twin, inputV, inputM, imported, archived]);
     const user = userEvent.setup();
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     await screen.findByRole('checkbox', { name: 'Select 101010 data.csv' });
     return user;
   }
@@ -1053,7 +1056,7 @@ describe('file IDs', () => {
     const claimed: FileMeta = { ...imported, id: '101015-V', name: 'edited_copy.csv', processor: 'validation', importedFrom: '101011' };
     vi.mocked(api.list).mockResolvedValue([input, twin, linked, claimed, imported]);
     const user = userEvent.setup();
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     await screen.findByRole('checkbox', { name: 'Select 101010 data.csv' });
     const marker = (id: string) => within(screen.getByRole('row', { name: new RegExp(id) })).getByText('Imported');
     expect(marker('101014-V')).toHaveAttribute('title', 'Uploaded result file, linked to original input 101010.');
@@ -1123,7 +1126,7 @@ describe('file identity regression', () => {
   async function open() {
     vi.mocked(api.list).mockResolvedValue([inputA, inputB, resultA, resultB]);
     const user = userEvent.setup();
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     await screen.findByRole('checkbox', { name: 'Select 101010 data.csv' });
     return user;
   }
@@ -1341,9 +1344,9 @@ describe('preview', () => {
 describe('browser storage notice and Clear my data', () => {
   const clearButton = (options = {}) => screen.getByRole('button', { name: 'Clear my data', ...options });
 
-  it('says files are kept only in this browser', async () => {
+  it('says demo files are temporary', async () => {
     await setup();
-    expect(await screen.findByText('Files are kept only in this browser. Clearing your browser data removes them.')).toBeInTheDocument();
+    expect(await screen.findByText("Demo files are temporary. They're discarded when you sign out.")).toBeInTheDocument();
   });
 
   it('says files will be lost on refresh when the browser is not saving them', async () => {
@@ -1357,7 +1360,7 @@ describe('browser storage notice and Clear my data', () => {
     clearButton().focus();
     await user.keyboard('{Enter}');
     const dialog = await screen.findByRole('dialog', { name: 'Clear my data?' });
-    expect(dialog).toHaveTextContent("This deletes every file you uploaded and every result in this browser. The five sample files come back. This can't be undone.");
+    expect(dialog).toHaveTextContent("This deletes every file you uploaded and every result in this demo. The five sample files come back. This can't be undone.");
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(clearButton()).toHaveFocus();
@@ -1375,7 +1378,7 @@ describe('browser storage notice and Clear my data', () => {
     vi.mocked(api.list).mockResolvedValue([invalid]);
     await user.click(clearButton());
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Clear my data' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Your data was cleared. The five sample files are back.');
+    expect(await findPageStatus()).toHaveTextContent('Your data was cleared. The five sample files are back.');
     expect(api.clearData).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('row', { name: /clean\.csv/ })).not.toBeInTheDocument();
     expect(check('invalid.csv')).not.toBeChecked();
@@ -1505,7 +1508,7 @@ describe('comparing results', () => {
     const many = Array.from({ length: 6 }, (_, i) => val(`v${i}`, `result_extra_${i}_validation.csv`));
     vi.mocked(api.list).mockResolvedValue(many);
     const user = userEvent.setup();
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     await screen.findByRole('checkbox', { name: withId('Select', many[0].name) });
     await user.click(screen.getByRole('checkbox', { name: 'Select all files' }));
     expect(compareButton()).toHaveAccessibleDescription('Compare up to 5 results at a time.');
@@ -1671,7 +1674,7 @@ describe('comparing results', () => {
       vi.mocked(freshApi.list).mockResolvedValue([clean, invalid, result, valA, valB]);
       vi.mocked(freshApi.compare).mockResolvedValue(comparison);
       const user = userEvent.setup();
-      render(<FreshFilesPage />);
+      render(<FreshFilesPage account={account} />);
       await user.click(await screen.findByRole('checkbox', { name: withId('Select', valA.name) }));
       await user.click(check(valB.name));
       await user.click(compareButton());
@@ -1691,13 +1694,13 @@ describe('comparing results', () => {
     const madeB: FileMeta = { ...valB, uploadedAt: new Date().toISOString() };
     vi.mocked(api.list).mockResolvedValue([inputA, inputB, madeA, madeB]);
     const user = userEvent.setup();
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     await screen.findByRole('checkbox', { name: 'Select in-a a.csv' });
     vi.mocked(api.process).mockResolvedValueOnce(madeA).mockResolvedValueOnce(madeB);
     await user.click(check('a.csv'));
     await user.click(check('b.csv'));
     await user.click(screen.getByRole('button', { name: 'Run Processing (2)' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Processed 2 files. Their results are selected, so you can compare them.');
+    expect(await findPageStatus()).toHaveTextContent('Processed 2 files. Their results are selected, so you can compare them.');
     expect(check(valA.name)).toBeChecked();
     expect(check(valB.name)).toBeChecked();
     expect(compareButton()).toBeEnabled();
@@ -1726,7 +1729,7 @@ describe('request ordering', () => {
     // Uploaded just now, so the list's filter to today's originals after an upload (9.12) shows it.
     const added: FileMeta = { ...clean, id: 'added', name: 'added.csv', uploadedAt: new Date().toISOString() };
     const user = userEvent.setup();
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     await user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, [new File(['a'], 'added.csv')]);
     await act(async () => second.resolve([clean, added])); // the upload's refresh answers first
     expect(await screen.findByRole('checkbox', { name: 'Select added added.csv' })).toBeInTheDocument();
@@ -1742,7 +1745,7 @@ describe('request ordering', () => {
     vi.mocked(api.list).mockReturnValueOnce(first.promise).mockResolvedValueOnce([{ ...clean, uploadedAt: new Date().toISOString() }]);
     vi.mocked(api.upload).mockResolvedValue(clean);
     const user = userEvent.setup();
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     await user.upload(document.querySelector<HTMLInputElement>('input[type="file"]')!, [new File(['a'], 'clean.csv')]);
     expect(await screen.findByRole('checkbox', { name: 'Select clean clean.csv' })).toBeInTheDocument();
     await act(async () => first.reject(new Error('Network error')));
@@ -1796,7 +1799,7 @@ describe('request ordering', () => {
     await user.click(check('result.csv'));
     vi.mocked(api.archive).mockResolvedValue([{ ...result, archived: true }]);
     await user.click(within(screen.getByRole('toolbar', { name: 'Selected files' })).getByRole('button', { name: /^Archive/ }));
-    const toast = await screen.findByRole('status');
+    const toast = await findPageStatus();
     const undo = () => within(toast).getByRole('button', { name: 'Undo' });
     expect(undo()).toBeEnabled();
 
@@ -1817,7 +1820,7 @@ describe('first load', () => {
   it('says the files are loading until the list arrives', async () => {
     let answer!: (list: FileMeta[]) => void;
     vi.mocked(api.list).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
 
     expect(screen.getByText('Loading files…')).toBeInTheDocument();
     expect(screen.queryByText('No CSV files match your filters.')).not.toBeInTheDocument();
@@ -1831,7 +1834,7 @@ describe('first load', () => {
   it('shows the error banner and stops loading when the list fails', async () => {
     let fail!: (error: Error) => void;
     vi.mocked(api.list).mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     expect(screen.getByText('Loading files…')).toBeInTheDocument();
 
     await act(async () => fail(new Error('Server unavailable')));
@@ -1849,7 +1852,6 @@ describe('layout at phone width', () => {
     const upload = within(main).getByRole('button', { name: 'browse files' });
     // DOCUMENT_POSITION_FOLLOWING: the upload control comes after the heading, so reading and Tab order start at the title.
     expect(heading.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(screen.getByRole('navigation', { name: 'Pages' })).getByRole('link', { name: /CSV Generator/ })).toHaveAttribute('href', '/generator');
   });
 
   it('pins the checkbox and Actions columns while the table scrolls sideways', async () => {
@@ -1923,7 +1925,7 @@ describe('workspace navigation (17.9)', () => {
 
   it('applies #results from the address on load', async () => {
     window.history.pushState({}, '', '/#results');
-    render(<FilesPage />);
+    render(<FilesPage account={account} />);
     await screen.findByRole('row', { name: /result.csv/ });
     await waitFor(() => expect(statusFilter()).toHaveDisplayValue('Processed'));
   });

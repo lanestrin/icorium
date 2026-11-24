@@ -9,7 +9,9 @@ import { SAMPLE_FILES } from './samples';
 // except the browser's download plumbing, which jsdom lacks.
 
 let databases = 0;
-const freshApi = () => createApi(() => openWorkspace(`api-test-${++databases}`));
+/** File actions over a demo workspace kept in the named database. */
+const demoApi = (name: string) => createApi(() => openWorkspace(name), undefined, { kind: 'demo', sessionId: 'session' });
+const freshApi = () => demoApi(`api-test-${++databases}`);
 const sample = (name: string) => SAMPLE_FILES.find((f) => f.name === name)!.text;
 const csvFile = (name: string, text: string) => new File([text], name, { type: 'text/csv' });
 
@@ -27,7 +29,7 @@ describe('browser API', () => {
       ['100004', 'partner_b_followup.csv'],
       ['100005', 'partner_c_baseline.csv'],
     ]);
-    expect(await api.storageMode()).toBe('saved');
+    expect(await api.storageMode()).toBe('demo');
   });
 
   it('uploads a CSV as the next File ID, and refuses a large or non-CSV file', async () => {
@@ -120,16 +122,16 @@ describe('browser API', () => {
       request.onupgradeneeded = () => { request.result.createObjectStore('meta', { keyPath: 'id' }); request.result.createObjectStore('files'); };
       request.onsuccess = () => resolve(request.result);
     });
-    const blockedApi = createApi(() => openWorkspace(name));
+    const blockedApi = demoApi(name);
     await expect(blockedApi.list()).rejects.toThrow(UPGRADE_BLOCKED_MESSAGE);
     oldTab.close();
     expect(await blockedApi.list()).toHaveLength(5);
-    expect(await blockedApi.storageMode()).toBe('saved');
+    expect(await blockedApi.storageMode()).toBe('demo');
   });
 
   it('keeps files in memory, and says so, when the browser will not open IndexedDB', async () => {
     vi.spyOn(indexedDB, 'open').mockImplementation(() => { throw new DOMException('Storage disabled', 'SecurityError'); });
-    const memoryApi = createApi(() => openWorkspace('blocked'));
+    const memoryApi = demoApi('blocked');
     expect(await memoryApi.storageMode()).toBe('memory');
     expect(await memoryApi.list()).toHaveLength(5);
     expect((await memoryApi.upload(csvFile('mine.csv', sample('partner_a_baseline.csv')))).id).toBe('100006');

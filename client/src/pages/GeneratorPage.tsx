@@ -15,7 +15,7 @@ import { WORKSPACE_CHANGED_MESSAGE } from '../lib/workspace';
 import { errorMessage, plural } from '../lib/format';
 import { flaggedRows, withCsv } from '../lib/generated-files';
 import { AppShell } from '../components/layout/AppShell';
-import { useAccount } from '../hooks/useAccount';
+import type { AccountApi } from '../components/layout/AccountMenu';
 import { useWorkspace } from '../hooks/useWorkspace';
 
 const ERROR_ROWS_HELP = 'In each file. Each of these rows fails Composition Validation: missing or non-numeric mass, a negative percentage, '
@@ -32,8 +32,7 @@ function batchSummary(files: GeneratedFile[]) {
 }
 
 /** The CSV Generator (/generator): make synthetic partner CSVs, preview and download them, or add them to CSV Files. */
-export function GeneratorPage() {
-  const account = useAccount();
+export function GeneratorPage({ account }: { account: AccountApi }) {
   useWorkspace(account.account); // adds generated files to the account's workspace
   const [partner, setPartner] = useState<GeneratorPartner>('A');
   const [rows, setRows] = useState('25');

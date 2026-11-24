@@ -19,6 +19,7 @@ function fake() {
     fail: {} as Record<string, Failure | undefined>, // keyed by "op:name", e.g. "upload:.original" or "insert:files"
     blind: 0, // the next N reads and updates see no rows, as when another device writes in between
     inactive: false, // updates match no row
+    active: true as unknown, // what is_active_account() answers
   };
   const failure = (key: string) => {
     const hit = Object.entries(state.fail).find(([k, v]) => v && key.includes(k));
@@ -107,6 +108,7 @@ function fake() {
       if (failed instanceof Error) throw failed;
       if (failed) return rejected(failed);
       if (name === 'allocate_file_id') return { data: String(++state.counter), error: null };
+      if (name === 'is_active_account') return { data: state.active, error: null };
       return { data: state.room, error: null };
     },
   } as unknown as SupabaseClient;
@@ -374,5 +376,31 @@ describe('supplier profiles', () => {
     await store.saveProfile(profile);
     expect(f.tables.supplier_profiles).toHaveLength(1);
     expect(f.tables.supplier_profiles[0].profile).toMatchObject({ name: 'Supplier' });
+  });
+});
+
+describe('an empty list', () => {
+  it('is reported as empty only after the database says the account is active, with one call', async () => {
+    expect(await store.list()).toEqual([]);
+    expect(f.log.filter((l) => l.startsWith('rpc:'))).toEqual(['rpc:is_active_account']);
+  });
+
+  it('is the inactive message for an account deactivated mid-session (F-73)', async () => {
+    f.state.active = false;
+    await expect(store.list()).rejects.toMatchObject({ statusCode: 403, message: INACTIVE_MESSAGE });
+  });
+
+  it('is unavailable when the account cannot be checked', async () => {
+    f.state.fail['rpc:is_active_account'] = { message: 'down', status: 503 };
+    await expect(store.list()).rejects.toMatchObject({ statusCode: 503, message: UNAVAILABLE_FILES_MESSAGE });
+    f.state.fail['rpc:is_active_account'] = new TypeError('Failed to fetch');
+    await expect(store.list()).rejects.toMatchObject({ statusCode: 503 });
+  });
+
+  it('makes no extra call when there are files', async () => {
+    await store.create(upload());
+    f.log.length = 0;
+    expect(await store.list()).toHaveLength(1);
+    expect(f.log).not.toContain('rpc:is_active_account');
   });
 });
